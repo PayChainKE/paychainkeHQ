@@ -73,9 +73,9 @@ const computeRiskSignals = (merchant, agg) => {
   if (!merchant.kraPin || !merchant.isKRAVerified) {
     signals.push({ id: 'no_kra', label: 'KRA not verified', severity: 'medium' });
   }
-  if (!merchant.stellarPublicKey) {
-    signals.push({ id: 'no_wallet', label: 'No wallet', severity: 'low' });
-  }
+  // No "no_wallet" signal — the digital wallet feature is on hold
+  // platform-wide (only ever enabled for the demo account), so every real
+  // merchant would trip this and it stopped being a meaningful signal.
 
   // Velocity / pattern signals.
   if (ageDays < 7 && txn30 > 50) {
@@ -2229,6 +2229,60 @@ export const getInsights = async (req, res) => {
       { $limit: 6 },
     ]);
 
+    // ── Payout & collection rail health ───────────────────────────────
+    // Success/failure reliability per settlement rail — an operational
+    // signal distinct from GTV (how much money moved) or merchant health
+    // (who's active): whether the rails actually deliver when a merchant
+    // or their customer tries to use them. 'pending' rows are shown but
+    // excluded from the success-rate denominator (neither a success nor a
+    // failure yet). STK/QR come from STKRequest (collections); everything
+    // else is a Transaction type (payouts/bill payments).
+    const RAIL_TXN_TYPES = {
+      ncba_mobile_b2w:    'Mobile Money Payout',
+      ncba_outbound:      'Bank Transfer (PesaLink)',
+      mpesa_b2c:          'M-Pesa Withdrawal',
+      ncba_lipa_na_mpesa: 'Paybill/Till Payout',
+      ncba_kplc:          'KPLC Postpaid',
+      ncba_kplc_prepaid:  'KPLC Prepaid',
+      ncba_ncwsc:         'NCWSC Water',
+    };
+    const [railTxnAgg, railStkAgg] = await Promise.all([
+      Transaction.aggregate([
+        { $match: { createdAt: { $gte: txnSince }, type: { $in: Object.keys(RAIL_TXN_TYPES) }, ...excludeDemo, ...excludeReversed } },
+        { $group: { _id: { type: '$type', status: '$status' }, count: { $sum: 1 } } },
+      ]),
+      STKRequest.aggregate([
+        { $match: { createdAt: { $gte: txnSince }, ...excludeDemo } },
+        { $group: { _id: { channel: '$channel', status: '$status' }, count: { $sum: 1 } } },
+      ]),
+    ]);
+
+    const railBuckets = new Map(); // rail label -> { succeeded, failed, pending }
+    const bump = (label, status, count) => {
+      const b = railBuckets.get(label) || { succeeded: 0, failed: 0, pending: 0 };
+      if (status === 'completed' || status === 'verified' || status === 'success') b.succeeded += count;
+      else if (status === 'failed') b.failed += count;
+      else b.pending += count;
+      railBuckets.set(label, b);
+    };
+    railTxnAgg.forEach((r) => bump(RAIL_TXN_TYPES[r._id.type] || r._id.type, r._id.status, r.count));
+    railStkAgg.forEach((r) => bump(r._id.channel === 'qr' ? 'QR Code Collection' : 'STK Push Collection', r._id.status, r.count));
+
+    const railHealth = Array.from(railBuckets.entries())
+      .map(([rail, b]) => {
+        const resolved = b.succeeded + b.failed;
+        return {
+          rail,
+          succeeded: b.succeeded,
+          failed: b.failed,
+          pending: b.pending,
+          total: b.succeeded + b.failed + b.pending,
+          successRate: resolved > 0 ? Number(((b.succeeded / resolved) * 100).toFixed(1)) : null,
+        };
+      })
+      .filter((r) => r.total > 0)
+      .sort((a, b) => b.total - a.total);
+
     res.json({
       success: true,
       data: {
@@ -2292,6 +2346,7 @@ export const getInsights = async (req, res) => {
         topMerchants,
         txnTypeMix: txnTypeMix.map((r) => ({ type: r._id || 'other', count: r.count, volume: r.volume })),
         businessTypes: businessTypes.map((r) => ({ type: r._id || 'Unknown', count: r.count })),
+        railHealth,
       },
     });
   } catch (error) {
@@ -2352,6 +2407,11 @@ export const getMerchantAnalytics = async (req, res) => {
     ]);
     const totalUsdcLocked = usdcAggregation.length > 0 ? usdcAggregation[0].totalUsdc : 0;
 
+    // Locked count — powers the Overview page's merchant-health composition
+    // (Active / Verified-but-Inactive / Pending KYC / Locked), same
+    // countDocuments({ status: 'locked' }) getSystemStatus already uses.
+    const lockedMerchants = await Merchant.countDocuments({ ...notDemo, status: 'locked' });
+
     res.json({
       success: true,
       data: {
@@ -2361,7 +2421,8 @@ export const getMerchantAnalytics = async (req, res) => {
         recentMerchants,
         activeMerchants30d,
         activeWallets,
-        totalUsdcLocked
+        totalUsdcLocked,
+        lockedMerchants
       }
     });
   } catch (error) {

@@ -638,6 +638,16 @@ export default function Transactions() {
   const txSign = (tx) => getAmountSign(tx.type)
   const txAmountColor = (tx) => getAmountColorClass(tx.type)
 
+  // 'failed' used to render with the same amber dot as 'pending' — visually
+  // indistinguishable from a payout still in flight. A failed row is always
+  // refunded in full (see bulkPayController.js/mpesaController.js), so it
+  // needs to read as unambiguously over, not still-processing.
+  const txStatusMeta = (status) => {
+    if (status === 'verified' || status === 'completed') return { dot: 'bg-green-500', text: 'text-emerald-600' }
+    if (status === 'failed') return { dot: 'bg-red-500', text: 'text-red-600' }
+    return { dot: 'bg-amber-500', text: 'text-amber-600' }
+  }
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const weekAgo = new Date(today);
@@ -776,8 +786,8 @@ export default function Transactions() {
                         </td>
                         <td className="px-6 py-2">
                           <div className="flex items-center gap-1.5">
-                            <div className={`w-1.5 h-1.5 rounded-full ${tx.status === 'verified' || tx.status === 'completed' ? 'bg-green-500' : 'bg-amber-500'}`}></div>
-                            <span className="text-[11px] font-semibold capitalize">{tx.status}</span>
+                            <div className={`w-1.5 h-1.5 rounded-full ${txStatusMeta(tx.status).dot}`}></div>
+                            <span className={`text-[11px] font-semibold capitalize ${tx.status === 'failed' ? txStatusMeta(tx.status).text : ''}`}>{tx.status === 'failed' ? 'Failed & Refunded' : tx.status}</span>
                           </div>
                         </td>
                       </tr>
@@ -827,12 +837,8 @@ export default function Transactions() {
 
                   {/* Status */}
                   <div className="flex items-center justify-between mt-2 pt-2 border-t border-outline-variant/5">
-                    <span className={`text-[9px] font-black uppercase tracking-[0.3em] ${
-                      tx.status === 'verified' || tx.status === 'completed' 
-                        ? 'text-emerald-600' 
-                        : 'text-amber-600'
-                    }`}>
-                      {tx.status}
+                    <span className={`text-[9px] font-black uppercase tracking-[0.3em] ${txStatusMeta(tx.status).text}`}>
+                      {tx.status === 'failed' ? 'Failed & Refunded' : tx.status}
                     </span>
                     <span className="material-symbols-outlined text-primary/20 text-lg">arrow_forward</span>
                   </div>
@@ -912,17 +918,20 @@ export default function Transactions() {
                   {/* Settlement Section */}
                   <div className="space-y-3">
                     <p className="text-[10px] text-on-surface-variant/60 font-bold uppercase tracking-[0.2em]">Settlement</p>
-                    <p className={`text-3xl lg:text-4xl font-headline tabular-nums transition-all duration-300 ${!showAmounts && 'blur-lg'} ${getAmountColorClass(selectedTx.type)}`}>
+                    <p className={`text-3xl lg:text-4xl font-headline tabular-nums transition-all duration-300 ${!showAmounts && 'blur-lg'} ${selectedTx.status === 'failed' ? 'text-on-surface-variant/40 line-through' : getAmountColorClass(selectedTx.type)}`}>
                       {getAmountSign(selectedTx.type)}{selectedTx.type === 'fx_swap' ? formatUSDC(selectedTx.usdcAmount) : formatKES(selectedTx.amount || selectedTx.kesAmount || 0)}
                     </p>
+                    {selectedTx.status === 'failed' && (
+                      <p className="text-[11px] font-bold text-red-600">This payout failed and the full amount was refunded to your balance.</p>
+                    )}
                   </div>
 
                   {/* Network Status Section */}
                   <div className="space-y-3 pt-6 border-t border-outline-variant/5">
                     <p className="text-[10px] text-on-surface-variant/60 font-bold uppercase tracking-[0.2em]">Network Status</p>
-                    <div className="inline-flex items-center gap-2.5 px-3 py-1.5 rounded-none bg-emerald-500/10 border border-emerald-500/20 text-emerald-700">
-                      <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                      <p className="text-[11px] font-black uppercase tracking-widest">{selectedTx.status}</p>
+                    <div className={`inline-flex items-center gap-2.5 px-3 py-1.5 rounded-none border ${selectedTx.status === 'failed' ? 'bg-red-500/10 border-red-500/20 text-red-700' : selectedTx.status === 'completed' || selectedTx.status === 'verified' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-700' : 'bg-amber-500/10 border-amber-500/20 text-amber-700'}`}>
+                      <div className={`w-2 h-2 rounded-full animate-pulse ${selectedTx.status === 'failed' ? 'bg-red-500' : selectedTx.status === 'completed' || selectedTx.status === 'verified' ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
+                      <p className="text-[11px] font-black uppercase tracking-widest">{selectedTx.status === 'failed' ? 'Failed & Refunded' : selectedTx.status}</p>
                     </div>
                   </div>
 

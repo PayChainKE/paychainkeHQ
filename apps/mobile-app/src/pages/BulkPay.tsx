@@ -12,6 +12,7 @@ import { ValidatedTextInput } from '../components/ValidatedTextInput';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/config';
 import TopBar from '../components/layout/TopBar';
+import FundAccountModal from '../components/FundAccountModal';
 import { formatAccountNumber } from '../utils/formatAccountNumber';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -55,6 +56,7 @@ interface Receipt {
   reference: string;
   timestamp: string;
   status?: string;
+  failureReason?: string | null;
 }
 
 interface BatchHistory {
@@ -158,6 +160,10 @@ export default function BulkPay() {
   const [showBatchDetails, setShowBatchDetails] = useState<BatchHistory | null>(null);
   const [showFundingSourceSelect, setShowFundingSourceSelect] = useState(false);
   const [showSecurity, setShowSecurity] = useState(false);
+  // Matches the merchant-dashboard's Liquidity "+" button in BulkPay.jsx —
+  // lets a merchant top up straight from here instead of leaving Bulk Pay
+  // to find the funding flow elsewhere.
+  const [showFundAccount, setShowFundAccount] = useState(false);
 
   // Funding source (virtual account) — mirrors the dashboard's single
   // funding-source selector, derived from the merchant's own profile (no
@@ -660,12 +666,11 @@ export default function BulkPay() {
 
   const validateNewPayee = (): string | null => {
     if (!newPayee.name.trim()) return 'Recipient name is required.';
-    if (newPayee.type === 'employee' && (!newPayee.kraPin || !newPayee.idNumber)) {
-      return 'KRA PIN and ID Number are required for employees.';
-    }
-    if (newPayee.type === 'supplier' && (!newPayee.kraPin || !newPayee.etimsInvoiceNumber || !newPayee.cuNumber)) {
-      return 'KRA PIN, eTIMS Invoice, and CU Number are required for suppliers.';
-    }
+    // Neither Employees nor Suppliers require KRA PIN/ID Number/eTIMS
+    // Invoice/CU Number — PayChain has no live KRA integration on this
+    // path, so these are optional record-keeping fields only (matches the
+    // dashboard's equivalent form and the backend, which never enforced
+    // this either since bulkPayController.js's addPayee/updatePayee).
     if (newPayee.paymentMethod === 'Mobile Money') {
       if (newPayee.mobileMoneyType === 'Personal Number' && !validatePhone(newPayee.phone)) {
         return 'Enter a valid Kenyan phone number (07XX or 01XX).';
@@ -864,6 +869,7 @@ export default function BulkPay() {
           day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
         }),
         status: tx.status || 'pending',
+        failureReason: tx.failureReason || null,
       }));
 
       setReceipts(newReceipts);
@@ -878,6 +884,20 @@ export default function BulkPay() {
       // waiting on the ambient 5s poll in AuthContext, so the balance shown
       // elsewhere in the app reflects this payout immediately.
       refreshSession();
+
+      // Surface why a row failed (e.g. below NCBA's KES 50 Mobile Money
+      // minimum) instead of leaving the merchant with just "N failed" and
+      // no way to tell why — matches the dashboard's equivalent summary.
+      const failedReceipts = newReceipts.filter(r => r.status === 'failed');
+      if (failedReceipts.length > 0) {
+        const distinctReasons = [...new Set(failedReceipts.map(r => r.failureReason).filter(Boolean))];
+        if (distinctReasons.length > 0) {
+          Alert.alert(
+            failedReceipts.length === newReceipts.length ? 'Batch Failed' : 'Batch Partially Processed',
+            `${failedReceipts.length} of ${newReceipts.length} payout${newReceipts.length === 1 ? '' : 's'} failed and ${failedReceipts.length === 1 ? 'was' : 'were'} refunded.\n\n${distinctReasons.join('\n')}`
+          );
+        }
+      }
     } catch (e: any) {
       Alert.alert('Authorization failed', e?.response?.data?.message || 'Could not process batch.');
       // Allow retry for PIN if it fails, matching the dashboard's behavior.
@@ -999,7 +1019,22 @@ export default function BulkPay() {
 
   return (
     <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
-      <TopBar title="Bulk Payments" subtitle={`Balance: ${formatKES(balance)}`} showBack={false} />
+      <TopBar title="Bulk Payments" showBack={false} />
+
+      {/* Liquidity */}
+      <View className="w-full max-w-lg mx-auto px-6 mt-3 flex-row items-center justify-between">
+        <View>
+          <Text className="text-[9px] font-jakarta-bold text-[#707971] uppercase tracking-[0.15em] mb-0.5">Liquidity</Text>
+          <Text className="font-jakarta-bold text-[16px] text-[#0c2010]">{formatKES(balance)}</Text>
+        </View>
+        <TouchableOpacity
+          onPress={() => setShowFundAccount(true)}
+          className="w-10 h-10 rounded-full bg-[#00351d] items-center justify-center shadow-sm"
+          accessibilityLabel="Fund Account"
+        >
+          <Feather name="plus" size={18} color="#ffffff" />
+        </TouchableOpacity>
+      </View>
 
       {/* Tabs */}
       <View className="w-full max-w-lg mx-auto px-6 mt-4">
@@ -1072,8 +1107,14 @@ export default function BulkPay() {
               <View className="bg-[#fef2f2] border border-[#fecaca] rounded-2xl p-3.5 mb-4 flex-row items-center gap-2">
                 <Feather name="alert-triangle" size={16} color="#b91c1c" />
                 <Text className="text-[#b91c1c] font-jakarta-bold text-[12px] flex-1" numberOfLines={2}>
-                  Batch ({formatKES(batchTotal)}) exceeds balance ({formatKES(balance)}). Top up to proceed.
+                  Batch ({formatKES(batchTotal)}) exceeds balance ({formatKES(balance)}).
                 </Text>
+                <TouchableOpacity
+                  onPress={() => setShowFundAccount(true)}
+                  className="bg-[#b91c1c] px-3 py-1.5 rounded-full"
+                >
+                  <Text className="text-white font-jakarta-bold text-[11px]">Top Up</Text>
+                </TouchableOpacity>
               </View>
             )}
 
@@ -1710,18 +1751,25 @@ export default function BulkPay() {
                   ? { color: '#b91c1c', label: 'Failed · Refunded' }
                   : { color: '#b87333', label: 'Pending' };
                 return (
-                  <View key={r.id} className="bg-[#f0fdf4] rounded-2xl p-3 mb-2 border border-[#e7ece7] flex-row items-center">
-                    <View className="w-9 h-9 rounded-full bg-white items-center justify-center mr-3 border border-[#bfc9bf]/30">
-                      <Text className="font-jakarta-bold text-[10px] text-[#404942]">{initials(r.name)}</Text>
+                  <View key={r.id} className="bg-[#f0fdf4] rounded-2xl p-3 mb-2 border border-[#e7ece7]">
+                    <View className="flex-row items-center">
+                      <View className="w-9 h-9 rounded-full bg-white items-center justify-center mr-3 border border-[#bfc9bf]/30">
+                        <Text className="font-jakarta-bold text-[10px] text-[#404942]">{initials(r.name)}</Text>
+                      </View>
+                      <View className="flex-1 min-w-0 mr-2">
+                        <Text className="font-jakarta-bold text-[13px] text-[#0c2010]" numberOfLines={1}>{r.name}</Text>
+                        <Text className="text-[#707971] font-jakarta-medium text-[10px]" numberOfLines={1}>{r.id}</Text>
+                      </View>
+                      <View className="items-end" style={{ flexShrink: 0 }}>
+                        <Text className="font-jakarta-bold text-[13px] text-[#0c2010]">{formatKES(r.amount)}</Text>
+                        <Text style={{ color: rowMeta.color }} className="text-[9px] font-jakarta-bold uppercase tracking-wider mt-0.5">{rowMeta.label}</Text>
+                      </View>
                     </View>
-                    <View className="flex-1 min-w-0 mr-2">
-                      <Text className="font-jakarta-bold text-[13px] text-[#0c2010]" numberOfLines={1}>{r.name}</Text>
-                      <Text className="text-[#707971] font-jakarta-medium text-[10px]" numberOfLines={1}>{r.id}</Text>
-                    </View>
-                    <View className="items-end" style={{ flexShrink: 0 }}>
-                      <Text className="font-jakarta-bold text-[13px] text-[#0c2010]">{formatKES(r.amount)}</Text>
-                      <Text style={{ color: rowMeta.color }} className="text-[9px] font-jakarta-bold uppercase tracking-wider mt-0.5">{rowMeta.label}</Text>
-                    </View>
+                    {r.status === 'failed' && r.failureReason && (
+                      <View className="bg-[#fef2f2] rounded-xl px-3 py-2 mt-2 border border-[#fecaca]">
+                        <Text className="text-[10px] font-jakarta-semibold text-[#b91c1c]">{r.failureReason}</Text>
+                      </View>
+                    )}
                   </View>
                 );
               })}
@@ -1780,20 +1828,27 @@ export default function BulkPay() {
                     const rowStatus = tx.status || 'pending';
                     const meta = BATCH_STATUS_META[rowStatus === 'completed' ? 'Processed' : rowStatus === 'failed' ? 'Failed' : 'Pending'];
                     return (
-                      <View key={tx.receiptNumber || idx} className="bg-[#f0fdf4] rounded-2xl p-3 mb-2 border border-[#e7ece7] flex-row items-center">
-                        <View className="w-9 h-9 rounded-full bg-white items-center justify-center mr-3 border border-[#bfc9bf]/30">
-                          <Text className="font-jakarta-bold text-[10px] text-[#404942]">{initials(tx.name)}</Text>
-                        </View>
-                        <View className="flex-1 min-w-0 mr-2">
-                          <Text className="font-jakarta-bold text-[13px] text-[#0c2010]" numberOfLines={1}>{tx.name}</Text>
-                          <Text className="text-[#707971] font-jakarta-medium text-[10px]" numberOfLines={1}>{tx.accountReference}</Text>
-                        </View>
-                        <View className="items-end" style={{ flexShrink: 0 }}>
-                          <Text className="font-jakarta-bold text-[13px] text-[#0c2010]">{formatKES(tx.amount)}</Text>
-                          <View style={{ backgroundColor: meta.bg }} className="px-2 py-0.5 rounded-full mt-1">
-                            <Text style={{ color: meta.text }} className="text-[8px] font-jakarta-bold uppercase tracking-wider">{rowStatus}</Text>
+                      <View key={tx.receiptNumber || idx} className="bg-[#f0fdf4] rounded-2xl p-3 mb-2 border border-[#e7ece7]">
+                        <View className="flex-row items-center">
+                          <View className="w-9 h-9 rounded-full bg-white items-center justify-center mr-3 border border-[#bfc9bf]/30">
+                            <Text className="font-jakarta-bold text-[10px] text-[#404942]">{initials(tx.name)}</Text>
+                          </View>
+                          <View className="flex-1 min-w-0 mr-2">
+                            <Text className="font-jakarta-bold text-[13px] text-[#0c2010]" numberOfLines={1}>{tx.name}</Text>
+                            <Text className="text-[#707971] font-jakarta-medium text-[10px]" numberOfLines={1}>{tx.accountReference}</Text>
+                          </View>
+                          <View className="items-end" style={{ flexShrink: 0 }}>
+                            <Text className="font-jakarta-bold text-[13px] text-[#0c2010]">{formatKES(tx.amount)}</Text>
+                            <View style={{ backgroundColor: meta.bg }} className="px-2 py-0.5 rounded-full mt-1">
+                              <Text style={{ color: meta.text }} className="text-[8px] font-jakarta-bold uppercase tracking-wider">{rowStatus}</Text>
+                            </View>
                           </View>
                         </View>
+                        {rowStatus === 'failed' && tx.failureReason && (
+                          <View className="bg-[#fef2f2] rounded-xl px-3 py-2 mt-2 border border-[#fecaca]">
+                            <Text className="text-[10px] font-jakarta-semibold text-[#b91c1c]">{tx.failureReason}</Text>
+                          </View>
+                        )}
                       </View>
                     );
                   })}
@@ -1869,8 +1924,9 @@ export default function BulkPay() {
                     {/* KRA Employee fields */}
                     {newPayee.type === 'employee' && (
                       <View className="bg-[#f0fdf4] rounded-2xl p-4 mb-4 border border-[#bbf7d0]">
-                        <Text className="text-[10px] font-jakarta-bold text-[#006c4e] uppercase tracking-wider mb-3">KRA Payroll Details</Text>
-                        <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">KRA PIN *</Text>
+                        <Text className="text-[10px] font-jakarta-bold text-[#006c4e] uppercase tracking-wider mb-1">KRA Payroll Details (Optional)</Text>
+                        <Text className="text-[10px] font-jakarta-medium text-[#707971] mb-3">For your own business records.</Text>
+                        <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">KRA PIN</Text>
                         <TextInput
                           value={newPayee.kraPin}
                           onChangeText={(t) => setNewPayee({ ...newPayee, kraPin: t.toUpperCase() })}
@@ -1879,7 +1935,7 @@ export default function BulkPay() {
                           placeholderTextColor="#a1a1aa"
                           className="bg-white border border-[#e7ece7] rounded-xl px-4 py-3 text-[#0c2010] font-jakarta-bold text-[14px] mb-3"
                         />
-                        <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">ID Number *</Text>
+                        <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">ID Number</Text>
                         <TextInput
                           value={newPayee.idNumber}
                           onChangeText={(t) => setNewPayee({ ...newPayee, idNumber: t.replace(/\D/g, '') })}
@@ -1916,8 +1972,9 @@ export default function BulkPay() {
                     {/* KRA Supplier fields */}
                     {newPayee.type === 'supplier' && (
                       <View className="bg-[#eef2ff] rounded-2xl p-4 mb-4 border border-[#c7d2fe]">
-                        <Text className="text-[10px] font-jakarta-bold text-[#3730a3] uppercase tracking-wider mb-3">KRA eTIMS Details</Text>
-                        <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">Supplier KRA PIN *</Text>
+                        <Text className="text-[10px] font-jakarta-bold text-[#3730a3] uppercase tracking-wider mb-1">KRA eTIMS Details (Optional)</Text>
+                        <Text className="text-[10px] font-jakarta-medium text-[#707971] mb-3">For your own business records.</Text>
+                        <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">Supplier KRA PIN</Text>
                         <TextInput
                           value={newPayee.kraPin}
                           onChangeText={(t) => setNewPayee({ ...newPayee, kraPin: t.toUpperCase() })}
@@ -1926,7 +1983,7 @@ export default function BulkPay() {
                           placeholderTextColor="#a1a1aa"
                           className="bg-white border border-[#e7ece7] rounded-xl px-4 py-3 text-[#0c2010] font-jakarta-bold text-[14px] mb-3"
                         />
-                        <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">eTIMS Invoice *</Text>
+                        <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">eTIMS Invoice</Text>
                         <TextInput
                           value={newPayee.etimsInvoiceNumber}
                           onChangeText={(t) => setNewPayee({ ...newPayee, etimsInvoiceNumber: t })}
@@ -1934,7 +1991,7 @@ export default function BulkPay() {
                           placeholderTextColor="#a1a1aa"
                           className="bg-white border border-[#e7ece7] rounded-xl px-4 py-3 text-[#0c2010] font-jakarta-bold text-[14px] mb-3"
                         />
-                        <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">Control Unit (CU) *</Text>
+                        <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">Control Unit (CU)</Text>
                         <TextInput
                           value={newPayee.cuNumber}
                           onChangeText={(t) => setNewPayee({ ...newPayee, cuNumber: t })}
@@ -2301,6 +2358,8 @@ export default function BulkPay() {
           </View>
         </View>
       </Modal>
+
+      <FundAccountModal visible={showFundAccount} onClose={() => setShowFundAccount(false)} />
     </SafeAreaView>
   );
 }

@@ -797,7 +797,10 @@ export const getLivePoolBalance = async (req, res) => {
 // @access  Private (Admin)
 export const getReconciliations = async (req, res) => {
   try {
-    const records = await BankReconciliation.find({})
+    // Excludes rows an admin has "cleared" from this list — same convention
+    // as getRevenueSweeps. Nothing is actually deleted (see archiveReconciliation
+    // below), so this is purely a display filter.
+    const records = await BankReconciliation.find({ archived: { $ne: true } })
       .sort('-createdAt')
       .limit(52)
       .populate('checkedBy', 'email name')
@@ -827,6 +830,103 @@ export const submitReconciliation = async (req, res) => {
     res.json({ success: true, data: record });
   } catch (error) {
     console.error('Submit Reconciliation Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    "Clear" one reconciliation check from the admin's list — same
+//          reversible archive as archiveRevenueSweep above, not a real
+//          delete: the record (and any discrepancy alert it triggered)
+//          stays intact, just hidden from getReconciliations.
+// @route   PATCH /api/admin/revenue/reconciliations/:id/archive
+// @access  Private (Admin, owner/admin only)
+export const archiveReconciliation = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid reconciliation id.' });
+    }
+    const record = await BankReconciliation.findByIdAndUpdate(
+      id,
+      { $set: { archived: true, archivedAt: new Date(), archivedBy: req.admin._id } },
+      { new: true }
+    );
+    if (!record) return res.status(404).json({ error: 'Reconciliation record not found.' });
+
+    logAudit({
+      action: 'admin.reconciliation.archived', category: 'admin', severity: 'info',
+      message: `Reconciliation check ${record._id} cleared from the Pool Reconciliation list`,
+      actor: adminActor(req.admin), req,
+      metadata: { reconciliationId: String(record._id), status: record.status, difference: record.difference },
+    });
+
+    res.json({ success: true, data: record });
+  } catch (error) {
+    console.error('Archive Reconciliation Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Undo an accidental "clear" — restores a reconciliation row to the list.
+// @route   PATCH /api/admin/revenue/reconciliations/:id/unarchive
+// @access  Private (Admin, owner/admin only)
+export const unarchiveReconciliation = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid reconciliation id.' });
+    }
+    const record = await BankReconciliation.findByIdAndUpdate(
+      id,
+      { $set: { archived: false, archivedAt: null, archivedBy: null } },
+      { new: true }
+    );
+    if (!record) return res.status(404).json({ error: 'Reconciliation record not found.' });
+
+    logAudit({
+      action: 'admin.reconciliation.unarchived', category: 'admin', severity: 'info',
+      message: `Reconciliation check ${record._id} restored to the Pool Reconciliation list`,
+      actor: adminActor(req.admin), req,
+      metadata: { reconciliationId: String(record._id) },
+    });
+
+    res.json({ success: true, data: record });
+  } catch (error) {
+    console.error('Unarchive Reconciliation Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Clear multiple reconciliation checks at once — backs the "select
+//          all, then clear" bulk action in the UI. Same archive semantics
+//          as archiveReconciliation, applied to every id in one request
+//          rather than one PATCH per row.
+// @route   POST /api/admin/revenue/reconciliations/bulk-archive
+//          Body: { ids: string[] }
+// @access  Private (Admin, owner/admin only)
+export const bulkArchiveReconciliations = async (req, res) => {
+  try {
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
+    const validIds = ids.filter((id) => mongoose.Types.ObjectId.isValid(id));
+    if (!validIds.length) {
+      return res.status(400).json({ error: 'At least one valid reconciliation id is required.' });
+    }
+
+    const result = await BankReconciliation.updateMany(
+      { _id: { $in: validIds }, archived: { $ne: true } },
+      { $set: { archived: true, archivedAt: new Date(), archivedBy: req.admin._id } }
+    );
+
+    logAudit({
+      action: 'admin.reconciliation.bulk_archived', category: 'admin', severity: 'info',
+      message: `${result.modifiedCount} reconciliation check(s) cleared from the Pool Reconciliation list`,
+      actor: adminActor(req.admin), req,
+      metadata: { reconciliationIds: validIds, clearedCount: result.modifiedCount },
+    });
+
+    res.json({ success: true, clearedCount: result.modifiedCount });
+  } catch (error) {
+    console.error('Bulk Archive Reconciliations Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };

@@ -76,7 +76,7 @@ import {
 import { runWalletAudit } from '../controllers/walletAuditController.js';
 import { adminListInvoices } from '../controllers/invoiceController.js';
 import { sendSmsBroadcast, getSmsBroadcasts, deleteSmsBroadcast, clearSmsBroadcasts } from '../controllers/smsBroadcastController.js';
-import { getRevenue, getRevenueSweeps, archiveRevenueSweep, unarchiveRevenueSweep, exportRevenueSweeps, triggerRevenueSweep, getReconciliations, submitReconciliation, getExpectedPoolBalance, getLivePoolBalance } from '../controllers/revenueController.js';
+import { getRevenue, getRevenueSweeps, archiveRevenueSweep, unarchiveRevenueSweep, exportRevenueSweeps, triggerRevenueSweep, getReconciliations, submitReconciliation, archiveReconciliation, unarchiveReconciliation, bulkArchiveReconciliations, getExpectedPoolBalance, getLivePoolBalance } from '../controllers/revenueController.js';
 import { adminListStuckOpenBankingPayouts, adminResolveStuckOpenBankingPayout } from '../controllers/ncbaOpenBankingController.js';
 import { adminListCashAdvanceRequests, adminUpdateCashAdvanceRequest } from '../controllers/cashAdvanceController.js';
 import {
@@ -206,6 +206,9 @@ router.get('/revenue/pool-balance/expected', protect, excludeOfficer, getExpecte
 router.get('/revenue/pool-balance/live', protect, excludeOfficer, getLivePoolBalance);
 router.get('/revenue/reconciliations', protect, excludeOfficer, getReconciliations);
 router.post('/revenue/reconciliations', protect, requireMutator, sensitiveActionLimiter, submitReconciliation);
+router.post('/revenue/reconciliations/bulk-archive', protect, requireMutator, sensitiveActionLimiter, bulkArchiveReconciliations);
+router.patch('/revenue/reconciliations/:id/archive', protect, requireMutator, sensitiveActionLimiter, archiveReconciliation);
+router.patch('/revenue/reconciliations/:id/unarchive', protect, requireMutator, sensitiveActionLimiter, unarchiveReconciliation);
 
 // NCBA async-rail payouts stuck 'pending' past the reconciliation sweep's
 // timeout (see services/ncbaOpenBankingReconciliationService.js) — flagged

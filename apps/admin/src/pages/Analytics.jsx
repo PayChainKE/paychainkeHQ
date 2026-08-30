@@ -200,6 +200,18 @@ const Analytics = () => {
               </div>
             </div>
 
+            {/* Rail Health — operational reliability, distinct from volume */}
+            <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/20 p-6 shadow-editorial">
+              <div className="flex items-start justify-between mb-5">
+                <div>
+                  <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-1">Operational Reliability</p>
+                  <h3 className="text-lg font-bold text-on-surface tracking-tight">Payout &amp; Collection Rail Health</h3>
+                </div>
+                <span className="text-2xs text-on-surface-variant/40">Last {range === 'all' ? 'all time' : range}</span>
+              </div>
+              <RailHealthGrid rails={data.railHealth} />
+            </div>
+
             {/* Top Merchants + Signups */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               <div className="lg:col-span-7 bg-surface-container-lowest rounded-2xl border border-outline-variant/20 overflow-hidden shadow-editorial">
@@ -399,6 +411,66 @@ const FunnelCard = ({ funnel }) => {
           );
         })}
       </div>
+    </div>
+  );
+};
+
+// ── Rail Health Grid ─────────────────────────────────────────────────
+// One tile per settlement/collection rail — success rate is the headline
+// (not volume), since this section exists to answer "is the money actually
+// getting there," a distinct question from GTV. Thresholds mirror what an
+// ops team would page on: <85% is a real reliability problem, 85-95% is
+// worth watching, ≥95% is healthy. A rail with zero resolved outcomes yet
+// (only pending rows) shows "—" rather than a misleading 0%/100%.
+const RAIL_ICONS = {
+  'STK Push Collection':        'bolt',
+  'QR Code Collection':         'qr_code_2',
+  'Mobile Money Payout':        'phone_iphone',
+  'Bank Transfer (PesaLink)':   'account_balance',
+  'M-Pesa Withdrawal':          'sim_card',
+  'Paybill/Till Payout':        'storefront',
+  'KPLC Postpaid':              'bolt',
+  'KPLC Prepaid':               'flash_on',
+  'NCWSC Water':                'water_drop',
+};
+
+const rateTone = (rate) => {
+  if (rate == null) return { text: 'text-on-surface-variant/50', bar: 'bg-on-surface-variant/30', chip: 'bg-surface-container text-on-surface-variant/60' };
+  if (rate >= 95) return { text: 'text-emerald-700', bar: 'bg-emerald-500', chip: 'bg-emerald-50 text-emerald-700 border border-emerald-200' };
+  if (rate >= 85) return { text: 'text-amber-700', bar: 'bg-amber-500', chip: 'bg-amber-50 text-amber-700 border border-amber-200' };
+  return { text: 'text-red-700', bar: 'bg-red-500', chip: 'bg-red-50 text-red-700 border border-red-200' };
+};
+
+const RailHealthGrid = ({ rails }) => {
+  if (!rails || rails.length === 0) {
+    return <p className="text-sm text-on-surface-variant/50 text-center py-10">No payout or collection activity in this window yet.</p>;
+  }
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {rails.map((r) => {
+        const tone = rateTone(r.successRate);
+        return (
+          <div key={r.rail} className="border border-outline-variant/15 rounded-xl p-4 hover:border-outline-variant/30 transition-colors">
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="material-symbols-outlined text-on-surface-variant/40 text-lg shrink-0">{RAIL_ICONS[r.rail] || 'sync_alt'}</span>
+                <span className="text-xs font-bold text-on-surface tracking-tight truncate">{r.rail}</span>
+              </div>
+              <span className={`shrink-0 px-2 py-0.5 rounded-full text-2xs font-bold tabular-nums ${tone.chip}`}>
+                {r.successRate != null ? `${r.successRate}%` : '—'}
+              </span>
+            </div>
+            <div className="h-1.5 bg-surface-container-low rounded-full overflow-hidden mb-3">
+              <div className={`h-full ${tone.bar} rounded-full transition-all`} style={{ width: `${r.successRate ?? 0}%` }} />
+            </div>
+            <div className="flex items-center gap-3 text-2xs font-bold text-on-surface-variant/50">
+              <span className="text-emerald-600">{fmtNum(r.succeeded)} ok</span>
+              {r.failed > 0 && <span className="text-red-600">{fmtNum(r.failed)} failed</span>}
+              {r.pending > 0 && <span className="text-amber-600">{fmtNum(r.pending)} pending</span>}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 };

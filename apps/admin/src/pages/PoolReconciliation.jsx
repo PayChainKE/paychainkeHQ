@@ -167,6 +167,47 @@ const PoolReconciliation = () => {
     }
   }, [reportedBalance, note, showToast]);
 
+  // "Clear" one or many reconciliation checks from this list — archives
+  // them (see archiveReconciliation/bulkArchiveReconciliations,
+  // controllers/revenueController.js) rather than deleting the real
+  // record, same reversible pattern Revenue.jsx already uses for sweep
+  // history rows.
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [clearTarget, setClearTarget] = useState(null); // single row pending confirmation, or 'bulk'
+  const [clearBusy, setClearBusy] = useState(false);
+
+  const toggleSelected = useCallback((id) => {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }, []);
+
+  const toggleSelectAll = useCallback(() => {
+    setSelectedIds((prev) => (prev.length === history.length ? [] : history.map((r) => r._id)));
+  }, [history]);
+
+  const confirmClear = useCallback(async () => {
+    if (!clearTarget) return;
+    setClearBusy(true);
+    try {
+      if (clearTarget === 'bulk') {
+        const res = await api.post('/api/admin/revenue/reconciliations/bulk-archive', { ids: selectedIds });
+        const clearedCount = res.data?.clearedCount ?? selectedIds.length;
+        setHistory((prev) => prev.filter((r) => !selectedIds.includes(r._id)));
+        setSelectedIds([]);
+        showToast(`${clearedCount} reconciliation check${clearedCount === 1 ? '' : 's'} cleared from this list.`);
+      } else {
+        await api.patch(`/api/admin/revenue/reconciliations/${clearTarget._id}/archive`);
+        setHistory((prev) => prev.filter((r) => r._id !== clearTarget._id));
+        setSelectedIds((prev) => prev.filter((id) => id !== clearTarget._id));
+        showToast('Reconciliation check cleared from this list.');
+      }
+    } catch (e) {
+      showToast(e?.response?.data?.error || 'Could not clear that record.');
+    } finally {
+      setClearBusy(false);
+      setClearTarget(null);
+    }
+  }, [clearTarget, selectedIds, showToast]);
+
   const exportMerchantBalancesCsv = useCallback(async () => {
     setExportingBalances(true);
     try {
@@ -466,6 +507,24 @@ const PoolReconciliation = () => {
             </form>
           )}
 
+          {canSubmitCheck && selectedIds.length > 0 && (
+            <div className="flex items-center justify-between mb-3 px-4 py-2.5 rounded-lg bg-on-surface text-surface-container-lowest">
+              <span className="text-2xs font-bold uppercase tracking-widest">{selectedIds.length} selected</span>
+              <div className="flex items-center gap-3">
+                <button onClick={() => setSelectedIds([])} className="text-2xs font-bold uppercase tracking-widest opacity-70 hover:opacity-100 transition-opacity">
+                  Deselect All
+                </button>
+                <button
+                  onClick={() => setClearTarget('bulk')}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-red-600 text-white text-2xs font-bold uppercase tracking-widest hover:bg-red-700 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-sm">clear</span>
+                  Clear Selected
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="bg-surface-container-lowest border border-outline-variant/40 rounded-lg overflow-hidden">
             {historyLoading ? (
               <div className="p-8"><Skel className="w-full h-32" /></div>
@@ -476,6 +535,17 @@ const PoolReconciliation = () => {
                 <table className="w-full text-xs">
                   <thead className="bg-surface-container/70 border-b border-outline-variant/40">
                     <tr className="text-2xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
+                      {canSubmitCheck && (
+                        <th className="text-left pl-5 pr-2 py-3 w-8">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.length === history.length}
+                            onChange={toggleSelectAll}
+                            className="w-3.5 h-3.5 rounded border-outline-variant/60 accent-on-surface cursor-pointer"
+                            aria-label="Select all"
+                          />
+                        </th>
+                      )}
                       <th className="text-left px-5 py-3">Checked</th>
                       <th className="text-right px-3 py-3">Reported</th>
                       <th className="text-right px-3 py-3">Expected</th>
@@ -483,11 +553,23 @@ const PoolReconciliation = () => {
                       <th className="text-left px-3 py-3">Status</th>
                       <th className="text-left px-3 py-3">By</th>
                       <th className="text-left px-5 py-3">Note</th>
+                      {canSubmitCheck && <th className="text-right px-5 py-3">Clear</th>}
                     </tr>
                   </thead>
                   <tbody>
                     {history.map((r) => (
                       <tr key={r._id} className="border-b border-outline-variant/40 last:border-b-0 hover:bg-surface-container/70 transition-colors">
+                        {canSubmitCheck && (
+                          <td className="pl-5 pr-2 py-3.5">
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.includes(r._id)}
+                              onChange={() => toggleSelected(r._id)}
+                              className="w-3.5 h-3.5 rounded border-outline-variant/60 accent-on-surface cursor-pointer"
+                              aria-label={`Select check from ${fmtDateTime(r.createdAt)}`}
+                            />
+                          </td>
+                        )}
                         <td className="px-5 py-3.5 text-on-surface tabular-nums">{fmtDateTime(r.createdAt)}</td>
                         <td className="px-3 py-3.5 text-right tabular-nums text-on-surface">{formatKES(r.reportedBalance)}</td>
                         <td className="px-3 py-3.5 text-right tabular-nums text-on-surface-variant">{formatKES(r.expectedPoolBalance)}</td>
@@ -504,6 +586,17 @@ const PoolReconciliation = () => {
                         </td>
                         <td className="px-3 py-3.5 text-on-surface-variant">{r.checkedBy?.name || r.checkedBy?.email || '—'}</td>
                         <td className="px-5 py-3.5 text-on-surface-variant">{r.note || '—'}</td>
+                        {canSubmitCheck && (
+                          <td className="px-5 py-3.5 text-right">
+                            <button
+                              onClick={() => setClearTarget(r)}
+                              title="Clear from this list — the real record is kept"
+                              className="text-on-surface-variant/50 hover:text-red-600 transition-colors"
+                            >
+                              <span className="material-symbols-outlined text-lg">clear</span>
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -513,6 +606,33 @@ const PoolReconciliation = () => {
           </div>
         </section>
       </div>
+
+      {/* Clear reconciliation check(s) — confirmation */}
+      {clearTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => !clearBusy && setClearTarget(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="p-7">
+              <div className="w-14 h-14 rounded-full bg-surface-container text-on-surface-variant flex items-center justify-center mb-4">
+                <span className="material-symbols-outlined text-3xl">clear</span>
+              </div>
+              <h3 className="text-xl font-bold text-on-surface mb-1">
+                {clearTarget === 'bulk' ? `Clear ${selectedIds.length} reconciliation check${selectedIds.length === 1 ? '' : 's'}?` : 'Clear this reconciliation check?'}
+              </h3>
+              <p className="text-sm text-on-surface-variant mb-5">
+                {clearTarget === 'bulk'
+                  ? 'Removes them from this list only — the real records are kept, and any discrepancy alerts already sent are unaffected. Nothing is deleted.'
+                  : `Removes it from this list only — the real record (${fmtDateTime(clearTarget.createdAt)}, ${formatKES(clearTarget.reportedBalance)} reported) is kept, and any discrepancy alert already sent is unaffected. Nothing is deleted.`}
+              </p>
+              <div className="flex gap-3">
+                <button onClick={() => setClearTarget(null)} disabled={clearBusy} className="flex-1 py-2.5 rounded-lg border border-outline-variant/40 text-on-surface text-sm font-semibold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40">Cancel</button>
+                <button onClick={confirmClear} disabled={clearBusy} className="flex-1 py-2.5 rounded-lg bg-on-surface text-surface-container-lowest text-sm font-semibold uppercase tracking-widest hover:opacity-90 disabled:opacity-50">
+                  {clearBusy ? 'Clearing…' : 'Clear'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {toast && (
         <div className="fixed bottom-6 right-6 z-50 bg-on-surface text-surface-container-lowest px-4 py-2.5 rounded-xl shadow-lg text-xs font-bold max-w-sm">{toast}</div>

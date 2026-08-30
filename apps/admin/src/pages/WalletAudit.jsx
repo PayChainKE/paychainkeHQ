@@ -44,9 +44,9 @@ const WalletAudit = () => {
   const [copiedKey, setCopiedKey] = useState('');
   const [summary, setSummary] = useState({
     totalMerchants: 0,
+    walletsProvisioned: 0,
     activeWallets: 0,
     inactiveWallets: 0,
-    noWallet: 0,
     errorCount: 0,
     discrepancyCount: 0,
     totalUsdcFloat: '0.0000',
@@ -126,6 +126,10 @@ const WalletAudit = () => {
               <p className="text-xs md:text-sm text-blue-100/60 mt-2 max-w-2xl font-body">
                 Cryptographically verifiable record of PayChain master and merchant accounts. Synchronized in real-time with the Stellar Network and M-Pesa.
               </p>
+              <p className="text-2xs font-bold text-amber-300/80 mt-3 uppercase tracking-wider flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-sm">info</span>
+                Digital wallets are on hold platform-wide — currently provisioned for the demo account only. Scoped to wallet-holding merchants only.
+              </p>
             </div>
             <button 
               onClick={fetchAudit} 
@@ -174,6 +178,7 @@ const WalletAudit = () => {
           <div className="bg-surface-container-lowest p-5 rounded-2xl border border-outline-variant/20 shadow-sm transition-transform hover:-translate-y-1">
             <span className="text-2xs font-bold uppercase tracking-[0.15em] text-on-surface-variant/50 block mb-2">Registered Merchants</span>
             <span className="text-3xl md:text-4xl font-black text-on-surface tracking-tighter tabular-nums">{summary.totalMerchants}</span>
+            <p className="text-2xs text-on-surface-variant/40 font-medium mt-1">{summary.walletsProvisioned} with a wallet provisioned</p>
           </div>
 
           <div className="bg-gradient-to-br from-[#0A101D] to-[#0F172A] p-5 rounded-2xl border border-[#1E293B] shadow-lg transition-transform hover:-translate-y-1">
@@ -187,7 +192,7 @@ const WalletAudit = () => {
           <div className="bg-surface-container-lowest p-5 rounded-2xl border border-outline-variant/20 shadow-sm transition-transform hover:-translate-y-1">
             <span className="text-2xs font-bold uppercase tracking-[0.15em] text-on-surface-variant/50 block mb-2">Pending Activation</span>
             <span className="text-3xl md:text-4xl font-black text-on-surface tracking-tighter tabular-nums">
-              {(summary.inactiveWallets ?? 0) + (summary.noWallet ?? 0)}
+              {summary.inactiveWallets ?? 0}
             </span>
           </div>
 
@@ -364,19 +369,20 @@ const AuditRow = ({ row, network, copiedKey, onCopy }) => {
   );
 };
 
-// Every possible backend status gets its own distinct tone — critically,
-// "Error" (we failed to check) and "No Wallet" (merchant never set one up)
-// must not look the same: one is a data-quality warning, the other is normal.
+// Every possible backend status gets its own distinct tone. "No Wallet" no
+// longer exists as a status — the audit is scoped server-side to only
+// merchants that actually have a wallet provisioned (see
+// walletAuditController.js), since the feature is on hold platform-wide and
+// almost every row would otherwise say "No Wallet".
 const STATUS_STYLES = {
   Active:     { styles: 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-sm', dot: 'bg-emerald-500 animate-pulse' },
   Inactive:   { styles: 'bg-amber-50 text-amber-700 border-amber-200',                  dot: 'bg-amber-500' },
   Unfunded:   { styles: 'bg-amber-50 text-amber-700 border-amber-200',                  dot: 'bg-amber-500' },
-  'No Wallet':{ styles: 'bg-slate-100 text-slate-500 border-slate-200',                 dot: 'bg-slate-400' },
   Error:      { styles: 'bg-rose-50 text-rose-700 border-rose-200',                     dot: 'bg-rose-500' },
 };
 
 const StatusPill = ({ status }) => {
-  const { styles, dot } = STATUS_STYLES[status] || STATUS_STYLES['No Wallet'];
+  const { styles, dot } = STATUS_STYLES[status] || STATUS_STYLES.Error;
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-2xs font-bold uppercase tracking-widest border ${styles}`}>
       <div className={`w-1.5 h-1.5 rounded-full ${dot}`}></div>

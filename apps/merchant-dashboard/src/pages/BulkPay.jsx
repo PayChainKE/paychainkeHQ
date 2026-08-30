@@ -178,8 +178,14 @@ export default function BulkPay() {
     setNewPayee({
       name: p.name,
       type: p.type.charAt(0).toUpperCase() + p.type.slice(1),
-      utilityType: (p.utilityProvider === 'KPLC' || p.utilityProvider === 'KPLC_PREPAID') ? 'Electricity' : p.utilityProvider === 'WATER' ? 'Water' : 'Electricity',
-      utilityProvider: p.utilityProvider || '',
+      // Only a real Utility payee should ever populate these — leaving them
+      // truthy for Employee/Supplier/Contractor payees made the Utility-only
+      // "Account Type: Postpaid/Prepaid" step render during their edit too
+      // (see the render guard below), which then bound the KPLC meter
+      // number/notification-phone fields onto this payee's real
+      // accountNumber/phone and broke the save.
+      utilityType: p.type === 'utility' ? (p.utilityType || 'Electricity') : '',
+      utilityProvider: p.type === 'utility' ? (p.utilityProvider || '') : '',
       paymentMethod: p.paymentMethod || 'Mobile Money',
       mobileMoneyType: p.mobileMoneyType || 'Personal Number',
       mobileNetwork: p.mobileNetwork || 'safaricom',
@@ -974,6 +980,12 @@ export default function BulkPay() {
         phone: tx.accountReference,
         reference: processedBatch.batchReference,
         status: tx.status, // 'completed' | 'pending' | 'failed'
+        // Why NCBA (or PayChain) rejected this specific row — e.g. "Amount
+        // must be between KES 50 and KES 250,000" — only ever set when
+        // status is 'failed'. Without this, a failed row only ever showed
+        // as a bare "Failed & Refunded" with no way for the merchant to
+        // tell why.
+        failureReason: tx.failureReason || null,
         timestamp: new Date().toLocaleString('en-KE', {
           day: '2-digit', month: 'short', year: 'numeric',
           hour: '2-digit', minute: '2-digit'
@@ -991,10 +1003,16 @@ export default function BulkPay() {
 
       const failedCount = newReceipts.filter(r => r.status === 'failed').length;
       const allFailed = failedCount > 0 && failedCount === newReceipts.length;
+      // Surface the actual rejection reason(s) instead of just "N failed" —
+      // most batches fail for one specific, fixable reason (e.g. an amount
+      // below NCBA's KES 50 Mobile Money minimum), and that reason was
+      // previously only ever visible in the server's own logs.
+      const distinctReasons = [...new Set(newReceipts.filter(r => r.status === 'failed' && r.failureReason).map(r => r.failureReason))];
+      const reasonSuffix = distinctReasons.length ? ` Reason: ${distinctReasons.join(' | ')}` : '';
       addNotification({
         title: allFailed ? 'Batch Failed' : failedCount > 0 ? 'Batch Partially Processed' : 'Batch Processed',
         message: failedCount > 0
-          ? `${failedCount} of ${newReceipts.length} payout${newReceipts.length === 1 ? '' : 's'} failed and ${failedCount === 1 ? 'was' : 'were'} refunded to your balance. ${res.data.message}`
+          ? `${failedCount} of ${newReceipts.length} payout${newReceipts.length === 1 ? '' : 's'} failed and ${failedCount === 1 ? 'was' : 'were'} refunded to your balance.${reasonSuffix}`
           : res.data.message,
         type: allFailed ? 'error' : failedCount > 0 ? 'warning' : 'success'
       });
@@ -1403,7 +1421,7 @@ export default function BulkPay() {
                         </div>
                       )}
 
-                      {newPayee.utilityType === 'Electricity' && (
+                      {newPayee.type === 'Utility' && newPayee.utilityType === 'Electricity' && (
                         <div className="space-y-2 pt-2 animate-in fade-in duration-500">
                           <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Account Type</label>
                           <div className="flex gap-2 p-1.5 bg-surface-container-low/50 rounded-2xl border border-outline-variant/5">
@@ -1427,7 +1445,7 @@ export default function BulkPay() {
                         </div>
                       )}
 
-                      {DEDICATED_RAIL_UTILITIES.includes(newPayee.utilityProvider) && (() => {
+                      {newPayee.type === 'Utility' && DEDICATED_RAIL_UTILITIES.includes(newPayee.utilityProvider) && (() => {
                         const isKplc = newPayee.utilityProvider === 'KPLC' || newPayee.utilityProvider === 'KPLC_PREPAID'
                         const isPrepaid = newPayee.utilityProvider === 'KPLC_PREPAID'
                         const logo = isKplc ? '/utilities%20logo/kplc.png' : '/utilities%20logo/ncwsc.png'
@@ -1524,16 +1542,19 @@ export default function BulkPay() {
                         <div className="space-y-4 pt-4 animate-in fade-in duration-500 bg-purple-50/30 p-4 rounded-2xl border border-purple-500/10">
                           <h4 className="text-[10px] text-purple-700 font-black uppercase tracking-widest mb-2 flex items-center gap-2">
                             <span className="material-symbols-outlined text-[14px]">receipt_long</span>
-                            KRA eTIMS Details
+                            KRA eTIMS Details (Optional)
                           </h4>
+                          <p className="text-[10px] text-on-surface-variant/60 font-medium -mt-1 mb-1">
+                            For your own business records.
+                          </p>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-1.5">
-                              <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Supplier KRA PIN *</label>
-                              <ValidatedInput kind="kraPin" value={newPayee.kraPin} onChange={(e) => setNewPayee({...newPayee, kraPin: e.target.value})} placeholder="P000000000A" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-purple-500/50 uppercase" />
+                              <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Supplier KRA PIN</label>
+                              <ValidatedInput kind="kraPin" optional value={newPayee.kraPin} onChange={(e) => setNewPayee({...newPayee, kraPin: e.target.value})} placeholder="P000000000A" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-purple-500/50 uppercase" />
                             </div>
                             <div className="space-y-1.5">
-                              <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">eTIMS Invoice No. *</label>
-                              <ValidatedInput kind="etims" value={newPayee.etimsInvoiceNumber} onChange={(e) => setNewPayee({...newPayee, etimsInvoiceNumber: e.target.value})} placeholder="e.g. INV-123" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-purple-500/50" />
+                              <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">eTIMS Invoice No.</label>
+                              <ValidatedInput kind="etims" optional value={newPayee.etimsInvoiceNumber} onChange={(e) => setNewPayee({...newPayee, etimsInvoiceNumber: e.target.value})} placeholder="e.g. INV-123" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-purple-500/50" />
                             </div>
                             <div className="space-y-1.5 sm:col-span-2">
                               <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Control Unit (CU) No.</label>
@@ -1555,7 +1576,7 @@ export default function BulkPay() {
                         />
                       </div>
 
-                      {newPayee.utilityProvider !== 'KPLC' && (
+                      {!DEDICATED_RAIL_UTILITIES.includes(newPayee.utilityProvider) && (
                       <div className="space-y-4 pt-4">
                         <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Settlement Method</label>
                         <div className="flex gap-2 p-1.5 bg-surface-container-low/50 rounded-2xl border border-outline-variant/5">
@@ -1574,7 +1595,7 @@ export default function BulkPay() {
                       </div>
                       )}
 
-                      {newPayee.utilityProvider !== 'KPLC' && (
+                      {!DEDICATED_RAIL_UTILITIES.includes(newPayee.utilityProvider) && (
                       <div className="pt-4 transition-all">
                         {newPayee.paymentMethod === 'Mobile Money' && (
                           <div className="space-y-6 animate-in fade-in duration-300">
@@ -1838,8 +1859,15 @@ export default function BulkPay() {
         {/* Right Column: Create Payment Batch */}
         <section className="flex-1 flex flex-col gap-6">
           {/* Step Indicator */}
-          <div className="bg-surface-container-low px-4 py-3 md:px-5 md:py-3.5 rounded-2xl flex items-center justify-between relative overflow-hidden editorial-shadow border border-outline-variant/10">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full -mr-12 -mt-12 blur-2xl"></div>
+          <div className="bg-surface-container-low px-4 py-3 md:px-5 md:py-3.5 rounded-2xl flex items-center justify-between relative editorial-shadow border border-outline-variant/10">
+            {/* Decorative blur gets its own clipped, non-interactive layer
+                instead of `overflow-hidden` on the card itself — that
+                clipped the Liquidity "+" dropdown below (position: absolute,
+                nested inside this card), making it render but stay
+                invisible/cut off every time it opened. */}
+            <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full -mr-12 -mt-12 blur-2xl"></div>
+            </div>
             <div className="flex items-center gap-3 md:gap-8 relative z-10 overflow-x-auto no-scrollbar">
               {[1, 2, 3, 4].map((s) => (
                 <div key={s} className="flex items-center gap-3 md:gap-4 shrink-0">
@@ -2132,6 +2160,7 @@ export default function BulkPay() {
                 const failedCount = authorizedReceipts.filter(r => r.status === 'failed').length
                 const pendingCount = authorizedReceipts.filter(r => r.status === 'pending').length
                 const allFailed = failedCount > 0 && failedCount === authorizedReceipts.length
+                const distinctFailureReasons = [...new Set(authorizedReceipts.filter(r => r.status === 'failed' && r.failureReason).map(r => r.failureReason))]
                 return (
                 <div className="p-6 md:p-12 animate-in fade-in zoom-in duration-700">
                   <div className="flex flex-col items-center text-center mb-12">
@@ -2151,6 +2180,16 @@ export default function BulkPay() {
                         ? `Submitted. ${pendingCount} payout${pendingCount === 1 ? '' : 's'} awaiting final confirmation.`
                         : 'Disbursement workflow complete. Receipts generated for all recipients.'}
                     </p>
+                    {distinctFailureReasons.length > 0 && (
+                      <div className="mt-4 max-w-md mx-auto bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-left">
+                        {distinctFailureReasons.map((reason, i) => (
+                          <p key={i} className="text-[11px] font-bold text-red-700 leading-relaxed flex items-start gap-1.5">
+                            <span className="material-symbols-outlined text-red-500 text-[14px] mt-0.5 shrink-0">error_outline</span>
+                            {reason}
+                          </p>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar pb-10">
@@ -2211,6 +2250,13 @@ export default function BulkPay() {
                               <p className="text-[9px] sm:text-[10px] text-on-surface-variant font-medium mt-1 opacity-50 italic">via {receipt.method}</p>
                             </div>
                           </div>
+
+                          {receipt.status === 'failed' && receipt.failureReason && (
+                            <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+                              <span className="material-symbols-outlined text-red-500 text-[16px] mt-0.5">error_outline</span>
+                              <p className="text-[11px] font-bold text-red-700 leading-relaxed">{receipt.failureReason}</p>
+                            </div>
+                          )}
                         </div>
                         <div className="px-6 py-4 bg-surface-container-low/30 border-t border-outline-variant/5 flex items-center justify-between">
                           <div className="flex items-center gap-2">

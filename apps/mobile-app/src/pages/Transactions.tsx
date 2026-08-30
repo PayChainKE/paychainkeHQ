@@ -463,6 +463,11 @@ export default function Transactions({ navigation }: any) {
                   ? (formatName(tx.sender?.name) || 'Unknown')
                   : (formatName(tx.recipient?.name) || formatName(tx.sender?.name) || 'Treasury');
                 const verified = tx.status === 'completed' || tx.status === 'verified';
+                // A failed payout is always refunded in full — without this,
+                // it showed with the exact same solid debit color as a real
+                // completed one, making it look like money had actually left
+                // when net balance impact was zero.
+                const isFailed = tx.status === 'failed';
                 const typeLabel = txTypeLabel(tx.type || 'inbound').toUpperCase();
                 const dateStr = formatTxDate(tx.createdAt || tx.timestamp);
                 const timeStr = formatTxTime(tx.createdAt || tx.timestamp);
@@ -489,7 +494,9 @@ export default function Transactions({ navigation }: any) {
                       <Text className="text-[#707971] text-[11px] font-jakarta-medium mt-0.5" numberOfLines={1} ellipsizeMode="tail">
                         {dateStr}, {timeStr} · {typeLabel}
                       </Text>
-                      {!!phoneStr && (
+                      {isFailed ? (
+                        <Text className="text-[#b91c1c] text-[10px] font-jakarta-bold mt-0.5 uppercase tracking-wider">Failed & Refunded</Text>
+                      ) : !!phoneStr && (
                         <Text className="text-[#707971]/70 text-[10px] font-jakarta-medium mt-0.5" numberOfLines={1} ellipsizeMode="tail">
                           {phoneStr}
                         </Text>
@@ -497,7 +504,7 @@ export default function Transactions({ navigation }: any) {
                     </View>
                     <Text
                       className={`font-jakarta-bold text-[14px] ${
-                        isSwap ? 'text-[#1D4ED8]' : isInbound ? 'text-[#006c4e]' : 'text-[#0c2010]'
+                        isFailed ? 'text-[#707971] line-through' : isSwap ? 'text-[#1D4ED8]' : isInbound ? 'text-[#006c4e]' : 'text-[#0c2010]'
                       }`}
                       numberOfLines={1}
                       style={{ flexShrink: 0 }}
@@ -549,10 +556,16 @@ export default function Transactions({ navigation }: any) {
           {selectedTx && (() => {
             const isInbound = isCreditTransaction(selectedTx.type);
             const isSwap = selectedTx.type === 'fx_swap';
-            const amountColor = isSwap ? '#1D4ED8' : isInbound ? '#006c4e' : '#0c2010';
+            // A failed payout is always refunded in full — without this, it
+            // showed with the exact same solid debit color and a green
+            // "Network Status" pill as a real completed one, making it look
+            // like money had actually left when net balance impact was zero.
+            const isFailedTx = selectedTx.status === 'failed';
+            const amountColor = isFailedTx ? '#9aa39c' : isSwap ? '#1D4ED8' : isInbound ? '#006c4e' : '#0c2010';
             const amountStr = isSwap
               ? `${(selectedTx.usdcAmount || 0).toLocaleString()} USDC`
               : `${isInbound ? '+' : '-'} ${formatKES(selectedTx.kesAmount || selectedTx.amount || 0)}`;
+            const statusPillColor = isFailedTx ? '#f87171' : (selectedTx.status === 'completed' || selectedTx.status === 'verified') ? '#5efeb3' : '#fbbf24';
             const counterpartyName = isInbound
               ? (formatName(selectedTx.sender?.name) || 'Unknown')
               : (formatName(selectedTx.recipient?.name) || formatName(selectedTx.sender?.name) || 'Internal Treasury');
@@ -571,16 +584,25 @@ export default function Transactions({ navigation }: any) {
 
                   <View className="mb-6">
                     <Text className="text-white/40 text-[10px] font-jakarta-bold uppercase tracking-[0.15em] mb-2">Settlement</Text>
-                    <Text className="text-[30px] font-jakarta-extrabold tracking-tight" style={{ color: amountColor === '#0c2010' ? '#ffffff' : amountColor }}>
+                    <Text
+                      className="text-[30px] font-jakarta-extrabold tracking-tight"
+                      style={{
+                        color: amountColor === '#0c2010' ? '#ffffff' : amountColor,
+                        textDecorationLine: isFailedTx ? 'line-through' : 'none',
+                      }}
+                    >
                       {amountStr}
                     </Text>
+                    {isFailedTx && (
+                      <Text className="text-[#f87171] text-[11px] font-jakarta-bold mt-2">This payout failed and the full amount was refunded to your balance.</Text>
+                    )}
                   </View>
 
                   <View className="mb-6 pt-5 border-t border-white/10">
                     <Text className="text-white/40 text-[10px] font-jakarta-bold uppercase tracking-[0.15em] mb-2">Network Status</Text>
-                    <View className="self-start flex-row items-center gap-2 px-3 py-1.5 rounded-full bg-[#5efeb3]/10 border border-[#5efeb3]/20">
-                      <View className="w-2 h-2 rounded-full bg-[#5efeb3]" />
-                      <Text className="text-[#5efeb3] text-[11px] font-jakarta-extrabold uppercase tracking-widest">{selectedTx.status}</Text>
+                    <View className="self-start flex-row items-center gap-2 px-3 py-1.5 rounded-full" style={{ backgroundColor: `${statusPillColor}1A`, borderWidth: 1, borderColor: `${statusPillColor}33` }}>
+                      <View className="w-2 h-2 rounded-full" style={{ backgroundColor: statusPillColor }} />
+                      <Text style={{ color: statusPillColor }} className="text-[11px] font-jakarta-extrabold uppercase tracking-widest">{isFailedTx ? 'Failed & Refunded' : selectedTx.status}</Text>
                     </View>
                   </View>
 

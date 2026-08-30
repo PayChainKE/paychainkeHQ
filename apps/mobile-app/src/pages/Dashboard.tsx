@@ -560,6 +560,11 @@ export default function Dashboard({ navigation }: any) {
                   const isSwap = tx.type === 'fx_swap';
                   const name = isInbound ? (formatName(tx.sender?.name) || 'Unknown') : (formatName(tx.recipient?.name) || formatName(tx.sender?.name) || 'Treasury');
                   const verified = tx.status === 'completed' || tx.status === 'verified';
+                  // A failed payout is always refunded in full — without this,
+                  // it showed with the exact same solid debit color as a real
+                  // completed one, making it look like money had actually
+                  // left when net balance impact was zero.
+                  const isFailed = tx.status === 'failed';
                   const kes = tx.kesAmount || tx.amount || 0;
                   const rawRef = tx.reference || tx.type.replace('_', ' ');
                   const refText = rawRef.length > 14 ? `${rawRef.slice(0, 6)}…${rawRef.slice(-4)}` : rawRef;
@@ -575,14 +580,18 @@ export default function Dashboard({ navigation }: any) {
                           <Text className="font-jakarta-bold text-[14px] text-[#0c2010] flex-shrink" numberOfLines={1} ellipsizeMode="tail">{name}</Text>
                           {verified && <MaterialIcons name="verified" size={12} color="#006c4e" style={{ marginLeft: 4 }} />}
                         </View>
-                        <Text className="text-[#707971] text-[10px] font-jakarta-medium mt-0.5" numberOfLines={1} ellipsizeMode="tail">
-                          {new Date(tx.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} · {refText}
-                        </Text>
+                        {isFailed ? (
+                          <Text className="text-[#b91c1c] text-[10px] font-jakarta-bold mt-0.5 uppercase tracking-wider">Failed & Refunded</Text>
+                        ) : (
+                          <Text className="text-[#707971] text-[10px] font-jakarta-medium mt-0.5" numberOfLines={1} ellipsizeMode="tail">
+                            {new Date(tx.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} · {refText}
+                          </Text>
+                        )}
                       </View>
                       <PrivateValue
                         hidden={!showAmounts}
                         tint="light"
-                        className={`font-jakarta-bold text-[13px] ${isSwap ? 'text-[#1D4ED8]' : isInbound ? 'text-[#006c4e]' : 'text-[#0c2010]'}`}
+                        className={`font-jakarta-bold text-[13px] ${isFailed ? 'text-[#707971] line-through' : isSwap ? 'text-[#1D4ED8]' : isInbound ? 'text-[#006c4e]' : 'text-[#0c2010]'}`}
                         numberOfLines={1}
                         style={{ flexShrink: 0 }}
                       >
