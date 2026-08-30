@@ -1,4 +1,5 @@
 import { safaricomFeeFor } from '../config/revenueRateCard.js';
+import { getTariffBands, getTariffFlat } from '../services/tariffCardCache.js';
 
 // M-Pesa monetization engine — the single source of truth for what PayChain
 // deducts from a merchant on every inbound M-Pesa collection (C2B paybill +
@@ -177,7 +178,7 @@ export class PricingEngineError extends Error {
 // transactionController.js#processPaymentLink (Payment Links/Invoices) and
 // mpesaController.js#initiateSTKPush (wallet top-ups, Request Money, pay-
 // to-account) for these product lines, no separate code path needed.
-export const CUSTOMER_SURCHARGE_BANDS = [
+const CUSTOMER_SURCHARGE_BANDS_DEFAULT = [
   { max: 100,      fee: 0  },
   { max: 500,      fee: 3  },
   { max: 1_000,    fee: 5  },
@@ -198,6 +199,13 @@ export const CUSTOMER_SURCHARGE_BANDS = [
   { max: 70_000,   fee: 35 },
   { max: 250_000,  fee: 35 },
 ];
+
+// Admin-editable (Transaction Tariffs page, OTP-gated) — see
+// services/tariffCardCache.js. Falls back to the hardcoded default above
+// if the DB-backed value is ever missing/malformed.
+export function getCustomerSurchargeBands() {
+  return getTariffBands('customer_surcharge', CUSTOMER_SURCHARGE_BANDS_DEFAULT);
+}
 
 // Amounts at or below this are exempt from every flat PayChain fee across
 // the platform — the STK customer surcharge, the raw-C2B markup, and the
@@ -223,7 +231,8 @@ export function calculateCustomerSurcharge(baseInvoiceAmount) {
   const base = Number(baseInvoiceAmount);
   if (!Number.isFinite(base) || base <= 0) return 0;
   if (base <= FLAT_FEE_FREE_TIER_MAX_KES) return 0;
-  const band = CUSTOMER_SURCHARGE_BANDS.find((b) => base <= b.max) || CUSTOMER_SURCHARGE_BANDS[CUSTOMER_SURCHARGE_BANDS.length - 1];
+  const bands = getCustomerSurchargeBands();
+  const band = bands.find((b) => base <= b.max) || bands[bands.length - 1];
   return round2(band.fee);
 }
 
@@ -267,7 +276,7 @@ export function getCheckoutTotal(baseInvoiceAmount) {
 // Service Fee is given as a single flat value per compressed row in the
 // sheet (not a range) — repeated across each row's real sub-bands here
 // purely so both tables share one boundary list.
-export const INVOICE_CLIENT_MARKUP_BANDS = [
+export const INVOICE_CLIENT_MARKUP_BANDS_DEFAULT = [
   { max: 100,      fee: 0  },
   { max: 500,      fee: 3  },
   { max: 1_000,    fee: 5  },
@@ -289,13 +298,23 @@ export const INVOICE_CLIENT_MARKUP_BANDS = [
   { max: 250_000,  fee: 35 },
 ];
 
+// Admin-editable — see getCustomerSurchargeBands's identical convention above.
+export function getInvoiceClientMarkupBands() {
+  return getTariffBands('invoice_client_markup', INVOICE_CLIENT_MARKUP_BANDS_DEFAULT);
+}
+
 // Flat merchant-side Invoice Service Fee (Brandon, 2026-08-30) — replaces
 // the old tiered INVOICE_MERCHANT_SERVICE_FEE_BANDS (KES 0-50, scaling with
 // invoice size). Deliberately small and flat, on every invoice regardless
 // of amount: the customer already pays the normal tiered markup via
 // calculateInvoiceClientMarkup below (unchanged) — this is just PayChain's
 // own small cut for the Invoicing workflow itself.
-export const INVOICE_MERCHANT_FLAT_FEE_KES = 23;
+const INVOICE_MERCHANT_FLAT_FEE_KES_DEFAULT = 23;
+
+// Admin-editable — see getCustomerSurchargeBands's identical convention above.
+export function getInvoiceMerchantFlatFee() {
+  return getTariffFlat('invoice_merchant_flat_fee', INVOICE_MERCHANT_FLAT_FEE_KES_DEFAULT);
+}
 
 /**
  * PayChain's client-facing markup on an Invoice STK prompt — the Invoicing
@@ -309,7 +328,8 @@ export function calculateInvoiceClientMarkup(baseInvoiceAmount) {
   const base = Number(baseInvoiceAmount);
   if (!Number.isFinite(base) || base <= 0) return 0;
   if (base <= FLAT_FEE_FREE_TIER_MAX_KES) return 0;
-  const band = INVOICE_CLIENT_MARKUP_BANDS.find((b) => base <= b.max) || INVOICE_CLIENT_MARKUP_BANDS[INVOICE_CLIENT_MARKUP_BANDS.length - 1];
+  const bands = getInvoiceClientMarkupBands();
+  const band = bands.find((b) => base <= b.max) || bands[bands.length - 1];
   return round2(band.fee);
 }
 
@@ -329,7 +349,7 @@ export function calculateInvoiceClientMarkup(baseInvoiceAmount) {
 export function calculateInvoiceServiceFee(baseInvoiceAmount) {
   const base = Number(baseInvoiceAmount);
   if (!Number.isFinite(base) || base <= 0) return 0;
-  return round2(Math.min(INVOICE_MERCHANT_FLAT_FEE_KES, base));
+  return round2(Math.min(getInvoiceMerchantFlatFee(), base));
 }
 
 /**

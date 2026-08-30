@@ -63,6 +63,8 @@ import publicCheckoutRoutes from './routes/publicCheckoutRoutes.js';
 import etimsRoutes from './routes/etimsRoutes.js';
 import { ensurePrimaryOwner } from './migrations/ensurePrimaryOwner.js';
 import { backfillTransactionFees } from './migrations/backfillTransactionFees.js';
+import { seedTariffCards } from './migrations/seedTariffCards.js';
+import { loadTariffCache, startTariffCacheRefreshInterval } from './services/tariffCardCache.js';
 import { backfillNcbaMerchantCodes } from './migrations/backfillNcbaMerchantCodes.js';
 import { checkAndSendDormancyReminders } from './services/dormancyReminderService.js';
 import { checkAndSendTaxDeadlineReminders } from './services/taxDeadlineReminderService.js';
@@ -308,6 +310,9 @@ async function bootstrap() {
     await ensurePrimaryOwner();
     await backfillTransactionFees();
     await backfillNcbaMerchantCodes();
+    await seedTariffCards();
+    await loadTariffCache();
+    startTariffCacheRefreshInterval();
   } catch (error) {
     // Hard-exiting on a failed initial connection only makes sense for a
     // traditional long-running deploy — killing the process is meaningless
