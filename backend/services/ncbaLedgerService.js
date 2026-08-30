@@ -134,19 +134,13 @@ const isDuplicateKeyError = (err) => err && err.code === 11000;
 const round2 = (value) => Math.round((value + Number.EPSILON) * 100) / 100;
 
 /**
- * Tiered "Safaricom-style" revenue split — credits an NCBA Virtual Account
- * inbound collection to a merchant's KES ledger.
+ * Credits an NCBA Virtual Account inbound collection to a merchant's KES
+ * ledger. Money IN is never charged to the merchant — netAmount always
+ * equals grossAmount in full (getNcbaTariffBand's totalFee is always 0; see
+ * config/ncbaTariffCard.js's header comment for the full policy, including
+ * why PayChain doesn't model a Safaricom-side cost for this rail either).
  *
- *   { safaricomFee, markup, totalFee } = getNcbaTariffBand(grossAmount)   (config/ncbaTariffCard.js)
- *   netMerchantCredit = grossAmount - totalFee
- *
- * PayChain absorbs the Safaricom-cost component itself rather than passing
- * it through, so the *combined* total (not just the markup) is what's
- * deducted from the merchant. `markup` alone is what gets stamped onto
- * Transaction.paychainFee (via the model's pre-save hook, which sources the
- * same tariff table — see utils/feeCalculator.js) and is the number the
- * admin Revenue dashboard reports as PayChain's actual earned revenue.
- *
+
  * The Transaction insert and the balance increment happen inside a single
  * Mongo session transaction so a mid-flight crash can never leave a ledger
  * entry without a matching balance credit (or vice versa), and concurrent

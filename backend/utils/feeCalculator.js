@@ -39,12 +39,11 @@ export function calculateFees(type, kesAmount, rail = null) {
     return { paychainFee: serviceFee, safaricomFee: baseCost, streamId: stream?.id || null };
   }
 
-  // NCBA Virtual Account collections price off a tiered band table, not a
-  // linear rate — see config/ncbaTariffCard.js. paychainFee here is the
-  // markup only (what PayChain actually keeps); safaricomFee is the
-  // absorbed Safaricom-cost component, tracked for transparency, not
-  // deducted from the merchant a second time here (that already happened
-  // in services/ncbaLedgerService.js when the ledger was credited).
+  // NCBA Virtual Account collections — see config/ncbaTariffCard.js.
+  // paychainFee and safaricomFee are always 0: money IN is never charged to
+  // the merchant, and PayChain doesn't model a Safaricom cost for this rail
+  // either — Safaricom collects its own cut automatically from the paying
+  // customer, invisibly to PayChain's ledger.
   if (type === 'ncba_inbound') {
     if (v <= 0) {
       return { paychainFee: 0, safaricomFee: 0, streamId: stream?.id || null };

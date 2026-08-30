@@ -152,7 +152,7 @@ export const REVENUE_STREAMS = [
   {
     id: 'ncba_collection_fee',
     label: 'NCBA Collection Fee',
-    description: 'Tiered Safaricom-style tariff on every inbound NCBA Virtual Account collection — PayChain absorbs the underlying Safaricom cost per band and keeps a fixed markup. No single rate; see config/ncbaTariffCard.js.',
+    description: 'Money IN is never charged to the merchant — this stream earns PayChain KES 0. Safaricom collects its own cut automatically from the paying customer; PayChain never sees or tracks that money (see config/ncbaTariffCard.js).',
     icon: 'account_balance',
     accent: 'teal',
     tiered: true,

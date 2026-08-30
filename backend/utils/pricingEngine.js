@@ -22,14 +22,15 @@ import { safaricomFeeFor } from '../config/revenueRateCard.js';
 // calculateCustomerMpesaFee (Safaricom's cut, pass-through) with
 // calculateCustomerSurcharge (PayChain's cut, collected from the customer).
 
-// Temporarily disabled — for now PayChain charges only the flat KES 5 (the
-// customer surcharge on STK flows, RAW_C2B_FLAT_MARKUP_KES on raw C2B
-// deposits) with no tiered/percentage merchant fee on top. calculateMerchantFee
-// returns 0 while this is false, which automatically zeroes it out
-// everywhere it's used (confirmationURL, processSplitTransaction, and the
-// 'inbound' case in feeCalculator.js's Transaction pre-save hook) without
-// touching any of those call sites. Flip back to true to resume charging
-// the tiered bands below.
+// Disabled platform-wide, permanently as of 2026-08-30: money IN is never
+// charged to the merchant — only money OUT is (see ncbaTariffCard.js's
+// header comment for the NCBA-rail side of this same rule). Whatever
+// PayChain earns on an inbound collection comes entirely from the paying
+// customer's surcharge instead (see "Dual-sided checkout model" below).
+// calculateMerchantFee returns 0 while this is false, which automatically
+// zeroes it out everywhere it's used (confirmationURL, processSplitTransaction,
+// and the 'inbound' case in feeCalculator.js's Transaction pre-save hook)
+// without touching any of those call sites.
 const MPESA_MERCHANT_FEE_ENABLED = false;
 
 // ── Merchant fee tier matrix ─────────────────────────────────────────────
@@ -84,35 +85,6 @@ export function calculateMerchantFee(grossAmount) {
   // Sanity clamp — a misconfigured band (e.g. a >100% rate typo) must never
   // let the deducted fee exceed the gross amount being credited.
   return round2(Math.min(Math.max(fee, 0), amount));
-}
-
-// Flat markup PayChain collects on every raw C2B paybill deposit
-// (mpesaController.js#confirmationURL) — a customer keying your paybill +
-// account number directly into their own M-Pesa menu picks their own
-// amount, so unlike STK Push there's no PayChain-controlled prompt to add a
-// customer-facing surcharge to (see "Dual-sided checkout model" further
-// down). This is PayChain's way of still collecting a flat margin on this
-// rail — deducted from the merchant alongside calculateMerchantFee above,
-// not billed to the payer. Kept as its own constant (separate from the
-// tiered CUSTOMER_SURCHARGE_BANDS further down) since the two are collected
-// through entirely different mechanisms and should be able to move
-// independently.
-export const RAW_C2B_FLAT_MARKUP_KES = 5;
-
-/**
- * RAW_C2B_FLAT_MARKUP_KES, but free for amounts at or below
- * FLAT_FEE_FREE_TIER_MAX_KES (declared further down this file — same
- * threshold every flat fee on the platform uses, so a small paybill
- * deposit isn't charged the same flat fee as a large one).
- *
- * @param {number} grossAmount
- * @returns {number} 0 or RAW_C2B_FLAT_MARKUP_KES.
- */
-export function calculateRawC2bMarkup(grossAmount) {
-  const amount = Number(grossAmount);
-  if (!Number.isFinite(amount) || amount <= 0) return 0;
-  if (amount <= FLAT_FEE_FREE_TIER_MAX_KES) return 0;
-  return RAW_C2B_FLAT_MARKUP_KES;
 }
 
 /**
