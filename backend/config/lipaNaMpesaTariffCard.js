@@ -14,7 +14,7 @@
 // Replaces the old flat KES 30 NCBA_LIPA_NA_MPESA_FLAT_FEE_KES (which was
 // also never actually charged on Bulk Pay's Paybill/Till rows — only on
 // the standalone single-payout endpoint, mpesaController.js#initiateB2B).
-const LIPA_NA_MPESA_B2B_BANDS = [
+export const LIPA_NA_MPESA_B2B_BANDS = [
   { max: 100,      baseCost: 0,  serviceFee: 0   },
   { max: 500,      baseCost: 5,  serviceFee: 5   },
   { max: 1_000,    baseCost: 7,  serviceFee: 8   },

@@ -20,7 +20,7 @@
 // destination bank code is NCBA's own — see NCBA_OWN_BANK_CODE in
 // ncbaOpenBankingController.js) — this tariff sheet is external-bank-only,
 // so IFT stays fee-exempt exactly as it is today.
-const PESALINK_BANDS = [
+export const PESALINK_BANDS = [
   { max: 500,      baseCost: 0,   serviceFee: 50  },
   { max: 3_500,    baseCost: 50,  serviceFee: 20  },
   { max: 7_000,    baseCost: 50,  serviceFee: 38  },

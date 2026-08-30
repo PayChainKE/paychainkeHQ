@@ -31,6 +31,7 @@ const NAV_SECTIONS = [
       { icon: 'balance',         label: 'Pool Reconciliation',    path: '/pool-reconciliation'    },
       { icon: 'point_of_sale',   label: 'STK Monitor',            path: '/stk-monitor'            },
       { icon: 'gavel',           label: 'Transaction Audit',      path: '/transaction-audit'      },
+      { icon: 'percent',         label: 'Transaction Tariffs',    path: '/transaction-tariffs'    },
       { icon: 'calculate',       label: 'Bookkeeping',            path: '/bookkeeping'            },
       { icon: 'request_quote',   label: 'Tax & Compliance',       path: '/tax-compliance'         },
       { icon: 'receipt_long',    label: 'Invoices',                path: '/invoices'               },

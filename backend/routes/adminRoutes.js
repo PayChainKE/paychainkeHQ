@@ -77,6 +77,7 @@ import { runWalletAudit } from '../controllers/walletAuditController.js';
 import { adminListInvoices } from '../controllers/invoiceController.js';
 import { sendSmsBroadcast, getSmsBroadcasts, deleteSmsBroadcast, clearSmsBroadcasts } from '../controllers/smsBroadcastController.js';
 import { getRevenue, getRevenueSweeps, archiveRevenueSweep, unarchiveRevenueSweep, exportRevenueSweeps, triggerRevenueSweep, getReconciliations, submitReconciliation, archiveReconciliation, unarchiveReconciliation, bulkArchiveReconciliations, getExpectedPoolBalance, getLivePoolBalance } from '../controllers/revenueController.js';
+import { getTariffs } from '../controllers/tariffController.js';
 import { adminListStuckOpenBankingPayouts, adminResolveStuckOpenBankingPayout } from '../controllers/ncbaOpenBankingController.js';
 import { adminListCashAdvanceRequests, adminUpdateCashAdvanceRequest } from '../controllers/cashAdvanceController.js';
 import {
@@ -202,6 +203,7 @@ router.patch('/revenue/sweeps/:id/unarchive', protect, requireMutator, sensitive
 // NCBA's own AccountDetails endpoint (best-effort — unconfirmed response
 // shape, may report unavailable) vs. the manual paste-in-and-compare flow
 // that predates the live pull and remains the proven fallback.
+router.get('/tariffs', protect, excludeOfficer, getTariffs);
 router.get('/revenue/pool-balance/expected', protect, excludeOfficer, getExpectedPoolBalance);
 router.get('/revenue/pool-balance/live', protect, excludeOfficer, getLivePoolBalance);
 router.get('/revenue/reconciliations', protect, excludeOfficer, getReconciliations);

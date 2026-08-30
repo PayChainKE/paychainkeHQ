@@ -169,6 +169,8 @@ const TransactionAudit = () => {
                   <Th>Merchant</Th>
                   <Th>Counterparty</Th>
                   <Th className="text-right">Amount</Th>
+                  <Th className="text-right">PayChain Fee</Th>
+                  <Th className="text-right">3rd-Party Fee</Th>
                   <Th>Status</Th>
                   <Th></Th>
                 </tr>
@@ -176,12 +178,12 @@ const TransactionAudit = () => {
               <tbody className="text-xs">
                 {loading ? (
                   [...Array(6)].map((_, i) => (
-                    <tr key={i}><td colSpan="8" className="px-3 py-3"><div className="h-5 bg-on-surface/5 rounded animate-pulse" /></td></tr>
+                    <tr key={i}><td colSpan="10" className="px-3 py-3"><div className="h-5 bg-on-surface/5 rounded animate-pulse" /></td></tr>
                   ))
                 ) : error ? (
-                  <tr><td colSpan="8" className="py-10 text-center text-error text-sm">{error}</td></tr>
+                  <tr><td colSpan="10" className="py-10 text-center text-error text-sm">{error}</td></tr>
                 ) : rows.length === 0 ? (
-                  <tr><td colSpan="8" className="py-10 text-center text-on-surface-variant/40 text-sm">No transactions match this search.</td></tr>
+                  <tr><td colSpan="10" className="py-10 text-center text-on-surface-variant/40 text-sm">No transactions match this search.</td></tr>
                 ) : rows.map((t) => {
                   const tm = TYPE_META[t.type] || TYPE_META.other;
                   const sm = STATUS_META[t.status] || STATUS_META.pending;
@@ -209,6 +211,12 @@ const TransactionAudit = () => {
                       </td>
                       <td className="px-3 py-2 border-b border-outline-variant/5 text-right font-bold text-on-surface tabular-nums">
                         {t.currency === 'USDC' ? `${t.amount} USDC` : fmtKES(t.amount)}
+                      </td>
+                      <td className="px-3 py-2 border-b border-outline-variant/5 text-right font-bold text-emerald-700 tabular-nums">
+                        {t.paychainFee > 0 ? fmtKES(t.paychainFee) : <span className="text-on-surface-variant/30 font-normal">—</span>}
+                      </td>
+                      <td className="px-3 py-2 border-b border-outline-variant/5 text-right text-on-surface-variant/70 tabular-nums">
+                        {t.safaricomFee > 0 ? fmtKES(t.safaricomFee) : <span className="text-on-surface-variant/30">—</span>}
                       </td>
                       <td className="px-3 py-2 border-b border-outline-variant/5">
                         <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-2xs font-bold uppercase tracking-widest border ${sm.pill}`}>
@@ -314,6 +322,7 @@ const AuditDrawer = ({ id, onClose }) => {
                   {txn.settlementRail && <DetailPill label="Settlement rail" value={txn.settlementRail.toUpperCase()} />}
                   {txn.mobileNetwork && <DetailPill label="Mobile network" value={txn.mobileNetwork} />}
                   <DetailPill label="PayChain fee" value={fmtKES(txn.paychainFee)} mono />
+                  <DetailPill label="3rd-party fee" value={fmtKES(txn.safaricomFee || 0)} mono />
                   <DetailPill label="Balance after" value={txn.balanceAfter != null ? fmtKES(txn.balanceAfter) : '—'} mono />
                 </div>
               </Section>
