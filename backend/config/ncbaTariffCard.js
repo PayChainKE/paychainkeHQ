@@ -1,45 +1,27 @@
-import { safaricomFeeFor } from './revenueRateCard.js';
-import { RAW_C2B_FLAT_MARKUP_KES, FLAT_FEE_FREE_TIER_MAX_KES } from '../utils/pricingEngine.js';
-
 // NCBA Virtual Account collection tariff.
 //
-// PayChain absorbs Safaricom's underlying cost per band (a real cost
-// PayChain pays away, not revenue) and layers its own margin on top. The
-// two are tracked separately (mirrors the existing paychainFee /
-// safaricomFee split on Transaction):
-//   - `safaricomFee` = the absorbed cost component. Not PayChain revenue —
-//     it's what we pay away, we just don't pass it to the merchant. Tiered
-//     by amount, since that real cost genuinely scales with amount.
-//   - `markup`       = what PayChain actually keeps. This is what's
-//     stamped into Transaction.paychainFee and what the admin Revenue
-//     dashboard reports as earned revenue for this stream.
+// Platform-wide pricing rule (Brandon, 2026-08-30): money IN is never
+// charged to the merchant — only money OUT is. The merchant is always
+// credited the full grossAmount for an inbound NCBA collection (raw Paybill
+// deposit, bank transfer, or any other NCBA account-notification credit),
+// regardless of amount. This mirrors the STK Push / QR / Payment Link /
+// Wallet Top-Up flows, which already bill their entire fee to the paying
+// customer via the checkout-total surcharge (pricingEngine.js's
+// splitCustomerSurcharge) rather than the merchant.
 //
-// markup = safaricomFee + RAW_C2B_FLAT_MARKUP_KES (a flat KES margin on
-// top of whatever cost PayChain absorbed for that band), not a flat
-// constant on its own. A flat-only markup — what this used to be — meant
-// every collection above a few hundred KES cost PayChain more to absorb
-// than it earned (safaricomFee grows with amount; a flat markup doesn't),
-// so the whole NCBA rail was quietly running at a loss for its larger
-// transactions. Scaling markup with the absorbed cost guarantees a
-// constant, real KES 5 margin no matter the amount. Free (both zero) at
-// or below FLAT_FEE_FREE_TIER_MAX_KES, matching every other rail.
-//
-// The merchant is credited grossAmount minus the *combined* total — see
-// getNcbaTariffBand() below and services/ncbaLedgerService.js.
+// Extended the same day: PayChain also does not compute, track, or deduct
+// a "Safaricom fee" for this rail anymore. Under the Business Bouquet
+// Paybill tariff PayChain operates under, Safaricom's own cut is collected
+// automatically from the paying customer's M-Pesa account as part of their
+// send — PayChain never sees that money, never pays it away, and never
+// touches it. Modeling a `safaricomFee` here (as an earlier version of this
+// file did, as a "cost PayChain absorbs") double-counted a third-party fee
+// that Safaricom already deducts on its own, invisibly to PayChain's ledger
+// — so it's gone entirely rather than just excluded from the merchant's
+// deduction. If PayChain ever needs a real, PayChain-borne network cost
+// line for this rail in the future, it should come from an actual NCBA/
+// Safaricom settlement statement, not a guessed tariff band.
 export const MAX_NCBA_COLLECTION_AMOUNT = 250_000;
-
-const NCBA_SAFARICOM_FEE_BANDS = [
-  { max: 100,     safaricomFee: 0  },
-  { max: 500,     safaricomFee: 5  },
-  { max: 1_000,   safaricomFee: 10 },
-  { max: 1_500,   safaricomFee: 15 },
-  { max: 2_500,   safaricomFee: 20 },
-  { max: 3_500,   safaricomFee: 25 },
-  { max: 5_000,   safaricomFee: 34 },
-  { max: 7_500,   safaricomFee: 42 },
-  { max: 10_000,  safaricomFee: 48 },
-  { max: 15_000,  safaricomFee: 57 },
-];
 
 export class NcbaTariffBoundsError extends Error {
   constructor(message) {
@@ -48,16 +30,13 @@ export class NcbaTariffBoundsError extends Error {
   }
 }
 
-// Standard financial rounding: half away from zero, to 2dp. All inputs here
-// are already integers, but every downstream KES amount in this pipeline is
-// rounded via this same helper for consistency.
-const round2 = (value) => Math.round((value + Number.EPSILON) * 100) / 100;
-
 /**
- * Look up the NCBA collection fee for a given gross amount — the absorbed
- * Safaricom-side cost (tiered) plus PayChain's own margin on top of it
- * (flat KES 5, scaling with the cost so it's never smaller than what was
- * absorbed). Free (0/0) at or below FLAT_FEE_FREE_TIER_MAX_KES.
+ * Look up the NCBA collection cost for a given gross amount. Money IN is
+ * never charged to the merchant, and PayChain does not model a third-party
+ * Safaricom fee for this rail (see this file's header comment) — every
+ * field here is always 0. Kept as a function (rather than removed outright)
+ * purely so callers don't need special-casing, and so a future real,
+ * PayChain-borne cost for this rail has a single place to be reintroduced.
  *
  * @param {number} grossAmount
  * @returns {{ safaricomFee: number, markup: number, totalFee: number }}
@@ -76,13 +55,5 @@ export function getNcbaTariffBand(grossAmount) {
     );
   }
 
-  const band = NCBA_SAFARICOM_FEE_BANDS.find((b) => amount <= b.max);
-  const safaricomFee = band ? band.safaricomFee : safaricomFeeFor(amount);
-  const markup = amount <= FLAT_FEE_FREE_TIER_MAX_KES ? 0 : round2(safaricomFee + RAW_C2B_FLAT_MARKUP_KES);
-
-  return {
-    safaricomFee: round2(safaricomFee),
-    markup,
-    totalFee: round2(safaricomFee + markup),
-  };
+  return { safaricomFee: 0, markup: 0, totalFee: 0 };
 }
