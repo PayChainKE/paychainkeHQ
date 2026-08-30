@@ -13,6 +13,18 @@ const revenueSweepSchema = new mongoose.Schema({
   // computed-but-unmet figure on 'skipped'/'failed' rows (for visibility).
   attemptedAmount: { type: Number, required: true },
   amount: { type: Number, default: 0 },
+  // The real NCBA fee for moving this transfer, looked up via NCBA's own
+  // ChargeInquiry endpoint before submission (see
+  // services/ncbaOpenBankingService.js#getNcbaChargeInquiry). Kept separate
+  // from `amount` (which stays "what actually landed at PayChain's revenue
+  // account," so the notification email's "KES X moved" claim never
+  // changes) — but computeUnsweptRevenue() sums amount + bankChargeAmount
+  // as what left the pooled account, so a real bank charge on the sweep
+  // itself is never mistaken for revenue that's still sitting unswept in
+  // the shared pool. 0 when the inquiry wasn't available/failed (fails
+  // open — a charge-lookup hiccup must never block a real sweep) or on a
+  // simulated run.
+  bankChargeAmount: { type: Number, default: 0 },
   transactionCount: { type: Number, default: 0 },
   status: {
     type: String,

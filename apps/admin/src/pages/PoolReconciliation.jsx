@@ -62,6 +62,33 @@ const PoolReconciliation = () => {
   const [merchantSearch, setMerchantSearch] = useState('');
   const [exportingBalances, setExportingBalances] = useState(false);
 
+  // Real NCBA account statement — the line-by-line ground truth for what
+  // actually moved on the pooled account. Deliberately NOT auto-fetched on
+  // mount or polled (unlike the balance card above) — it's a real NCBA API
+  // call per date range, only pulled when an admin actually wants to dig
+  // into a discrepancy, same restraint fetchLive's own doc comment already
+  // applies to avoid hitting NCBA more than needed.
+  const todayIso = () => new Date().toISOString().slice(0, 10);
+  const daysAgoIso = (n) => new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const [stmtFrom, setStmtFrom] = useState(daysAgoIso(7));
+  const [stmtTo, setStmtTo] = useState(todayIso());
+  const [statement, setStatement] = useState(null);
+  const [statementLoading, setStatementLoading] = useState(false);
+  const [statementFetched, setStatementFetched] = useState(false);
+
+  const fetchStatement = useCallback(async () => {
+    setStatementLoading(true);
+    try {
+      const res = await api.get('/api/admin/revenue/pool-account/statement', { params: { fromDate: stmtFrom, toDate: stmtTo } });
+      setStatement(res.data?.data || null);
+    } catch (e) {
+      setStatement({ available: false, reason: e?.response?.data?.error || 'Request failed.' });
+    } finally {
+      setStatementLoading(false);
+      setStatementFetched(true);
+    }
+  }, [stmtFrom, stmtTo]);
+
   const [stuckPayouts, setStuckPayouts] = useState([]);
   const [stuckLoading, setStuckLoading] = useState(true);
   const [resolveTarget, setResolveTarget] = useState(null); // { transaction, succeeded }
@@ -398,6 +425,96 @@ const PoolReconciliation = () => {
               </p>
             )}
           </div>
+        </section>
+
+        {/* ── Account Movement — the real NCBA statement ───────────────
+            Line-by-line ground truth for what's actually posted on the
+            pooled account, so a discrepancy above can be traced to a real
+            entry instead of only ever comparing two totals. ──────────── */}
+        <section className="bg-surface-container-lowest rounded-xl border border-outline-variant/40 overflow-hidden">
+          <div className="p-5 md:p-6 pb-4 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+            <div>
+              <h3 className="text-base font-bold text-on-surface tracking-tight font-headline">Account Movement</h3>
+              <p className="text-xs text-on-surface-variant mt-1 max-w-xl">
+                Every real debit and credit NCBA has posted on the pooled account (NCBA 1010837186), straight from NCBA's own
+                statement — the ground truth to check against when the Discrepancy card above isn't zero.
+              </p>
+            </div>
+            <div className="flex items-end gap-2 shrink-0">
+              <div className="flex flex-col gap-1">
+                <label className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant">From</label>
+                <input type="date" value={stmtFrom} max={stmtTo} onChange={(e) => setStmtFrom(e.target.value)}
+                  className="bg-surface-container border border-outline-variant/40 rounded-md px-2.5 py-2 text-xs text-on-surface focus:outline-none focus:border-primary" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant">To</label>
+                <input type="date" value={stmtTo} min={stmtFrom} max={todayIso()} onChange={(e) => setStmtTo(e.target.value)}
+                  className="bg-surface-container border border-outline-variant/40 rounded-md px-2.5 py-2 text-xs text-on-surface focus:outline-none focus:border-primary" />
+              </div>
+              <button
+                onClick={fetchStatement}
+                disabled={statementLoading}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-on-surface text-surface-container-lowest text-2xs font-bold uppercase tracking-widest hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                <span className={`material-symbols-outlined text-sm ${statementLoading ? 'animate-spin' : ''}`}>{statementLoading ? 'progress_activity' : 'receipt_long'}</span>
+                {statementLoading ? 'Loading…' : 'Load Statement'}
+              </button>
+            </div>
+          </div>
+
+          {!statementFetched ? (
+            <div className="px-5 md:px-6 pb-6 text-xs text-on-surface-variant/70">Pick a date range and load the statement — this calls NCBA directly, so it's on demand rather than automatic.</div>
+          ) : statementLoading ? (
+            <div className="p-8"><Skel className="w-full h-32" /></div>
+          ) : !statement?.available ? (
+            <div className="px-5 md:px-6 pb-6">
+              <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+                {statement?.reason || 'NCBA did not return a usable statement.'}
+              </div>
+            </div>
+          ) : (
+            <>
+              {statement.summary && (
+                <div className="px-5 md:px-6 pb-4 flex flex-wrap gap-x-6 gap-y-2 text-2xs text-on-surface-variant">
+                  <span>Opening <span className="font-bold text-on-surface">{formatKES(statement.summary.openingBalance ?? 0)}</span></span>
+                  <span>Closing <span className="font-bold text-on-surface">{formatKES(statement.summary.closingBalance ?? 0)}</span></span>
+                  <span>Total Debit <span className="font-bold text-red-600">{formatKES(statement.summary.totalDebit ?? 0)}</span></span>
+                  <span>Total Credit <span className="font-bold text-emerald-700">{formatKES(statement.summary.totalCredit ?? 0)}</span></span>
+                  <span>{statement.summary.totalTxn ?? statement.entries.length} transactions</span>
+                </div>
+              )}
+              {statement.entries.length === 0 ? (
+                <div className="px-5 md:px-6 pb-6 text-xs text-on-surface-variant/70">No entries posted on this account in the selected range.</div>
+              ) : (
+                <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-surface-container/70 border-b border-outline-variant/40 sticky top-0">
+                      <tr className="text-2xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
+                        <th className="text-left px-5 py-3">Date</th>
+                        <th className="text-left px-3 py-3">Description</th>
+                        <th className="text-left px-3 py-3">Reference</th>
+                        <th className="text-right px-3 py-3">Debit</th>
+                        <th className="text-right px-3 py-3">Credit</th>
+                        <th className="text-right px-5 py-3">Running Balance</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {statement.entries.map((e, i) => (
+                        <tr key={i} className="border-b border-outline-variant/40 last:border-b-0 hover:bg-surface-container/70 transition-colors">
+                          <td className="px-5 py-3 text-on-surface-variant whitespace-nowrap">{e.valueDate || '—'}</td>
+                          <td className="px-3 py-3 text-on-surface">{e.description}</td>
+                          <td className="px-3 py-3 font-mono text-2xs text-on-surface-variant">{e.reference || '—'}</td>
+                          <td className="px-3 py-3 text-right tabular-nums text-red-600">{e.debit ? formatKES(e.debit) : '—'}</td>
+                          <td className="px-3 py-3 text-right tabular-nums text-emerald-700">{e.credit ? formatKES(e.credit) : '—'}</td>
+                          <td className="px-5 py-3 text-right tabular-nums font-bold text-on-surface">{e.runningBalance != null ? formatKES(e.runningBalance) : '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
         </section>
 
         {/* ── Stuck payouts needing manual review ──────────────────── */}

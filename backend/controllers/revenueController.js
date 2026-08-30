@@ -6,7 +6,7 @@ import { REVENUE_STREAMS } from '../config/revenueRateCard.js';
 import { LIVE_DATA_CUTOFF } from '../config/liveDataCutoff.js';
 import { runRevenueSweep, REVENUE_SWEEP_DESTINATION, computeExpectedPoolBalance } from '../services/revenueSweepService.js';
 import { recordReconciliation } from '../services/reconciliationService.js';
-import { getNcbaAccountBalance } from '../services/ncbaOpenBankingService.js';
+import { getNcbaAccountBalance, getNcbaAccountStatement } from '../services/ncbaOpenBankingService.js';
 import { reversedTransactionExclusionMatch } from '../utils/reversedTransactions.js';
 import { excludeDemoMerchantsMatch } from '../utils/demoMerchantExclusion.js';
 import { logAudit } from '../utils/auditLog.js';
@@ -689,7 +689,7 @@ export const exportRevenueSweeps = async (req, res) => {
 
     const header = [
       'Ran At', 'Period Start', 'Period End', 'Status', 'Amount (KES)',
-      'Attempted Amount (KES)', 'Transactions', 'Destination Bank Code',
+      'Bank Fee (KES)', 'Attempted Amount (KES)', 'Transactions', 'Destination Bank Code',
       'Destination Account Number', 'NCBA Reference', 'Simulated',
       'Failure Reason', 'Archived',
     ];
@@ -705,6 +705,7 @@ export const exportRevenueSweeps = async (req, res) => {
       s.periodEnd?.toISOString() || '',
       s.status,
       s.status === 'completed' ? s.amount : 0,
+      s.bankChargeAmount || 0,
       s.attemptedAmount,
       s.transactionCount,
       s.destinationBankCode || '',
@@ -786,6 +787,37 @@ export const getLivePoolBalance = async (req, res) => {
     res.json({ success: true, data: { available: true, balance, totalBalance, raw, fetchedAt: new Date() } });
   } catch (error) {
     console.error('Get Live Pool Balance Error:', error);
+    res.json({ success: true, data: { available: false, reason: error.message } });
+  }
+};
+
+// @desc    The real, dated list of every debit/credit NCBA has actually
+//          posted on the pooled account — the ground truth for tracking
+//          down exactly what a Live-vs-Expected discrepancy is (a real bank
+//          charge, a manual transfer never recorded in the ledger, etc.)
+//          instead of only ever comparing two totals. Defaults to the last
+//          30 days if no range is given. Never confirmed live (unlike
+//          pool-balance/live) — always returns 200 with `available: false`
+//          on any failure or if NCBA_OPENBANKING_LIVE_ENABLED isn't set, so
+//          this can ship ahead of that confirmation without breaking the
+//          page.
+// @route   GET /api/admin/revenue/pool-account/statement?fromDate&toDate (YYYY-MM-DD)
+// @access  Private (Admin)
+export const getPoolAccountStatement = async (req, res) => {
+  try {
+    const toDate = req.query.toDate ? new Date(req.query.toDate) : new Date();
+    const fromDate = req.query.fromDate ? new Date(req.query.fromDate) : new Date(toDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+    if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+      return res.status(400).json({ error: 'fromDate/toDate must be valid dates (YYYY-MM-DD).' });
+    }
+
+    const { raw, entries, summary } = await getNcbaAccountStatement({ fromDate, toDate });
+    if (entries === null) {
+      return res.json({ success: true, data: { available: false, raw, reason: raw?.simulated ? 'NCBA live calls are disabled in this environment — no real statement to show.' : 'NCBA did not return a usable statement — see raw response.' } });
+    }
+    res.json({ success: true, data: { available: true, entries, summary, fetchedAt: new Date() } });
+  } catch (error) {
+    console.error('Get Pool Account Statement Error:', error);
     res.json({ success: true, data: { available: false, reason: error.message } });
   }
 };

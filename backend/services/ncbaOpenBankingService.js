@@ -365,6 +365,155 @@ export async function getNcbaAccountBalance({ accountNo } = {}) {
   return { raw, balance, totalBalance };
 }
 
+// DDMMYYYY — the exact format NCBA's own UAT Guide sample payloads use for
+// AccountStatement ("FromDate":"26052022"). A plain YYYY-MM-DD sent instead
+// would silently return an empty or rejected statement rather than an
+// obvious error, so this is deliberately the only accepted input path —
+// callers pass a real JS Date and never construct the wire format by hand.
+function toNcbaDateString(date) {
+  const d = String(date.getUTCDate()).padStart(2, '0');
+  const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const y = date.getUTCFullYear();
+  return `${d}${m}${y}`;
+}
+
+/**
+ * Fetches the real, dated list of every debit/credit NCBA has posted on a
+ * PayChain account — /api/v1/AccountStatement/accountstatement, from "API
+ * documents/Open Banking V2- Callback Enabled.postman_collection.json".
+ * Response shape per the UAT Guide's own documented sample (never yet
+ * confirmed live, unlike getNcbaAccountBalance — no probe script has been
+ * run against this endpoint):
+ *   { ErrorCode: "000", ErrorMessage: "success", AccountNumber, AccountName,
+ *     StartDate, EndDate, Currency, AvailableBalance, OpeningBalance,
+ *     ClosingBalance, TotalDebit, TotalCredit, TotalTxn,
+ *     AccountList: [{ ValueDate, UniqueTransactionLegNo, CreditAmount,
+ *       DebitAmount, RunningBalance, CreditDebitFlag, TransactionSeqNo,
+ *       Narrative, AdditionalReference, InstrumentReferenceNumber,
+ *       TransactionCode, TransactionCodeDescription, TransactionCurrency,
+ *       PaymentDetails, CreditReference }] }
+ * This is the one real, line-by-line ground truth for what actually moved
+ * on the pooled account — the intended tool for pinning down exactly which
+ * real debit/credit a Live-vs-Expected discrepancy (see
+ * revenueSweepService.js#computeExpectedPoolBalance) traces back to,
+ * instead of only ever seeing the two totals and having to guess.
+ *
+ * @param {object} [params]
+ * @param {Date} params.fromDate
+ * @param {Date} params.toDate
+ * @param {string} [params.accountNo] - defaults to PayChain's own NCBA account
+ * @returns {{ raw: object, entries: object[]|null, summary: object|null }}
+ */
+export async function getNcbaAccountStatement({ fromDate, toDate, accountNo } = {}) {
+  const acct = accountNo || ncbaOpenBankingAccountNumber;
+  if (!acct) {
+    throw new NcbaOpenBankingValidationError('No NCBA account number configured');
+  }
+  if (!(fromDate instanceof Date) || !(toDate instanceof Date) || Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+    throw new NcbaOpenBankingValidationError('fromDate and toDate must be valid Dates');
+  }
+
+  if (!liveCallsEnabled) {
+    return { raw: simulate('ncba_openbanking_account_statement_sandbox', { accountNo: acct }), entries: null, summary: null };
+  }
+
+  const raw = await ncbaOpenBankingPost('/api/v1/AccountStatement/accountstatement', {
+    country: 'KE',
+    accountNo: acct,
+    fromDate: toNcbaDateString(fromDate),
+    toDate: toNcbaDateString(toDate),
+  });
+
+  if (raw?.ErrorCode && raw.ErrorCode !== '000') {
+    return { raw, entries: null, summary: null };
+  }
+
+  const list = Array.isArray(raw?.AccountList) ? raw.AccountList : [];
+  const numeric = (v) => (typeof v === 'number' || (typeof v === 'string' && v.trim() !== '' && !isNaN(Number(v)))) ? Number(v) : null;
+  const entries = list.map((row) => ({
+    valueDate: row.ValueDate || null,
+    description: row.TransactionCodeDescription || row.Narrative || row.PaymentDetails || '—',
+    reference: row.InstrumentReferenceNumber || row.AdditionalReference || row.CreditReference || null,
+    debit: numeric(row.DebitAmount),
+    credit: numeric(row.CreditAmount),
+    runningBalance: numeric(row.RunningBalance),
+    currency: row.TransactionCurrency || raw.Currency || 'KES',
+    seq: row.TransactionSeqNo ?? null,
+  }));
+
+  const summary = {
+    accountNumber: raw.AccountNumber || acct,
+    accountName: raw.AccountName || null,
+    startDate: raw.StartDate || null,
+    endDate: raw.EndDate || null,
+    currency: raw.Currency || 'KES',
+    availableBalance: numeric(raw.AvailableBalance),
+    openingBalance: numeric(raw.OpeningBalance),
+    closingBalance: numeric(raw.ClosingBalance),
+    totalDebit: numeric(raw.TotalDebit),
+    totalCredit: numeric(raw.TotalCredit),
+    totalTxn: raw.TotalTxn ?? entries.length,
+  };
+
+  return { raw, entries, summary };
+}
+
+/**
+ * Looks up the real NCBA fee for a transfer BEFORE submitting it —
+ * /api/v1/ChargeInquiry/chargeinquiry, from "API documents/Open Banking
+ * V2- Callback Enabled.postman_collection.json". Response shape per the
+ * UAT Guide's own documented sample:
+ *   { ErrorCode: "000", ErrorMessage: "SUCCESS", UnitId, ServiceType,
+ *     ChargeCurrency, DebitAccount, ChargeAmount: "0.0" }
+ * Never confirmed live. Built specifically for
+ * services/revenueSweepService.js#runRevenueSweep — the revenue sweep
+ * moves PayChain's own money between its own NCBA accounts, and unlike
+ * every merchant-facing rail (which prices in a real `baseCost` up front),
+ * nothing has ever accounted for what NCBA itself charges for that
+ * transfer. A charge here comes straight out of the pooled account
+ * alongside the swept amount, so if it's never looked up, it silently
+ * drains real money — merchant money and PayChain's own revenue sit in the
+ * same pool — that the ledger has no record of. Fails open by design (see
+ * the try/catch at every call site): a charge-inquiry hiccup must never
+ * block a real sweep from happening.
+ *
+ * @param {object} params
+ * @param {number} params.transactionAmount
+ * @param {string} [params.serviceType] - 'IFT' for the revenue sweep's own same-bank transfer
+ * @param {string} [params.debitAccount] - defaults to PayChain's own NCBA account
+ * @returns {{ raw: object, chargeAmount: number|null }}
+ */
+export async function getNcbaChargeInquiry({ transactionAmount, serviceType = 'IFT', debitAccount } = {}) {
+  const acct = debitAccount || ncbaOpenBankingAccountNumber;
+  if (!acct) {
+    throw new NcbaOpenBankingValidationError('No NCBA account number configured');
+  }
+  const amount = Number(transactionAmount);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new NcbaOpenBankingValidationError('transactionAmount must be a positive number');
+  }
+
+  if (!liveCallsEnabled) {
+    return { raw: simulate('ncba_openbanking_charge_inquiry_sandbox', { serviceType, amount }), chargeAmount: null };
+  }
+
+  const raw = await ncbaOpenBankingPost('/api/v1/ChargeInquiry/chargeinquiry', {
+    country: 'KE',
+    debitAccount: acct,
+    chargeCurrency: 'KES',
+    transactionAmount: amount.toFixed(2),
+    serviceType,
+  });
+
+  if (raw?.ErrorCode && raw.ErrorCode !== '000') {
+    return { raw, chargeAmount: null };
+  }
+  const chargeAmount = (typeof raw?.ChargeAmount === 'number' || (typeof raw?.ChargeAmount === 'string' && raw.ChargeAmount.trim() !== '' && !isNaN(Number(raw.ChargeAmount))))
+    ? Number(raw.ChargeAmount)
+    : null;
+  return { raw, chargeAmount };
+}
+
 export async function validatePesaLinkMobileNumber({ phoneNumber, debitAccount }) {
   if (!phoneNumber) {
     throw new NcbaOpenBankingValidationError('phoneNumber is required to validate a PesaLink-registered mobile number');

@@ -3,6 +3,7 @@ import RevenueSweep from '../models/RevenueSweep.js';
 import Merchant from '../models/Merchant.js';
 import Admin from '../models/Admin.js';
 import { submitNcbaBankTransfer } from '../controllers/ncbaOpenBankingController.js';
+import { getNcbaChargeInquiry } from './ncbaOpenBankingService.js';
 import { sendRevenueSweepNotification } from '../utils/resend.js';
 import { LIVE_DATA_CUTOFF } from '../config/liveDataCutoff.js';
 import { reversedTransactionExclusionMatch } from '../utils/reversedTransactions.js';
@@ -103,8 +104,13 @@ async function computeUnsweptRevenue() {
     ]),
     RevenueSweep.aggregate([
       // simulated rows never actually moved money — must not count as swept.
+      // Sums amount + bankChargeAmount, not just amount: a real NCBA fee on
+      // the sweep transfer itself also left the pooled account for real,
+      // even though it never reached PayChain's revenue account — leaving
+      // it out would keep showing that fee as still "unswept" forever, when
+      // it's actually gone (see getNcbaChargeInquiry's doc comment).
       { $match: { status: 'completed', simulated: { $ne: true } } },
-      { $group: { _id: null, total: { $sum: '$amount' } } },
+      { $group: { _id: null, total: { $sum: { $add: ['$amount', { $ifNull: ['$bankChargeAmount', 0] }] } } } },
     ]),
   ]);
 
@@ -232,6 +238,21 @@ export async function runRevenueSweep() {
     });
   }
 
+  // What NCBA itself will charge for moving PayChain's own money — never
+  // priced anywhere before this, unlike every merchant-facing rail. Fails
+  // open (chargeAmount stays 0) on any error: a charge-lookup hiccup must
+  // never block a real sweep, and 0 is the same conservative default this
+  // codebase already uses everywhere a fee lookup isn't fully proven yet.
+  let bankChargeAmount = 0;
+  try {
+    const { chargeAmount } = await getNcbaChargeInquiry({ transactionAmount: attemptedAmount, serviceType: 'IFT' });
+    if (typeof chargeAmount === 'number' && Number.isFinite(chargeAmount) && chargeAmount >= 0) {
+      bankChargeAmount = chargeAmount;
+    }
+  } catch (e) {
+    logEvent('warn', 'revenue_sweep_charge_inquiry_failed', { amount: attemptedAmount, error: e.message });
+  }
+
   try {
     const { transactionId, hostResponse } = await submitNcbaBankTransfer({
       businessName: 'PayChain Revenue Sweep',
@@ -243,10 +264,11 @@ export async function runRevenueSweep() {
     });
 
     const simulated = hostResponse?.simulated === true;
-    logEvent('info', 'revenue_sweep_completed', { amount: attemptedAmount, transactionId, simulated });
+    logEvent('info', 'revenue_sweep_completed', { amount: attemptedAmount, transactionId, simulated, bankChargeAmount });
     return recordSweep({
       periodStart, periodEnd, attemptedAmount, amount: attemptedAmount, transactionCount,
       status: 'completed', ...destinationAudit, ncbaReference: transactionId, simulated,
+      bankChargeAmount: simulated ? 0 : bankChargeAmount,
     });
   } catch (err) {
     logEvent('error', 'revenue_sweep_failed', { amount: attemptedAmount, error: err.message });
