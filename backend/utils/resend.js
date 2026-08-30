@@ -1645,11 +1645,23 @@ export const sendRevenueSweepNotification = async (email, sweep) => {
     const amount = Number(sweep.status === 'completed' ? sweep.amount : sweep.attemptedAmount).toLocaleString(undefined, { minimumFractionDigits: 2 });
     const period = `${new Date(sweep.periodStart).toLocaleDateString('en-KE', { day: 'numeric', month: 'short' })} – ${new Date(sweep.periodEnd).toLocaleDateString('en-KE', { day: 'numeric', month: 'short' })}`;
 
-    const theme = {
-      completed: { accent: '#5EFEB3', dot: '#10b981', dotBg: 'rgba(16,185,129,0.18)', icon: '✓', label: 'Sweep completed', headline: `KES ${amount} moved to your revenue account` },
-      failed:    { accent: '#fca5a5', dot: '#ef4444', dotBg: 'rgba(239,68,68,0.18)',  icon: '!', label: 'Sweep failed',    headline: `KES ${amount} could not be transferred` },
-      skipped:   { accent: '#fcd34d', dot: '#f59e0b', dotBg: 'rgba(245,158,11,0.18)', icon: '!', label: 'Sweep skipped',   headline: `No transfer this week` },
-    }[sweep.status] || { accent: '#9ca3af', dot: '#9ca3af', dotBg: 'rgba(156,163,175,0.18)', icon: '!', label: 'Sweep update', headline: '' };
+    // A 'completed' sweep with simulated:true never actually moved money —
+    // NCBA live calls were disabled wherever this ran (see
+    // ncbaOpenBankingService.js's liveCallsEnabled / simulate()). Must get
+    // its own theme, distinct from a real completed transfer, or an admin
+    // reading "KES X moved to your revenue account" has no way to know the
+    // money is still sitting in FBO — exactly the confusion this caused
+    // once already (2026-08-31, a local diagnostic boot triggering the real
+    // weekly-sweep scheduler against production while running in sandbox
+    // mode).
+    const isSimulated = sweep.status === 'completed' && sweep.simulated === true;
+    const theme = isSimulated
+      ? { accent: '#fcd34d', dot: '#f59e0b', dotBg: 'rgba(245,158,11,0.18)', icon: '!', label: 'Sweep simulated — no transfer sent', headline: `KES ${amount} NOT moved — this was a simulated run` }
+      : {
+          completed: { accent: '#5EFEB3', dot: '#10b981', dotBg: 'rgba(16,185,129,0.18)', icon: '✓', label: 'Sweep completed', headline: `KES ${amount} moved to your revenue account` },
+          failed:    { accent: '#fca5a5', dot: '#ef4444', dotBg: 'rgba(239,68,68,0.18)',  icon: '!', label: 'Sweep failed',    headline: `KES ${amount} could not be transferred` },
+          skipped:   { accent: '#fcd34d', dot: '#f59e0b', dotBg: 'rgba(245,158,11,0.18)', icon: '!', label: 'Sweep skipped',   headline: `No transfer this week` },
+        }[sweep.status] || { accent: '#9ca3af', dot: '#9ca3af', dotBg: 'rgba(156,163,175,0.18)', icon: '!', label: 'Sweep update', headline: '' };
 
     const data = await resend.emails.send({
       from: 'PayChain <info@paychain.co.ke>',
@@ -1673,10 +1685,15 @@ export const sendRevenueSweepNotification = async (email, sweep) => {
               The weekly sweep of PayChain's accrued transaction fees (${period}) just ran automatically — no PIN or manual approval, since this moves PayChain's own revenue, not a merchant's.
             </p>
 
+            ${isSimulated ? `
+            <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 16px 18px; margin: 0 0 18px;">
+              <p style="margin: 0; color: #92400e; font-size: 13px; line-height: 1.6;"><strong>No real transfer happened.</strong> This environment had NCBA live transfers switched off, so the sweep ran in test mode — the amount below is still sitting in the pooled FBO account, not at PayChain's revenue account. This is expected for a non-production/test run only; if you see this from the real production system, NCBA live calls need to be re-enabled.</p>
+            </div>` : ''}
+
             <div style="background: #f6fbf7; border: 1px solid #d8ecdd; border-radius: 12px; padding: 20px 22px; margin: 0 0 22px;">
               <div style="display: flex; justify-content: space-between; padding: 6px 0;">
                 <span style="color: #6b7280; font-size: 13px;">Status</span>
-                <span style="color: #06201B; font-size: 13px; font-weight: 700; text-transform: capitalize;">${sweep.status}</span>
+                <span style="color: #06201B; font-size: 13px; font-weight: 700; text-transform: capitalize;">${isSimulated ? 'Completed (simulated — no real transfer)' : sweep.status}</span>
               </div>
               <div style="display: flex; justify-content: space-between; padding: 6px 0;">
                 <span style="color: #6b7280; font-size: 13px;">Amount</span>
