@@ -744,7 +744,17 @@ export async function resolvePendingOpenBankingTransaction({ reference, succeede
       // merchant that fee even though the transfer/bill payment never went
       // through.
       let refundAmount = transaction.amount;
-      if (transaction.type === 'ncba_mobile_b2w') {
+      if (transaction.type === 'ncba_outbound') {
+        // Defensive only — executeNcbaBankPayout/bulkPayController.js's Bank
+        // branch both resolve PesaLink/RTGS synchronously today (never
+        // leaving a Transaction 'pending'), so this branch is not known to
+        // be reachable in practice. Kept so a future change that makes this
+        // rail genuinely async can't silently reintroduce the exact
+        // fee-not-refunded gap this function's other branches exist to
+        // avoid — see this function's own doc comment above.
+        const { totalFee } = getBankTransferTariff(transaction.settlementRail, transaction.amount);
+        refundAmount += totalFee;
+      } else if (transaction.type === 'ncba_mobile_b2w') {
         const { totalFee } = getB2cTariff(transaction.amount);
         refundAmount += totalFee;
       } else if (transaction.type === 'ncba_lipa_na_mpesa') {

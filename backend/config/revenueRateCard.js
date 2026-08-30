@@ -178,7 +178,7 @@ export const REVENUE_STREAMS = [
   {
     id: 'mpesa_b2c_fee',
     label: 'M-Pesa B2C Fee',
-    description: 'Safaricom\'s standard B2C tariff on merchant withdrawals to M-Pesa, passed through at cost, plus PayChain\'s own tiered Mobile Withdrawal service fee (config/mpesaB2cTariffCard.js#calculateB2cServiceFee) — both deducted from the merchant alongside the withdrawal.',
+    description: 'PayChain\'s own tiered Mobile Withdrawal service fee on merchant withdrawals to M-Pesa (config/mpesaB2cTariffCard.js#calculateB2cServiceFee), charged alongside Safaricom\'s real B2C cost — both deducted from the merchant.',
     icon: 'smartphone',
     accent: 'rose',
     tiered: true,
@@ -191,7 +191,7 @@ export const REVENUE_STREAMS = [
   {
     id: 'ncba_mobile_b2w_fee',
     label: 'NCBA Mobile B2W Fee',
-    description: 'NCBA\'s replacement for Daraja B2C — merchant withdrawals to M-Pesa/Airtel numbers via NCBA\'s Mobile B2W Payment API, billed under the same Mobile Withdrawal tariff as mpesa_b2c_fee (config/mpesaB2cTariffCard.js). NCBA has not published a real cost schedule for this rail, so the Safaricom-cost portion here is inherited from Safaricom\'s own B2C tariff as a placeholder — PayChain\'s own service fee portion is real either way.',
+    description: 'NCBA\'s replacement for Daraja B2C — merchant withdrawals to M-Pesa/Airtel numbers via NCBA\'s Mobile B2W Payment API, billed under the same Mobile Withdrawal tariff as mpesa_b2c_fee (config/mpesaB2cTariffCard.js) — both Safaricom\'s real cost and PayChain\'s own service fee are charged to the merchant.',
     icon: 'smartphone',
     accent: 'rose',
     tiered: true,
@@ -217,7 +217,7 @@ export const REVENUE_STREAMS = [
   {
     id: 'ncba_lipa_na_mpesa_fee',
     label: 'NCBA Lipa na M-Pesa Fee',
-    description: 'Tiered B2B PayBill & Till Payout tariff (third-party NCBA + Safaricom B2B cost, plus PayChain\'s own service fee) on merchant payouts to another business\'s Paybill or Till, via NCBA\'s Lipa na M-Pesa Payment API — NCBA\'s replacement for Daraja B2B. See config/lipaNaMpesaTariffCard.js. Charged both on the standalone single-payout endpoint (controllers/mpesaController.js#initiateB2B) and on Bulk Pay\'s Mobile Money -> Paybill/Buy Goods rows.',
+    description: 'Tiered B2B PayBill & Till Payout tariff — real NCBA/Safaricom B2B switching cost plus PayChain\'s own service fee, both charged to the merchant — on payouts to another business\'s Paybill or Till, via NCBA\'s Lipa na M-Pesa Payment API — NCBA\'s replacement for Daraja B2B. See config/lipaNaMpesaTariffCard.js. Charged both on the standalone single-payout endpoint (controllers/mpesaController.js#initiateB2B) and on Bulk Pay\'s Mobile Money -> Paybill/Buy Goods rows.',
     icon: 'point_of_sale',
     accent: 'indigo',
     tiered: true,
@@ -230,7 +230,7 @@ export const REVENUE_STREAMS = [
   {
     id: 'ncba_kplc_fee',
     label: 'NCBA KPLC Bill Payment Fee',
-    description: `PayChain's flat KES ${KPLC_POSTPAID_SERVICE_FEE} service fee on Bulk Pay KPLC (Kenya Power) postpaid bill payments (config/billPaymentTariffCard.js), via NCBA's Open Banking KPLC Payment API — plus a KES 10 third-party bank/aggregator base cost, both charged to the merchant alongside the bill value, distinct from the generic ncba_disbursement_fee stream used by bank and other utility (WATER) bulk payouts.`,
+    description: `PayChain's flat KES ${KPLC_POSTPAID_SERVICE_FEE} service fee, plus the real third-party base cost, on Bulk Pay KPLC (Kenya Power) postpaid bill payments (config/billPaymentTariffCard.js), via NCBA's Open Banking KPLC Payment API — both charged to the merchant alongside the bill value, distinct from the generic ncba_disbursement_fee stream used by bank and other utility (WATER) bulk payouts.`,
     icon: 'bolt',
     accent: 'amber',
     rate: null,
@@ -243,7 +243,7 @@ export const REVENUE_STREAMS = [
   {
     id: 'ncba_kplc_prepaid_fee',
     label: 'NCBA KPLC Prepaid Token Fee',
-    description: 'Tiered PayChain service fee (KES 7-69, plus a KES 5-15 third-party base cost) on Bulk Pay KPLC (Kenya Power) prepaid electricity token purchases, via NCBA\'s Open Banking KPLC Prepaid Transaction API — see config/billPaymentTariffCard.js. Distinct from ncba_kplc_fee (postpaid bill payments) — NCBA treats prepaid and postpaid as separate products.',
+    description: 'Tiered PayChain service fee (KES 7-69) plus the real third-party base cost on Bulk Pay KPLC (Kenya Power) prepaid electricity token purchases, via NCBA\'s Open Banking KPLC Prepaid Transaction API — see config/billPaymentTariffCard.js. Distinct from ncba_kplc_fee (postpaid bill payments) — NCBA treats prepaid and postpaid as separate products.',
     icon: 'bolt',
     accent: 'amber',
     tiered: true,
@@ -256,7 +256,7 @@ export const REVENUE_STREAMS = [
   {
     id: 'ncba_ncwsc_fee',
     label: 'NCBA NCWSC Bill Payment Fee',
-    description: `PayChain's flat KES ${NCWSC_SERVICE_FEE} service fee on Bulk Pay Nairobi Water (NCWSC) bill payments (config/billPaymentTariffCard.js), via NCBA's Open Banking NWSC Payment API — plus a KES 10 third-party bank/aggregator base cost, both charged to the merchant alongside the bill value.`,
+    description: `PayChain's flat KES ${NCWSC_SERVICE_FEE} service fee, plus the real third-party base cost, on Bulk Pay Nairobi Water (NCWSC) bill payments (config/billPaymentTariffCard.js), via NCBA's Open Banking NWSC Payment API — both charged to the merchant alongside the bill value.`,
     icon: 'water_drop',
     accent: 'sky',
     rate: null,

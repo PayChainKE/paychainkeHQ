@@ -289,27 +289,13 @@ const INVOICE_CLIENT_MARKUP_BANDS = [
   { max: 250_000,  fee: 35 },
 ];
 
-const INVOICE_MERCHANT_SERVICE_FEE_BANDS = [
-  { max: 100,      fee: 0  },
-  { max: 500,      fee: 5  },
-  { max: 1_000,    fee: 10 },
-  { max: 1_500,    fee: 15 },
-  { max: 2_500,    fee: 20 },
-  { max: 3_500,    fee: 20 },
-  { max: 5_000,    fee: 25 },
-  { max: 7_500,    fee: 30 },
-  { max: 10_000,   fee: 35 },
-  { max: 15_000,   fee: 40 },
-  { max: 20_000,   fee: 40 },
-  { max: 25_000,   fee: 50 },
-  { max: 30_000,   fee: 50 },
-  { max: 35_000,   fee: 50 },
-  { max: 40_000,   fee: 50 },
-  { max: 45_000,   fee: 50 },
-  { max: 50_000,   fee: 50 },
-  { max: 70_000,   fee: 50 },
-  { max: 250_000,  fee: 50 },
-];
+// Flat merchant-side Invoice Service Fee (Brandon, 2026-08-30) — replaces
+// the old tiered INVOICE_MERCHANT_SERVICE_FEE_BANDS (KES 0-50, scaling with
+// invoice size). Deliberately small and flat, on every invoice regardless
+// of amount: the customer already pays the normal tiered markup via
+// calculateInvoiceClientMarkup below (unchanged) — this is just PayChain's
+// own small cut for the Invoicing workflow itself.
+export const INVOICE_MERCHANT_FLAT_FEE_KES = 23;
 
 /**
  * PayChain's client-facing markup on an Invoice STK prompt — the Invoicing
@@ -331,7 +317,11 @@ export function calculateInvoiceClientMarkup(baseInvoiceAmount) {
  * PayChain's merchant-facing "Invoice Service Fee" — deducted from the
  * merchant's net settlement on a paid Invoice (software/workflow charge,
  * distinct from calculateMerchantFee's disabled general M-Pesa fee engine).
- * Free at or below FLAT_FEE_FREE_TIER_MAX_KES.
+ * Flat KES 23 on every invoice, no free tier — the customer already pays
+ * the normal tiered markup via calculateInvoiceClientMarkup above. Clamped
+ * to never exceed the invoice's own base amount (same sanity-clamp
+ * convention as calculateMerchantFee above), so a sub-KES-23 invoice can
+ * never produce a negative merchant settlement.
  *
  * @param {number} baseInvoiceAmount
  * @returns {number} fee in KES, rounded to 2dp.
@@ -339,9 +329,7 @@ export function calculateInvoiceClientMarkup(baseInvoiceAmount) {
 export function calculateInvoiceServiceFee(baseInvoiceAmount) {
   const base = Number(baseInvoiceAmount);
   if (!Number.isFinite(base) || base <= 0) return 0;
-  if (base <= FLAT_FEE_FREE_TIER_MAX_KES) return 0;
-  const band = INVOICE_MERCHANT_SERVICE_FEE_BANDS.find((b) => base <= b.max) || INVOICE_MERCHANT_SERVICE_FEE_BANDS[INVOICE_MERCHANT_SERVICE_FEE_BANDS.length - 1];
-  return round2(band.fee);
+  return round2(Math.min(INVOICE_MERCHANT_FLAT_FEE_KES, base));
 }
 
 /**

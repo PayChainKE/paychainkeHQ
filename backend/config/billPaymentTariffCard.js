@@ -1,22 +1,14 @@
 // PayChain Bill Payments — KPLC (Prepaid & Postpaid), NCWSC (Nairobi
 // Water), Internet, and Rent Settlements, all settled from Bulk Pay
-// (Standard Bill Payment Tariff Schedule, 2026-08-12). Same shape as
-// config/mpesaB2cTariffCard.js#getB2cTariff: every lookup returns
-// { baseCost, serviceFee, totalFee }, where baseCost is the third-party
-// bank/aggregator pass-through cost and serviceFee is PayChain's own kept
-// margin — both are charged to the paying user as a flat fee added to the
-// bill value (unlike the STK/QR checkout model, where the Safaricom-side
-// cost is billed separately by Safaricom, here the whole totalFee is
-// deducted from the merchant's PayChain balance alongside the bill
-// principal, since PayChain itself incurs the third-party cost on this
-// rail — see controllers/bulkPayController.js).
+// (Standard Bill Payment Tariff Schedule, 2026-08-12).
 //
-// KPLC Prepaid's two compressed ranges (2,001-10,000: service fee "19-40";
-// 10,001-250,000: "42-69") and Rent's compressed 10,001-50,000 range
-// ("75-175") had no real third-party cost sub-band to anchor an
-// interpolation to — KPLC/aggregator base cost is flat within each of
-// those rows, same situation as the Mobile Withdrawal tariff's top band.
-// Confirmed with the user (2026-08-12): even round tiers.
+// Pricing rule (Brandon, 2026-08-30, revised same day): the merchant pays
+// both the real third-party (bank/aggregator) pass-through cost
+// (`baseCost`) and PayChain's own kept margin (`serviceFee`) on every bill
+// payment — same shape as config/bankTransferTariffCard.js and
+// config/lipaNaMpesaTariffCard.js. The whole totalFee is deducted from the
+// merchant's PayChain balance alongside the bill principal — see
+// controllers/bulkPayController.js.
 
 const round2 = (value) => Math.round((value + Number.EPSILON) * 100) / 100;
 
