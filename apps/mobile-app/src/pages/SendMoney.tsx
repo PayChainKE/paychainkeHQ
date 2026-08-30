@@ -167,15 +167,15 @@ function estimateB2cFee(amount: number) {
 
 // Mirrors backend/config/bankTransferTariffCard.js — see dashboard
 // SendMoney.jsx's equivalent comment for why a flat KES 50 was wrong (real
-// PesaLink tiers run up to KES 210, RTGS is a flat KES 430).
+// PesaLink tiers run up to KES 210, RTGS is a flat KES 400).
 const PESALINK_BANDS = [
   { max: 500,      totalFee: 50  },
-  { max: 3_500,    totalFee: 97  },
-  { max: 7_000,    totalFee: 122 },
-  { max: 10_000,   totalFee: 147 },
+  { max: 3_500,    totalFee: 70  },
+  { max: 7_000,    totalFee: 88  },
+  { max: 10_000,   totalFee: 100 },
   { max: 250_000,  totalFee: 210 },
 ];
-const RTGS_TOTAL_FEE = 430;
+const RTGS_TOTAL_FEE = 400;
 
 function estimateBankFee(rail: 'pesalink' | 'rtgs', amount: number) {
   if (rail === 'rtgs') return RTGS_TOTAL_FEE;

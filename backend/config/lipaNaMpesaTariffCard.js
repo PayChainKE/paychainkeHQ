@@ -2,24 +2,18 @@
 // 2026-08-12) — PayChain B2B Lipa Na M-Pesa: business-initiated payouts
 // from a merchant's PayChain balance/Virtual Account to any Safaricom Buy
 // Goods Till or Business PayBill, via NCBA's Open Banking Lipa na M-Pesa
-// Payment API (NCBA's replacement for Daraja B2B). Same shape as
-// config/mpesaB2cTariffCard.js#getB2cTariff and
-// config/billPaymentTariffCard.js: every lookup returns
-// { baseCost, serviceFee, totalFee }, where baseCost is the third-party
-// (NCBA + Safaricom B2B switching) pass-through cost and serviceFee is
-// PayChain's own kept margin — both deducted from the paying business's
-// PayChain balance alongside the transfer principal.
+// Payment API (NCBA's replacement for Daraja B2B).
+//
+// Pricing rule (Brandon, 2026-08-30, revised same day): the merchant pays
+// both the real NCBA + Safaricom B2B switching pass-through cost
+// (`baseCost`) and PayChain's own kept margin (`serviceFee`) — same shape
+// as config/bankTransferTariffCard.js and config/billPaymentTariffCard.js.
+// Deducted from the paying business's PayChain balance alongside the
+// transfer principal.
 //
 // Replaces the old flat KES 30 NCBA_LIPA_NA_MPESA_FLAT_FEE_KES (which was
 // also never actually charged on Bulk Pay's Paybill/Till rows — only on
 // the standalone single-payout endpoint, mpesaController.js#initiateB2B).
-//
-// The two compressed top rows (20,001-50,000: service fee "39-54";
-// 50,001-250,000: "56-110") had no real third-party cost sub-band to
-// anchor an interpolation to — Safaricom/NCBA's real B2B cost is flat
-// within each of those rows (KES 25 and KES 30 respectively), same
-// situation as the Mobile Withdrawal and Bill Payment tariffs' top bands.
-// Confirmed with the user (2026-08-12): even round tiers.
 const LIPA_NA_MPESA_B2B_BANDS = [
   { max: 100,      baseCost: 0,  serviceFee: 0   },
   { max: 500,      baseCost: 5,  serviceFee: 5   },

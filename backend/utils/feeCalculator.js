@@ -28,9 +28,10 @@ export function calculateFees(type, kesAmount, rail = null) {
   // executeNcbaBankPayout (the standalone "Withdraw to Bank" endpoint) and
   // bulkPayController.js's Bank payee rows both stamp settlementRail on the
   // Transaction before it's ever saved, so it's always known here. Tiered/
-  // flat per rail — see config/bankTransferTariffCard.js. IFT (NCBA-to-NCBA)
-  // and any untracked rail fall through to zero fee, matching today's
-  // actual (unpriced) behavior — this tariff sheet is external-bank-only.
+  // flat per rail — see config/bankTransferTariffCard.js: merchant pays
+  // both the real NCBA cost (safaricomFee below) and PayChain's own margin
+  // (paychainFee). IFT (NCBA-to-NCBA) and any untracked rail fall through
+  // to zero fee, matching today's actual (unpriced) behavior.
   if (type === 'ncba_outbound') {
     if (v <= 0) {
       return { paychainFee: 0, safaricomFee: 0, streamId: stream?.id || null };
@@ -57,13 +58,12 @@ export function calculateFees(type, kesAmount, rail = null) {
   }
 
   // M-Pesa B2C withdrawals (initiateB2C in mpesaController.js) price off
-  // Safaricom's banded B2C tariff, not a linear rate — see
-  // config/mpesaB2cTariffCard.js. This is the exact same figure the
+  // the tiered Mobile Withdrawal tariff — see config/mpesaB2cTariffCard.js:
+  // merchant pays both Safaricom's real cost (safaricomFee) and PayChain's
+  // own service fee (paychainFee). This is the exact same figure the
   // controller already deducted from the merchant's balance via
   // getB2cTariff(amount) before creating this Transaction, so the two can
-  // never disagree. paychainFee is the tiered Mobile Withdrawal service fee
-  // (calculateB2cServiceFee); the rest is the real Safaricom cost, passed
-  // straight through.
+  // never disagree.
   if (type === 'mpesa_b2c') {
     if (v <= 0) {
       return { paychainFee: 0, safaricomFee: 0, streamId: stream?.id || null };
@@ -97,13 +97,10 @@ export function calculateFees(type, kesAmount, rail = null) {
   }
 
   // KPLC postpaid bill payments (Bulk Pay) — flat Bill Payment tariff, see
-  // config/billPaymentTariffCard.js. paychainFee is the service-fee portion
-  // PayChain actually keeps; safaricomFee here holds the third-party bank/
-  // aggregator base cost (this field is reused across every rail in this
-  // file as "the pass-through cost", not literally Safaricom-specific).
-  // Was a no-op flat KES 20 stamped for reporting only, never actually
-  // deducted from the merchant — bulkPayController.js now folds this same
-  // totalFee into the batch's atomic debit, so the two can't disagree.
+  // config/billPaymentTariffCard.js: merchant pays both the real
+  // bank/aggregator cost (safaricomFee) and PayChain's own service fee
+  // (paychainFee) — bulkPayController.js folds this same totalFee into the
+  // batch's atomic debit, so the two can't disagree.
   if (type === 'ncba_kplc') {
     if (v <= 0) {
       return { paychainFee: 0, safaricomFee: 0, streamId: stream?.id || null };
@@ -134,9 +131,9 @@ export function calculateFees(type, kesAmount, rail = null) {
 
   // B2B PayBill/Till payouts (mpesaController.js#initiateB2B, and Bulk
   // Pay's Mobile Money -> Paybill/Buy Goods rows) — tiered B2B PayBill &
-  // Till Payout tariff, see config/lipaNaMpesaTariffCard.js. Replaces the
-  // old flat KES 30 margin. paychainFee is the service-fee portion only;
-  // safaricomFee holds the third-party NCBA+Safaricom B2B base cost.
+  // Till Payout tariff, see config/lipaNaMpesaTariffCard.js: merchant pays
+  // both the real NCBA/Safaricom B2B switching cost (safaricomFee) and
+  // PayChain's own service fee (paychainFee).
   if (type === 'ncba_lipa_na_mpesa') {
     if (v <= 0) {
       return { paychainFee: 0, safaricomFee: 0, streamId: stream?.id || null };

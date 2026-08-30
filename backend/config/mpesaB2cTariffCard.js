@@ -1,18 +1,15 @@
-// Safaricom's official M-PESA B2C ("Business Bouquet") tariff — the
-// standard business-pays charge for B2C transfers to registered M-Pesa
-// users (customer pays 0, business bears the full charge). Source:
-// Safaricom's own published tariff sheet, "M-PESA B2C PAYMENTS TO
-// REGISTERED USERS" (mpesa-b2c-registered-users.pdf), the base table —
-// not the "withdrawal charges paid" variant, where the business also
-// covers the recipient's cash-out fee (an optional premium add-on, not
-// the standard tariff).
+// M-Pesa B2C ("Business Bouquet") payouts — merchant withdrawals to a
+// registered M-Pesa number. Also used for NCBA Mobile B2W (see
+// utils/feeCalculator.js's ncba_mobile_b2w branch).
 //
-// PayChain's own service fee on top of Safaricom's real cost — tracked
-// here as the tiered B2C_SERVICE_FEE_BANDS table (Mobile Withdrawal
-// Tariff Schedule, 2026-08-12) so every place that debits or reports a
-// B2C fee (initiateB2C, bulk pay's Mobile Money rows, the revenue
-// dashboard) reads the same numbers. Mirrors the safaricomFee / markup
-// split already used in config/ncbaTariffCard.js.
+// Pricing rule (Brandon, 2026-08-30, revised same day): the merchant pays
+// both Safaricom's real B2C cost (B2C_REGISTERED_USER_BANDS, source:
+// Safaricom's own published tariff sheet, "M-PESA B2C PAYMENTS TO
+// REGISTERED USERS") and PayChain's own tiered service fee
+// (B2C_SERVICE_FEE_BANDS, Mobile Withdrawal Tariff Schedule, 2026-08-12).
+// Note the free threshold here is KES 49 (not the platform's usual KES 100
+// FLAT_FEE_FREE_TIER_MAX_KES) — Mobile Withdrawal has its own cutoff per
+// the tariff sheet, charging KES 5 from KES 50 already.
 const B2C_REGISTERED_USER_BANDS = [
   { max: 49,      safaricomFee: 0  },
   { max: 100,     safaricomFee: 0  },
@@ -36,16 +33,6 @@ const B2C_REGISTERED_USER_BANDS = [
   { max: 250_000, safaricomFee: 13 },
 ];
 
-// PayChain's own tiered service fee — replaces the old flat KES 10 margin.
-// Note the free threshold here is KES 49 (not the platform's usual KES 100
-// FLAT_FEE_FREE_TIER_MAX_KES) — Mobile Withdrawal has its own cutoff per
-// the tariff sheet, charging KES 5 from KES 50 already. Doesn't need to
-// share breakpoints with B2C_REGISTERED_USER_BANDS above: unlike the STK/QR
-// tariff, Safaricom's real B2C cost is already flat (KES 13) across the
-// entire 20,001-250,000 range, so there's no real cost sub-band for the
-// sheet's compressed "KES 100-200" top row to anchor to. That range was
-// confirmed (2026-08-12) as three even round tiers instead: KES 100 up to
-// 50,000, KES 150 up to 100,000, KES 200 above that.
 const B2C_SERVICE_FEE_BANDS = [
   { max: 49,      fee: 0   },
   { max: 100,     fee: 5   },
@@ -90,7 +77,9 @@ export function calculateB2cServiceFee(amount) {
 }
 
 /**
- * Look up the standard M-Pesa B2C tariff for a given payout amount.
+ * Look up the M-Pesa B2C tariff for a given payout amount. `safaricomFee`
+ * is Safaricom's real cost, `markup` is PayChain's own kept margin —
+ * `totalFee` (both combined) is what's actually deducted from the merchant.
  *
  * @param {number} amount
  * @returns {{ safaricomFee: number, markup: number, totalFee: number }}

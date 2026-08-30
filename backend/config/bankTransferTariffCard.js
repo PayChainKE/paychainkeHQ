@@ -2,30 +2,29 @@
 // outbound bank transfers from a merchant's PayChain balance/Virtual
 // Account (same underlying Merchant.kesBalance field — "Virtual Account"
 // is the NCBA-provisioned account-number concept, not a separate ledger)
-// to any commercial bank account in Kenya. Same shape as every other
-// tariff card this session: every lookup returns
-// { baseCost, serviceFee, totalFee }, where baseCost is NCBA's real
-// Online/Mobile bank-charge pass-through and serviceFee is PayChain's own
-// kept margin — both deducted from the merchant's balance alongside the
-// transfer principal, via controllers/ncbaOpenBankingController.js's
-// executeNcbaBankPayout (the standalone "Withdraw to Bank" endpoint) and
+// to any commercial bank account in Kenya.
+//
+// Pricing rule (Brandon, 2026-08-30, revised same day): the merchant pays
+// both NCBA's real pass-through cost (`baseCost`) and PayChain's own kept
+// margin (`serviceFee`) on every outbound bank transfer — same as every
+// other money-out rail (see the identical shape in
+// config/lipaNaMpesaTariffCard.js, config/billPaymentTariffCard.js, and
+// config/mpesaB2cTariffCard.js). Money IN (config/ncbaTariffCard.js) stays
+// merchant-free — that's a separate, still-standing policy. Deducted from
+// the merchant's balance alongside the transfer principal, via
+// controllers/ncbaOpenBankingController.js's executeNcbaBankPayout (the
+// standalone "Withdraw to Bank" endpoint) and
 // controllers/bulkPayController.js's Bank payee rows.
 //
 // Does NOT cover IFT (NCBA-to-NCBA internal transfers, forced whenever the
 // destination bank code is NCBA's own — see NCBA_OWN_BANK_CODE in
 // ncbaOpenBankingController.js) — this tariff sheet is external-bank-only,
 // so IFT stays fee-exempt exactly as it is today.
-//
-// PesaLink's 501-10,000 band (service markup given as a range, "47-97")
-// had no real third-party cost sub-band to anchor an interpolation to —
-// NCBA's real PesaLink charge is flat KES 50 across that whole row, same
-// situation as every other tariff's compressed bands this session.
-// Confirmed with the user (2026-08-12): 3 round tiers.
 const PESALINK_BANDS = [
   { max: 500,      baseCost: 0,   serviceFee: 50  },
-  { max: 3_500,    baseCost: 50,  serviceFee: 47  },
-  { max: 7_000,    baseCost: 50,  serviceFee: 72  },
-  { max: 10_000,   baseCost: 50,  serviceFee: 97  },
+  { max: 3_500,    baseCost: 50,  serviceFee: 20  },
+  { max: 7_000,    baseCost: 50,  serviceFee: 38  },
+  { max: 10_000,   baseCost: 50,  serviceFee: 50  },
   { max: 250_000,  baseCost: 100, serviceFee: 110 },
 ];
 
@@ -50,10 +49,12 @@ export function getPesaLinkTariff(amount) {
   };
 }
 
-// RTGS — flat, any amount. NCBA's manual branch RTGS charge is KES 500,
-// PayChain's automated rate is KES 300.
+// RTGS — flat, any amount. Real NCBA cost is KES 300; per Brandon
+// (2026-08-30), total charged to the merchant is fixed at KES 400 rather
+// than cost+the standard KES 130 margin (which would total 430) — so
+// PayChain's kept margin on RTGS is KES 100, not 130.
 export const RTGS_BASE_COST = 300;
-export const RTGS_SERVICE_FEE = 130;
+export const RTGS_SERVICE_FEE = 100;
 
 /** @returns {{ baseCost: number, serviceFee: number, totalFee: number }} */
 export function getRtgsTariff() {

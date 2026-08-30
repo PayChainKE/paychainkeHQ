@@ -94,12 +94,12 @@ function estimateB2cFee(amount) {
 // have the backend charge more than shown.
 const PESALINK_BANDS = [
   { max: 500,      totalFee: 50  },
-  { max: 3_500,    totalFee: 97  },
-  { max: 7_000,    totalFee: 122 },
-  { max: 10_000,   totalFee: 147 },
+  { max: 3_500,    totalFee: 70  },
+  { max: 7_000,    totalFee: 88  },
+  { max: 10_000,   totalFee: 100 },
   { max: 250_000,  totalFee: 210 },
 ]
-const RTGS_TOTAL_FEE = 430 // baseCost 300 + serviceFee 130, flat any amount
+const RTGS_TOTAL_FEE = 400 // baseCost 300 + serviceFee 100, flat any amount
 
 function estimateBankFee(rail, amount) {
   if (rail === 'rtgs') return RTGS_TOTAL_FEE
