@@ -62,6 +62,21 @@ const PoolReconciliation = () => {
   const [merchantSearch, setMerchantSearch] = useState('');
   const [exportingBalances, setExportingBalances] = useState(false);
 
+  // Manually credit a real NCBA collection confirmed on the bank's own
+  // statement but that this webhook never fired for (see
+  // ncbaAccountNotificationController.js#adminManualCreditNcbaCollection —
+  // built 2026-08-31 after exactly this happened to Delamere Dairy Farm).
+  const [showManualCredit, setShowManualCredit] = useState(false);
+  const [manualCreditStep, setManualCreditStep] = useState('form'); // 'form' | 'review'
+  const [manualCreditMerchantId, setManualCreditMerchantId] = useState('');
+  const [manualCreditAmount, setManualCreditAmount] = useState('');
+  const [manualCreditRef, setManualCreditRef] = useState('');
+  const [manualCreditPayerName, setManualCreditPayerName] = useState('');
+  const [manualCreditDate, setManualCreditDate] = useState('');
+  const [manualCreditTime, setManualCreditTime] = useState('');
+  const [manualCreditSubmitting, setManualCreditSubmitting] = useState(false);
+  const [manualCreditError, setManualCreditError] = useState('');
+
   // Real NCBA account statement — the line-by-line ground truth for what
   // actually moved on the pooled account. Deliberately NOT auto-fetched on
   // mount or polled (unlike the balance card above) — it's a real NCBA API
@@ -111,6 +126,19 @@ const PoolReconciliation = () => {
   const [stuckLoading, setStuckLoading] = useState(true);
   const [resolveTarget, setResolveTarget] = useState(null); // { transaction, succeeded }
   const [resolveBusy, setResolveBusy] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null); // transaction
+  const [deleteBusy, setDeleteBusy] = useState(false);
+
+  // Real NCBA statement credits confirmed attributable to a merchant but
+  // with no matching Transaction — services/ncbaCollectionReconciliationService.js's
+  // hourly sweep (built 2026-08-31 after Delamere Dairy Farm's missed
+  // collection). Never auto-credited — each one is a suggestion to review
+  // via Credit Missed Collection above, or dismiss if it's a false match.
+  const [missedCollections, setMissedCollections] = useState([]);
+  const [missedCollectionsLoading, setMissedCollectionsLoading] = useState(true);
+  const [dismissTarget, setDismissTarget] = useState(null); // candidate
+  const [dismissNote, setDismissNote] = useState('');
+  const [dismissBusy, setDismissBusy] = useState(false);
 
   const [reportedBalance, setReportedBalance] = useState('');
   const [note, setNote] = useState('');
@@ -280,17 +308,29 @@ const PoolReconciliation = () => {
     }
   }, []);
 
-  useEffect(() => { fetchExpected(); fetchLive(); fetchHistory(); fetchMerchantBalances(); fetchStuckPayouts(); }, [fetchExpected, fetchLive, fetchHistory, fetchMerchantBalances, fetchStuckPayouts]);
+  const fetchMissedCollections = useCallback(async (silent = false) => {
+    if (!silent) setMissedCollectionsLoading(true);
+    try {
+      const res = await api.get('/api/admin/ncba-collections/missed');
+      setMissedCollections(res.data?.data || []);
+    } catch (e) {
+      if (!silent) setMissedCollections([]);
+    } finally {
+      if (!silent) setMissedCollectionsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchExpected(); fetchLive(); fetchHistory(); fetchMerchantBalances(); fetchStuckPayouts(); fetchMissedCollections(); }, [fetchExpected, fetchLive, fetchHistory, fetchMerchantBalances, fetchStuckPayouts, fetchMissedCollections]);
 
   // Ledger-derived figures + history refresh instantly on any real-time
   // platform event (see context/AuthContext.jsx's SSE connection), plus a
   // 30s fallback poll — matches Revenue.jsx's live-refresh convention.
   useEffect(() => {
-    const id = setInterval(() => { fetchExpected(true); fetchHistory(true); fetchMerchantBalances(true); fetchStuckPayouts(true); }, 30_000);
-    const onSync = () => { fetchExpected(true); fetchHistory(true); fetchMerchantBalances(true); fetchStuckPayouts(true); };
+    const id = setInterval(() => { fetchExpected(true); fetchHistory(true); fetchMerchantBalances(true); fetchStuckPayouts(true); fetchMissedCollections(true); }, 30_000);
+    const onSync = () => { fetchExpected(true); fetchHistory(true); fetchMerchantBalances(true); fetchStuckPayouts(true); fetchMissedCollections(true); };
     window.addEventListener('paychain:sync', onSync);
     return () => { clearInterval(id); window.removeEventListener('paychain:sync', onSync); };
-  }, [fetchExpected, fetchHistory, fetchMerchantBalances, fetchStuckPayouts]);
+  }, [fetchExpected, fetchHistory, fetchMerchantBalances, fetchStuckPayouts, fetchMissedCollections]);
 
   // Live NCBA balance — its own slower, independent cadence (see fetchLive's
   // doc comment above for why this isn't tied to paychain:sync).
@@ -381,6 +421,37 @@ const PoolReconciliation = () => {
     }
   }, [resolveTarget, showToast]);
 
+  const confirmDeleteStuckPayout = useCallback(async () => {
+    if (!deleteTarget) return;
+    setDeleteBusy(true);
+    try {
+      await api.delete(`/api/admin/ncba-payouts/${encodeURIComponent(deleteTarget.reference)}`);
+      setStuckPayouts((prev) => prev.filter((t) => t.reference !== deleteTarget.reference));
+      showToast(`Deleted ${deleteTarget.reference} — no refund issued, merchant balance untouched.`);
+    } catch (e) {
+      showToast(e?.response?.data?.error || 'Could not delete this payout.');
+    } finally {
+      setDeleteBusy(false);
+      setDeleteTarget(null);
+    }
+  }, [deleteTarget, showToast]);
+
+  const confirmDismissMissedCollection = useCallback(async () => {
+    if (!dismissTarget) return;
+    setDismissBusy(true);
+    try {
+      await api.post(`/api/admin/ncba-collections/missed/${dismissTarget._id}/dismiss`, { note: dismissNote.trim() || undefined });
+      setMissedCollections((prev) => prev.filter((c) => c._id !== dismissTarget._id));
+      showToast(`Dismissed ${dismissTarget.statementReference} — no credit applied.`);
+    } catch (e) {
+      showToast(e?.response?.data?.error || 'Could not dismiss this candidate.');
+    } finally {
+      setDismissBusy(false);
+      setDismissTarget(null);
+      setDismissNote('');
+    }
+  }, [dismissTarget, dismissNote, showToast]);
+
   const exportMerchantBalancesCsv = useCallback(async () => {
     setExportingBalances(true);
     try {
@@ -410,6 +481,69 @@ const PoolReconciliation = () => {
       (m.phone || '').toLowerCase().includes(q)
     );
   }, [merchantBalances, merchantSearch]);
+
+  function resetManualCreditForm() {
+    setManualCreditStep('form');
+    setManualCreditMerchantId('');
+    setManualCreditAmount('');
+    setManualCreditRef('');
+    setManualCreditPayerName('');
+    setManualCreditDate('');
+    setManualCreditTime('');
+    setManualCreditError('');
+  }
+
+  function openManualCredit(candidate) {
+    resetManualCreditForm();
+    if (candidate) {
+      setManualCreditMerchantId(candidate.matchedMerchantId?._id || '');
+      setManualCreditAmount(String(candidate.amount));
+      setManualCreditRef(candidate.statementReference || '');
+    }
+    setShowManualCredit(true);
+  }
+
+  function closeManualCredit() {
+    if (manualCreditSubmitting) return;
+    setShowManualCredit(false);
+  }
+
+  function reviewManualCredit(e) {
+    e.preventDefault();
+    setManualCreditError('');
+    if (!manualCreditMerchantId) return setManualCreditError('Select which merchant this money belongs to.');
+    if (!manualCreditAmount || Number(manualCreditAmount) <= 0) return setManualCreditError('Enter the real amount from the bank statement.');
+    if (!manualCreditRef.trim()) return setManualCreditError('Enter the real M-Pesa/NCBA reference from the bank statement.');
+    setManualCreditStep('review');
+  }
+
+  const confirmManualCredit = useCallback(async () => {
+    setManualCreditSubmitting(true);
+    setManualCreditError('');
+    try {
+      const res = await api.post('/api/admin/ncba-collections/manual-credit', {
+        merchantId: manualCreditMerchantId,
+        grossAmount: Number(manualCreditAmount),
+        bankRef: manualCreditRef.trim(),
+        customerName: manualCreditPayerName.trim() || undefined,
+        date: manualCreditDate || undefined,
+        time: manualCreditTime || undefined,
+      });
+      showToast(`Credited KES ${Number(manualCreditAmount).toLocaleString()} — new balance KES ${res.data?.data?.newBalance?.toLocaleString?.() ?? '—'}.`);
+      setShowManualCredit(false);
+      fetchMerchantBalances();
+    } catch (e) {
+      setManualCreditError(e?.response?.data?.error || 'Could not credit this collection.');
+      setManualCreditStep('form');
+    } finally {
+      setManualCreditSubmitting(false);
+    }
+  }, [manualCreditMerchantId, manualCreditAmount, manualCreditRef, manualCreditPayerName, manualCreditDate, manualCreditTime, showToast, fetchMerchantBalances]);
+
+  const manualCreditMerchant = useMemo(
+    () => merchantBalances.find((m) => m._id === manualCreditMerchantId) || null,
+    [merchantBalances, manualCreditMerchantId]
+  );
 
   const liveDiscrepancy = (live?.available && expected)
     ? Math.round((live.balance - expected.expectedPoolBalance) * 100) / 100
@@ -625,8 +759,9 @@ const PoolReconciliation = () => {
               <h3 className="text-base font-bold text-on-surface tracking-tight font-headline">Bank Charges</h3>
               <p className="text-xs text-on-surface-variant mt-1 max-w-xl">
                 Real NCBA/KRA charges on the pooled account with no matching PayChain transfer — Excise Duty (KRA's tax on bank
-                fees), an SMS fee, anything spotted on NCBA Connect Plus or the statement above. Recorded here, these reduce
-                PayChain's own unswept revenue, never merchant money.
+                fees), an SMS fee, anything spotted on NCBA Connect Plus or the statement above. An hourly sweep now finds and
+                records most of these automatically (marked "Auto-detected" below) — add one by hand for anything it misses.
+                Recorded here, these reduce PayChain's own unswept revenue, never merchant money.
               </p>
             </div>
             {canSubmitCheck && (
@@ -695,7 +830,14 @@ const PoolReconciliation = () => {
                       <td className="px-3 py-3 text-on-surface">{c.description}</td>
                       <td className="px-3 py-3 font-mono text-2xs text-on-surface-variant">{c.reference || '—'}</td>
                       <td className="px-3 py-3 text-right tabular-nums font-bold text-red-600">{formatKES(c.amount)}</td>
-                      <td className="px-3 py-3 text-on-surface-variant">{c.recordedBy?.name || c.recordedBy?.email || '—'}</td>
+                      <td className="px-3 py-3 text-on-surface-variant">
+                        {c.source === 'auto_detected' ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-bold uppercase tracking-widest border bg-blue-50 text-blue-700 border-blue-200">
+                            <span className="material-symbols-outlined text-[12px]">auto_awesome</span>
+                            Auto-detected
+                          </span>
+                        ) : (c.recordedBy?.name || c.recordedBy?.email || '—')}
+                      </td>
                       {canSubmitCheck && (
                         <td className="px-5 py-3 text-right whitespace-nowrap">
                           <button onClick={() => startEditCharge(c)} title="Correct this charge's amount, date, description, or reference" className="text-on-surface-variant/50 hover:text-on-surface transition-colors mr-2">
@@ -760,6 +902,66 @@ const PoolReconciliation = () => {
                       <td className="px-3 py-2 border-b border-outline-variant/5 text-right whitespace-nowrap">
                         <button onClick={() => setResolveTarget({ transaction: t, succeeded: true })} className="text-2xs font-bold uppercase tracking-widest text-emerald-700 hover:text-emerald-900 px-2">Succeeded</button>
                         <button onClick={() => setResolveTarget({ transaction: t, succeeded: false })} className="text-2xs font-bold uppercase tracking-widest text-red-700 hover:text-red-900 px-2">Failed</button>
+                        <button onClick={() => setDeleteTarget(t)} title="Permanently remove this row without a refund decision — for rows that were never real customer money" className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 hover:text-red-900 px-2">Delete</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
+
+        {/* ── Missed collections — real NCBA statement credits with no
+            matching Transaction, flagged by the hourly reconciliation
+            sweep (services/ncbaCollectionReconciliationService.js). Never
+            auto-credited — Credit opens the same reviewed, dedup-checked
+            tool above, pre-filled. ──────────────────────────────────── */}
+        {(missedCollectionsLoading || missedCollections.length > 0) && (
+          <section className="bg-surface-container-lowest rounded-xl border border-amber-200 overflow-hidden">
+            <div className="p-5 md:p-6 pb-3 flex items-center justify-between">
+              <div>
+                <span className="text-xs font-medium text-amber-700 flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-base">report</span>
+                  Missed Collections · Needs Manual Review
+                </span>
+                <p className="text-2xs text-on-surface-variant/60 mt-1 max-w-xl">
+                  Real credits on NCBA's own statement, confidently matched to a merchant, but with no matching PayChain transaction — the account-notification webhook never fired for these. Review against the bank statement, then credit or dismiss.
+                </p>
+              </div>
+              {!missedCollectionsLoading && missedCollections.length > 0 && (
+                <span className="shrink-0 text-2xs font-bold uppercase tracking-widest text-amber-700 bg-amber-100 px-2.5 py-1 rounded-full">{missedCollections.length}</span>
+              )}
+            </div>
+            <div className="overflow-x-auto custom-scrollbar">
+              <table className="w-full text-left font-body">
+                <thead>
+                  <tr className="bg-surface-container-low/50">
+                    <Th>Reference</Th>
+                    <Th>Merchant</Th>
+                    <Th>Description</Th>
+                    <Th className="text-right">Amount</Th>
+                    <Th>Statement Date</Th>
+                    <Th>Flagged</Th>
+                    <Th></Th>
+                  </tr>
+                </thead>
+                <tbody className="text-xs">
+                  {missedCollectionsLoading ? (
+                    [...Array(2)].map((_, i) => (
+                      <tr key={i}><td colSpan="7" className="px-3 py-3"><div className="h-5 bg-on-surface/5 rounded animate-pulse" /></td></tr>
+                    ))
+                  ) : missedCollections.map((c) => (
+                    <tr key={c._id}>
+                      <td className="px-3 py-2 border-b border-outline-variant/5 font-mono text-2xs font-bold text-on-surface">{c.statementReference}</td>
+                      <td className="px-3 py-2 border-b border-outline-variant/5 font-bold text-on-surface truncate max-w-[160px]">{c.matchedMerchantId?.businessName || c.matchedMerchantCode || '—'}</td>
+                      <td className="px-3 py-2 border-b border-outline-variant/5 text-on-surface-variant/70 truncate max-w-[220px]">{c.statementDescription || '—'}</td>
+                      <td className="px-3 py-2 border-b border-outline-variant/5 text-right font-bold text-on-surface tabular-nums">{formatKES(c.amount)}</td>
+                      <td className="px-3 py-2 border-b border-outline-variant/5 text-on-surface-variant/70 whitespace-nowrap">{c.statementDate || '—'}</td>
+                      <td className="px-3 py-2 border-b border-outline-variant/5 text-on-surface-variant/70 whitespace-nowrap">{fmtDateTime(c.createdAt)}</td>
+                      <td className="px-3 py-2 border-b border-outline-variant/5 text-right whitespace-nowrap">
+                        <button onClick={() => openManualCredit(c)} className="text-2xs font-bold uppercase tracking-widest text-emerald-700 hover:text-emerald-900 px-2">Credit</button>
+                        <button onClick={() => setDismissTarget(c)} className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 hover:text-red-900 px-2">Dismiss</button>
                       </td>
                     </tr>
                   ))}
@@ -825,6 +1027,14 @@ const PoolReconciliation = () => {
               >
                 <span className="material-symbols-outlined text-sm">{exportingBalances ? 'progress_activity' : 'download'}</span>
                 {exportingBalances ? 'Preparing…' : 'Download CSV'}
+              </button>
+              <button
+                onClick={() => openManualCredit()}
+                title="For real money confirmed on NCBA's own statement that never reached a merchant's balance because the webhook never fired"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-amber-50 border border-amber-200 text-amber-800 text-2xs font-bold uppercase tracking-widest hover:bg-amber-100 transition-colors whitespace-nowrap"
+              >
+                <span className="material-symbols-outlined text-sm">add_card</span>
+                Credit Missed Collection
               </button>
             </div>
           </div>
@@ -1074,6 +1284,150 @@ const PoolReconciliation = () => {
                   {resolveBusy ? 'Resolving…' : `Confirm ${resolveTarget.succeeded ? 'succeeded' : 'failed'}`}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dismiss a missed-collection candidate — no credit applied */}
+      {dismissTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => !dismissBusy && setDismissTarget(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="p-7">
+              <div className="w-14 h-14 rounded-full flex items-center justify-center mb-4 bg-surface-container text-on-surface-variant">
+                <span className="material-symbols-outlined text-3xl">visibility_off</span>
+              </div>
+              <h3 className="text-xl font-bold text-on-surface mb-1">Dismiss {dismissTarget.statementReference}?</h3>
+              <p className="text-sm text-on-surface-variant mb-4">
+                This clears it from the review list without crediting anyone — use this if it's a false match, or turns out to already be accounted for.
+              </p>
+              <textarea value={dismissNote} onChange={(e) => setDismissNote(e.target.value)} placeholder="Why (optional, kept for the audit log)" rows={2} className="w-full px-3 py-2 border border-outline-variant/40 rounded-lg text-xs mb-4" />
+              <div className="flex gap-3">
+                <button onClick={() => setDismissTarget(null)} disabled={dismissBusy} className="flex-1 py-2.5 rounded-lg border border-outline-variant/40 text-on-surface text-sm font-semibold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40">Cancel</button>
+                <button onClick={confirmDismissMissedCollection} disabled={dismissBusy} className="flex-1 py-2.5 rounded-lg text-sm font-semibold uppercase tracking-widest text-white bg-on-surface hover:opacity-90 disabled:opacity-50">
+                  {dismissBusy ? 'Dismissing…' : 'Confirm Dismiss'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Permanently delete a stuck payout — no refund, no succeeded/failed
+          decision, just gone. For rows that were never real customer money
+          (e.g. live-test payouts) — not a substitute for Failed when a real
+          refund is owed. */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => !deleteBusy && setDeleteTarget(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="p-7">
+              <div className="w-14 h-14 rounded-full flex items-center justify-center mb-4 bg-red-100 text-red-700">
+                <span className="material-symbols-outlined text-3xl">delete_forever</span>
+              </div>
+              <h3 className="text-xl font-bold text-on-surface mb-1">
+                Permanently delete {deleteTarget.reference}?
+              </h3>
+              <p className="text-sm text-on-surface-variant mb-5">
+                This removes the {formatKES(deleteTarget.kesAmount || deleteTarget.amount)} transaction record entirely.
+                {' '}<strong className="text-red-700">No refund is issued and the merchant's balance is not changed</strong> — only use this for a row that was never real customer money.
+                {' '}If money actually needs to go back to the merchant, cancel and use "Failed" instead. This row moves to Trash and can be restored there within 90 days if needed.
+              </p>
+              <div className="flex gap-3">
+                <button onClick={() => setDeleteTarget(null)} disabled={deleteBusy} className="flex-1 py-2.5 rounded-lg border border-outline-variant/40 text-on-surface text-sm font-semibold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40">Cancel</button>
+                <button onClick={confirmDeleteStuckPayout} disabled={deleteBusy} className="flex-1 py-2.5 rounded-lg text-sm font-semibold uppercase tracking-widest text-white disabled:opacity-50 bg-red-600 hover:bg-red-700">
+                  {deleteBusy ? 'Deleting…' : 'Confirm delete'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manually credit a missed NCBA collection — form, then a review
+          step before it actually touches the merchant's balance. */}
+      {showManualCredit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={closeManualCredit}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="p-7">
+              {manualCreditStep === 'form' ? (
+                <>
+                  <div className="w-14 h-14 rounded-full flex items-center justify-center mb-4 bg-amber-100 text-amber-700">
+                    <span className="material-symbols-outlined text-3xl">add_card</span>
+                  </div>
+                  <h3 className="text-xl font-bold text-on-surface mb-1">Credit a missed collection</h3>
+                  <p className="text-sm text-on-surface-variant mb-5">
+                    Only for money you've personally confirmed on NCBA's own statement — this credits the merchant's real balance immediately.
+                  </p>
+                  <form onSubmit={reviewManualCredit} className="space-y-3">
+                    <div>
+                      <label className="block text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 mb-1">Merchant</label>
+                      <select
+                        value={manualCreditMerchantId}
+                        onChange={(e) => setManualCreditMerchantId(e.target.value)}
+                        className="w-full bg-surface-container border border-outline-variant/40 rounded-md px-3 py-2 text-sm text-on-surface focus:outline-none focus:border-primary"
+                      >
+                        <option value="">Select merchant…</option>
+                        {merchantBalances.map((m) => (
+                          <option key={m._id} value={m._id}>{m.businessName} · {m.ncbaMerchantCode}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 mb-1">Amount (KES)</label>
+                      <input type="number" min="1" step="0.01" value={manualCreditAmount} onChange={(e) => setManualCreditAmount(e.target.value)} placeholder="3000" className="w-full bg-surface-container border border-outline-variant/40 rounded-md px-3 py-2 text-sm text-on-surface focus:outline-none focus:border-primary" />
+                    </div>
+                    <div>
+                      <label className="block text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 mb-1">M-Pesa / NCBA Reference</label>
+                      <input type="text" value={manualCreditRef} onChange={(e) => setManualCreditRef(e.target.value.toUpperCase())} placeholder="UHVCT58LFU" className="w-full bg-surface-container border border-outline-variant/40 rounded-md px-3 py-2 text-sm text-on-surface font-mono focus:outline-none focus:border-primary" />
+                    </div>
+                    <div>
+                      <label className="block text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 mb-1">Payer Name (optional)</label>
+                      <input type="text" value={manualCreditPayerName} onChange={(e) => setManualCreditPayerName(e.target.value)} placeholder="Everlyn Owino Onyango" className="w-full bg-surface-container border border-outline-variant/40 rounded-md px-3 py-2 text-sm text-on-surface focus:outline-none focus:border-primary" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 mb-1">Date (optional)</label>
+                        <input type="date" value={manualCreditDate} onChange={(e) => setManualCreditDate(e.target.value)} className="w-full bg-surface-container border border-outline-variant/40 rounded-md px-3 py-2 text-sm text-on-surface focus:outline-none focus:border-primary" />
+                      </div>
+                      <div>
+                        <label className="block text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 mb-1">Time (optional)</label>
+                        <input type="time" value={manualCreditTime} onChange={(e) => setManualCreditTime(e.target.value)} className="w-full bg-surface-container border border-outline-variant/40 rounded-md px-3 py-2 text-sm text-on-surface focus:outline-none focus:border-primary" />
+                      </div>
+                    </div>
+                    {manualCreditError && (
+                      <div className="text-[13px] text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-medium">{manualCreditError}</div>
+                    )}
+                    <div className="flex gap-3 pt-2">
+                      <button type="button" onClick={closeManualCredit} className="flex-1 py-2.5 rounded-lg border border-outline-variant/40 text-on-surface text-sm font-semibold uppercase tracking-widest hover:bg-surface-container-low">Cancel</button>
+                      <button type="submit" className="flex-1 py-2.5 rounded-lg text-sm font-semibold uppercase tracking-widest text-white bg-amber-600 hover:bg-amber-700">Review</button>
+                    </div>
+                  </form>
+                </>
+              ) : (
+                <>
+                  <div className="w-14 h-14 rounded-full flex items-center justify-center mb-4 bg-amber-100 text-amber-700">
+                    <span className="material-symbols-outlined text-3xl">warning</span>
+                  </div>
+                  <h3 className="text-xl font-bold text-on-surface mb-1">Confirm this credit</h3>
+                  <p className="text-sm text-on-surface-variant mb-4">This immediately changes a real merchant balance. Double-check against the bank statement before confirming.</p>
+                  <div className="bg-surface-container-low rounded-lg p-4 space-y-1.5 text-sm mb-5">
+                    <p><span className="text-on-surface-variant/60">Merchant:</span> <strong>{manualCreditMerchant?.businessName || '—'}</strong></p>
+                    <p><span className="text-on-surface-variant/60">Amount:</span> <strong>{formatKES(Number(manualCreditAmount))}</strong></p>
+                    <p><span className="text-on-surface-variant/60">Reference:</span> <strong className="font-mono">{manualCreditRef}</strong></p>
+                    {manualCreditPayerName && <p><span className="text-on-surface-variant/60">Payer:</span> <strong>{manualCreditPayerName}</strong></p>}
+                    {manualCreditDate && <p><span className="text-on-surface-variant/60">When:</span> <strong>{manualCreditDate}{manualCreditTime ? ` ${manualCreditTime}` : ''}</strong></p>}
+                  </div>
+                  {manualCreditError && (
+                    <div className="text-[13px] text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-medium mb-4">{manualCreditError}</div>
+                  )}
+                  <div className="flex gap-3">
+                    <button onClick={() => setManualCreditStep('form')} disabled={manualCreditSubmitting} className="flex-1 py-2.5 rounded-lg border border-outline-variant/40 text-on-surface text-sm font-semibold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40">Back</button>
+                    <button onClick={confirmManualCredit} disabled={manualCreditSubmitting} className="flex-1 py-2.5 rounded-lg text-sm font-semibold uppercase tracking-widest text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50">
+                      {manualCreditSubmitting ? 'Crediting…' : 'Confirm Credit'}
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

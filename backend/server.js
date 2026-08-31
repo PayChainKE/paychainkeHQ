@@ -70,6 +70,8 @@ import { checkAndSendDormancyReminders } from './services/dormancyReminderServic
 import { checkAndSendTaxDeadlineReminders } from './services/taxDeadlineReminderService.js';
 import { runWeeklyRevenueSweepIfDue } from './services/revenueSweepService.js';
 import { reconcileStuckOpenBankingPayouts } from './services/ncbaOpenBankingReconciliationService.js';
+import { reconcileMissedNcbaCollections } from './services/ncbaCollectionReconciliationService.js';
+import { reconcileUnrecordedBankCharges } from './services/bankChargeReconciliationService.js';
 import { retryInsufficientFundsPayouts } from './services/ncbaPayoutRetryService.js';
 import { processPendingWebhookDeliveries } from './services/webhookDeliveryService.js';
 import { reconcileStuckStkRequests } from './services/stkRequestReconciliationService.js';
@@ -416,6 +418,33 @@ async function bootstrap() {
   setInterval(() => {
     reconcileStuckOpenBankingPayouts().catch((e) => console.error('Open Banking reconciliation sweep failed:', e));
   }, 5 * 60 * 1000);
+
+  // Missed-collection reconciliation — catches a real NCBA credit that
+  // never reached PayChain because the account-notification webhook never
+  // fired for it (confirmed real 2026-08-31: Delamere Dairy Farm, KES
+  // 3,000, only discovered because the merchant complained). Pulls the
+  // real NCBA statement and cross-checks it against Transaction records;
+  // never auto-credits, only flags for admin review on Pool Reconciliation
+  // (see services/ncbaCollectionReconciliationService.js). Hourly, not
+  // 5-minute — this is a real live NCBA API call per run, unlike the
+  // local-DB-only sweep above.
+  reconcileMissedNcbaCollections().catch((e) => console.error('Missed NCBA collection reconciliation sweep failed:', e));
+  setInterval(() => {
+    reconcileMissedNcbaCollections().catch((e) => console.error('Missed NCBA collection reconciliation sweep failed:', e));
+  }, 60 * 60 * 1000);
+
+  // Bank charge reconciliation — catches real NCBA/KRA fee debits (Excise
+  // Duty etc.) on ordinary outbound merchant payouts, not just the weekly
+  // sweep, so PoolReconciliation's discrepancy stops silently growing
+  // between manual NCBA Connect Plus checks (confirmed real 2026-08-31:
+  // -17.60 -> -169.20 in days, entirely from unrecorded charges on regular
+  // Mobile B2W withdrawals). Auto-records — unlike missed collections,
+  // this never touches a merchant's balance, only PayChain's own accrued-
+  // revenue accounting (see services/bankChargeReconciliationService.js).
+  reconcileUnrecordedBankCharges().catch((e) => console.error('Bank charge reconciliation sweep failed:', e));
+  setInterval(() => {
+    reconcileUnrecordedBankCharges().catch((e) => console.error('Bank charge reconciliation sweep failed:', e));
+  }, 60 * 60 * 1000);
 
   // NCBA B2C/B2B payout retry — a genuine "Insufficient Funds" rejection
   // (unlike the ambiguous case above) means nothing moved, so it's safe to

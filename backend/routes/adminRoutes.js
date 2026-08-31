@@ -78,7 +78,9 @@ import { adminListInvoices } from '../controllers/invoiceController.js';
 import { sendSmsBroadcast, getSmsBroadcasts, deleteSmsBroadcast, clearSmsBroadcasts } from '../controllers/smsBroadcastController.js';
 import { getRevenue, getRevenueSweeps, archiveRevenueSweep, unarchiveRevenueSweep, exportRevenueSweeps, triggerRevenueSweep, getReconciliations, submitReconciliation, archiveReconciliation, unarchiveReconciliation, bulkArchiveReconciliations, getExpectedPoolBalance, getLivePoolBalance, getPoolAccountStatement, getBankCharges, recordBankCharge, updateBankCharge, archiveBankCharge } from '../controllers/revenueController.js';
 import { getTariffs, requestTariffUpdate, confirmTariffUpdate } from '../controllers/tariffController.js';
-import { adminListStuckOpenBankingPayouts, adminResolveStuckOpenBankingPayout } from '../controllers/ncbaOpenBankingController.js';
+import { adminListStuckOpenBankingPayouts, adminResolveStuckOpenBankingPayout, adminDeleteStuckOpenBankingPayout } from '../controllers/ncbaOpenBankingController.js';
+import { adminManualCreditNcbaCollection, adminListMissedNcbaCollections, adminDismissMissedNcbaCollection } from '../controllers/ncbaAccountNotificationController.js';
+import { getTrash, restoreTrashItem } from '../controllers/trashController.js';
 import { adminListCashAdvanceRequests, adminUpdateCashAdvanceRequest } from '../controllers/cashAdvanceController.js';
 import {
   listExpenses,
@@ -226,6 +228,26 @@ router.patch('/revenue/reconciliations/:id/unarchive', protect, requireMutator, 
 // then resolves it here.
 router.get('/ncba-payouts/stuck-review', protect, excludeOfficer, adminListStuckOpenBankingPayouts);
 router.post('/ncba-payouts/:reference/resolve', protect, requireMutator, sensitiveActionLimiter, adminResolveStuckOpenBankingPayout);
+// Permanently wipes a stuck row without a succeeded/failed decision — for
+// rows that were never real customer money (e.g. live-test payouts), not a
+// substitute for "Failed" when a real refund is owed. See
+// adminDeleteStuckOpenBankingPayout's doc comment.
+router.delete('/ncba-payouts/:reference', protect, requireMutator, sensitiveActionLimiter, adminDeleteStuckOpenBankingPayout);
+
+// Manually credit a real NCBA collection that landed on NCBA's own
+// statement but this webhook never fired for — see
+// adminManualCreditNcbaCollection's doc comment.
+router.post('/ncba-collections/manual-credit', protect, requireMutator, sensitiveActionLimiter, adminManualCreditNcbaCollection);
+// Proactive detection — services/ncbaCollectionReconciliationService.js's
+// hourly sweep flags real statement credits with no matching Transaction.
+router.get('/ncba-collections/missed', protect, excludeOfficer, adminListMissedNcbaCollections);
+router.post('/ncba-collections/missed/:id/dismiss', protect, requireMutator, sensitiveActionLimiter, adminDismissMissedNcbaCollection);
+
+// Trash — snapshots of the handful of significant admin-initiated
+// deletions (Merchant, Transaction/stuck-payout, Admin/officer-or-team,
+// Expense), restorable within a 90-day window. See models/DeletedRecord.js.
+router.get('/trash', protect, requireMutator, getTrash);
+router.post('/trash/:id/restore', protect, requireMutator, sensitiveActionLimiter, restoreTrashItem);
 
 // Stellar Wallet Audit (live Horizon cross-reference)
 router.get('/wallet-audit', protect, excludeOfficer, runWalletAudit);

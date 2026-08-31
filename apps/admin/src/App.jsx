@@ -31,6 +31,7 @@ import TaxCompliance from './pages/TaxCompliance';
 import SmsBroadcast from './pages/SmsBroadcast';
 import KycVerification from './pages/KycVerification';
 import KycApplicationDetail from './pages/KycApplicationDetail';
+import Trash from './pages/Trash';
 import ToastHost from './components/ui/Toast';
 import { Analytics as VercelAnalytics } from "@vercel/analytics/react";
 
@@ -73,6 +74,7 @@ export default function App(){
             <Route path="/wallet-audit" element={<Protected><WalletAudit/></Protected>} />
             <Route path="/invoices" element={<Protected><Invoices/></Protected>} />
             <Route path="/audit-log" element={<Protected><AuditLog/></Protected>} />
+            <Route path="/trash" element={<Protected><Trash/></Protected>} />
             <Route path="/transaction-audit" element={<Protected><TransactionAudit/></Protected>} />
             <Route path="/transaction-tariffs" element={<Protected><TransactionTariffs/></Protected>} />
             <Route path="/security" element={<Protected><Security/></Protected>} />

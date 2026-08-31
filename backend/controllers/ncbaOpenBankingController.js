@@ -35,6 +35,7 @@ import { getB2cTariff } from '../config/mpesaB2cTariffCard.js';
 import { getLipaNaMpesaTariff } from '../config/lipaNaMpesaTariffCard.js';
 import { getBankTransferTariff } from '../config/bankTransferTariffCard.js';
 import { logAudit } from '../utils/auditLog.js';
+import { recordDeletion } from '../utils/trash.js';
 
 export class InsufficientFundsError extends Error {
   constructor(merchantId, requested, available) {
@@ -977,5 +978,53 @@ export const adminResolveStuckOpenBankingPayout = async (req, res) => {
   } catch (err) {
     logEvent('error', 'admin_resolve_stuck_openbanking_payout_error', { reference, error: err.message });
     res.status(500).json({ error: 'Failed to resolve this payout' });
+  }
+};
+
+// @desc    Permanently remove a stuck payout from the review queue without
+//          resolving it as succeeded/failed — for a row that was never real
+//          customer money (e.g. a live-test payout) and doesn't belong in
+//          the ledger at all, rather than something that needs a refund
+//          decision. Deliberately does NOT touch the merchant's balance —
+//          "Failed" already exists for the case where money needs to go
+//          back; this is only for wiping a row that shouldn't be resolved
+//          through the normal accounting path. Scoped tightly to exactly
+//          this queue (status:'pending' AND the manual-review flag) so it
+//          can never be pointed at an arbitrary transaction by reference.
+//          The full transaction is snapshotted into the audit log before
+//          deletion, since the live document won't exist to look up
+//          afterwards — this is the only remaining record of it.
+// @route   DELETE /admin/ncba-payouts/:reference
+// @access  Private (admin, requireMutator + sensitiveActionLimiter —
+//          irreversible and touches the transaction ledger)
+export const adminDeleteStuckOpenBankingPayout = async (req, res) => {
+  const { reference } = req.params;
+  try {
+    const transaction = await Transaction.findOneAndDelete({
+      reference,
+      status: 'pending',
+      pendingReason: 'stuck_timeout_needs_manual_review',
+    }).lean();
+    if (!transaction) {
+      return res.status(404).json({ error: 'No stuck payout found with this reference — it may already have been resolved.' });
+    }
+
+    // findOneAndDelete already removed it atomically above — this can't be
+    // strictly "before" the delete the way every other trashed model does
+    // it, but the transaction is already gone by this point regardless, so
+    // the only thing at risk from a crash right here is losing undo-ability
+    // for this one row, never correctness. See utils/trash.js.
+    await recordDeletion({ collectionName: 'Transaction', doc: transaction, label: `${transaction.type} · ${transaction.reference}`, deletedBy: req.admin._id });
+
+    logAudit({
+      action: 'admin.ncba_payout.manual_delete', category: 'wallet', severity: 'critical',
+      message: `Admin permanently deleted stuck payout ${reference} without resolving it — no refund issued, merchant balance untouched`,
+      req, actor: { type: 'admin', id: req.admin._id, email: req.admin.email, name: req.admin.name },
+      metadata: { reference, deletedTransaction: transaction },
+    });
+    res.json({ success: true, reference });
+  } catch (err) {
+    logEvent('error', 'admin_delete_stuck_openbanking_payout_error', { reference, error: err.message });
+    res.status(500).json({ error: 'Failed to delete this payout' });
   }
 };

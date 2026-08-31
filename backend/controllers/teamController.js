@@ -6,6 +6,7 @@ import Contact from '../models/Contact.js';
 import Communication from '../models/Communication.js';
 import { sendTeamInvite } from '../utils/resend.js';
 import { notifyAdmins, escapeHtml } from '../utils/securityAlerts.js';
+import { recordDeletion } from '../utils/trash.js';
 
 const ADMIN_DASHBOARD_URL =
   process.env.ADMIN_DASHBOARD_URL || 'https://admin.paychain.co.ke';
@@ -210,6 +211,7 @@ export const removeTeamMember = async (req, res) => {
       const ownerCount = await Admin.countDocuments({ role: 'owner' });
       if (ownerCount <= 1) return res.status(400).json({ error: 'Cannot remove the only remaining owner.' });
     }
+    await recordDeletion({ collectionName: 'Admin', doc: target, label: `${target.name || target.email} (${target.role})`, deletedBy: req.admin._id });
     await target.deleteOne();
     res.json({ success: true });
   } catch (error) {

@@ -1,6 +1,7 @@
 import Expense, { EXPENSE_CATEGORIES, PAYMENT_METHODS } from '../models/Expense.js';
 import Transaction from '../models/Transaction.js';
 import { logAudit } from '../utils/auditLog.js';
+import { recordDeletion } from '../utils/trash.js';
 import { adminActor } from './adminController.js';
 import { REVENUE_STREAMS } from '../config/revenueRateCard.js';
 import { excludeDemoMerchantsMatch } from '../utils/demoMerchantExclusion.js';
@@ -213,6 +214,7 @@ export const deleteExpense = async (req, res) => {
       metadata: { expenseId: String(expense._id) },
     });
 
+    await recordDeletion({ collectionName: 'Expense', doc: expense, label: `${expense.category}: KES ${expense.amount.toLocaleString()}`, deletedBy: req.admin._id });
     await Expense.deleteOne({ _id: expense._id });
     res.json({ success: true, message: 'Expense deleted.' });
   } catch (error) {

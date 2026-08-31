@@ -53,7 +53,7 @@ const KycVerification = () => {
   const [status, setStatus] = useState('all');
   const [riskTier, setRiskTier] = useState('all');
   const [search, setSearch] = useState('');
-  const PAGE_SIZE = 25;
+  const PAGE_SIZE = 30;
   const [page, setPage] = useState(1);
   const [totalApplications, setTotalApplications] = useState(0);
 

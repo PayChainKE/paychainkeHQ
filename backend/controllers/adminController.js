@@ -14,6 +14,7 @@ import Communication from '../models/Communication.js';
 import SmsLog from '../models/SmsLog.js';
 import { sendMerchantInvite, sendAdminActionOTP, sendContactDetailsChangedEmail } from '../utils/resend.js';
 import { logAudit } from '../utils/auditLog.js';
+import { recordDeletion } from '../utils/trash.js';
 import { getNcbaVirtualAccountNumber, generateRandomMerchantCode, validatePhoneNumber, isValidPhoneInputFormat, NcbaValidationError } from '../utils/ncbaValidators.js';
 import { generateMerchantStickerPdf, generateBulkStickerPdf, generateMerchantQrFlyerPdf } from '../utils/stickerGenerator.js';
 import { LIVE_DATA_CUTOFF } from '../config/liveDataCutoff.js';
@@ -553,6 +554,13 @@ export const confirmMerchantAction = async (req, res) => {
             })
           : Promise.resolve(),
       ]);
+      // Snapshot BEFORE deleting so this shows up on the Trash page and can
+      // be restored — see utils/trash.js. Only the Merchant document itself
+      // is restorable; the Payee/PaymentLink/STKRequest rows just deleted
+      // above are not (they're the "pre-transaction configuration" this
+      // cascade deliberately treats as non-critical — see the comment
+      // above this block).
+      await recordDeletion({ collectionName: 'Merchant', doc: merchant, label: merchant.businessName || merchant.email, deletedBy: admin._id });
       await Merchant.deleteOne({ _id: merchant._id });
     }
 
@@ -1448,10 +1456,19 @@ export const getMerchantDetail = async (req, res) => {
 
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const oneDayAgo    = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const [txnCount30d, txnCount24h, lastTxn, thirtyDayAgg, lifetimeAgg] = await Promise.all([
+    const [txnCount30d, txnCount24h, lastTxn, recentTransactions, thirtyDayAgg, lifetimeAgg] = await Promise.all([
       Transaction.countDocuments({ merchantId: merchant._id, createdAt: { $gte: thirtyDaysAgo } }),
       Transaction.countDocuments({ merchantId: merchant._id, createdAt: { $gte: oneDayAgo } }),
       Transaction.findOne({ merchantId: merchant._id }).sort('-createdAt').select('createdAt amount status type').lean(),
+      // Last 10 transactions, regardless of type — so an admin can check a
+      // merchant's real recent activity (stuck payouts, failed collections,
+      // anything odd) straight from this drawer instead of navigating to
+      // the separate Transactions page and filtering by merchant.
+      Transaction.find({ merchantId: merchant._id })
+        .sort('-createdAt')
+        .limit(10)
+        .select('type status amount kesAmount currency reference sender recipient pendingReason createdAt')
+        .lean(),
       // 30d KES + USDC volume (NCBA-normalised, mirrors getMerchants)
       Transaction.aggregate([
         { $match: { merchantId: merchant._id, createdAt: { $gte: thirtyDaysAgo } } },
@@ -1594,6 +1611,7 @@ export const getMerchantDetail = async (req, res) => {
           amount: lastTxn.amount,
           status: lastTxn.status,
         } : null,
+        recentTransactions,
         // Onboarding-officer pipeline due diligence — absent (null/[]) for
         // self-serve/admin-direct merchants, since kybStatus is only ever
         // set by officerController.js's createApplication.
