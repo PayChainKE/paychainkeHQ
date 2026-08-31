@@ -97,6 +97,18 @@ const transactionSchema = new mongoose.Schema({
     name: String,
     id: String
   },
+  // For an ncba_lipa_na_mpesa payout specifically: the destination paybill's
+  // account-reference field (e.g. a merchant's own ncbaMerchantCode when
+  // paying into PayChain's own shared paybill, NCBA_STK_BUSINESS_NUMBER) —
+  // recipient.id above only ever holds the paybill/till number itself
+  // (partyB), not this sub-account reference, so without this field there
+  // was no way to later confirm which specific account actually received a
+  // stuck payout's money. Lets
+  // services/ncbaOpenBankingReconciliationService.js auto-resolve a stuck
+  // payout by cross-matching PayChain's own ncba_inbound credit records
+  // instead of requiring a manual admin check every time, for the one case
+  // (paying into PayChain's own paybill) where that's actually safe to do.
+  paybillAccountReference: { type: String, default: null },
   // Per-transaction fee fields, auto-stamped at save time from the canonical
   // rate card. Persisting these (rather than always re-computing at query
   // time) means: (1) historical revenue is locked-in even if rates change,
