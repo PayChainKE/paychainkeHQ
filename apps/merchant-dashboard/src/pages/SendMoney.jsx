@@ -19,6 +19,12 @@ const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
 // confirmed working, then opened up to every merchant.
 const LIPA_NA_MPESA_BETA_MERCHANT_ID = '6a8f30cb228671cacc4361fe' // Brantech Solutions
 
+// Paused 2026-08-31, mirrors backend/config/lipaNaMpesaBetaAllowlist.js's
+// LIVE_TESTING_ENABLED — NCBA callbacks unconfirmed, so Till/Paybill is
+// hidden for everyone (including the beta merchant) until Rose confirms
+// they're working. Flip back to true alongside that backend flag.
+const LIPA_NA_MPESA_LIVE_TESTING_ENABLED = false
+
 const DESTINATIONS = [
   { id: 'mpesa-primary', label: 'Primary M-PESA Number',   icon: 'phone_iphone',     fee: null, hint: 'Your registered phone number' },
   { id: 'mobile',        label: 'Any M-PESA Number',        icon: 'smartphone',        fee: null, hint: 'Send to any Kenyan mobile number' },
@@ -162,7 +168,7 @@ export default function SendMoney() {
   // the wizard. Freezing it for the duration of this flow keeps the step
   // machine consistent regardless of when the underlying record refreshes.
   const [hasPin]      = useState(() => !!merchant?.hasAppPin)
-  const isLipaNaMpesaBetaMerchant = merchant?._id === LIPA_NA_MPESA_BETA_MERCHANT_ID
+  const isLipaNaMpesaBetaMerchant = LIPA_NA_MPESA_LIVE_TESTING_ENABLED && merchant?._id === LIPA_NA_MPESA_BETA_MERCHANT_ID
   const selectedDest = DESTINATIONS.find(d => d.id === destination)
   const isMobileDest = destination === 'mpesa-primary' || destination === 'mobile'
   const isB2bDest     = destination === 'till' || destination === 'paybill'
