@@ -1,9 +1,10 @@
 import Transaction from '../models/Transaction.js';
 import RevenueSweep from '../models/RevenueSweep.js';
+import BankAccountCharge from '../models/BankAccountCharge.js';
 import Merchant from '../models/Merchant.js';
 import Admin from '../models/Admin.js';
 import { submitNcbaBankTransfer } from '../controllers/ncbaOpenBankingController.js';
-import { getNcbaChargeInquiry } from './ncbaOpenBankingService.js';
+import { getNcbaChargeInquiry, getNcbaAccountBalance } from './ncbaOpenBankingService.js';
 import { sendRevenueSweepNotification } from '../utils/resend.js';
 import { LIVE_DATA_CUTOFF } from '../config/liveDataCutoff.js';
 import { reversedTransactionExclusionMatch } from '../utils/reversedTransactions.js';
@@ -97,7 +98,7 @@ async function computeUnsweptRevenue() {
     reversedTransactionExclusionMatch(),
     excludeDemoMerchantsMatch(),
   ]);
-  const [accruedAgg, sweptAgg] = await Promise.all([
+  const [accruedAgg, sweptAgg, chargesAgg] = await Promise.all([
     Transaction.aggregate([
       { $match: { createdAt: { $gte: LIVE_DATA_CUTOFF }, status: { $in: ['completed', 'verified'] }, ...excludeReversed, ...excludeDemo } },
       { $group: { _id: null, total: { $sum: '$paychainFee' }, count: { $sum: 1 } } },
@@ -112,12 +113,23 @@ async function computeUnsweptRevenue() {
       { $match: { status: 'completed', simulated: { $ne: true } } },
       { $group: { _id: null, total: { $sum: { $add: ['$amount', { $ifNull: ['$bankChargeAmount', 0] }] } } } },
     ]),
+    // Real NCBA/KRA-side charges not tied to any transfer — confirmed live
+    // 2026-08-31 via NCBA Connect Plus: a recurring ~KES 10.80 Excise Duty
+    // charge (KRA's tax on bank transaction fees) that getNcbaChargeInquiry
+    // never catches, since it's a government tax layered on top, not
+    // NCBA's own fee. See models/BankAccountCharge.js. `archived` is a
+    // display-only filter elsewhere; every recorded charge still counts
+    // here regardless.
+    BankAccountCharge.aggregate([
+      { $group: { _id: null, total: { $sum: '$amount' } } },
+    ]),
   ]);
 
   const totalAccrued = accruedAgg[0]?.total || 0;
   const transactionCount = accruedAgg[0]?.count || 0;
   const totalSwept = sweptAgg[0]?.total || 0;
-  const unswept = Math.round((totalAccrued - totalSwept) * 100) / 100;
+  const totalCharges = chargesAgg[0]?.total || 0;
+  const unswept = Math.round((totalAccrued - totalSwept - totalCharges) * 100) / 100;
 
   return { unswept: Math.max(0, unswept), transactionCount };
 }
@@ -225,7 +237,7 @@ export async function runRevenueSweep() {
   }
 
   const { unswept, transactionCount } = await computeUnsweptRevenue();
-  const attemptedAmount = Math.min(unswept, MAX_TRANSFER_AMOUNT);
+  let attemptedAmount = Math.min(unswept, MAX_TRANSFER_AMOUNT);
 
   if (attemptedAmount < MIN_TRANSFER_AMOUNT) {
     logEvent('info', 'revenue_sweep_skipped_below_minimum', { unswept });
@@ -235,6 +247,46 @@ export async function runRevenueSweep() {
       failureReason: unswept <= 0
         ? 'No revenue accrued since the last sweep.'
         : `Accrued revenue (KES ${unswept}) is below NCBA's KES ${MIN_TRANSFER_AMOUNT} minimum transfer.`,
+    });
+  }
+
+  // Hard safety gate — protects merchant money from ANY unmodeled drain on
+  // the real account (Excise Duty, a future new bank/tax charge, a ledger
+  // bug — anything), not just the ones already known about. The ledger's
+  // own `unswept` figure alone is never trusted to submit a real transfer:
+  // it's cross-checked against what NCBA actually reports right now, and
+  // capped so a sweep can never take the real balance below what's owed to
+  // merchants. Fails safe (skips, doesn't guess) if the live balance can't
+  // be verified — a missed sweep this week just means more accrues and
+  // goes out next run (computeUnsweptRevenue is a running total); a wrong
+  // guess here would risk moving merchant money.
+  const merchantAgg = await Merchant.aggregate([
+    { $match: { isDemoMerchant: { $ne: true } } },
+    { $group: { _id: null, total: { $sum: '$kesBalance' } } },
+  ]);
+  const merchantBalanceTotal = Math.round((merchantAgg[0]?.total || 0) * 100) / 100;
+
+  const { balance: liveBalance } = await getNcbaAccountBalance().catch(() => ({ balance: null }));
+  if (liveBalance === null) {
+    logEvent('warn', 'revenue_sweep_skipped_no_live_balance', { attemptedAmount });
+    return recordSweep({
+      periodStart, periodEnd, attemptedAmount, transactionCount, status: 'skipped',
+      ...destinationAudit,
+      failureReason: 'Could not verify the real NCBA balance before sweeping — skipped rather than risk transferring merchant money. Will retry next run.',
+    });
+  }
+
+  const safeToSweep = Math.max(0, Math.round((liveBalance - merchantBalanceTotal) * 100) / 100);
+  if (safeToSweep < attemptedAmount) {
+    logEvent('warn', 'revenue_sweep_capped_by_live_balance', { attemptedAmount, liveBalance, merchantBalanceTotal, safeToSweep });
+  }
+  attemptedAmount = Math.min(attemptedAmount, safeToSweep);
+
+  if (attemptedAmount < MIN_TRANSFER_AMOUNT) {
+    return recordSweep({
+      periodStart, periodEnd, attemptedAmount, transactionCount, status: 'skipped',
+      ...destinationAudit,
+      failureReason: `Live balance (KES ${liveBalance}) minus merchant money owed (KES ${merchantBalanceTotal}) leaves only KES ${safeToSweep} safely sweepable — below NCBA's KES ${MIN_TRANSFER_AMOUNT} minimum. Skipped to protect merchant funds; will retry next run as the gap resolves (e.g. once it's recorded under Bank Charges).`,
     });
   }
 
