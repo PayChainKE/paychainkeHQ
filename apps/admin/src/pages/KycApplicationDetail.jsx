@@ -247,6 +247,12 @@ const KycApplicationDetail = () => {
             <p><span className="text-on-surface-variant/50">Account Status:</span> {app.status || '—'}{app.isVerified ? ' · Verified' : ''}</p>
             <p><span className="text-on-surface-variant/50">Business Number:</span> {app.businessNumber || '—'}</p>
             <p><span className="text-on-surface-variant/50">KRA PIN Format Check:</span> {app.isKRAVerified ? 'Passed' : 'Not verified'}</p>
+            <p><span className="text-on-surface-variant/50">Business Type:</span> {app.businessType || '—'}</p>
+            <p><span className="text-on-surface-variant/50">County:</span> {app.county || '—'}</p>
+            <p><span className="text-on-surface-variant/50">Business Area:</span> {app.businessArea || '—'}</p>
+            <p><span className="text-on-surface-variant/50">Employee Count:</span> {app.employeeCount || '—'}</p>
+            <p><span className="text-on-surface-variant/50">E-Commerce Business:</span> {app.isEcommerce === true ? 'Yes' : app.isEcommerce === false ? 'No' : '—'}</p>
+            <p><span className="text-on-surface-variant/50">Agreed to Terms:</span> {app.agreedToTerms ? `Yes${app.agreedToTermsAt ? ` (${new Date(app.agreedToTermsAt).toLocaleDateString()})` : ''}` : 'No'}</p>
             <div className="sm:col-span-2">
               <span className="text-on-surface-variant/50">Business Certificate:</span>{' '}
               <UploadableDocRow
