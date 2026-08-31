@@ -18,7 +18,13 @@ const bankAccountChargeSchema = new mongoose.Schema({
   amount: { type: Number, required: true, min: 0 },
   description: { type: String, required: true, trim: true },
   reference: { type: String, default: null }, // NCBA's own reference/narrative from the statement, if any
-  recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', required: true },
+  // 'auto_detected' — services/bankChargeReconciliationService.js's hourly
+  // sweep found this directly on NCBA's real statement (a fee-type debit
+  // line — Excise Duty, a commission, etc. — with no PayChain Transaction
+  // behind it) and recorded it itself, same as an admin would via NCBA
+  // Connect Plus. recordedBy is null for these — nobody manually entered it.
+  source: { type: String, enum: ['manual', 'auto_detected'], default: 'manual' },
+  recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null },
   // "Clear" from the admin's list — same reversible-archive pattern as
   // RevenueSweep/BankReconciliation. Never touched by
   // computeUnsweptRevenue, which must keep subtracting every real charge
