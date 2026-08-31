@@ -304,7 +304,7 @@ export const claimApplication = async (req, res) => {
       { returnDocument: 'after' }
     );
     if (!application) {
-      return res.status(409).json({ error: 'Already claimed by another officer, or not in a claimable state.' });
+      return res.status(409).json({ error: 'Already claimed by someone else, or not in a claimable state.' });
     }
 
     logAudit({
