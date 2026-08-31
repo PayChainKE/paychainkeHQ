@@ -76,7 +76,7 @@ import {
 import { runWalletAudit } from '../controllers/walletAuditController.js';
 import { adminListInvoices } from '../controllers/invoiceController.js';
 import { sendSmsBroadcast, getSmsBroadcasts, deleteSmsBroadcast, clearSmsBroadcasts } from '../controllers/smsBroadcastController.js';
-import { getRevenue, getRevenueSweeps, archiveRevenueSweep, unarchiveRevenueSweep, exportRevenueSweeps, triggerRevenueSweep, getReconciliations, submitReconciliation, archiveReconciliation, unarchiveReconciliation, bulkArchiveReconciliations, getExpectedPoolBalance, getLivePoolBalance } from '../controllers/revenueController.js';
+import { getRevenue, getRevenueSweeps, archiveRevenueSweep, unarchiveRevenueSweep, exportRevenueSweeps, triggerRevenueSweep, getReconciliations, submitReconciliation, archiveReconciliation, unarchiveReconciliation, bulkArchiveReconciliations, getExpectedPoolBalance, getLivePoolBalance, getPoolAccountStatement, getBankCharges, recordBankCharge, updateBankCharge, archiveBankCharge } from '../controllers/revenueController.js';
 import { getTariffs, requestTariffUpdate, confirmTariffUpdate } from '../controllers/tariffController.js';
 import { adminListStuckOpenBankingPayouts, adminResolveStuckOpenBankingPayout } from '../controllers/ncbaOpenBankingController.js';
 import { adminListCashAdvanceRequests, adminUpdateCashAdvanceRequest } from '../controllers/cashAdvanceController.js';
@@ -208,6 +208,11 @@ router.post('/tariffs/request-update', protect, requireMutator, sensitiveActionL
 router.post('/tariffs/confirm-update', protect, requireMutator, sensitiveActionLimiter, confirmTariffUpdate);
 router.get('/revenue/pool-balance/expected', protect, excludeOfficer, getExpectedPoolBalance);
 router.get('/revenue/pool-balance/live', protect, excludeOfficer, getLivePoolBalance);
+router.get('/revenue/pool-account/statement', protect, excludeOfficer, getPoolAccountStatement);
+router.get('/revenue/pool-account/charges', protect, excludeOfficer, getBankCharges);
+router.post('/revenue/pool-account/charges', protect, requireMutator, sensitiveActionLimiter, recordBankCharge);
+router.patch('/revenue/pool-account/charges/:id', protect, requireMutator, sensitiveActionLimiter, updateBankCharge);
+router.patch('/revenue/pool-account/charges/:id/archive', protect, requireMutator, sensitiveActionLimiter, archiveBankCharge);
 router.get('/revenue/reconciliations', protect, excludeOfficer, getReconciliations);
 router.post('/revenue/reconciliations', protect, requireMutator, sensitiveActionLimiter, submitReconciliation);
 router.post('/revenue/reconciliations/bulk-archive', protect, requireMutator, sensitiveActionLimiter, bulkArchiveReconciliations);

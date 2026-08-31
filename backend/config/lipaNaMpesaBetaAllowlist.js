@@ -12,8 +12,18 @@ const LIPA_NA_MPESA_BETA_MERCHANT_IDS = new Set([
   '6a8f30cb228671cacc4361fe', // Brantech Solutions
 ]);
 
+// Paused 2026-08-31: NCBA's Lipa na M-Pesa callbacks are unconfirmed after
+// Brantech's own live test (PAYOUTB2B1788164950565NRJLU) sat stuck with no
+// callback ever arriving. Rose (NCBA contact) is checking whether callbacks
+// are actually enabled on this account. Until she confirms, Till/Paybill is
+// blocked for EVERYONE — including the beta merchant above — so no more
+// merchant money gets stuck behind a rail that isn't provably working. Flip
+// back to true once Rose confirms callbacks are live; nothing else about
+// the allowlist needs to change.
+const LIVE_TESTING_ENABLED = false;
+
 export function isLipaNaMpesaBetaMerchant(merchantId) {
-  return LIPA_NA_MPESA_BETA_MERCHANT_IDS.has(String(merchantId));
+  return LIVE_TESTING_ENABLED && LIPA_NA_MPESA_BETA_MERCHANT_IDS.has(String(merchantId));
 }
 
 export const LIPA_NA_MPESA_NOT_AVAILABLE_MESSAGE =

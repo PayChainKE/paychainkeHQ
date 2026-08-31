@@ -1049,6 +1049,11 @@ const Revenue = () => {
                           <td className="px-3 py-3.5 text-right tabular-nums">
                             <span className="font-bold text-on-surface">{fmtKESPrecise(amount)}</span>
                             {s.status !== 'completed' && <span className="block text-2xs text-on-surface-variant normal-case">attempted</span>}
+                            {s.status === 'completed' && !s.simulated && s.bankChargeAmount > 0 && (
+                              <span className="block text-2xs text-amber-700 normal-case" title="Real NCBA fee for this transfer — already accounted for, pooled-account money">
+                                +{fmtKESPrecise(s.bankChargeAmount)} bank fee
+                              </span>
+                            )}
                           </td>
                           <td className="px-3 py-3.5 text-right tabular-nums text-on-surface-variant">
                             {fmtNum(s.transactionCount)}

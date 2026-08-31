@@ -896,6 +896,11 @@ export const authorizeBatch = async (req, res) => {
           mobileNetwork: (payee.paymentMethod === 'Mobile Money' && payee.mobileMoneyType === 'Personal Number')
             ? (payee.mobileNetwork === 'airtel' ? 'airtel' : 'safaricom')
             : null,
+          // See models/Transaction.js's doc comment — lets a stuck Lipa na
+          // M-Pesa payout into PayChain's own shared paybill be
+          // auto-resolved by cross-matching the real ncba_inbound credit,
+          // instead of always needing a manual admin check.
+          paybillAccountReference: row.isLnmRow ? (payee.businessAccount || null) : null,
           // Only Bank rows ever set this (captured from submitNcbaBankTransfer's
           // return above) — utils/feeCalculator.js's pre-save hook uses it to
           // price 'ncba_outbound' per-rail. undefined for every other row,

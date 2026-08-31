@@ -2,11 +2,12 @@ import mongoose from 'mongoose';
 import Transaction from '../models/Transaction.js';
 import RevenueSweep from '../models/RevenueSweep.js';
 import BankReconciliation from '../models/BankReconciliation.js';
+import BankAccountCharge from '../models/BankAccountCharge.js';
 import { REVENUE_STREAMS } from '../config/revenueRateCard.js';
 import { LIVE_DATA_CUTOFF } from '../config/liveDataCutoff.js';
 import { runRevenueSweep, REVENUE_SWEEP_DESTINATION, computeExpectedPoolBalance } from '../services/revenueSweepService.js';
 import { recordReconciliation } from '../services/reconciliationService.js';
-import { getNcbaAccountBalance } from '../services/ncbaOpenBankingService.js';
+import { getNcbaAccountBalance, getNcbaAccountStatement } from '../services/ncbaOpenBankingService.js';
 import { reversedTransactionExclusionMatch } from '../utils/reversedTransactions.js';
 import { excludeDemoMerchantsMatch } from '../utils/demoMerchantExclusion.js';
 import { logAudit } from '../utils/auditLog.js';
@@ -689,7 +690,7 @@ export const exportRevenueSweeps = async (req, res) => {
 
     const header = [
       'Ran At', 'Period Start', 'Period End', 'Status', 'Amount (KES)',
-      'Attempted Amount (KES)', 'Transactions', 'Destination Bank Code',
+      'Bank Fee (KES)', 'Attempted Amount (KES)', 'Transactions', 'Destination Bank Code',
       'Destination Account Number', 'NCBA Reference', 'Simulated',
       'Failure Reason', 'Archived',
     ];
@@ -705,6 +706,7 @@ export const exportRevenueSweeps = async (req, res) => {
       s.periodEnd?.toISOString() || '',
       s.status,
       s.status === 'completed' ? s.amount : 0,
+      s.bankChargeAmount || 0,
       s.attemptedAmount,
       s.transactionCount,
       s.destinationBankCode || '',
@@ -787,6 +789,177 @@ export const getLivePoolBalance = async (req, res) => {
   } catch (error) {
     console.error('Get Live Pool Balance Error:', error);
     res.json({ success: true, data: { available: false, reason: error.message } });
+  }
+};
+
+// @desc    The real, dated list of every debit/credit NCBA has actually
+//          posted on the pooled account — the ground truth for tracking
+//          down exactly what a Live-vs-Expected discrepancy is (a real bank
+//          charge, a manual transfer never recorded in the ledger, etc.)
+//          instead of only ever comparing two totals. Defaults to the last
+//          30 days if no range is given. Never confirmed live (unlike
+//          pool-balance/live) — always returns 200 with `available: false`
+//          on any failure or if NCBA_OPENBANKING_LIVE_ENABLED isn't set, so
+//          this can ship ahead of that confirmation without breaking the
+//          page.
+// @route   GET /api/admin/revenue/pool-account/statement?fromDate&toDate (YYYY-MM-DD)
+// @access  Private (Admin)
+export const getPoolAccountStatement = async (req, res) => {
+  try {
+    const toDate = req.query.toDate ? new Date(req.query.toDate) : new Date();
+    const fromDate = req.query.fromDate ? new Date(req.query.fromDate) : new Date(toDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+    if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+      return res.status(400).json({ error: 'fromDate/toDate must be valid dates (YYYY-MM-DD).' });
+    }
+
+    const { raw, entries, summary } = await getNcbaAccountStatement({ fromDate, toDate });
+    if (entries === null) {
+      return res.json({ success: true, data: { available: false, raw, reason: raw?.simulated ? 'NCBA live calls are disabled in this environment — no real statement to show.' : 'NCBA did not return a usable statement — see raw response.' } });
+    }
+    res.json({ success: true, data: { available: true, entries, summary, fetchedAt: new Date() } });
+  } catch (error) {
+    console.error('Get Pool Account Statement Error:', error);
+    res.json({ success: true, data: { available: false, reason: error.message } });
+  }
+};
+
+// @desc    Every real NCBA/KRA-side charge on the pooled account an admin
+//          has confirmed against NCBA Connect Plus or the real statement —
+//          Excise Duty, SMS fees, anything not tied to a specific transfer
+//          (see models/BankAccountCharge.js). Excludes archived rows, same
+//          display-only-filter convention as getReconciliations.
+// @route   GET /api/admin/revenue/pool-account/charges
+// @access  Private (Admin)
+export const getBankCharges = async (req, res) => {
+  try {
+    const records = await BankAccountCharge.find({ archived: { $ne: true } })
+      .sort('-chargedAt')
+      .limit(200)
+      .populate('recordedBy', 'email name')
+      .lean();
+    res.json({ success: true, data: records });
+  } catch (error) {
+    console.error('Get Bank Charges Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Record a real NCBA/KRA charge spotted on NCBA Connect Plus or
+//          the account statement that has no matching PayChain transfer
+//          behind it — reduces PayChain's own accrued revenue (never
+//          merchant money) in computeUnsweptRevenue() going forward, so a
+//          genuine bank/tax cost stops showing up as an unexplained
+//          Live-vs-Expected gap.
+// @route   POST /api/admin/revenue/pool-account/charges
+// @access  Private (Admin, owner/admin only)
+export const recordBankCharge = async (req, res) => {
+  try {
+    const { chargedAt, amount, description, reference } = req.body || {};
+    const numericAmount = Number(amount);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      return res.status(400).json({ error: 'amount must be a positive number.' });
+    }
+    if (!description || !String(description).trim()) {
+      return res.status(400).json({ error: 'A description is required — what this charge is, per NCBA Connect Plus or the statement.' });
+    }
+    const date = chargedAt ? new Date(chargedAt) : new Date();
+    if (Number.isNaN(date.getTime())) {
+      return res.status(400).json({ error: 'chargedAt must be a valid date.' });
+    }
+
+    const record = await BankAccountCharge.create({
+      chargedAt: date,
+      amount: numericAmount,
+      description: String(description).trim(),
+      reference: reference ? String(reference).trim() : null,
+      recordedBy: req.admin._id,
+    });
+
+    logAudit({
+      action: 'admin.bank_charge.recorded',
+      category: 'admin',
+      severity: 'high',
+      message: `Admin recorded a real NCBA/KRA charge of KES ${numericAmount} on the pooled account (${description})`,
+      actor: adminActor(req.admin),
+      req,
+      metadata: { chargeId: record._id, amount: numericAmount, description, chargedAt: date },
+    });
+
+    res.json({ success: true, data: await record.populate('recordedBy', 'email name') });
+  } catch (error) {
+    console.error('Record Bank Charge Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Correct a previously recorded bank charge — fixes a typo'd
+//          amount/date/description without needing to clear it and record
+//          a fresh one (clearing alone doesn't undo its effect on the
+//          numbers; see archiveBankCharge's doc comment — it's a display
+//          filter, not a correction). Every field is required, same
+//          validation as recordBankCharge, so a partial/malformed edit
+//          can't corrupt the record.
+// @route   PATCH /api/admin/revenue/pool-account/charges/:id
+// @access  Private (Admin, owner/admin only)
+export const updateBankCharge = async (req, res) => {
+  try {
+    const { chargedAt, amount, description, reference } = req.body || {};
+    const numericAmount = Number(amount);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      return res.status(400).json({ error: 'amount must be a positive number.' });
+    }
+    if (!description || !String(description).trim()) {
+      return res.status(400).json({ error: 'A description is required — what this charge is, per NCBA Connect Plus or the statement.' });
+    }
+    const date = chargedAt ? new Date(chargedAt) : null;
+    if (!date || Number.isNaN(date.getTime())) {
+      return res.status(400).json({ error: 'chargedAt must be a valid date.' });
+    }
+
+    const before = await BankAccountCharge.findById(req.params.id).lean();
+    if (!before) return res.status(404).json({ error: 'Charge record not found.' });
+
+    const record = await BankAccountCharge.findByIdAndUpdate(
+      req.params.id,
+      { chargedAt: date, amount: numericAmount, description: String(description).trim(), reference: reference ? String(reference).trim() : null },
+      { new: true }
+    ).populate('recordedBy', 'email name');
+
+    logAudit({
+      action: 'admin.bank_charge.updated',
+      category: 'admin',
+      severity: 'high',
+      message: `Admin corrected a recorded NCBA/KRA charge (KES ${before.amount} → KES ${numericAmount})`,
+      actor: adminActor(req.admin),
+      req,
+      metadata: { chargeId: record._id, before: { amount: before.amount, description: before.description, chargedAt: before.chargedAt }, after: { amount: numericAmount, description, chargedAt: date } },
+    });
+
+    res.json({ success: true, data: record });
+  } catch (error) {
+    console.error('Update Bank Charge Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    "Clear" a recorded bank charge from the admin's list — archives
+//          it, never deletes it. computeUnsweptRevenue() keeps subtracting
+//          it regardless (archived is a display-only filter, same as every
+//          other reversible-archive record in this codebase).
+// @route   PATCH /api/admin/revenue/pool-account/charges/:id/archive
+// @access  Private (Admin, owner/admin only)
+export const archiveBankCharge = async (req, res) => {
+  try {
+    const record = await BankAccountCharge.findByIdAndUpdate(
+      req.params.id,
+      { archived: true, archivedAt: new Date(), archivedBy: req.admin._id },
+      { new: true }
+    );
+    if (!record) return res.status(404).json({ error: 'Charge record not found.' });
+    res.json({ success: true, data: record });
+  } catch (error) {
+    console.error('Archive Bank Charge Error:', error);
+    res.status(500).json({ error: 'Server Error' });
   }
 };
 

@@ -9,9 +9,9 @@ import ResetContactModal from '../components/modals/ResetContactModal';
 // Same review workspace as apps/officer's Workstation.jsx, against the same
 // /api/officer/applications/:id endpoints — owner/admin roles are already
 // authorized to view and decide on any application (officerRoutes.js's
-// `viewOrAct` RBAC), independent of who claimed it. Claiming itself stays
-// officer-only, so unlike the officer version this page never prompts to
-// claim — it just shows who (if anyone) has, for context.
+// `viewOrAct` RBAC), independent of who claimed it. Claiming is also
+// owner/admin-capable now (2026-08-31 product decision) — the Claim button
+// below hits the same /claim endpoint apps/officer's Workstation.jsx uses.
 //
 // Also resolves self-serve merchants (no kybStatus at all) — canDecide
 // below is naturally false for them (kybStatus isn't 'pending'/
@@ -109,6 +109,14 @@ const KycApplicationDetail = () => {
     } catch (e) { showToast(e?.response?.data?.error || e?.message || 'Could not set risk tier.'); }
   }
 
+  async function handleClaim() {
+    try {
+      const res = await api.post(`/api/officer/applications/${id}/claim`);
+      if (res.data?.success) { showToast('Application claimed.'); fetchApp(); }
+      else throw new Error(res.data?.error);
+    } catch (e) { showToast(e?.response?.data?.error || e?.message || 'Could not claim this application.'); }
+  }
+
   async function handleApprove() {
     try {
       const res = await api.post(`/api/officer/applications/${id}/approve`);
@@ -190,8 +198,17 @@ const KycApplicationDetail = () => {
               <span className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50">
                 {!app.kybStatus
                   ? 'Self-serve signup — no officer review'
-                  : app.claimedBy ? `Claimed by ${app.claimedBy.name || app.claimedBy.email}` : 'Unclaimed — awaiting an officer'}
+                  : app.claimedBy ? `Claimed by ${app.claimedBy.name || app.claimedBy.email}` : 'Unclaimed'}
               </span>
+              {app.kybStatus && !app.claimedBy && canDecide && (
+                <button
+                  onClick={handleClaim}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-white hover:opacity-90 text-2xs font-bold uppercase tracking-widest transition-all"
+                >
+                  <span className="material-symbols-outlined text-[14px]">how_to_reg</span>
+                  Claim
+                </button>
+              )}
               {app.resubmissionCount > 0 && <span className="text-2xs font-bold uppercase tracking-widest text-blue-700">Resubmitted {app.resubmissionCount}x</span>}
             </div>
           </div>

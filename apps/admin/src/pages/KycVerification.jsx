@@ -6,11 +6,11 @@ import { useAuth } from '../context/AuthContext';
 
 // Reuses the same real onboarding-officer review pipeline as apps/officer
 // (backend/controllers/officerController.js, /api/officer/applications/*) —
-// owner/admin roles are already fully authorized to view and act on every
-// application (see officerRoutes.js's `viewOrAct` RBAC comment), they just
-// had no page in this dashboard that called the endpoint. Originating a new
-// application or claiming one stays officer-only by design (that's the
-// officer's specific job), so this admin view is read/decide, not intake.
+// owner/admin roles are fully authorized to view, claim, and decide on any
+// application (see officerRoutes.js's `viewOrAct` RBAC comment). Only
+// originating a brand-new application stays officer-only (that's the
+// officer's specific in-field job), so this admin view is review/decide,
+// not intake.
 //
 // This list also includes every self-serve merchant (web/mobile signup) —
 // they carry no kybStatus/kybDocuments/checklist since they never entered

@@ -1430,6 +1430,7 @@ export const initiateB2B = async (req, res) => {
           currency: 'KES',
           status: 'pending',
           pendingReason: ncbaErr.isInsufficientFunds ? 'insufficient_funds' : 'ambiguous_response',
+          paybillAccountReference: paymentType === 'Paybill' ? accountReference : null,
           retryPayload: ncbaErr.isInsufficientFunds
             ? {
                 rail: 'ncba_lipa_na_mpesa',
@@ -1460,7 +1461,7 @@ export const initiateB2B = async (req, res) => {
     ncbaAcceptedContext = {
       transactionId, merchantId: merchant._id, amount: numericAmount,
       businessName: merchant.businessName, ncbaMerchantCode: merchant.ncbaMerchantCode,
-      recipientName, partyB,
+      recipientName, partyB, paybillAccountReference: paymentType === 'Paybill' ? accountReference : null,
     };
 
     const tx = await Transaction.create({
@@ -1474,6 +1475,7 @@ export const initiateB2B = async (req, res) => {
       reference: transactionId,
       sender: { name: merchant.businessName, id: merchant.ncbaMerchantCode },
       recipient: { name: recipientName, id: partyB },
+      paybillAccountReference: paymentType === 'Paybill' ? accountReference : null,
     });
 
     res.status(200).json({ success: true, message: 'Transfer initiated successfully', transaction: tx });
@@ -1512,6 +1514,7 @@ export const initiateB2B = async (req, res) => {
               reference: ncbaAcceptedContext.transactionId,
               sender: { name: ncbaAcceptedContext.businessName, id: ncbaAcceptedContext.ncbaMerchantCode },
               recipient: { name: ncbaAcceptedContext.recipientName, id: ncbaAcceptedContext.partyB },
+              paybillAccountReference: ncbaAcceptedContext.paybillAccountReference || null,
             },
           },
           { upsert: true }

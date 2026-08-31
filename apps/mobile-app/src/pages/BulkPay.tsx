@@ -26,6 +26,12 @@ type MobileMoneyType = 'Personal Number' | 'Paybill' | 'Buy Goods';
 // confirmed working, then opened up to every merchant.
 const LIPA_NA_MPESA_BETA_MERCHANT_ID = '6a8f30cb228671cacc4361fe'; // Brantech Solutions
 
+// Paused 2026-08-31, mirrors backend/config/lipaNaMpesaBetaAllowlist.js's
+// LIVE_TESTING_ENABLED — NCBA callbacks unconfirmed, so Till/Paybill is
+// hidden for everyone (including the beta merchant) until Rose confirms
+// they're working. Flip back to true alongside that backend flag.
+const LIPA_NA_MPESA_LIVE_TESTING_ENABLED = false;
+
 interface Payee {
   _id: string;
   name: string;
@@ -135,7 +141,7 @@ const BATCH_STATUS_META: Record<string, { bg: string; text: string }> = {
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function BulkPay() {
   const { merchant, refreshSession } = useAuth();
-  const isLipaNaMpesaBetaMerchant = merchant?._id === LIPA_NA_MPESA_BETA_MERCHANT_ID;
+  const isLipaNaMpesaBetaMerchant = LIPA_NA_MPESA_LIVE_TESTING_ENABLED && merchant?._id === LIPA_NA_MPESA_BETA_MERCHANT_ID;
 
   const [activeTab, setActiveTab] = useState<'Payees' | 'Batches' | 'Invoices'>('Payees');
   const [activeFilter, setActiveFilter] = useState<Filter>('All');

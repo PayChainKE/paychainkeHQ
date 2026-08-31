@@ -99,6 +99,12 @@ type Destination = 'mpesa-primary' | 'mobile' | 'bank' | 'till' | 'paybill';
 // confirmed working, then opened up to every merchant.
 const LIPA_NA_MPESA_BETA_MERCHANT_ID = '6a8f30cb228671cacc4361fe'; // Brantech Solutions
 
+// Paused 2026-08-31, mirrors backend/config/lipaNaMpesaBetaAllowlist.js's
+// LIVE_TESTING_ENABLED — NCBA callbacks unconfirmed, so Till/Paybill is
+// hidden for everyone (including the beta merchant) until Rose confirms
+// they're working. Flip back to true alongside that backend flag.
+const LIPA_NA_MPESA_LIVE_TESTING_ENABLED = false;
+
 const DESTINATIONS: Array<{ id: Destination; label: string; icon: keyof typeof MaterialIcons.glyphMap; hint: string; feeLabel: string; betaOnly?: boolean }> = [
   { id: 'mpesa-primary', label: 'Primary M-PESA Number', icon: 'smartphone', hint: 'Your registered phone number', feeLabel: 'Varies' },
   { id: 'mobile', label: 'Any M-PESA Number', icon: 'smartphone', hint: 'Send to any Kenyan mobile number', feeLabel: 'Varies' },
@@ -224,7 +230,7 @@ export default function SendMoney({ navigation }: any) {
   // second real transfer.
   const [confirmLocked, setConfirmLocked] = useState(false);
 
-  const isLipaNaMpesaBetaMerchant = merchant?._id === LIPA_NA_MPESA_BETA_MERCHANT_ID;
+  const isLipaNaMpesaBetaMerchant = LIPA_NA_MPESA_LIVE_TESTING_ENABLED && merchant?._id === LIPA_NA_MPESA_BETA_MERCHANT_ID;
   const selectedDest = DESTINATIONS.find((d) => d.id === destination);
   const isMobileDest = destination === 'mpesa-primary' || destination === 'mobile';
   const isB2bDest = destination === 'till' || destination === 'paybill';

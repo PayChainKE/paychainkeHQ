@@ -28,11 +28,17 @@ const PAYCHAIN_SLOGAN = 'Collect, Pay, Protect, Grow'
 // confirmed working, then opened up to every merchant.
 const LIPA_NA_MPESA_BETA_MERCHANT_ID = '6a8f30cb228671cacc4361fe' // Brantech Solutions
 
+// Paused 2026-08-31, mirrors backend/config/lipaNaMpesaBetaAllowlist.js's
+// LIVE_TESTING_ENABLED — NCBA callbacks unconfirmed, so Till/Paybill is
+// hidden for everyone (including the beta merchant) until Rose confirms
+// they're working. Flip back to true alongside that backend flag.
+const LIPA_NA_MPESA_LIVE_TESTING_ENABLED = false
+
 export default function BulkPay() {
   const { showAmounts } = usePrivacyMode()
   const { addNotification } = useNotification()
   const { merchant, refreshSession } = useMerchantAuth()
-  const isLipaNaMpesaBetaMerchant = merchant?._id === LIPA_NA_MPESA_BETA_MERCHANT_ID
+  const isLipaNaMpesaBetaMerchant = LIPA_NA_MPESA_LIVE_TESTING_ENABLED && merchant?._id === LIPA_NA_MPESA_BETA_MERCHANT_ID
   const [payeesList, setPayeesList] = useState([])
 
   useEffect(() => {

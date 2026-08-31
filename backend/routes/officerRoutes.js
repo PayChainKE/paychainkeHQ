@@ -21,10 +21,13 @@ import {
 
 const router = express.Router();
 
-// Viewing/acting on an existing application is open to owner, admin, and
-// officer per the product's RBAC table. Originating a new application or
-// claiming one is officer-only — that's the officer's specific job, not a
-// permission owner/admin need to exercise directly.
+// Viewing/acting on an existing application — including claiming one — is
+// open to owner, admin, and officer per the product's RBAC table.
+// Originating a brand-new application stays officer-only (that's the
+// officer's specific job in the field, not something owner/admin do
+// directly); claiming was officer-only for the same reason until an
+// explicit product decision (2026-08-31) to let owner/admin claim and work
+// applications themselves too, same as they can already approve/reject.
 const viewOrAct = requireRole('owner', 'admin', 'officer');
 const officerOnly = requireRole('officer');
 
@@ -63,7 +66,7 @@ router.get('/metrics', protect, viewOrAct, getMetrics);
 router.get('/applications', protect, viewOrAct, getQueue);
 router.post('/applications', protect, officerOnly, applicationCreateLimiter, upload.fields(applicationFields), createApplication);
 router.get('/applications/:id', protect, viewOrAct, getApplication);
-router.post('/applications/:id/claim', protect, officerOnly, claimApplication);
+router.post('/applications/:id/claim', protect, viewOrAct, claimApplication);
 router.patch('/applications/:id/checklist', protect, viewOrAct, updateChecklist);
 router.patch('/applications/:id/documents/:docType', protect, viewOrAct, updateDocumentStatus);
 router.post('/applications/:id/notes', protect, viewOrAct, addNote);
