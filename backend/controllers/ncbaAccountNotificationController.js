@@ -1,5 +1,9 @@
+import mongoose from 'mongoose';
 import Merchant from '../models/Merchant.js';
+import MissedNcbaCollectionCandidate from '../models/MissedNcbaCollectionCandidate.js';
 import { createNotification } from './notificationController.js';
+import { logAudit } from '../utils/auditLog.js';
+import { adminActor } from './adminController.js';
 import { sendStaggeredSms } from '../utils/smsSanitizer.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { parseSoapXmlSafely, findFirstTagValue, XmlSecurityError } from '../utils/xmlSecurity.js';
@@ -501,5 +505,190 @@ export const handleNcbaAccountNotification = async (req, res) => {
 
     logEvent('error', 'ncba_account_notification_internal_error', { transId, error: err.message, stack: err.stack });
     return respondFail(res, 'Internal processing failure');
+  }
+};
+
+// @desc    Manually credit a real NCBA collection that never reached this
+//          webhook — confirmed 2026-08-31 (Delamere Dairy Farm, KES 3,000
+//          from Everlyn Owino Onyango, M-Pesa ref UHVCT58LFU): the money
+//          landed on NCBA's own statement but this webhook never fired for
+//          it, so the merchant was never credited and had no way to know.
+//          Routes through the exact same ledger path handleNcbaAccountNotification
+//          uses above (creditNcbaCollection — atomic session transaction,
+//          auto fee-stamping, unique-reference dedup) plus the same
+//          cross-feed/STK dedup guards, so this can never double-credit a
+//          collection that actually did arrive through a normal path. Not a
+//          general-purpose "adjust a balance" tool — bankRef becomes the
+//          Transaction's reference and must be the real M-Pesa/NCBA
+//          reference off the bank statement, so this stays traceable back
+//          to a real, independently-verifiable bank event.
+// @route   POST /admin/ncba-collections/manual-credit
+// @access  Private (admin, requireMutator + sensitiveActionLimiter — a
+//          direct, real-money ledger credit)
+export const adminManualCreditNcbaCollection = async (req, res) => {
+  try {
+    const { merchantId, grossAmount, bankRef, customerName, date, time } = req.body || {};
+
+    if (!mongoose.Types.ObjectId.isValid(merchantId)) {
+      return res.status(400).json({ error: 'A valid merchantId is required.' });
+    }
+    const amount = Number(grossAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({ error: 'grossAmount must be a positive number.' });
+    }
+    const ref = String(bankRef || '').trim();
+    if (!ref) {
+      return res.status(400).json({ error: 'bankRef (the real M-Pesa/NCBA reference from the bank statement) is required.' });
+    }
+
+    const merchant = await Merchant.findById(merchantId);
+    if (!merchant) return res.status(404).json({ error: 'Merchant not found.' });
+
+    const viaStk = await wasAlreadySettledByStkPush(merchant, amount);
+    const viaOtherFeed = await wasAlreadyCreditedByOtherNcbaFeed(merchant, amount, ref);
+    if (viaStk || viaOtherFeed) {
+      return res.status(409).json({ error: 'This looks like it was already credited through another path (STK or a separate NCBA feed) — check the merchant\'s transaction history before crediting again.' });
+    }
+
+    let ledgerResult;
+    try {
+      ledgerResult = await creditNcbaCollection({
+        merchant,
+        grossAmount: amount,
+        bankRef: ref,
+        customerName: customerName ? String(customerName).trim() : null,
+      });
+    } catch (err) {
+      if (err instanceof DuplicateCollectionError) {
+        return res.status(409).json({ error: `Reference "${ref}" was already used for a transaction — this collection may already be credited.` });
+      }
+      throw err;
+    }
+
+    createNotification({
+      merchantId: merchant._id,
+      kind: 'payment',
+      title: 'Payment received',
+      message: `You received KES ${ledgerResult.netAmount.toLocaleString()} via your PayChain Virtual Account. Ref: ${ref}.`,
+    }).catch((e) => logEvent('error', 'ncba_manual_credit_notification_failed', { ref, error: e.message }));
+
+    // date/time are the admin's own plain "YYYY-MM-DD"/"HH:mm" typed
+    // values off the bank statement, treated as literal Nairobi wall-clock
+    // (matching how every other NCBA/M-Pesa timestamp in this codebase is
+    // handled — see transactionDateFormat.js's header comment) — NOT run
+    // through a Date object, so this can't drift with server timezone.
+    // Converted into NCBA's own YYMMDDhhmm wire format so it reuses that
+    // same formatter other credits build their SMS from, rather than a
+    // second date-formatting implementation.
+    let smsDateTime;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(date || '') && /^\d{2}:\d{2}$/.test(time || '')) {
+      const ncbaFormat = `${date.slice(2, 4)}${date.slice(5, 7)}${date.slice(8, 10)}${time.slice(0, 2)}${time.slice(3, 5)}`;
+      smsDateTime = formatTransactionDateTime(ncbaFormat);
+    } else {
+      smsDateTime = formatTransactionDateTime(null); // falls back to current Nairobi time
+    }
+
+    if (merchant.phone) {
+      const sms = buildPaymentReceivedSms({
+        ref,
+        amount: ledgerResult.netAmount,
+        payerName: customerName || null,
+        payerPhone: null,
+        date: smsDateTime.date,
+        time: smsDateTime.time,
+        balance: ledgerResult.merchant.kesBalance,
+      });
+      sendStaggeredSms([{ to: merchant.phone, message: sms.message }]).then((results) => {
+        const result = results[0];
+        if (result.success) logEvent('info', 'ncba_manual_credit_sms_sent', { ref, merchantId: merchant._id.toString(), messageId: result.messageId });
+        else logEvent('error', 'ncba_manual_credit_sms_failed', { ref, merchantId: merchant._id.toString(), error: result.error });
+      });
+    }
+
+    logAudit({
+      action: 'admin.ncba_collection.manual_credit', category: 'wallet', severity: 'critical',
+      message: `Manually credited a missed NCBA collection for ${merchant.businessName} — confirmed on NCBA's real statement (ref ${ref}) but this webhook never fired for it.`,
+      merchant, actor: adminActor(req.admin), req,
+      metadata: { bankRef: ref, grossAmount: amount, netAmount: ledgerResult.netAmount, customerName: customerName || null, transactionId: ledgerResult.transaction._id.toString() },
+    });
+
+    // If this credit was raised by the reconciliation sweep, close out the
+    // matching candidate so it stops showing as pending — matched by
+    // reference, not just "any pending candidate for this merchant", so
+    // crediting one candidate never accidentally closes a different one.
+    MissedNcbaCollectionCandidate.findOneAndUpdate(
+      { statementReference: ref, status: 'pending' },
+      { $set: { status: 'credited', resolvedBy: req.admin._id, resolvedAt: new Date() } }
+    ).catch((e) => logEvent('error', 'ncba_manual_credit_candidate_close_failed', { ref, error: e.message }));
+
+    res.json({
+      success: true,
+      data: {
+        transactionId: ledgerResult.transaction._id,
+        reference: ledgerResult.transaction.reference,
+        netAmount: ledgerResult.netAmount,
+        newBalance: ledgerResult.merchant.kesBalance,
+      },
+    });
+  } catch (err) {
+    if (err instanceof NcbaTariffBoundsError) {
+      return res.status(400).json({ error: err.message });
+    }
+    logEvent('error', 'ncba_manual_credit_error', { error: err.message, stack: err.stack });
+    res.status(500).json({ error: 'Failed to credit this collection.' });
+  }
+};
+
+// @desc    List pending "missed collection" candidates —
+//          services/ncbaCollectionReconciliationService.js's hourly sweep
+//          flags a real NCBA statement credit here when it's confidently
+//          attributed to a merchant but has no matching Transaction. Each
+//          one is a real-money suggestion for adminManualCreditNcbaCollection
+//          above to act on, never auto-applied.
+// @route   GET /admin/ncba-collections/missed
+// @access  Private (admin)
+export const adminListMissedNcbaCollections = async (req, res) => {
+  try {
+    const candidates = await MissedNcbaCollectionCandidate.find({ status: 'pending' })
+      .sort('-createdAt')
+      .limit(200)
+      .populate('matchedMerchantId', 'businessName phone ncbaMerchantCode');
+    res.json({ success: true, data: candidates });
+  } catch (err) {
+    logEvent('error', 'admin_list_missed_ncba_collections_error', { error: err.message });
+    res.status(500).json({ error: 'Failed to list missed collections' });
+  }
+};
+
+// @desc    Dismiss a missed-collection candidate without crediting it — for
+//          a false match, or one that turns out to already be accounted
+//          for under a reference the sweep didn't recognize. Does not
+//          touch any balance.
+// @route   POST /admin/ncba-collections/missed/:id/dismiss
+// @access  Private (admin, requireMutator)
+export const adminDismissMissedNcbaCollection = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid id.' });
+    }
+    const note = String(req.body?.note || '').trim() || null;
+    const candidate = await MissedNcbaCollectionCandidate.findOneAndUpdate(
+      { _id: id, status: 'pending' },
+      { $set: { status: 'dismissed', resolvedBy: req.admin._id, resolvedAt: new Date(), resolutionNote: note } },
+      { returnDocument: 'after' }
+    );
+    if (!candidate) return res.status(404).json({ error: 'Candidate not found or already resolved.' });
+
+    logAudit({
+      action: 'admin.ncba_collection.candidate_dismissed', category: 'wallet', severity: 'warning',
+      message: `Dismissed missed-collection candidate ${candidate.statementReference} without crediting${note ? `: ${note}` : ''}`,
+      actor: adminActor(req.admin), req,
+      metadata: { statementReference: candidate.statementReference, amount: candidate.amount, note },
+    });
+    res.json({ success: true });
+  } catch (err) {
+    logEvent('error', 'admin_dismiss_missed_ncba_collection_error', { error: err.message });
+    res.status(500).json({ error: 'Failed to dismiss this candidate' });
   }
 };
