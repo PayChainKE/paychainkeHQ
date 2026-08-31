@@ -18,6 +18,13 @@ import ResetContactModal from '../components/modals/ResetContactModal';
 // 'requires_revision'), so every decision/checklist/document-status action
 // already hides itself with no extra guard needed. The Signup Details
 // section further down is what actually shows their collected info.
+//
+// The "Start Review" button (2026-08-31) lets admin/owner pull one of these
+// into the same pipeline, claimed for themselves in the same step (POST
+// .../start-review) — after that it behaves exactly like an
+// officer-originated application (checklist, risk tier, approve/reject),
+// except approve/reject skip the invite/rejection emails server-side since
+// this merchant already has a working login (see officerController.js).
 const CHECKLIST_ITEMS = [
   { key: 'legalNameMatch', label: 'Legal business name matches registration documents' },
   { key: 'ubosIdentified', label: 'Directors / Ultimate Beneficial Owners (UBOs) identified' },
@@ -117,6 +124,14 @@ const KycApplicationDetail = () => {
     } catch (e) { showToast(e?.response?.data?.error || e?.message || 'Could not claim this application.'); }
   }
 
+  async function handleStartReview() {
+    try {
+      const res = await api.post(`/api/officer/applications/${id}/start-review`);
+      if (res.data?.success) { showToast('Review started — claimed for you.'); fetchApp(); }
+      else throw new Error(res.data?.error);
+    } catch (e) { showToast(e?.response?.data?.error || e?.message || 'Could not start review.'); }
+  }
+
   async function handleApprove() {
     try {
       const res = await api.post(`/api/officer/applications/${id}/approve`);
@@ -207,6 +222,16 @@ const KycApplicationDetail = () => {
                 >
                   <span className="material-symbols-outlined text-[14px]">how_to_reg</span>
                   Claim
+                </button>
+              )}
+              {!app.kybStatus && (
+                <button
+                  onClick={handleStartReview}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-white hover:opacity-90 text-2xs font-bold uppercase tracking-widest transition-all"
+                  title="Pull this self-serve signup into KYB review — claims it for you"
+                >
+                  <span className="material-symbols-outlined text-[14px]">rate_review</span>
+                  Start Review
                 </button>
               )}
               {app.resubmissionCount > 0 && <span className="text-2xs font-bold uppercase tracking-widest text-blue-700">Resubmitted {app.resubmissionCount}x</span>}

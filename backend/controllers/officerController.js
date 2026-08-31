@@ -320,6 +320,51 @@ export const claimApplication = async (req, res) => {
   }
 };
 
+// @desc    Pull a true self-serve merchant (no kybStatus — never entered
+//          officer review) into the same pending/checklist/approve pipeline
+//          officer-originated applications use, claimed by the calling
+//          admin/owner in the same step. Admin/owner-only (not officers —
+//          these were never an officer's applicant, and getApplication's
+//          scopedToOfficer already 404s a self-serve merchant for them
+//          regardless). onboardingOfficerId is deliberately left unset —
+//          approveApplication/rejectApplication key off its absence to skip
+//          the invite/rejection emails that assume a brand-new officer-
+//          originated account, since a self-serve merchant already has a
+//          working login and is already active.
+// @route   POST /api/officer/applications/:id/start-review
+// @access  Private (Owner/Admin)
+export const startReview = async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: 'Invalid id.' });
+    }
+    const application = await Merchant.findOneAndUpdate(
+      { _id: req.params.id, kybStatus: { $exists: false } },
+      { $set: {
+        kybStatus: 'pending',
+        submittedAt: new Date(),
+        claimedBy: req.admin._id,
+        claimedAt: new Date(),
+      } },
+      { returnDocument: 'after' }
+    );
+    if (!application) {
+      return res.status(409).json({ error: 'Not a self-serve signup, or it already has a KYB review in progress.' });
+    }
+
+    logAudit({
+      action: 'admin.application.review_started', category: 'admin', severity: 'info',
+      message: `Started KYB review on self-serve merchant ${application.businessName}, claimed by ${req.admin.name || req.admin.email}`,
+      merchant: application, actor: adminActorPlain(req.admin), req,
+    });
+
+    res.json({ success: true, data: { _id: application._id, kybStatus: application.kybStatus, claimedBy: application.claimedBy, claimedAt: application.claimedAt } });
+  } catch (error) {
+    console.error('Start Review Error:', error?.message || error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
 // @desc    Toggle checklist items on an application.
 // @route   PATCH /api/officer/applications/:id/checklist
 // @access  Private (Owner/Admin/Officer)
@@ -483,27 +528,44 @@ export const approveApplication = async (req, res) => {
     // deliberately no longer assigned on approval — the live payment rail
     // is the NCBA virtual account (ncbaMerchantCode), already auto-assigned
     // by the Merchant model's pre-save hook when the application was created.
-    const rawToken = crypto.randomBytes(32).toString('hex');
-    const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
-    const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+    //
+    // An officer-originated application has no password yet (Merchant.create
+    // in createApplication above never sets one) — it genuinely needs the
+    // set-up-password invite link below. A self-serve merchant reviewed via
+    // startReview already has a working password and is already using the
+    // platform (onboardingOfficerId stays unset for that path specifically
+    // so this check can tell the two apart) — sending it a "set up your
+    // password" email would be wrong and confusing, so skip the token/email
+    // entirely and just record the approval.
+    const wasOfficerOriginated = !!application.onboardingOfficerId;
+    let setupLink = null;
+    if (wasOfficerOriginated) {
+      const rawToken = crypto.randomBytes(32).toString('hex');
+      const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+      const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+      application.passwordResetToken = hashedToken;
+      application.passwordResetExpires = expires;
+      setupLink = `${MERCHANT_DASHBOARD_URL.replace(/\/$/, '')}/setup-password?token=${rawToken}`;
+    }
 
     application.isVerified = true;
     application.kybStatus = 'approved';
-    application.passwordResetToken = hashedToken;
-    application.passwordResetExpires = expires;
     application.reviewedAt = new Date();
     application.reviewedBy = req.admin._id;
     await application.save();
 
-    const setupLink = `${MERCHANT_DASHBOARD_URL.replace(/\/$/, '')}/setup-password?token=${rawToken}`;
-    sendMerchantInvite(
-      application.email, application.name, application.businessName, setupLink,
-      getNcbaVirtualAccountNumber(application.ncbaMerchantCode), application.ncbaMerchantCode
-    ).catch((err) => console.error(`📧 Failed to send approval invite to ${application.email}:`, err));
+    if (wasOfficerOriginated) {
+      sendMerchantInvite(
+        application.email, application.name, application.businessName, setupLink,
+        getNcbaVirtualAccountNumber(application.ncbaMerchantCode), application.ncbaMerchantCode
+      ).catch((err) => console.error(`📧 Failed to send approval invite to ${application.email}:`, err));
+    }
 
     logAudit({
       action: 'officer.application.approved', category: 'admin', severity: 'success',
-      message: `Approved and activated — invite sent to ${application.email}`,
+      message: wasOfficerOriginated
+        ? `Approved and activated — invite sent to ${application.email}`
+        : `KYB review approved for self-serve merchant ${application.email} (already active — no invite email sent)`,
       merchant: application, actor: actorFor(req.admin), req,
       metadata: { riskTier: application.riskTier },
     });
@@ -581,15 +643,24 @@ export const rejectApplication = async (req, res) => {
     const application = await Merchant.findOne({ _id: req.params.id, kybStatus: { $exists: true }, ...scopedToOfficer(req.admin) });
     if (!application) return res.status(404).json({ error: 'Application not found.' });
 
+    // See approveApplication's identical check — a self-serve merchant
+    // reviewed via startReview already has a working account, so "Your
+    // application was not approved" would be actively confusing (and
+    // wrong: this does NOT suspend their existing access, only marks the
+    // KYB review rejected internally).
+    const wasOfficerOriginated = !!application.onboardingOfficerId;
+
     application.kybStatus = 'rejected';
     application.reviewedAt = new Date();
     application.reviewedBy = req.admin._id;
     application.kybNotes.push({ authorId: req.admin._id, authorName: req.admin.name || req.admin.email, note, createdAt: new Date() });
     await application.save();
 
-    sendKybRejection(application.email, application.name, application.businessName).catch((err) => {
-      console.error(`📧 Failed to send rejection notice to ${application.email}:`, err);
-    });
+    if (wasOfficerOriginated) {
+      sendKybRejection(application.email, application.name, application.businessName).catch((err) => {
+        console.error(`📧 Failed to send rejection notice to ${application.email}:`, err);
+      });
+    }
 
     logAudit({
       action: 'officer.application.rejected', category: 'admin', severity: 'critical',

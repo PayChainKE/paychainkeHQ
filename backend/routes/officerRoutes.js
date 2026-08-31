@@ -8,6 +8,7 @@ import {
   getMetrics,
   getApplication,
   claimApplication,
+  startReview,
   updateChecklist,
   updateDocumentStatus,
   addNote,
@@ -30,6 +31,10 @@ const router = express.Router();
 // applications themselves too, same as they can already approve/reject.
 const viewOrAct = requireRole('owner', 'admin', 'officer');
 const officerOnly = requireRole('officer');
+// Pulling a self-serve signup into KYB review is admin/owner-only — it was
+// never an officer's applicant (see startReview's doc comment), and
+// getApplication's scopedToOfficer already 404s it for an officer anyway.
+const adminOrOwner = requireRole('owner', 'admin');
 
 const docFields = [
   { name: 'business_registration', maxCount: 1 },
@@ -67,6 +72,7 @@ router.get('/applications', protect, viewOrAct, getQueue);
 router.post('/applications', protect, officerOnly, applicationCreateLimiter, upload.fields(applicationFields), createApplication);
 router.get('/applications/:id', protect, viewOrAct, getApplication);
 router.post('/applications/:id/claim', protect, viewOrAct, claimApplication);
+router.post('/applications/:id/start-review', protect, adminOrOwner, startReview);
 router.patch('/applications/:id/checklist', protect, viewOrAct, updateChecklist);
 router.patch('/applications/:id/documents/:docType', protect, viewOrAct, updateDocumentStatus);
 router.post('/applications/:id/notes', protect, viewOrAct, addNote);
