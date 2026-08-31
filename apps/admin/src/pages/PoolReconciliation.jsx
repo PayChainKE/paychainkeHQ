@@ -89,6 +89,24 @@ const PoolReconciliation = () => {
     }
   }, [stmtFrom, stmtTo]);
 
+  // Real NCBA/KRA-side charges (Excise Duty, SMS fees, etc.) an admin has
+  // spotted on NCBA Connect Plus or the statement above and confirmed have
+  // no matching PayChain transfer behind them — recorded so
+  // computeUnsweptRevenue() can account for them against PayChain's own
+  // revenue, never merchant money.
+  const [bankCharges, setBankCharges] = useState([]);
+  const [bankChargesLoading, setBankChargesLoading] = useState(true);
+  const [showChargeForm, setShowChargeForm] = useState(false);
+  const [editingChargeId, setEditingChargeId] = useState(null); // set → form submits a correction (PATCH) instead of a new record (POST)
+  const [chargeDate, setChargeDate] = useState(todayIso());
+  const [chargeAmount, setChargeAmount] = useState('');
+  const [chargeDescription, setChargeDescription] = useState('');
+  const [chargeReference, setChargeReference] = useState('');
+  const [chargeSubmitting, setChargeSubmitting] = useState(false);
+  const [chargeError, setChargeError] = useState('');
+  const [clearChargeTarget, setClearChargeTarget] = useState(null);
+  const [clearChargeBusy, setClearChargeBusy] = useState(false);
+
   const [stuckPayouts, setStuckPayouts] = useState([]);
   const [stuckLoading, setStuckLoading] = useState(true);
   const [resolveTarget, setResolveTarget] = useState(null); // { transaction, succeeded }
@@ -117,6 +135,86 @@ const PoolReconciliation = () => {
       if (!silent) setExpectedLoading(false);
     }
   }, []);
+
+  const fetchBankCharges = useCallback(async (silent = false) => {
+    if (!silent) setBankChargesLoading(true);
+    try {
+      const res = await api.get('/api/admin/revenue/pool-account/charges');
+      setBankCharges(res.data?.data || []);
+    } catch (e) {
+      if (!silent) setBankCharges([]);
+    } finally {
+      if (!silent) setBankChargesLoading(false);
+    }
+  }, []);
+
+  const submitBankCharge = useCallback(async (e) => {
+    e.preventDefault();
+    const numericAmount = Number(chargeAmount);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      setChargeError('Enter a valid, positive amount.');
+      return;
+    }
+    if (!chargeDescription.trim()) {
+      setChargeError('Describe what this charge is, per NCBA Connect Plus or the statement.');
+      return;
+    }
+    setChargeSubmitting(true);
+    setChargeError('');
+    const payload = { chargedAt: chargeDate, amount: numericAmount, description: chargeDescription.trim(), reference: chargeReference || undefined };
+    try {
+      if (editingChargeId) {
+        const res = await api.patch(`/api/admin/revenue/pool-account/charges/${editingChargeId}`, payload);
+        setBankCharges((prev) => prev.map((c) => (c._id === editingChargeId ? res.data?.data : c)));
+        showToast('Bank charge corrected — Expected Balance updated.');
+      } else {
+        const res = await api.post('/api/admin/revenue/pool-account/charges', payload);
+        setBankCharges((prev) => [res.data?.data, ...prev]);
+        showToast('Bank charge recorded — now factored into Expected Balance.');
+      }
+      setChargeAmount(''); setChargeDescription(''); setChargeReference(''); setEditingChargeId(null);
+      setShowChargeForm(false);
+      fetchExpected(); // this charge now reduces unswept revenue — refresh the figures above
+    } catch (err) {
+      setChargeError(err?.response?.data?.error || 'Could not save this charge.');
+    } finally {
+      setChargeSubmitting(false);
+    }
+  }, [chargeDate, chargeAmount, chargeDescription, chargeReference, editingChargeId, fetchExpected, showToast]);
+
+  const startEditCharge = useCallback((charge) => {
+    setEditingChargeId(charge._id);
+    setChargeDate(new Date(charge.chargedAt).toISOString().slice(0, 10));
+    setChargeAmount(String(charge.amount));
+    setChargeDescription(charge.description);
+    setChargeReference(charge.reference || '');
+    setChargeError('');
+    setShowChargeForm(true);
+  }, []);
+
+  const cancelChargeForm = useCallback(() => {
+    setShowChargeForm(false);
+    setEditingChargeId(null);
+    setChargeAmount(''); setChargeDescription(''); setChargeReference(''); setChargeDate(todayIso());
+    setChargeError('');
+  }, []);
+
+  const confirmClearCharge = useCallback(async () => {
+    if (!clearChargeTarget) return;
+    setClearChargeBusy(true);
+    try {
+      await api.patch(`/api/admin/revenue/pool-account/charges/${clearChargeTarget._id}/archive`);
+      setBankCharges((prev) => prev.filter((c) => c._id !== clearChargeTarget._id));
+      showToast('Cleared from this list — still counted against unswept revenue.');
+    } catch (e) {
+      showToast(e?.response?.data?.error || 'Could not clear this record.');
+    } finally {
+      setClearChargeBusy(false);
+      setClearChargeTarget(null);
+    }
+  }, [clearChargeTarget, showToast]);
+
+  useEffect(() => { fetchBankCharges(); }, [fetchBankCharges]);
 
   // Live NCBA balance is a real external API call (auth token + request to
   // NCBA) — deliberately NOT tied to paychain:sync, which fires on every
@@ -517,6 +615,105 @@ const PoolReconciliation = () => {
           )}
         </section>
 
+        {/* ── Bank Charges — real NCBA/KRA-side costs not tied to any
+            transfer (e.g. Excise Duty), confirmed against NCBA Connect Plus
+            or the statement above and recorded so they reduce PayChain's
+            own revenue, never merchant money. ─────────────────────────── */}
+        <section className="bg-surface-container-lowest rounded-xl border border-outline-variant/40 overflow-hidden">
+          <div className="p-5 md:p-6 pb-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+            <div>
+              <h3 className="text-base font-bold text-on-surface tracking-tight font-headline">Bank Charges</h3>
+              <p className="text-xs text-on-surface-variant mt-1 max-w-xl">
+                Real NCBA/KRA charges on the pooled account with no matching PayChain transfer — Excise Duty (KRA's tax on bank
+                fees), an SMS fee, anything spotted on NCBA Connect Plus or the statement above. Recorded here, these reduce
+                PayChain's own unswept revenue, never merchant money.
+              </p>
+            </div>
+            {canSubmitCheck && (
+              <button
+                onClick={() => (showChargeForm ? cancelChargeForm() : setShowChargeForm(true))}
+                className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-on-surface text-surface-container-lowest text-2xs font-bold uppercase tracking-widest hover:opacity-90 transition-opacity"
+              >
+                <span className="material-symbols-outlined text-sm">{showChargeForm ? 'close' : 'add'}</span>
+                {showChargeForm ? 'Cancel' : 'Record Charge'}
+              </button>
+            )}
+          </div>
+
+          {showChargeForm && canSubmitCheck && (
+            <form onSubmit={submitBankCharge} className="mx-5 md:mx-6 mb-5 p-4 rounded-lg border border-outline-variant/40 flex flex-col sm:flex-row sm:items-end gap-3 flex-wrap">
+              {editingChargeId && <p className="basis-full text-2xs font-bold uppercase tracking-widest text-amber-700">Correcting this charge — Expected Balance updates on save.</p>}
+              <div className="flex flex-col gap-1">
+                <label className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant">Date charged</label>
+                <input type="date" value={chargeDate} max={todayIso()} onChange={(e) => setChargeDate(e.target.value)}
+                  className="bg-surface-container border border-outline-variant/40 rounded-md px-2.5 py-2 text-xs text-on-surface focus:outline-none focus:border-primary" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant">Amount (KES)</label>
+                <input type="number" step="0.01" min="0.01" required value={chargeAmount} onChange={(e) => setChargeAmount(e.target.value)}
+                  placeholder="0.00" className="w-32 bg-surface-container border border-outline-variant/40 rounded-md px-3 py-2 text-sm text-on-surface focus:outline-none focus:border-primary" />
+              </div>
+              <div className="flex flex-col gap-1 flex-1 min-w-[200px]">
+                <label className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant">Description</label>
+                <input type="text" required value={chargeDescription} onChange={(e) => setChargeDescription(e.target.value)}
+                  placeholder="e.g. Excise Duty, per NCBA Connect Plus" className="w-full bg-surface-container border border-outline-variant/40 rounded-md px-3 py-2 text-sm text-on-surface focus:outline-none focus:border-primary" />
+              </div>
+              <div className="flex flex-col gap-1 min-w-[140px]">
+                <label className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant">Reference (optional)</label>
+                <input type="text" value={chargeReference} onChange={(e) => setChargeReference(e.target.value)}
+                  placeholder="NCBA ref" className="w-full bg-surface-container border border-outline-variant/40 rounded-md px-3 py-2 text-sm text-on-surface focus:outline-none focus:border-primary" />
+              </div>
+              <button type="submit" disabled={chargeSubmitting}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-on-surface text-surface-container-lowest text-2xs font-bold uppercase tracking-widest hover:opacity-90 transition-opacity disabled:opacity-50">
+                {chargeSubmitting ? 'Saving…' : editingChargeId ? 'Save Correction' : 'Record'}
+              </button>
+              {chargeError && <p className="text-2xs text-red-600 basis-full">{chargeError}</p>}
+            </form>
+          )}
+
+          {bankChargesLoading ? (
+            <div className="p-8"><Skel className="w-full h-24" /></div>
+          ) : bankCharges.length === 0 ? (
+            <div className="px-5 md:px-6 pb-6 text-xs text-on-surface-variant/70">No bank charges recorded yet.</div>
+          ) : (
+            <div className="overflow-x-auto max-h-[320px] overflow-y-auto">
+              <table className="w-full text-xs">
+                <thead className="bg-surface-container/70 border-b border-outline-variant/40 sticky top-0">
+                  <tr className="text-2xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
+                    <th className="text-left px-5 py-3">Date</th>
+                    <th className="text-left px-3 py-3">Description</th>
+                    <th className="text-left px-3 py-3">Reference</th>
+                    <th className="text-right px-3 py-3">Amount</th>
+                    <th className="text-left px-3 py-3">Recorded By</th>
+                    {canSubmitCheck && <th className="text-right px-5 py-3">Edit / Clear</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {bankCharges.map((c) => (
+                    <tr key={c._id} className="border-b border-outline-variant/40 last:border-b-0 hover:bg-surface-container/70 transition-colors">
+                      <td className="px-5 py-3 text-on-surface-variant whitespace-nowrap">{fmtDateTime(c.chargedAt)}</td>
+                      <td className="px-3 py-3 text-on-surface">{c.description}</td>
+                      <td className="px-3 py-3 font-mono text-2xs text-on-surface-variant">{c.reference || '—'}</td>
+                      <td className="px-3 py-3 text-right tabular-nums font-bold text-red-600">{formatKES(c.amount)}</td>
+                      <td className="px-3 py-3 text-on-surface-variant">{c.recordedBy?.name || c.recordedBy?.email || '—'}</td>
+                      {canSubmitCheck && (
+                        <td className="px-5 py-3 text-right whitespace-nowrap">
+                          <button onClick={() => startEditCharge(c)} title="Correct this charge's amount, date, description, or reference" className="text-on-surface-variant/50 hover:text-on-surface transition-colors mr-2">
+                            <span className="material-symbols-outlined text-lg">edit</span>
+                          </button>
+                          <button onClick={() => setClearChargeTarget(c)} title="Clear from this list — still counted against unswept revenue" className="text-on-surface-variant/50 hover:text-red-600 transition-colors">
+                            <span className="material-symbols-outlined text-lg">clear</span>
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
         {/* ── Stuck payouts needing manual review ──────────────────── */}
         {(stuckLoading || stuckPayouts.length > 0) && (
           <section className="bg-surface-container-lowest rounded-xl border border-amber-200 overflow-hidden">
@@ -875,6 +1072,30 @@ const PoolReconciliation = () => {
                 <button onClick={() => setResolveTarget(null)} disabled={resolveBusy} className="flex-1 py-2.5 rounded-lg border border-outline-variant/40 text-on-surface text-sm font-semibold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40">Cancel</button>
                 <button onClick={confirmResolveStuckPayout} disabled={resolveBusy} className={`flex-1 py-2.5 rounded-lg text-sm font-semibold uppercase tracking-widest text-white disabled:opacity-50 ${resolveTarget.succeeded ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'}`}>
                   {resolveBusy ? 'Resolving…' : `Confirm ${resolveTarget.succeeded ? 'succeeded' : 'failed'}`}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Clear a recorded bank charge — confirmation */}
+      {clearChargeTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => !clearChargeBusy && setClearChargeTarget(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="p-7">
+              <div className="w-14 h-14 rounded-full bg-surface-container text-on-surface-variant flex items-center justify-center mb-4">
+                <span className="material-symbols-outlined text-3xl">clear</span>
+              </div>
+              <h3 className="text-xl font-bold text-on-surface mb-1">Clear this bank charge?</h3>
+              <p className="text-sm text-on-surface-variant mb-5">
+                Removes it from this list only — {formatKES(clearChargeTarget.amount)} ({clearChargeTarget.description}) still
+                counts against unswept revenue in every calculation. Nothing is deleted.
+              </p>
+              <div className="flex gap-3">
+                <button onClick={() => setClearChargeTarget(null)} disabled={clearChargeBusy} className="flex-1 py-2.5 rounded-lg border border-outline-variant/40 text-on-surface text-sm font-semibold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40">Cancel</button>
+                <button onClick={confirmClearCharge} disabled={clearChargeBusy} className="flex-1 py-2.5 rounded-lg bg-on-surface text-surface-container-lowest text-sm font-semibold uppercase tracking-widest hover:opacity-90 disabled:opacity-50">
+                  {clearChargeBusy ? 'Clearing…' : 'Clear'}
                 </button>
               </div>
             </div>
