@@ -38,6 +38,7 @@ const NAV_SECTIONS = [
       { icon: 'savings',         label: 'Cash Advance Requests', path: '/cash-advance-requests' },
       { icon: 'security',        label: 'Wallet Audit',           path: '/wallet-audit'           },
       { icon: 'fact_check',      label: 'Audit Log',              path: '/audit-log'              },
+      { icon: 'restore_from_trash', label: 'Trash',               path: '/trash'                  },
       { icon: 'shield_lock',     label: 'Security',               path: '/security'               },
     ],
   },

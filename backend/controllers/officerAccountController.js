@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import Admin from '../models/Admin.js';
 import Merchant from '../models/Merchant.js';
 import { logAudit } from '../utils/auditLog.js';
+import { recordDeletion } from '../utils/trash.js';
 import { adminActor } from './adminController.js';
 import { sendOfficerCredentials } from '../utils/resend.js';
 import { toE164Kenyan } from '../utils/notificationService.js';
@@ -267,6 +268,7 @@ export const deleteOfficer = async (req, res) => {
       return res.status(400).json({ error: `Reassign or resolve ${openCount} open application(s) claimed by this officer before deleting their account.` });
     }
 
+    await recordDeletion({ collectionName: 'Admin', doc: target, label: `${target.name || target.email} (officer)`, deletedBy: req.admin._id });
     await target.deleteOne();
 
     logAudit({
