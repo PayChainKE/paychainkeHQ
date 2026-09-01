@@ -18,7 +18,7 @@ export function buildPaymentReceivedSms({ ref, amount, payerName, payerPhone, da
   const phone = payerPhone ? formatPhoneDisplay(payerPhone) : null;
   return buildStrictSms(
     ({ ref, amt, name, phone, channel, date, time, balance }) =>
-      `${ref} Confirmed. You have received Ksh ${amt} from ${name}${phone ? ` ${phone}` : ''} via ${channel} on ${date} at ${time}. New PayChain balance is Ksh ${balance}.`,
+      `${ref} Confirmed. You have received Ksh ${amt} from ${name}${phone ? ` ${phone}` : ''} via ${channel} on ${date} at ${time}. New balance: Ksh ${balance}.`,
     {
       fixed: { ref, amt: formatKes(amount), phone: phone || '', channel, date, time, balance: formatKes(balance) },
       truncatable: [{ key: 'name', value: payerName || 'a customer', minLength: 6 }],
@@ -58,7 +58,7 @@ export function buildPaymentSentSms({ ref, amount, recipientName, recipientPhone
   const showFee = typeof fee === 'number' && Number.isFinite(fee);
   return buildStrictSms(
     ({ ref, amt, name, phone, date, time, balance, feeLine }) =>
-      `${ref} Confirmed. Ksh ${amt} sent to ${name}${phone ? ` ${phone}` : ''} on ${date} at ${time}. New PayChain balance is Ksh ${balance}.${feeLine}`,
+      `${ref} Confirmed. Ksh ${amt} sent to ${name}${phone ? ` ${phone}` : ''} on ${date} at ${time}. New balance: Ksh ${balance}.${feeLine}`,
     {
       fixed: {
         ref,
@@ -126,7 +126,7 @@ export function buildCustomerPaidSms({ ref, amount, businessName, accountRef, da
   const showFee = typeof fee === 'number' && Number.isFinite(fee) && fee > 0;
   return buildStrictSms(
     ({ ref, amt, name, acct, date, time, feeLine }) =>
-      `${ref} Confirmed. Ksh ${amt} paid to ${name}${acct ? ` for account ${acct}` : ''} on ${date} at ${time}.${feeLine} Thank you for your payment.`,
+      `${ref} Confirmed. Ksh ${amt} paid to ${name}${acct ? ` (account ${acct})` : ''} on ${date} at ${time}.${feeLine} Thank you.`,
     {
       fixed: {
         ref,
@@ -173,7 +173,7 @@ export function buildPaybillPaymentReceiptSms({ ref, amount, businessName, accou
   const showFee = typeof fee === 'number' && Number.isFinite(fee) && fee > 0;
   return buildStrictSms(
     ({ ref, amt, name, acct, date, time, feeLine }) =>
-      `PayChain Confirmed. You have sent Ksh ${amt} to ${name}${acct ? `-${acct}` : ''}. PayChain Ref ${ref} on ${date} at ${time}.${feeLine} Thank you for your payment.`,
+      `PayChain: Ksh ${amt} sent to ${name}${acct ? ` (account ${acct})` : ''}. Ref ${ref} on ${date} at ${time}.${feeLine} Thank you.`,
     {
       fixed: {
         ref,

@@ -32,15 +32,16 @@ const PAYBILL_NUMBER = '880100';
 export function buildMerchantWelcomeSms({ businessName, accountNumber, accountIsInterim = false }) {
   return buildStrictSms(
     ({ name, paybill, account, interimNote }) =>
-      `Welcome to PayChain, ${name}! Your merchant account is now active. Receive M-PESA payments via Paybill ${paybill}, Account No. ${account}${interimNote}. Share these details with your customers. Thank you for choosing PayChain.`,
+      `Welcome to PayChain, ${name}! Your M-PESA Paybill is ${paybill}, Account No. ${account}${interimNote}.`,
     {
       fixed: {
         paybill: PAYBILL_NUMBER,
         account: accountNumber,
-        // Same "temporary, upgrades automatically" framing as the email's
-        // accountIsInterim branch — never claim a pending 8-digit code is
-        // the merchant's final account number.
-        interimNote: accountIsInterim ? ' (temporary, upgrades automatically)' : '',
+        // Same "temporary" framing as the email's accountIsInterim branch —
+        // never claim a pending 8-digit code is the merchant's final account
+        // number. Shortened from the email's own wording ("temporary,
+        // upgrades automatically") to buy back segment budget.
+        interimNote: accountIsInterim ? ' (temporary)' : '',
       },
       truncatable: [{ key: 'name', value: businessName || 'valued merchant' }],
     }
@@ -61,7 +62,7 @@ export function buildMerchantWelcomeSms({ businessName, accountNumber, accountIs
 export function buildInstallReminderSms({ businessName, loginUrl }) {
   return buildStrictSms(
     ({ name, url }) =>
-      `Hi ${name}, install the PayChain app for instant access. No need to open your browser every time. Open this link on your phone and log in: ${url}. Then add it to your home screen when prompted.`,
+      `Hi ${name}, install the PayChain app: open this link on your phone, log in, and add to your home screen. ${url}`,
     {
       fixed: { url: loginUrl },
       truncatable: [{ key: 'name', value: businessName || 'there' }],

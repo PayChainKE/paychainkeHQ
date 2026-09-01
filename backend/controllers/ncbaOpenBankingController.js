@@ -577,7 +577,7 @@ export const handleBankPayout = async (req, res) => {
 
     if (updatedMerchant.phone) {
       const { date, time } = formatTransactionDateTime();
-      const RAIL_SMS_LABEL = { rtgs: 'Bank Payout (RTGS)', pesalink: 'Bank Payout', ift: 'Bank Payout' };
+      const RAIL_SMS_LABEL = { rtgs: 'RTGS Payout', pesalink: 'Bank Payout', ift: 'Bank Payout' };
       const { message } = buildPayoutSentSms({
         ref: transaction.reference,
         label: RAIL_SMS_LABEL[usedRail],
@@ -644,7 +644,7 @@ export const handleBankPayout = async (req, res) => {
     // Payout Sent" SMS, but nothing told them when it failed instead.
     Merchant.findById(merchantId).select('phone kesBalance').then((merchant) => {
       if (!merchant?.phone) return;
-      const RAIL_SMS_LABEL = { rtgs: 'Bank Payout (RTGS)', pesalink: 'Bank Payout', ift: 'Bank Payout' };
+      const RAIL_SMS_LABEL = { rtgs: 'RTGS Payout', pesalink: 'Bank Payout', ift: 'Bank Payout' };
       const { message } = buildPayoutFailedSms({
         ref: `BANK-${Date.now()}`,
         label: RAIL_SMS_LABEL[rail] || 'Bank Payout',
@@ -782,11 +782,11 @@ export async function resolvePendingOpenBankingTransaction({ reference, succeede
     // the Transaction itself, so "Till/Paybill Payment" is the most specific
     // label available without adding a new field just for wording.
     const NON_BANK_TYPE_LABELS = {
-      ncba_kplc: 'KPLC bill payment',
-      ncba_kplc_prepaid: 'KPLC prepaid token purchase',
-      ncba_ncwsc: 'NCWSC bill payment',
+      ncba_kplc: 'KPLC Bill',
+      ncba_kplc_prepaid: 'KPLC Prepaid',
+      ncba_ncwsc: 'NCWSC Bill',
       ncba_mobile_b2w: 'Withdrawal',
-      ncba_lipa_na_mpesa: 'Till/Paybill Payment',
+      ncba_lipa_na_mpesa: 'Paybill/Till',
     };
     const isBankPayout = !Object.keys(NON_BANK_TYPE_LABELS).includes(transaction.type);
     const payoutLabel = isBankPayout ? 'Bank payout' : (NON_BANK_TYPE_LABELS[transaction.type] || 'Payout');
