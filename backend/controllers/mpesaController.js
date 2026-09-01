@@ -351,6 +351,7 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
               sender: { name: formatPhoneDisplay(stkReq.phone), id: formatPhoneDisplay(stkReq.phone) },
               recipient: { name: merchant.businessName, id: merchant.ncbaMerchantCode },
               balanceAfter: updatedMerchant.kesBalance,
+              paymentLinkId: link.linkId,
             });
 
             if (customerFee > 0) {

@@ -2548,6 +2548,12 @@ export const searchTransactionAudit = async (req, res) => {
     const merchantId = req.query.merchantId && mongoose.Types.ObjectId.isValid(req.query.merchantId)
       ? req.query.merchantId
       : null;
+    // Payment Link Audit page (apps/admin/src/pages/PaymentLinkAudit.jsx)
+    // reuses this same search endpoint rather than duplicating its
+    // filter/pagination/CSV/detail logic — scopes to transactions that
+    // settled a customer-paid Payment Link (see Transaction.paymentLinkId).
+    const viaPaymentLink = req.query.viaPaymentLink === 'true';
+    const paymentLinkId = req.query.paymentLinkId ? String(req.query.paymentLinkId).trim() : null;
 
     // Demo merchant (apps/demo's showcase account) runs real-looking
     // simulated transactions on purpose — the Tax & Compliance payout audit
@@ -2561,6 +2567,8 @@ export const searchTransactionAudit = async (req, res) => {
     if (typeList) filter.type = typeList.length === 1 ? typeList[0] : { $in: typeList };
     if (status) filter.status = status;
     if (merchantId) filter.merchantId = merchantId;
+    if (paymentLinkId) filter.paymentLinkId = paymentLinkId;
+    else if (viaPaymentLink) filter.paymentLinkId = { $ne: null };
     if (req.query.preset) {
       // Tax & Compliance's payout audit trail sends a calendar-aligned
       // preset (this_month/last_month/...), same as its KPI strip — without
@@ -2625,6 +2633,7 @@ export const searchTransactionAudit = async (req, res) => {
         recipient: t.recipient,
         settlementRail: t.settlementRail,
         mobileNetwork: t.mobileNetwork,
+        paymentLinkId: t.paymentLinkId,
         paychainFee: t.paychainFee,
         safaricomFee: t.safaricomFee,
         balanceAfter: t.balanceAfter,

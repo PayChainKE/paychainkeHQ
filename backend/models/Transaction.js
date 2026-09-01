@@ -152,6 +152,15 @@ const transactionSchema = new mongoose.Schema({
   // meaningful for 'ncba_mobile_b2w' payouts, which can target either
   // Safaricom M-Pesa or Airtel Money. Null for every other transaction type.
   mobileNetwork: { type: String, enum: ['safaricom', 'airtel', null], default: null },
+  // The PaymentLink.linkId this customer payment settled, when the STK Push
+  // that created this Transaction was raised to pay a Payment Link (see
+  // controllers/mpesaController.js's STK-poll success branch, and
+  // STKRequest.linkId). Stored as the raw string, not an ObjectId ref —
+  // PaymentLink documents are TTL-deleted shortly after expiry
+  // (models/PaymentLink.js), so this must keep working as a stable
+  // historical marker even after the source link itself is long gone. Null
+  // for every transaction not raised to settle a payment link.
+  paymentLinkId: { type: String, default: null, index: true },
 }, {
   timestamps: true
 });
