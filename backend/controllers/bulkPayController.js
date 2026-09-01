@@ -1039,7 +1039,7 @@ export const authorizeBatch = async (req, res) => {
       const { date, time } = formatTransactionDateTime();
       safeSendSMS({
         to: merchant.phone,
-        message: `${savedBatch.batchReference} Bulk Payout Submitted. Ksh ${formatKes(totalNet)} to ${transactions.length} recipient${transactions.length === 1 ? '' : 's'} on ${date} at ${time}.${failedCount > 0 ? ` ${failedCount} failed and were refunded.` : ''} New balance: Ksh ${formatKes(merchant.kesBalance)}.`,
+        message: `${savedBatch.batchReference} Bulk Payout Submitted. Ksh ${formatKes(totalNet)} to ${transactions.length} recipient${transactions.length === 1 ? '' : 's'} on ${date} at ${time}.${failedCount > 0 ? ` ${failedCount} failed, refunded.` : ''} New balance: Ksh ${formatKes(merchant.kesBalance)}.`,
       }).then((result) => {
         if (!result.success) console.error(`Bulk payout SMS failed for merchant ${merchant._id}:`, result.error);
       });
