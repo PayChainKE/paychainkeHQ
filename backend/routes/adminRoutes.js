@@ -76,7 +76,7 @@ import {
 import { runWalletAudit } from '../controllers/walletAuditController.js';
 import { adminListInvoices } from '../controllers/invoiceController.js';
 import { sendSmsBroadcast, getSmsBroadcasts, deleteSmsBroadcast, clearSmsBroadcasts } from '../controllers/smsBroadcastController.js';
-import { getRevenue, getRevenueSweeps, archiveRevenueSweep, unarchiveRevenueSweep, exportRevenueSweeps, triggerRevenueSweep, getReconciliations, submitReconciliation, archiveReconciliation, unarchiveReconciliation, bulkArchiveReconciliations, getExpectedPoolBalance, getLivePoolBalance, getPoolAccountStatement, getBankCharges, recordBankCharge, updateBankCharge, archiveBankCharge } from '../controllers/revenueController.js';
+import { getRevenue, getRevenueSweeps, archiveRevenueSweep, unarchiveRevenueSweep, exportRevenueSweeps, triggerRevenueSweep, getReconciliations, submitReconciliation, archiveReconciliation, unarchiveReconciliation, bulkArchiveReconciliations, getExpectedPoolBalance, getLivePoolBalance, getPoolAccountStatement, getBankCharges, recordBankCharge, updateBankCharge, archiveBankCharge, writeOffRevenueDeficit } from '../controllers/revenueController.js';
 import { getTariffs, requestTariffUpdate, confirmTariffUpdate } from '../controllers/tariffController.js';
 import { adminListStuckOpenBankingPayouts, adminResolveStuckOpenBankingPayout, adminDeleteStuckOpenBankingPayout } from '../controllers/ncbaOpenBankingController.js';
 import { adminManualCreditNcbaCollection, adminListMissedNcbaCollections, adminDismissMissedNcbaCollection } from '../controllers/ncbaAccountNotificationController.js';
@@ -215,6 +215,7 @@ router.get('/revenue/pool-account/charges', protect, excludeOfficer, getBankChar
 router.post('/revenue/pool-account/charges', protect, requireMutator, sensitiveActionLimiter, recordBankCharge);
 router.patch('/revenue/pool-account/charges/:id', protect, requireMutator, sensitiveActionLimiter, updateBankCharge);
 router.patch('/revenue/pool-account/charges/:id/archive', protect, requireMutator, sensitiveActionLimiter, archiveBankCharge);
+router.post('/revenue/pool-account/write-off-deficit', protect, requireMutator, sensitiveActionLimiter, writeOffRevenueDeficit);
 router.get('/revenue/reconciliations', protect, excludeOfficer, getReconciliations);
 router.post('/revenue/reconciliations', protect, requireMutator, sensitiveActionLimiter, submitReconciliation);
 router.post('/revenue/reconciliations/bulk-archive', protect, requireMutator, sensitiveActionLimiter, bulkArchiveReconciliations);

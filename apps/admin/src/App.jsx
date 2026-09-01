@@ -22,10 +22,12 @@ import Invoices from './pages/Invoices';
 import CallCentre from './pages/CallCentre';
 import AuditLog from './pages/AuditLog';
 import TransactionAudit from './pages/TransactionAudit';
+import PaymentLinkAudit from './pages/PaymentLinkAudit';
 import TransactionTariffs from './pages/TransactionTariffs';
 import Security from './pages/Security';
 import Revenue from './pages/Revenue';
 import PoolReconciliation from './pages/PoolReconciliation';
+import BankCharges from './pages/BankCharges';
 import Bookkeeping from './pages/Bookkeeping';
 import TaxCompliance from './pages/TaxCompliance';
 import SmsBroadcast from './pages/SmsBroadcast';
@@ -67,6 +69,7 @@ export default function App(){
             <Route path="/stk-monitor" element={<Protected><StkMonitor/></Protected>} />
             <Route path="/revenue" element={<Protected><Revenue/></Protected>} />
             <Route path="/pool-reconciliation" element={<Protected><PoolReconciliation/></Protected>} />
+            <Route path="/bank-charges" element={<Protected><BankCharges/></Protected>} />
             <Route path="/kyc-verification" element={<Protected><KycVerification/></Protected>} />
             <Route path="/kyc-verification/:id" element={<Protected><KycApplicationDetail/></Protected>} />
             <Route path="/bookkeeping" element={<Protected><Bookkeeping/></Protected>} />
@@ -76,6 +79,7 @@ export default function App(){
             <Route path="/audit-log" element={<Protected><AuditLog/></Protected>} />
             <Route path="/trash" element={<Protected><Trash/></Protected>} />
             <Route path="/transaction-audit" element={<Protected><TransactionAudit/></Protected>} />
+            <Route path="/payment-link-audit" element={<Protected><PaymentLinkAudit/></Protected>} />
             <Route path="/transaction-tariffs" element={<Protected><TransactionTariffs/></Protected>} />
             <Route path="/security" element={<Protected><Security/></Protected>} />
             <Route path="/settings" element={<Protected><Settings/></Protected>} />

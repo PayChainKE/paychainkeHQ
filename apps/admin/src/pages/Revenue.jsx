@@ -392,13 +392,21 @@ const Revenue = () => {
   // this used to live here and could disagree with reality by tens of
   // shillings on any range narrower than "All Time" — see the Cash
   // Position card below).
+  // `unsweptNow` is deliberately the GROSS figure (accrued fees minus what's
+  // already been physically swept) — never reduced by real bank/tax charges.
+  // This is the "PayChain earned this" KPI; it must never look like it
+  // vanished to zero just because of an unrelated real NCBA/KRA cost. That
+  // cost is tracked separately as `bankChargesDeficit` and shown alongside,
+  // never silently netted in — see revenueSweepService.js#computeUnsweptRevenue.
   const [unsweptNow, setUnsweptNow] = useState(null);
   const [unsweptNowLoading, setUnsweptNowLoading] = useState(true);
+  const [bankChargesDeficit, setBankChargesDeficit] = useState(0);
   const fetchUnsweptNow = useCallback(async (silent = false) => {
     if (!silent) setUnsweptNowLoading(true);
     try {
       const res = await api.get('/api/admin/revenue/pool-balance/expected');
-      setUnsweptNow(res.data?.data?.unsweptRevenue ?? null);
+      setUnsweptNow(res.data?.data?.grossUnsweptRevenue ?? null);
+      setBankChargesDeficit(res.data?.data?.bankChargesDeficit ?? 0);
     } catch (e) {
       if (!silent) setUnsweptNow(null);
     } finally {
@@ -772,6 +780,11 @@ const Revenue = () => {
                 <span className="material-symbols-outlined text-on-surface-variant/60 text-sm" title="Collected but not yet swept out — the current running balance, right now, regardless of the period selected above">account_balance</span>
               </div>
               {unsweptNowLoading ? <Skel className="w-28 h-8" /> : <span className="text-2xl font-bold text-on-surface tracking-tighter tabular-nums">{fmtKES(unsweptNow)}</span>}
+              {!unsweptNowLoading && bankChargesDeficit > 0 && (
+                <Link to="/bank-charges" className="text-2xs text-red-600 hover:text-red-700 font-semibold w-fit">
+                  − {fmtKES(bankChargesDeficit)} in real bank/tax charges not yet covered →
+                </Link>
+              )}
               <Link to="/pool-reconciliation" className="text-2xs text-on-surface-variant hover:text-on-surface underline underline-offset-2 w-fit">Verify against real NCBA balance →</Link>
             </div>
           </div>
