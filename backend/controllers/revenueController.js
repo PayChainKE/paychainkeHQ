@@ -3,6 +3,7 @@ import Transaction from '../models/Transaction.js';
 import RevenueSweep from '../models/RevenueSweep.js';
 import BankReconciliation from '../models/BankReconciliation.js';
 import BankAccountCharge from '../models/BankAccountCharge.js';
+import RevenueWriteOff from '../models/RevenueWriteOff.js';
 import { REVENUE_STREAMS } from '../config/revenueRateCard.js';
 import { LIVE_DATA_CUTOFF } from '../config/liveDataCutoff.js';
 import { runRevenueSweep, REVENUE_SWEEP_DESTINATION, computeExpectedPoolBalance } from '../services/revenueSweepService.js';
@@ -769,6 +770,57 @@ export const getExpectedPoolBalance = async (req, res) => {
   }
 };
 
+// @desc    Write off the CURRENT bank/tax-charges deficit — the gap between
+//          PayChain's gross accrued revenue and real NCBA/KRA charges
+//          recorded against it (see models/RevenueWriteOff.js and
+//          computeUnsweptRevenue's doc comment). A deliberate one-time
+//          admin decision, not something ever created automatically:
+//          recognizes that historical shortfall as absorbed so the running
+//          "unswept revenue" figure stops being dragged down by it going
+//          forward. The underlying BankAccountCharge records are untouched
+//          — this doesn't dispute that the money left the account, only
+//          stops counting it against future revenue.
+//          Always computes the exact amount needed itself (current
+//          bankChargesDeficit) rather than trusting a client-supplied
+//          number — a write-off should never be able to exceed what's
+//          actually outstanding.
+// @route   POST /api/admin/revenue/pool-account/write-off-deficit
+// @access  Private (Admin, owner/admin only)
+export const writeOffRevenueDeficit = async (req, res) => {
+  try {
+    const before = await computeExpectedPoolBalance();
+    const amount = before.bankChargesDeficit;
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ error: 'There is no outstanding bank/tax-charges deficit to write off.' });
+    }
+
+    const { reason } = req.body || {};
+    const record = await RevenueWriteOff.create({
+      amount,
+      reason: reason && String(reason).trim() ? String(reason).trim() : 'Historical bank/tax charges deficit, written off per admin decision.',
+      snapshotGrossUnswept: before.grossUnsweptRevenue,
+      snapshotTotalCharges: before.totalBankCharges,
+      writtenOffBy: req.admin._id,
+    });
+
+    logAudit({
+      action: 'admin.revenue.deficit_written_off',
+      category: 'admin',
+      severity: 'critical',
+      message: `Admin wrote off KES ${amount} in accumulated bank/tax-charges deficit against unswept revenue`,
+      actor: adminActor(req.admin),
+      req,
+      metadata: { writeOffId: record._id, amount, snapshot: before },
+    });
+
+    const after = await computeExpectedPoolBalance();
+    res.json({ success: true, data: after });
+  } catch (error) {
+    console.error('Write Off Revenue Deficit Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
 // @desc    Live pooled-account balance straight from NCBA's AccountDetails
 //          endpoint — confirmed working live 2026-08-29 (see
 //          services/ncbaOpenBankingService.js#getNcbaAccountBalance's doc
@@ -828,16 +880,31 @@ export const getPoolAccountStatement = async (req, res) => {
 //          Excise Duty, SMS fees, anything not tied to a specific transfer
 //          (see models/BankAccountCharge.js). Excludes archived rows, same
 //          display-only-filter convention as getReconciliations.
+//          Paginated (page/limit query params) for the dedicated Bank
+//          Charges admin page; PoolReconciliation.jsx's embedded summary
+//          box calls this with no params, which keeps its old un-paginated
+//          200-row behavior exactly as before (default limit below).
 // @route   GET /api/admin/revenue/pool-account/charges
 // @access  Private (Admin)
 export const getBankCharges = async (req, res) => {
   try {
-    const records = await BankAccountCharge.find({ archived: { $ne: true } })
-      .sort('-chargedAt')
-      .limit(200)
-      .populate('recordedBy', 'email name')
-      .lean();
-    res.json({ success: true, data: records });
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = req.query.limit ? Math.min(200, Math.max(1, parseInt(req.query.limit, 10) || 200)) : 200;
+    const filter = { archived: { $ne: true } };
+
+    const [total, records, totalAmountAgg] = await Promise.all([
+      BankAccountCharge.countDocuments(filter),
+      BankAccountCharge.find(filter)
+        .sort('-chargedAt')
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .populate('recordedBy', 'email name')
+        .lean(),
+      BankAccountCharge.aggregate([{ $match: filter }, { $group: { _id: null, sum: { $sum: '$amount' } } }]),
+    ]);
+    const totalAmount = totalAmountAgg[0]?.sum || 0;
+
+    res.json({ success: true, data: records, total, page, limit, totalAmount });
   } catch (error) {
     console.error('Get Bank Charges Error:', error);
     res.status(500).json({ error: 'Server Error' });

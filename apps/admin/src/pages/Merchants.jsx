@@ -1238,6 +1238,24 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
     }
   };
 
+  const [installReminderBusy, setInstallReminderBusy] = React.useState(false);
+  const [installReminderSentAt, setInstallReminderSentAt] = React.useState(merchant?.pwaInstallReminderSentAt || null);
+  const INSTALL_REMINDER_COOLDOWN_MS = 5 * 60 * 1000; // mirrors adminController.js#sendInstallReminder
+
+  const handleResendInstallReminder = async () => {
+    try {
+      setInstallReminderBusy(true);
+      const res = await api.post(`/api/admin/merchants/${merchant._id}/send-install-reminder`);
+      if (res.data.success) {
+        setInstallReminderSentAt(res.data.pwaInstallReminderSentAt);
+      }
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to send the install reminder.');
+    } finally {
+      setInstallReminderBusy(false);
+    }
+  };
+
   const handleToggleFeature = async (featureName, value) => {
     try {
       setUpdatingFeatures(true);
@@ -1630,6 +1648,28 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
               <Row label="Mobile App PIN" value={<Badge tone={m.hasAppPin ? 'emerald' : 'gray'} icon={m.hasAppPin ? 'check' : 'remove'}>{m.hasAppPin ? 'Configured' : 'Not set'}</Badge>} />
               <Row label="Bulk Pay PIN" value={<Badge tone={m.hasBulkPayPin ? 'emerald' : 'gray'} icon={m.hasBulkPayPin ? 'check' : 'remove'}>{m.hasBulkPayPin ? 'Configured' : 'Not set'}</Badge>} />
               <Row label="Biometrics" value={<Badge tone={m.biometricsEnabled ? 'emerald' : 'gray'} icon={m.biometricsEnabled ? 'check' : 'remove'}>{m.biometricsEnabled ? 'Enabled' : 'Disabled'}</Badge>} />
+              <Row
+                label="Web App (PWA)"
+                value={<Badge tone={m.pwaInstalledAt ? 'emerald' : 'gray'} icon={m.pwaInstalledAt ? 'check' : 'remove'}>{m.pwaInstalledAt ? `Installed ${fmtDate(m.pwaInstalledAt)}` : 'Not installed'}</Badge>}
+              />
+              {!m.pwaInstalledAt && (
+                <Row
+                  label="Install Reminder"
+                  value={
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleResendInstallReminder}
+                        disabled={installReminderBusy || (installReminderSentAt && (Date.now() - new Date(installReminderSentAt).getTime()) < INSTALL_REMINDER_COOLDOWN_MS)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-white text-2xs font-bold uppercase tracking-widest hover:opacity-90 transition-opacity disabled:opacity-40"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">send</span>
+                        {installReminderBusy ? 'Sending…' : 'Resend Install Link'}
+                      </button>
+                      {installReminderSentAt && <span className="text-2xs text-on-surface-variant/60">Last sent {fmtDate(installReminderSentAt)}</span>}
+                    </div>
+                  }
+                />
+              )}
             </Section>
 
             {/* Feature Access */}

@@ -1,6 +1,7 @@
 import Transaction from '../models/Transaction.js';
 import RevenueSweep from '../models/RevenueSweep.js';
 import BankAccountCharge from '../models/BankAccountCharge.js';
+import RevenueWriteOff from '../models/RevenueWriteOff.js';
 import Merchant from '../models/Merchant.js';
 import Admin from '../models/Admin.js';
 import { submitNcbaBankTransfer } from '../controllers/ncbaOpenBankingController.js';
@@ -86,6 +87,25 @@ function logEvent(level, event, fields) {
 // means a failed, skipped, or amount-capped run never loses track of what
 // it still owes — the shortfall just carries forward automatically into
 // the next computation instead of needing its own retry bookkeeping.
+//
+// Returns BOTH a gross and a net figure — deliberately kept separate
+// (2026-09-01, after real bank/tax charges briefly outpaced accrued fee
+// revenue and made the net figure sit at KES 0 for weeks even as new fees
+// kept coming in):
+//   - `grossUnswept`: accrued fee revenue minus what's already been
+//     physically swept out. NOT reduced by real bank/tax charges — this is
+//     "PayChain's earned revenue," the number that should never look like
+//     it vanished to zero just because of an unrelated real cost.
+//   - `netUnswept`: `grossUnswept` minus real bank/tax charges
+//     (BankAccountCharge — Excise Duty, Withholding Tax, etc.) plus any
+//     deliberate write-off (RevenueWriteOff — see that model's doc
+//     comment). THIS is the figure actually safe to physically transfer
+//     (runRevenueSweep) or use to compute the pooled account's expected
+//     balance (computeExpectedPoolBalance) — it must stay charge-aware, or
+//     both of those would be wrong again.
+// Callers that want the admin-facing "how much has PayChain earned" KPI
+// should read `grossUnswept` + `totalCharges` (shown as its own line) side
+// by side, never blended into one silently-netted number.
 async function computeUnsweptRevenue() {
   // See reversedTransactionExclusionMatch's doc comment — a duplicate
   // credit and its correction entry must never contribute to what this
@@ -98,7 +118,7 @@ async function computeUnsweptRevenue() {
     reversedTransactionExclusionMatch(),
     excludeDemoMerchantsMatch(),
   ]);
-  const [accruedAgg, sweptAgg, chargesAgg] = await Promise.all([
+  const [accruedAgg, sweptAgg, chargesAgg, writeOffAgg] = await Promise.all([
     Transaction.aggregate([
       { $match: { createdAt: { $gte: LIVE_DATA_CUTOFF }, status: { $in: ['completed', 'verified'] }, ...excludeReversed, ...excludeDemo } },
       { $group: { _id: null, total: { $sum: '$paychainFee' }, count: { $sum: 1 } } },
@@ -123,15 +143,22 @@ async function computeUnsweptRevenue() {
     BankAccountCharge.aggregate([
       { $group: { _id: null, total: { $sum: '$amount' } } },
     ]),
+    // Deliberate one-time adjustments — see models/RevenueWriteOff.js.
+    RevenueWriteOff.aggregate([
+      { $group: { _id: null, total: { $sum: '$amount' } } },
+    ]),
   ]);
 
   const totalAccrued = accruedAgg[0]?.total || 0;
   const transactionCount = accruedAgg[0]?.count || 0;
   const totalSwept = sweptAgg[0]?.total || 0;
   const totalCharges = chargesAgg[0]?.total || 0;
-  const unswept = Math.round((totalAccrued - totalSwept - totalCharges) * 100) / 100;
+  const totalWriteOffs = writeOffAgg[0]?.total || 0;
 
-  return { unswept: Math.max(0, unswept), transactionCount };
+  const grossUnswept = Math.max(0, Math.round((totalAccrued - totalSwept) * 100) / 100);
+  const netUnswept = Math.max(0, Math.round((grossUnswept - totalCharges + totalWriteOffs) * 100) / 100);
+
+  return { grossUnswept, netUnswept, totalCharges, totalWriteOffs, transactionCount };
 }
 
 // What the pooled NCBA account SHOULD contain right now, per PayChain's own
@@ -141,7 +168,7 @@ async function computeUnsweptRevenue() {
 // only way today to catch money having left the pool through anything
 // other than a merchant's own withdrawal or the revenue sweep itself.
 export async function computeExpectedPoolBalance() {
-  const [merchantAgg, { unswept, transactionCount }] = await Promise.all([
+  const [merchantAgg, { grossUnswept, netUnswept, totalCharges, totalWriteOffs, transactionCount }] = await Promise.all([
     // Demo merchant's simulated kesBalance is not real money PayChain owes
     // anyone — must never inflate what the pool is expected to hold, same
     // discipline computeUnsweptRevenue below already applies to fee revenue.
@@ -158,9 +185,20 @@ export async function computeExpectedPoolBalance() {
   return {
     merchantBalanceTotal,
     merchantCount,
-    unsweptRevenue: unswept,
+    // `unsweptRevenue`/`expectedPoolBalance` MUST stay charge-aware (net) —
+    // this is the figure Pool Reconciliation cross-checks against the real
+    // NCBA balance, and it must reflect real money that has actually left
+    // the account. `grossUnsweptRevenue`/`bankChargesDeficit` below are the
+    // separate, never-netted admin-facing figures (see
+    // computeUnsweptRevenue's doc comment) — always show them side by
+    // side, never substitute one for the other.
+    unsweptRevenue: netUnswept,
+    grossUnsweptRevenue: grossUnswept,
+    bankChargesDeficit: Math.max(0, Math.round((totalCharges - totalWriteOffs) * 100) / 100),
+    totalBankCharges: totalCharges,
+    totalRevenueWriteOffs: totalWriteOffs,
     unsweptRevenueTransactionCount: transactionCount,
-    expectedPoolBalance: Math.round((merchantBalanceTotal + unswept) * 100) / 100,
+    expectedPoolBalance: Math.round((merchantBalanceTotal + netUnswept) * 100) / 100,
   };
 }
 
@@ -236,17 +274,21 @@ export async function runRevenueSweep() {
     throw e;
   }
 
-  const { unswept, transactionCount } = await computeUnsweptRevenue();
-  let attemptedAmount = Math.min(unswept, MAX_TRANSFER_AMOUNT);
+  // Physically transferring must always use the charge-aware net figure —
+  // never the gross admin-facing one (see computeUnsweptRevenue's doc
+  // comment) — real bank/tax charges have already left the account for
+  // real, so only the net remainder is actually safe to move out.
+  const { netUnswept, transactionCount } = await computeUnsweptRevenue();
+  let attemptedAmount = Math.min(netUnswept, MAX_TRANSFER_AMOUNT);
 
   if (attemptedAmount < MIN_TRANSFER_AMOUNT) {
-    logEvent('info', 'revenue_sweep_skipped_below_minimum', { unswept });
+    logEvent('info', 'revenue_sweep_skipped_below_minimum', { netUnswept });
     return recordSweep({
       periodStart, periodEnd, attemptedAmount, transactionCount, status: 'skipped',
       ...destinationAudit,
-      failureReason: unswept <= 0
+      failureReason: netUnswept <= 0
         ? 'No revenue accrued since the last sweep.'
-        : `Accrued revenue (KES ${unswept}) is below NCBA's KES ${MIN_TRANSFER_AMOUNT} minimum transfer.`,
+        : `Accrued revenue (KES ${netUnswept}) is below NCBA's KES ${MIN_TRANSFER_AMOUNT} minimum transfer.`,
     });
   }
 
