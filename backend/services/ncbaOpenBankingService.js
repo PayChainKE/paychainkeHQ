@@ -227,10 +227,30 @@ async function ncbaOpenBankingPost(path, body, { retrying = false } = {}) {
       await getAccessToken({ forceRefresh: true });
       return ncbaOpenBankingPost(path, body, { retrying: true });
     }
-    // Full upstream error detail goes to the server log only — never bake a
-    // raw upstream response body into a message that reaches the client.
+    // Full upstream error detail always goes to the server log — a raw
+    // response body (headers, stack traces, HTML error pages) must never
+    // reach the client verbatim.
     logEvent('error', 'ncba_openbanking_request_failed', { path, error: unwrapAxiosError(err) });
-    throw new NcbaOpenBankingRequestError('Open Banking request failed. Please try again.');
+    // But when NCBA rejected the request with an HTTP error status (not a
+    // clean 200 + succeeded:false, which already surfaces its own message
+    // below) AND that error body carries a short, plain-string reason in a
+    // recognizable field, surface it — this is what turns "Open Banking
+    // request failed. Please try again." into something a merchant/admin
+    // can actually act on (e.g. "Amount below minimum", "Invalid meter
+    // number") instead of a dead end that only Render's logs can explain.
+    // Same field-name-guessing findNcbaField already uses for the
+    // succeeded:false path, since NCBA's error field names are just as
+    // inconsistent across rails as its success ones. Only a short plain
+    // string is trusted — anything else (an object, an HTML error page)
+    // falls back to the generic message so nothing unsafe or unreadable
+    // ever reaches the client.
+    const upstreamMessage = findNcbaField(err.response?.data, NCBA_MESSAGE_PATTERNS);
+    const safeUpstreamMessage = typeof upstreamMessage === 'string' && upstreamMessage.trim() && upstreamMessage.length <= 200
+      ? upstreamMessage.trim()
+      : null;
+    throw new NcbaOpenBankingRequestError(
+      safeUpstreamMessage ? `Open Banking rejected this request: ${safeUpstreamMessage}` : 'Open Banking request failed. Please try again.'
+    );
   }
 }
 
