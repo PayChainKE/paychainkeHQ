@@ -91,23 +91,44 @@ export async function reconcileUnrecordedBankCharges() {
   for (const entry of debits) {
     try {
       const reference = entry.reference || `${entry.seq || ''}-${entry.valueDate || ''}-${entry.debit}`;
+      const description = entry.description || 'Bank charge (auto-detected from NCBA statement)';
 
-      const existingCharge = await BankAccountCharge.exists({ reference, source: 'auto_detected' });
+      // Confirmed live 2026-09-03: NCBA posts MULTIPLE distinct real charges
+      // under the exact same statement reference for one underlying transfer
+      // — e.g. a single Mobile B2W payout carries both "KE Excise Duty"
+      // (KES 10.80) AND a separate "IB Mobile Transfer Charge" (KES 72,
+      // never modeled anywhere before this) under one shared FTX reference.
+      // Deduping on `reference` alone (the previous behavior) meant whichever
+      // of these lines got processed first "claimed" that reference, and
+      // every other real charge sharing it was silently treated as already
+      // known and dropped forever — the KES 72 line was never once recorded
+      // by this sweep, on any mobile transfer, since it launched. `amount` +
+      // `description` disambiguate distinct charges that share a reference,
+      // while still safely no-op'ing a genuine re-run over the same line
+      // (same reference + description + amount = the same real charge).
+      const dedupeMatch = { reference, description, amount: entry.debit, source: 'auto_detected' };
+
+      const existingCharge = await BankAccountCharge.exists(dedupeMatch);
       if (existingCharge) { alreadyKnown++; continue; }
 
-      // Belt-and-suspenders: if a real Transaction actually does share this
-      // exact reference, this is someone's real transfer, not a fee — skip
-      // it regardless of what the description happened to contain.
-      const matchingTransfer = await Transaction.exists({ reference });
+      // Belt-and-suspenders: if a real Transaction shares this exact
+      // reference AND amount, this line almost certainly IS that transfer's
+      // own principal, not a separate fee — skip it. Matching on amount too
+      // (not reference alone) matters precisely because of the situation
+      // above — NCBA legitimately posts multiple distinct real charges
+      // under one shared reference, so checking reference alone would wrongly
+      // skip every one of them just because the real transfer happens to
+      // share their reference.
+      const matchingTransfer = await Transaction.exists({ reference, amount: entry.debit });
       if (matchingTransfer) { hasMatchingTransfer++; continue; }
 
       await BankAccountCharge.findOneAndUpdate(
-        { reference, source: 'auto_detected' },
+        dedupeMatch,
         {
           $setOnInsert: {
             chargedAt: parseStatementDate(entry.valueDate),
             amount: entry.debit,
-            description: entry.description || 'Bank charge (auto-detected from NCBA statement)',
+            description,
             reference,
             source: 'auto_detected',
           },
