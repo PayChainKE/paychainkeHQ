@@ -1712,6 +1712,8 @@ export const createMerchant = async (req, res) => {
       passwordResetToken: hashedToken,
       passwordResetExpires: expires,
       isDemoMerchant,
+      // Deliberately no tariffLock — see merchantAuthController.js's
+      // registerMerchant for why (only the pre-feature cohort is frozen).
     });
 
     // Deliverable 1 of the Stellar grant pipeline: a demo merchant's testnet

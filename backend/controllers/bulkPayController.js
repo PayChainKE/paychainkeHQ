@@ -16,6 +16,7 @@ import { debitAvailableBalance } from '../utils/availableBalance.js';
 import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard.js';
 import { getKplcPostpaidTariff, getKplcPrepaidTariff, getNcwscTariff } from '../config/billPaymentTariffCard.js';
 import { getLipaNaMpesaTariff } from '../config/lipaNaMpesaTariffCard.js';
+import { withMerchantTariffLock } from '../services/tariffCardCache.js';
 import { validatePhoneNumber, NcbaValidationError } from '../utils/ncbaValidators.js';
 import { submitMobileB2wPayment, submitLipaNaMpesaPayment, validateKplcAccount, submitKplcPayment, validateKplcPrepaidAccount, submitKplcPrepaidPayment, validateNcwscAccount, submitNcwscPayment, NcbaOpenBankingValidationError, NcbaOpenBankingRequestError } from '../services/ncbaOpenBankingService.js';
 import { buildPayoutSentSms } from '../utils/paymentSmsTemplates.js';
@@ -88,24 +89,30 @@ export const previewBatchFees = async (req, res) => {
     const payees = await Payee.find({ _id: { $in: payeeIds }, merchantId: req.merchant._id }).lean();
     const payeeById = Object.fromEntries(payees.map((p) => [String(p._id), p]));
 
-    let totalFee = 0;
-    const rows = items.map((item) => {
-      const payee = payeeById[item.payeeId];
-      const netAmount = Number(item.amount) || 0;
-      if (!payee || netAmount <= 0) return { payeeId: item.payeeId, fee: 0, category: null };
+    // Grandfathering — this merchant's own locked tariffs, not whatever's
+    // currently live, so the preview always matches what authorizeBatch
+    // below will actually charge. See services/tariffCardCache.js.
+    const { totalFee, rows } = await withMerchantTariffLock(req.merchant._id, () => {
+      let runningFee = 0;
+      const computedRows = items.map((item) => {
+        const payee = payeeById[item.payeeId];
+        const netAmount = Number(item.amount) || 0;
+        if (!payee || netAmount <= 0) return { payeeId: item.payeeId, fee: 0, category: null };
 
-      let fee = 0;
-      let category = null;
-      try {
-        ({ fee, category } = computeBulkPayoutRowFee(payee, netAmount));
-      } catch {
-        // Amount out of bounds for this rail's tariff — authorizeBatch
-        // surfaces this properly at authorize time with the actual payee
-        // name; the estimate just shows 0 for this one row rather than
-        // failing the whole preview over it.
-      }
-      totalFee += fee;
-      return { payeeId: item.payeeId, fee, category };
+        let fee = 0;
+        let category = null;
+        try {
+          ({ fee, category } = computeBulkPayoutRowFee(payee, netAmount));
+        } catch {
+          // Amount out of bounds for this rail's tariff — authorizeBatch
+          // surfaces this properly at authorize time with the actual payee
+          // name; the estimate just shows 0 for this one row rather than
+          // failing the whole preview over it.
+        }
+        runningFee += fee;
+        return { payeeId: item.payeeId, fee, category };
+      });
+      return { totalFee: runningFee, rows: computedRows };
     });
 
     res.json({ totalFee: Math.round(totalFee * 100) / 100, rows });
@@ -440,104 +447,119 @@ export const authorizeBatch = async (req, res) => {
     let totalLnmFee = 0;
     let totalBankFee = 0;
 
-    for (const row of batchRows) {
-      // payeeMatch is a client-supplied Payee _id — without the merchantId
-      // scope here, a merchant could authorize a payout against another
-      // merchant's Payee record
-      // just by guessing/enumerating its _id, redirecting funds to (and
-      // leaking the PII of) a payee they were never given.
-      let payee = row.payeeMatch
-        ? await Payee.findOne({ _id: row.payeeMatch, merchantId: req.merchant._id })
-        : null;
-      if (!payee) {
-        payee = new Payee({
-          merchantId: req.merchant._id,
-          name: row.name,
-          type: row.type || 'employee',
-          paymentMethod: 'Mobile Money',
-          mobileMoneyType: 'Personal Number',
-          phone: row.phone,
-          defaultAmount: row.grossAmount,
-        });
-        await payee.save();
-      }
-      row._payee = payee;
-
-      // Employees are paid the full stated amount, same as any other payee —
-      // no PAYE/NSSF/SHIF withheld (see uploadCSV's matching removal above).
-
-      totalGross += row.grossAmount;
-      totalNet += row.netAmount;
-      if (row.taxDeductions) {
-        totalTax += (row.taxDeductions.paye + row.taxDeductions.nssf + row.taxDeductions.shif);
-      }
-
-      row.isB2cRow = payee.paymentMethod === 'Mobile Money' && payee.mobileMoneyType === 'Personal Number';
-      if (row.isB2cRow) {
-        try {
-          const tariff = getB2cTariff(row.netAmount);
-          row.b2cFee = tariff.totalFee;
-          row.b2cSafaricomFee = tariff.safaricomFee;
-          row.b2cMarkup = tariff.markup;
-        } catch (e) {
-          if (e instanceof B2cTariffBoundsError) {
-            return res.status(400).json({ message: `Payout to "${payee.name}" — ${e.message}` });
-          }
-          throw e;
+    // Grandfathering — every get*Tariff call in this loop reads this
+    // merchant's own locked tariffs (not whatever's currently live), so the
+    // amount reserved here always matches what the Transaction pre-save
+    // hook later stamps onto each resulting Transaction. See
+    // services/tariffCardCache.js. Tariff-bounds errors can't `return
+    // res...` directly from inside this callback (that would only exit the
+    // callback, not authorizeBatch) — they're captured in
+    // tariffBoundsError and re-checked once the lock exits.
+    let tariffBoundsError = null;
+    await withMerchantTariffLock(req.merchant._id, async () => {
+      for (const row of batchRows) {
+        // payeeMatch is a client-supplied Payee _id — without the merchantId
+        // scope here, a merchant could authorize a payout against another
+        // merchant's Payee record
+        // just by guessing/enumerating its _id, redirecting funds to (and
+        // leaking the PII of) a payee they were never given.
+        let payee = row.payeeMatch
+          ? await Payee.findOne({ _id: row.payeeMatch, merchantId: req.merchant._id })
+          : null;
+        if (!payee) {
+          payee = new Payee({
+            merchantId: req.merchant._id,
+            name: row.name,
+            type: row.type || 'employee',
+            paymentMethod: 'Mobile Money',
+            mobileMoneyType: 'Personal Number',
+            phone: row.phone,
+            defaultAmount: row.grossAmount,
+          });
+          await payee.save();
         }
-        totalB2cFee += row.b2cFee;
-      } else {
-        row.b2cFee = 0;
-      }
+        row._payee = payee;
 
-      // Bill Payment tariff (config/billPaymentTariffCard.js) — KPLC
-      // (postpaid/prepaid) and NCWSC rows previously charged the merchant
-      // nothing beyond the bill principal; the flat fee constants that used
-      // to live in revenueRateCard.js were only ever stamped on the
-      // Transaction for dashboard reporting, never actually reserved here.
-      // Folded into totalDebit below, same pattern as totalB2cFee above.
-      row.isKplcRow = payee.type === 'utility' && payee.utilityProvider === 'KPLC';
-      row.isKplcPrepaidRow = payee.type === 'utility' && payee.utilityProvider === 'KPLC_PREPAID';
-      row.isNcwscRow = payee.type === 'utility' && payee.utilityProvider === 'WATER';
-      if (row.isKplcRow) {
-        ({ totalFee: row.utilityFee } = getKplcPostpaidTariff());
-      } else if (row.isKplcPrepaidRow) {
-        ({ totalFee: row.utilityFee } = getKplcPrepaidTariff(row.netAmount));
-      } else if (row.isNcwscRow) {
-        ({ totalFee: row.utilityFee } = getNcwscTariff());
-      } else {
-        row.utilityFee = 0;
-      }
-      totalUtilityFee += row.utilityFee;
+        // Employees are paid the full stated amount, same as any other payee —
+        // no PAYE/NSSF/SHIF withheld (see uploadCSV's matching removal above).
 
-      // B2B PayBill & Till Payout tariff (config/lipaNaMpesaTariffCard.js)
-      // — same "never actually charged" gap as KPLC/NCWSC above: this row
-      // type (Mobile Money, Paybill/Buy Goods) previously reserved nothing
-      // for its fee at all, unlike the standalone initiateB2B endpoint
-      // (mpesaController.js), which already charged its old flat KES 30.
-      row.isLnmRow = payee.paymentMethod === 'Mobile Money' && payee.mobileMoneyType !== 'Personal Number';
-      if (row.isLnmRow) {
-        ({ totalFee: row.lnmFee } = getLipaNaMpesaTariff(row.netAmount));
-      } else {
-        row.lnmFee = 0;
-      }
-      totalLnmFee += row.lnmFee;
+        totalGross += row.grossAmount;
+        totalNet += row.netAmount;
+        if (row.taxDeductions) {
+          totalTax += (row.taxDeductions.paye + row.taxDeductions.nssf + row.taxDeductions.shif);
+        }
 
-      // Interbank Transfer tariff (config/bankTransferTariffCard.js) — Bank
-      // rows previously charged nothing beyond the transfer principal, same
-      // gap as the other rails above. Bulk Pay never requests RTGS
-      // explicitly (submitNcbaBankTransfer defaults to 'pesalink'), so
-      // every Bank row prices as PesaLink — except a destination that's
-      // NCBA's own bank code, which gets forced onto the (unpriced) IFT
-      // rail regardless (see submitNcbaBankTransfer), so it's excluded here
-      // too rather than over-reserving a fee that won't actually apply.
-      row.isBankRow = payee.paymentMethod === 'Bank';
-      if (row.isBankRow && payee.bankCode !== NCBA_OWN_BANK_CODE) {
-        ({ totalFee: row.bankFee } = getBankTransferTariff('pesalink', row.netAmount));
-      } else {
-        row.bankFee = 0;
+        row.isB2cRow = payee.paymentMethod === 'Mobile Money' && payee.mobileMoneyType === 'Personal Number';
+        if (row.isB2cRow) {
+          try {
+            const tariff = getB2cTariff(row.netAmount);
+            row.b2cFee = tariff.totalFee;
+            row.b2cSafaricomFee = tariff.safaricomFee;
+            row.b2cMarkup = tariff.markup;
+          } catch (e) {
+            if (e instanceof B2cTariffBoundsError) {
+              tariffBoundsError = `Payout to "${payee.name}" — ${e.message}`;
+              return;
+            }
+            throw e;
+          }
+          totalB2cFee += row.b2cFee;
+        } else {
+          row.b2cFee = 0;
+        }
+
+        // Bill Payment tariff (config/billPaymentTariffCard.js) — KPLC
+        // (postpaid/prepaid) and NCWSC rows previously charged the merchant
+        // nothing beyond the bill principal; the flat fee constants that used
+        // to live in revenueRateCard.js were only ever stamped on the
+        // Transaction for dashboard reporting, never actually reserved here.
+        // Folded into totalDebit below, same pattern as totalB2cFee above.
+        row.isKplcRow = payee.type === 'utility' && payee.utilityProvider === 'KPLC';
+        row.isKplcPrepaidRow = payee.type === 'utility' && payee.utilityProvider === 'KPLC_PREPAID';
+        row.isNcwscRow = payee.type === 'utility' && payee.utilityProvider === 'WATER';
+        if (row.isKplcRow) {
+          ({ totalFee: row.utilityFee } = getKplcPostpaidTariff());
+        } else if (row.isKplcPrepaidRow) {
+          ({ totalFee: row.utilityFee } = getKplcPrepaidTariff(row.netAmount));
+        } else if (row.isNcwscRow) {
+          ({ totalFee: row.utilityFee } = getNcwscTariff());
+        } else {
+          row.utilityFee = 0;
+        }
+        totalUtilityFee += row.utilityFee;
+
+        // B2B PayBill & Till Payout tariff (config/lipaNaMpesaTariffCard.js)
+        // — same "never actually charged" gap as KPLC/NCWSC above: this row
+        // type (Mobile Money, Paybill/Buy Goods) previously reserved nothing
+        // for its fee at all, unlike the standalone initiateB2B endpoint
+        // (mpesaController.js), which already charged its old flat KES 30.
+        row.isLnmRow = payee.paymentMethod === 'Mobile Money' && payee.mobileMoneyType !== 'Personal Number';
+        if (row.isLnmRow) {
+          ({ totalFee: row.lnmFee } = getLipaNaMpesaTariff(row.netAmount));
+        } else {
+          row.lnmFee = 0;
+        }
+        totalLnmFee += row.lnmFee;
+
+        // Interbank Transfer tariff (config/bankTransferTariffCard.js) — Bank
+        // rows previously charged nothing beyond the transfer principal, same
+        // gap as the other rails above. Bulk Pay never requests RTGS
+        // explicitly (submitNcbaBankTransfer defaults to 'pesalink'), so
+        // every Bank row prices as PesaLink — except a destination that's
+        // NCBA's own bank code, which gets forced onto the (unpriced) IFT
+        // rail regardless (see submitNcbaBankTransfer), so it's excluded here
+        // too rather than over-reserving a fee that won't actually apply.
+        row.isBankRow = payee.paymentMethod === 'Bank';
+        if (row.isBankRow && payee.bankCode !== NCBA_OWN_BANK_CODE) {
+          ({ totalFee: row.bankFee } = getBankTransferTariff('pesalink', row.netAmount));
+        } else {
+          row.bankFee = 0;
+        }
+        totalBankFee += row.bankFee;
       }
-      totalBankFee += row.bankFee;
+    });
+    if (tariffBoundsError) {
+      return res.status(400).json({ message: tariffBoundsError });
     }
 
     const totalDebit = Math.round((totalNet + totalB2cFee + totalUtilityFee + totalLnmFee + totalBankFee) * 100) / 100;

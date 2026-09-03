@@ -4,7 +4,7 @@ import RevenueSweep from '../models/RevenueSweep.js';
 import BankReconciliation from '../models/BankReconciliation.js';
 import BankAccountCharge from '../models/BankAccountCharge.js';
 import RevenueWriteOff from '../models/RevenueWriteOff.js';
-import { REVENUE_STREAMS } from '../config/revenueRateCard.js';
+import { REVENUE_STREAMS, REVENUE_STREAM_BY_ID } from '../config/revenueRateCard.js';
 import { LIVE_DATA_CUTOFF } from '../config/liveDataCutoff.js';
 import { runRevenueSweep, REVENUE_SWEEP_DESTINATION, computeExpectedPoolBalance } from '../services/revenueSweepService.js';
 import { recordReconciliation } from '../services/reconciliationService.js';
@@ -1167,6 +1167,68 @@ export const bulkArchiveReconciliations = async (req, res) => {
     res.json({ success: true, clearedCount: result.modifiedCount });
   } catch (error) {
     console.error('Bulk Archive Reconciliations Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Transaction-level statement of PayChain's own revenue — every
+//          real transaction that actually earned PayChain a fee
+//          (paychainFee > 0), across every revenue stream, one row per
+//          transaction. Distinct from the aggregate totals/charts elsewhere
+//          on the Revenue page: this is the receipts behind those numbers,
+//          the same "show your work" role Transaction Audit plays for the
+//          platform's transactions generally, scoped here to only the ones
+//          that earned PayChain money. Same exclusions as
+//          revenueSweepService.js#computeUnsweptRevenue (reversed
+//          duplicates, the demo merchant) so this never disagrees with the
+//          headline revenue figures on this same page.
+// @route   GET /api/admin/revenue/transactions
+// @access  Private (Admin)
+export const getRevenueTransactions = async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 25));
+
+    const [excludeReversed, excludeDemo] = await Promise.all([
+      reversedTransactionExclusionMatch(),
+      excludeDemoMerchantsMatch(),
+    ]);
+
+    const createdAt = { $gte: LIVE_DATA_CUTOFF };
+    if (req.query.from) createdAt.$gte = new Date(req.query.from);
+    if (req.query.to) createdAt.$lte = new Date(req.query.to);
+
+    const filter = {
+      createdAt,
+      status: { $in: ['completed', 'verified'] },
+      paychainFee: { $gt: 0 },
+      ...excludeReversed,
+      ...excludeDemo,
+    };
+    if (req.query.revenueStream && req.query.revenueStream !== 'all') {
+      filter.revenueStream = req.query.revenueStream;
+    }
+
+    const [total, totalFeeAgg, rows] = await Promise.all([
+      Transaction.countDocuments(filter),
+      Transaction.aggregate([{ $match: filter }, { $group: { _id: null, total: { $sum: '$paychainFee' } } }]),
+      Transaction.find(filter)
+        .sort('-createdAt')
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .populate('merchantId', 'businessName')
+        .select('reference type revenueStream amount kesAmount currency paychainFee safaricomFee sender recipient status createdAt merchantId')
+        .lean(),
+    ]);
+
+    const data = rows.map((t) => ({
+      ...t,
+      streamLabel: REVENUE_STREAM_BY_ID[t.revenueStream]?.label || 'Other',
+    }));
+
+    res.json({ success: true, data, total, page, limit, totalFee: totalFeeAgg[0]?.total || 0 });
+  } catch (error) {
+    console.error('Get Revenue Transactions Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };

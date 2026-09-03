@@ -442,6 +442,37 @@ const Revenue = () => {
 
   useEffect(() => { fetchSweepHistory(); }, [fetchSweepHistory]);
 
+  // Revenue Statement — every real transaction that actually earned
+  // PayChain a fee (paychainFee > 0), one row per transaction, across every
+  // revenue stream. The receipts behind the Revenue Streams totals above —
+  // see revenueController.js#getRevenueTransactions.
+  const [revenueTxns, setRevenueTxns] = useState([]);
+  const [revenueTxnsTotal, setRevenueTxnsTotal] = useState(0);
+  const [revenueTxnsTotalFee, setRevenueTxnsTotalFee] = useState(0);
+  const [revenueTxnsLoading, setRevenueTxnsLoading] = useState(true);
+  const [revenueTxnsPage, setRevenueTxnsPage] = useState(1);
+  const [revenueTxnsStream, setRevenueTxnsStream] = useState('all');
+
+  const fetchRevenueTransactions = useCallback(async () => {
+    setRevenueTxnsLoading(true);
+    try {
+      const params = { page: revenueTxnsPage, limit: PAGE_SIZE };
+      if (revenueTxnsStream !== 'all') params.revenueStream = revenueTxnsStream;
+      const res = await api.get('/api/admin/revenue/transactions', { params });
+      setRevenueTxns(res.data?.data || []);
+      setRevenueTxnsTotal(res.data?.total ?? 0);
+      setRevenueTxnsTotalFee(res.data?.totalFee ?? 0);
+    } catch (e) {
+      setRevenueTxns([]);
+      setRevenueTxnsTotal(0);
+      setRevenueTxnsTotalFee(0);
+    } finally {
+      setRevenueTxnsLoading(false);
+    }
+  }, [revenueTxnsPage, revenueTxnsStream]);
+
+  useEffect(() => { fetchRevenueTransactions(); }, [fetchRevenueTransactions]);
+
   // Manual "Run Sweep Now" — POST /api/admin/revenue/sweeps/run. Attempts a
   // real PesaLink transfer of PayChain's accrued fee revenue (or a simulated
   // one, if NCBA_OPENBANKING_LIVE_ENABLED is off on the backend — this page
@@ -972,6 +1003,78 @@ const Revenue = () => {
                 })}
               </div>
             )}
+          </div>
+        </section>
+
+        {/* ── B3. Revenue Statement — transaction-level receipts behind
+            the Revenue Streams totals above. ─────────────────────────── */}
+        <section>
+          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-4">
+            <div>
+              <h3 className="text-base font-bold text-on-surface tracking-tight font-headline">Revenue Statement</h3>
+              <p className="text-xs text-on-surface-variant mt-1 max-w-2xl">
+                Every real transaction that earned PayChain a fee, one row per transaction, across every revenue channel — the receipts behind the totals above.
+              </p>
+            </div>
+            <select
+              value={revenueTxnsStream}
+              onChange={(e) => { setRevenueTxnsStream(e.target.value); setRevenueTxnsPage(1); }}
+              className="text-xs font-semibold bg-surface-container-low border border-outline-variant/20 rounded-lg px-3 py-2 text-on-surface focus:border-primary focus:ring-0"
+            >
+              <option value="all">All revenue channels</option>
+              {streams.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+            </select>
+          </div>
+          <div className="bg-surface-container-lowest border border-outline-variant/40 rounded-lg overflow-hidden">
+            <div className="px-4 md:px-5 py-3 border-b border-outline-variant/40 flex items-center justify-between bg-surface-container/30">
+              <span className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60">
+                {revenueTxnsLoading ? 'Loading…' : `${revenueTxnsTotal.toLocaleString()} transaction${revenueTxnsTotal === 1 ? '' : 's'}`}
+              </span>
+              <span className="text-xs font-bold text-on-surface tabular-nums">
+                {revenueTxnsLoading ? '—' : `${fmtKESPrecise(revenueTxnsTotalFee)} total`}
+              </span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-surface-container/70 border-b border-outline-variant/40">
+                  <tr className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60">
+                    <th className="text-left px-3 py-3">When</th>
+                    <th className="text-left px-3 py-3">Channel</th>
+                    <th className="text-left px-3 py-3">Merchant</th>
+                    <th className="text-left px-3 py-3">Reference</th>
+                    <th className="text-right px-3 py-3">Txn Amount</th>
+                    <th className="text-right px-3 py-3">PayChain Fee</th>
+                  </tr>
+                </thead>
+                <tbody className="text-xs">
+                  {revenueTxnsLoading ? (
+                    [...Array(6)].map((_, i) => (
+                      <tr key={i}><td colSpan="6" className="px-3 py-3"><div className="h-5 bg-on-surface/5 rounded animate-pulse" /></td></tr>
+                    ))
+                  ) : revenueTxns.length === 0 ? (
+                    <tr><td colSpan="6" className="py-10 text-center text-on-surface-variant/40 text-sm">No revenue-generating transactions in this filter.</td></tr>
+                  ) : revenueTxns.map((t) => (
+                    <tr key={t._id} className="hover:bg-secondary-container/5 transition-colors">
+                      <td className="px-3 py-2.5 border-b border-outline-variant/5 text-on-surface-variant/70 whitespace-nowrap">{fmtDateTime(t.createdAt)}</td>
+                      <td className="px-3 py-2.5 border-b border-outline-variant/5 text-on-surface">{t.streamLabel}</td>
+                      <td className="px-3 py-2.5 border-b border-outline-variant/5">
+                        {t.merchantId?.businessName ? (
+                          <span className="font-bold text-on-surface truncate max-w-[160px] inline-block align-bottom">{t.merchantId.businessName}</span>
+                        ) : <span className="text-on-surface-variant/40 italic">Deleted Merchant</span>}
+                      </td>
+                      <td className="px-3 py-2.5 border-b border-outline-variant/5 font-mono text-2xs text-on-surface-variant">
+                        {t.reference?.length > 20 ? `${t.reference.slice(0, 16)}…` : t.reference || '—'}
+                      </td>
+                      <td className="px-3 py-2.5 border-b border-outline-variant/5 text-right tabular-nums text-on-surface-variant">
+                        {t.currency === 'USDC' ? `${t.amount} USDC` : fmtKES(t.amount)}
+                      </td>
+                      <td className="px-3 py-2.5 border-b border-outline-variant/5 text-right font-bold text-emerald-700 tabular-nums">{fmtKESPrecise(t.paychainFee)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <TablePagination page={revenueTxnsPage} pageSize={PAGE_SIZE} total={revenueTxnsTotal} onPage={setRevenueTxnsPage} />
           </div>
         </section>
 

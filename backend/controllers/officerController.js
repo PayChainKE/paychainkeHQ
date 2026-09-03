@@ -144,6 +144,8 @@ export const createApplication = async (req, res) => {
       onboardingOfficerId: req.admin._id,
       submittedAt: new Date(),
       registrationSource: 'web',
+      // Deliberately no tariffLock — see merchantAuthController.js's
+      // registerMerchant for why (only the pre-feature cohort is frozen).
     });
 
     logAudit({

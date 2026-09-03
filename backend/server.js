@@ -64,6 +64,7 @@ import etimsRoutes from './routes/etimsRoutes.js';
 import { ensurePrimaryOwner } from './migrations/ensurePrimaryOwner.js';
 import { backfillTransactionFees } from './migrations/backfillTransactionFees.js';
 import { seedTariffCards } from './migrations/seedTariffCards.js';
+import { backfillMerchantTariffLocks } from './migrations/backfillMerchantTariffLocks.js';
 import { loadTariffCache, startTariffCacheRefreshInterval } from './services/tariffCardCache.js';
 import { backfillNcbaMerchantCodes } from './migrations/backfillNcbaMerchantCodes.js';
 import { checkAndSendDormancyReminders } from './services/dormancyReminderService.js';
@@ -314,6 +315,7 @@ async function bootstrap() {
     await backfillNcbaMerchantCodes();
     await seedTariffCards();
     await loadTariffCache();
+    await backfillMerchantTariffLocks();
     startTariffCacheRefreshInterval();
   } catch (error) {
     // Hard-exiting on a failed initial connection only makes sense for a

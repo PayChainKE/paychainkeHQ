@@ -20,6 +20,7 @@ import { generateMerchantStickerPdf } from '../utils/stickerGenerator.js';
 import { claimPayoutSubmission, DuplicateSubmissionError } from '../utils/idempotencyGuard.js';
 import { debitAvailableBalance } from '../utils/availableBalance.js';
 import { notifyAdmins, escapeHtml } from '../utils/securityAlerts.js';
+import { withMerchantTariffLock } from '../services/tariffCardCache.js';
 
 // Transfers at or above this amount get an admin visibility alert — not a
 // block, just a heads-up. Configurable since "large" depends on the
@@ -734,7 +735,10 @@ export const getPaymentLink = async (req, res) => {
     // uses this exact invoiceId branch below) — shown up front here since
     // NCBA's STK Push payload has no room for a fee breakdown, only a
     // single total Amount (see getCheckoutPreview's doc comment above).
-    const fee = link.invoiceId ? calculateInvoiceClientMarkup(link.amount) : calculateCustomerSurcharge(link.amount);
+    // Grandfathering — see tariffCardCache.js.
+    const fee = await withMerchantTariffLock(link.merchantId, () => (
+      link.invoiceId ? calculateInvoiceClientMarkup(link.amount) : calculateCustomerSurcharge(link.amount)
+    ));
 
     res.json({
       success: true,
@@ -791,9 +795,10 @@ export const processPaymentLink = async (req, res) => {
     // invoice-backed link (link.invoiceId set) uses the Electronic
     // Invoicing tariff's own Client Markup schedule instead of the standard
     // Hosted Payment Link one — see utils/pricingEngine.js.
-    const checkoutTotal = link.invoiceId
-      ? getInvoiceCheckoutTotal(link.amount)
-      : getCheckoutTotal(link.amount);
+    // Grandfathering — see tariffCardCache.js.
+    const checkoutTotal = await withMerchantTariffLock(link.merchantId, () => (
+      link.invoiceId ? getInvoiceCheckoutTotal(link.amount) : getCheckoutTotal(link.amount)
+    ));
 
     // Real STK Push via NCBA's shared Paybill 880100 (or simulated — see
     // services/ncbaStkPushService.js's NCBA_STK_LIVE_ENABLED gate).
@@ -927,7 +932,8 @@ export const payToMerchantAccount = async (req, res) => {
       throw e;
     }
 
-    const checkoutTotal = getCheckoutTotal(amount);
+    // Grandfathering — see tariffCardCache.js.
+    const checkoutTotal = await withMerchantTariffLock(merchant, () => getCheckoutTotal(amount));
 
     // Real STK Push via NCBA's shared Paybill 880100 (or simulated — see
     // services/ncbaStkPushService.js's NCBA_STK_LIVE_ENABLED gate).

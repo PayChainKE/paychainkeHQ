@@ -34,6 +34,7 @@ import { KENYAN_BANK_CODES } from '../config/kenyanBankCodes.js';
 import { getB2cTariff } from '../config/mpesaB2cTariffCard.js';
 import { getLipaNaMpesaTariff } from '../config/lipaNaMpesaTariffCard.js';
 import { getBankTransferTariff } from '../config/bankTransferTariffCard.js';
+import { withMerchantTariffLock } from '../services/tariffCardCache.js';
 import { logAudit } from '../utils/auditLog.js';
 import { recordDeletion } from '../utils/trash.js';
 
@@ -222,9 +223,10 @@ export async function executeNcbaBankPayout({
   // here too so the debit doesn't reserve a PesaLink/RTGS fee for a
   // transfer that's actually going out fee-free via IFT.
   const isNcbaOwnAccount = bankCode === NCBA_OWN_BANK_CODE;
+  // Grandfathering — see services/tariffCardCache.js.
   const { totalFee: transferFee } = isNcbaOwnAccount
     ? { totalFee: 0 }
-    : getBankTransferTariff(rail, numericAmount);
+    : await withMerchantTariffLock(merchantId, () => getBankTransferTariff(rail, numericAmount));
   const totalDebit = Math.round((numericAmount + transferFee) * 100) / 100;
 
   // Atomically reserve funds — the $gte guard means this either fully
@@ -321,7 +323,8 @@ export async function executeNcbaMobileMoneyPayout({ merchantId, phone, network,
   }
   const resolvedNetwork = network === 'airtel' ? 'airtel' : 'safaricom';
 
-  const { totalFee } = getB2cTariff(numericAmount);
+  // Grandfathering — see services/tariffCardCache.js.
+  const { totalFee } = await withMerchantTariffLock(merchantId, () => getB2cTariff(numericAmount));
   const totalDebit = Math.round((numericAmount + totalFee) * 100) / 100;
 
   // debitAvailableBalance also holds back money credited in the last 2
@@ -410,7 +413,8 @@ export async function executeNcbaLipaNaMpesaPayout({ merchantId, paymentType, pa
     throw new NcbaOpenBankingValidationError('payBillTillNo and a positive amount are required for a paybill/till payout');
   }
 
-  const { totalFee } = getLipaNaMpesaTariff(numericAmount);
+  // Grandfathering — see services/tariffCardCache.js.
+  const { totalFee } = await withMerchantTariffLock(merchantId, () => getLipaNaMpesaTariff(numericAmount));
   const totalDebit = Math.round((numericAmount + totalFee) * 100) / 100;
 
   // debitAvailableBalance also holds back money credited in the last 2

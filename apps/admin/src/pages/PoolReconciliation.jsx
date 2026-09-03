@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import api from '../api/api';
 import { useAuth } from '../context/AuthContext';
@@ -992,10 +993,20 @@ const PoolReconciliation = () => {
               <Skel className="w-32 h-8" />
             ) : (
               <span className="text-xl md:text-3xl font-semibold text-on-surface tracking-tighter tabular-nums">
-                {formatKES(expected?.unsweptRevenue ?? 0)}
+                {formatKES(expected?.grossUnsweptRevenue ?? 0)}
               </span>
             )}
             <p className="text-2xs text-on-surface-variant/60">PayChain's own fee revenue, collected but not yet swept to the corporate account.</p>
+            {!expectedLoading && (expected?.bankChargesDeficit ?? 0) > 0 && (
+              <Link to="/bank-charges" className="text-2xs text-red-600 hover:text-red-700 font-semibold w-fit">
+                − {formatKES(expected.bankChargesDeficit)} in real bank/tax charges not yet covered →
+              </Link>
+            )}
+            {!expectedLoading && (expected?.bankChargesDeficit ?? 0) > 0 && (
+              <p className="text-2xs text-on-surface-variant/50">
+                Expected Pool Balance below still nets this off — it's the figure cross-checked against the real NCBA balance, so it must reflect real money actually in the account.
+              </p>
+            )}
           </div>
         </section>
 

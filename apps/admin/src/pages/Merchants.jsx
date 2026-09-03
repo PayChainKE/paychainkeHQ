@@ -1093,7 +1093,7 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
   // backend always resolves to a concrete object, see
   // adminController.js#getMerchantDetail) — matches the current schema
   // default (false) rather than the old default, since this never persists.
-  const [features, setFeatures] = React.useState(merchant?.features || { digitalWallet: false, inflationShield: false });
+  const [features, setFeatures] = React.useState(merchant?.features || { digitalWallet: false, inflationShield: false, cashAdvanceForm: false });
   const [kybDocuments, setKybDocuments] = React.useState(merchant?.kybDocuments || []);
   const [uploadingDocType, setUploadingDocType] = React.useState(null);
   const [docUploadError, setDocUploadError] = React.useState('');
@@ -1702,7 +1702,22 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
                     </button>
                     <span className="text-[12px] font-semibold text-on-surface-variant/80">{features.inflationShield ? 'Enabled' : 'Disabled'}</span>
                   </div>
-                } 
+                }
+              />
+              <Row
+                label="Cash Advance"
+                value={
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => handleToggleFeature('cashAdvanceForm', !features.cashAdvanceForm)}
+                      disabled={updatingFeatures}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${features.cashAdvanceForm ? 'bg-primary' : 'bg-outline-variant/40'}`}
+                    >
+                      <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${features.cashAdvanceForm ? 'translate-x-4.5' : 'translate-x-1'}`} />
+                    </button>
+                    <span className="text-[12px] font-semibold text-on-surface-variant/80">{features.cashAdvanceForm ? 'Enabled' : 'Disabled'}</span>
+                  </div>
+                }
               />
             </Section>
           </div>
