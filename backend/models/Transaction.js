@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { calculateFees } from '../utils/feeCalculator.js';
+import { withMerchantTariffLock } from '../services/tariffCardCache.js';
 import { broadcastAdminEvent } from '../utils/adminEventStream.js';
 import { broadcastMerchantEvent } from '../utils/merchantEventStream.js';
 
@@ -185,13 +186,25 @@ const transactionSchema = new mongoose.Schema({
 // safaricomFee, and revenueStream in a follow-up update — this hook will
 // not do it for you, and skipping it silently inflates PayChain's reported
 // revenue with money that includes real merchant balance.
-transactionSchema.pre('save', function() {
+// Grandfathering (Brandon, 2026-09-03): wrapped in withMerchantTariffLock so
+// the STORED fee always reflects this merchant's own locked tariff snapshot
+// (Merchant.tariffLock), even if the controller that pre-computed a balance
+// deduction earlier in the same request already set up that same lock context
+// itself (withMerchantTariffLock is a no-op re-wrap in that case — same
+// merchant, same lock, same result) — this hook is the final, authoritative
+// source of truth for what actually got recorded, independent of whether
+// every upstream call site remembered to wrap itself. See
+// services/tariffCardCache.js for how the lock is read.
+transactionSchema.pre('save', async function() {
   if (this.isNew || this.isModified('amount') || this.isModified('kesAmount') || this.isModified('type')) {
     const basis = this.kesAmount > 0 ? this.kesAmount : this.amount;
     // settlementRail is only meaningful (and only ever varies the fee) for
     // 'ncba_outbound' — see feeCalculator.js. Passed through unconditionally
     // since every other type simply ignores it.
-    const { paychainFee, safaricomFee, streamId } = calculateFees(this.type, basis, this.settlementRail);
+    const { paychainFee, safaricomFee, streamId } = await withMerchantTariffLock(
+      this.merchantId,
+      () => calculateFees(this.type, basis, this.settlementRail)
+    );
     this.paychainFee  = paychainFee;
     this.safaricomFee = safaricomFee;
     this.revenueStream = streamId;
@@ -200,10 +213,13 @@ transactionSchema.pre('save', function() {
 
 // Mirror the hook for bulk insertMany — Mongoose does NOT run document
 // middleware on insertMany unless `ordered: false` and we ask for it.
-transactionSchema.pre('insertMany', function(docs) {
+transactionSchema.pre('insertMany', async function(docs) {
   for (const doc of docs) {
     const basis = (doc.kesAmount && doc.kesAmount > 0) ? doc.kesAmount : doc.amount;
-    const { paychainFee, safaricomFee, streamId } = calculateFees(doc.type, basis, doc.settlementRail);
+    const { paychainFee, safaricomFee, streamId } = await withMerchantTariffLock(
+      doc.merchantId,
+      () => calculateFees(doc.type, basis, doc.settlementRail)
+    );
     doc.paychainFee  = paychainFee;
     doc.safaricomFee = safaricomFee;
     doc.revenueStream = streamId;

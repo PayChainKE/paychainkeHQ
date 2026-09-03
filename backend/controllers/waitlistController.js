@@ -289,6 +289,8 @@ export const convertWaitlistEntry = async (req, res) => {
       invitedBy: req.admin?._id || null,
       passwordResetToken: hashedToken,
       passwordResetExpires: expires,
+      // Deliberately no tariffLock — see merchantAuthController.js's
+      // registerMerchant for why (only the pre-feature cohort is frozen).
     });
 
     const setupLink = `${MERCHANT_DASHBOARD_URL.replace(/\/$/, '')}/setup-password?token=${rawToken}`;

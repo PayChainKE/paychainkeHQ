@@ -10,6 +10,13 @@ const platformSettingsSchema = new mongoose.Schema({
   // Merchant.features.cashAdvanceForm (that's a per-merchant override; this
   // is "off for absolutely everyone" regardless of any per-merchant flag).
   cashAdvanceEnabled: { type: Boolean, default: true },
+  // Set once, ever, by migrations/backfillMerchantTariffLocks.js the first
+  // time it runs — guards that one-time backfill so it can never re-fire on
+  // a later boot and accidentally lock a merchant who signed up AFTER the
+  // original 28 (see that file's own header comment for why "tariffLock is
+  // still null" can't be used as the idempotency check here, unlike every
+  // other boot-time backfill in this codebase).
+  merchantTariffBackfillCompletedAt: { type: Date, default: null },
   updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null },
 }, { timestamps: true });
 

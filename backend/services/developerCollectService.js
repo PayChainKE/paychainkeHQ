@@ -3,6 +3,7 @@ import STKRequest from '../models/STKRequest.js';
 import { initiateAndTrackNcbaStk } from '../controllers/mpesaController.js';
 import { validatePhoneNumber, NcbaValidationError } from '../utils/ncbaValidators.js';
 import { getCheckoutTotal } from '../utils/pricingEngine.js';
+import { withMerchantTariffLock } from './tariffCardCache.js';
 import { claimClientIdempotencyKey } from '../utils/idempotencyGuard.js';
 import { publicDeveloperPayment } from '../utils/developerPaymentView.js';
 import { dispatchDeveloperEvent } from './webhookDeliveryService.js';
@@ -94,7 +95,8 @@ export async function initiateCollectPayment({ developerId, apiKeyId, merchantId
   }
 
   try {
-    const checkoutTotal = getCheckoutTotal(intAmount);
+    // Grandfathering — see services/tariffCardCache.js.
+    const checkoutTotal = await withMerchantTariffLock(merchantId, () => getCheckoutTotal(intAmount));
     const checkoutRequestId = await initiateAndTrackNcbaStk({
       merchantId,
       phone,

@@ -213,6 +213,14 @@ export const registerMerchant = async (req, res) => {
       isEcommerce,
       agreedToTerms: true,
       agreedToTermsAt: new Date(),
+      // Deliberately no tariffLock here — only the merchants that existed
+      // before this feature shipped (locked once, in
+      // migrations/backfillMerchantTariffLocks.js) are frozen to a fixed
+      // rate. Every merchant signing up from now on keeps
+      // Merchant.tariffLock at its default (null), so their pricing tracks
+      // the live Transaction Tariffs sheet exactly like it always has,
+      // however many times an admin edits it later (confirmed with
+      // Brandon, 2026-09-03).
     });
 
     console.log(`📧 Dispatching Welcome Email to: ${merchant.email}`);

@@ -560,6 +560,26 @@ const merchantSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  // Grandfathering (Brandon, 2026-09-03, revised same day): null for every
+  // merchant by default, meaning "track the live Transaction Tariffs sheet,
+  // exactly like always" — that stays true forever for any merchant created
+  // from now on, however many times an admin edits tariffs later. The ONLY
+  // merchants that ever get this populated are the ones that already
+  // existed before this feature shipped — migrations/backfillMerchantTariffLocks.js
+  // runs exactly once, ever (guarded by
+  // PlatformSettings.merchantTariffBackfillCompletedAt, not by this field
+  // being null — see that file), and freezes that one cohort to the rates
+  // they were already on. When set, every fee calculation for this merchant
+  // reads THIS snapshot instead of the live global cache — see
+  // services/tariffCardCache.js#withMerchantTariffLock.
+  tariffLock: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null,
+  },
+  tariffLockedAt: {
+    type: Date,
+    default: null,
+  },
   features: {
     // Both default to off as of 2026-08-11 — every new merchant signs up
     // without Digital Wallet or Inflation Shield visible at all, until an

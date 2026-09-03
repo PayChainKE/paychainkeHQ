@@ -16,6 +16,7 @@ import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLocked
 import { claimPayoutSubmission, DuplicateSubmissionError } from '../utils/idempotencyGuard.js';
 import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard.js';
 import { getLipaNaMpesaTariff } from '../config/lipaNaMpesaTariffCard.js';
+import { withMerchantTariffLock } from '../services/tariffCardCache.js';
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay.js';
 import { AUTO_INFLATION_SHIELD_ENABLED } from '../config/inflationShieldFlag.js';
 import { buildPaymentReceivedSms, buildCustomerPaidSms, buildPaymentRequestSms, buildPayoutSentSms, buildPayoutRecipientReceivedSms, buildWalletTopUpSms } from '../utils/paymentSmsTemplates.js';
@@ -70,7 +71,9 @@ export const initiateSTKPush = async (req, res) => {
     // (self top-up vs money collected from someone else), not for deciding
     // whether the fee applies.
     const kind = purpose === 'request_money' ? 'request_money' : 'topup';
-    const checkoutTotal = getCheckoutTotal(intAmount);
+    // Grandfathering — this merchant's own locked customer-surcharge
+    // tariff, not whatever's currently live. See tariffCardCache.js.
+    const checkoutTotal = await withMerchantTariffLock(merchantId, () => getCheckoutTotal(intAmount));
 
     // Same double-submission guard used by every payout endpoint — a
     // double-click or a client retry (previously also provoked by the STK
@@ -296,9 +299,13 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
             let paychainTotalRevenue;
             let customerFee;
             try {
-              ({ merchantFee, merchantNetSettlement, paychainTotalRevenue, customerFee } = link.invoiceId
-                ? processInvoiceSplitTransaction(stkReq.amount, link.amount)
-                : processSplitTransaction(stkReq.amount, link.amount));
+              // Grandfathering — this merchant's own locked Invoice/checkout
+              // tariffs, not whatever's currently live. See tariffCardCache.js.
+              ({ merchantFee, merchantNetSettlement, paychainTotalRevenue, customerFee } = await withMerchantTariffLock(merchant, () => (
+                link.invoiceId
+                  ? processInvoiceSplitTransaction(stkReq.amount, link.amount)
+                  : processSplitTransaction(stkReq.amount, link.amount)
+              )));
             } catch (splitError) {
               console.error(
                 `🚨 CRITICAL ledger split failure for ${receipt} (STK payment-link ${link.linkId}):`,
@@ -915,7 +922,8 @@ export const generateQrCheckout = async (req, res) => {
       return res.status(400).json({ error: 'A valid amount is required.' });
     }
 
-    const checkoutTotal = getCheckoutTotal(intAmount);
+    // Grandfathering — see tariffCardCache.js.
+    const checkoutTotal = await withMerchantTariffLock(merchantId, () => getCheckoutTotal(intAmount));
     const { reference, qrCodeDataUri } = await generateNcbaQrCheckout({
       merchantId,
       checkoutTotal,
@@ -1039,7 +1047,8 @@ export const initiateB2C = async (req, res) => {
     // the merchant alongside the withdrawal principal.
     let b2cFee;
     try {
-      ({ totalFee: b2cFee } = getB2cTariff(amount));
+      // Grandfathering — see tariffCardCache.js.
+      ({ totalFee: b2cFee } = await withMerchantTariffLock(merchantId, () => getB2cTariff(amount)));
     } catch (e) {
       if (e instanceof B2cTariffBoundsError) return res.status(400).json({ error: e.message });
       throw e;
@@ -1340,7 +1349,8 @@ export const initiateB2B = async (req, res) => {
     // same tariff the Transaction pre-save hook's fee calculator reads
     // (utils/feeCalculator.js), so the debit and the persisted paychainFee
     // can never disagree.
-    const { totalFee: fee } = getLipaNaMpesaTariff(numericAmount);
+    // Grandfathering — see tariffCardCache.js.
+    const { totalFee: fee } = await withMerchantTariffLock(merchantId, () => getLipaNaMpesaTariff(numericAmount));
 
     if (!pin) {
       return res.status(400).json({ error: 'Payment PIN is required.' });
