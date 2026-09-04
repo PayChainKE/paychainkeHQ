@@ -666,7 +666,10 @@ export default function Invoices() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-60">Currency</label>
-                    <input type="text" value={invoiceDetails.currency} onChange={e => setInvoiceDetails({...invoiceDetails, currency: e.target.value})} className="w-full bg-surface-container-lowest border border-outline-variant/20 rounded-xl px-4 py-2.5 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50" />
+                    <div className="w-full bg-surface-container-lowest/50 border border-outline-variant/10 rounded-xl px-4 py-2.5 flex items-center justify-between cursor-not-allowed">
+                       <span className="text-sm font-bold text-primary/70">KES</span>
+                       <span className="material-symbols-outlined text-[14px] text-on-surface-variant/40">lock</span>
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-60">Issue Date</label>

@@ -247,7 +247,7 @@ export const peekNextInvoiceNumber = async (req, res) => {
 // @access  Private
 export const createInvoice = async (req, res) => {
   try {
-    const { customer, items, currency, issueDate, dueDate, notes, recurring, invoiceNumber: reservedNumber } = req.body;
+    const { customer, items, issueDate, dueDate, notes, recurring, invoiceNumber: reservedNumber } = req.body;
 
     if (!customer?.name?.trim()) {
       return res.status(400).json({ error: 'Customer name is required.' });
@@ -277,7 +277,11 @@ export const createInvoice = async (req, res) => {
       publicToken,
       customer: sanitizeCustomer(customer),
       items: sanitizeItems(items),
-      currency: currency || 'KES',
+      // Locked to KES — every settlement rail this invoice can actually be
+      // paid through (STK push, the merchant's PayChain balance) only ever
+      // moves KES, so an invoice in any other currency could never really
+      // be paid. Not client-settable; see updateInvoice's identical note.
+      currency: 'KES',
       issueDate: issueDate ? new Date(issueDate) : new Date(),
       dueDate: dueDate ? new Date(dueDate) : null,
       notes: notes || '',
@@ -313,7 +317,7 @@ export const updateInvoice = async (req, res) => {
     if (!invoice) return res.status(404).json({ error: 'Invoice not found.' });
     if (invoice.status === 'paid') return res.status(400).json({ error: 'Paid invoices cannot be edited.' });
 
-    const { customer, items, currency, issueDate, dueDate, notes, recurring } = req.body;
+    const { customer, items, issueDate, dueDate, notes, recurring } = req.body;
 
     if (customer) {
       if (!customer.name?.trim()) return res.status(400).json({ error: 'Customer name is required.' });
@@ -324,7 +328,8 @@ export const updateInvoice = async (req, res) => {
       invoice.customer = sanitizeCustomer(customer);
     }
     if (items) invoice.items = sanitizeItems(items);
-    if (currency) invoice.currency = currency;
+    // currency is locked to KES — see createInvoice's identical note. Not
+    // client-settable, so no `if (currency)` branch here at all.
     if (issueDate) invoice.issueDate = new Date(issueDate);
     if (dueDate !== undefined) invoice.dueDate = dueDate ? new Date(dueDate) : null;
     if (notes !== undefined) invoice.notes = notes;

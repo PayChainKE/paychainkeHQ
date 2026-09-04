@@ -39,7 +39,7 @@ export const createDeveloperInvoice = async (req, res) => {
       return res.status(400).json({ error: 'No merchant account linked. Complete /api/developer/link-merchant first.', code: 'NO_LINKED_MERCHANT' });
     }
 
-    const { customer, items, currency, issueDate, dueDate, notes } = req.body || {};
+    const { customer, items, issueDate, dueDate, notes } = req.body || {};
     if (!customer?.name?.trim()) {
       return res.status(400).json({ error: 'customer.name is required.' });
     }
@@ -58,7 +58,9 @@ export const createDeveloperInvoice = async (req, res) => {
       publicToken: crypto.randomBytes(16).toString('hex'),
       customer: sanitizeCustomer(customer),
       items: sanitizeItems(items),
-      currency: currency || 'KES',
+      // Locked to KES — see models/Invoice.js's schema-level enum and
+      // invoiceController.js's identical note. Not client-settable.
+      currency: 'KES',
       issueDate: issueDate ? new Date(issueDate) : new Date(),
       dueDate: dueDate ? new Date(dueDate) : null,
       notes: notes || '',
