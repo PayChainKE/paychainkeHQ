@@ -294,7 +294,7 @@ export default function Dashboard({ navigation }: any) {
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={{
-                  aspectRatio: 1.586,
+                  aspectRatio: 1.75,
                   borderRadius: 24,
                   padding: 22,
                   overflow: 'hidden',
@@ -365,15 +365,6 @@ export default function Dashboard({ navigation }: any) {
                       </View>
                     </View>
                   )}
-                  {/* Card-number-style account line — same treatment a
-                      physical card gives its embossed digits: wide
-                      letter-spacing, no pill/border boxing it in. */}
-                  <Text
-                    style={{ letterSpacing: 2.5 }}
-                    className="text-white/70 text-[13px] font-jakarta-bold"
-                  >
-                    {formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'PENDING')}
-                  </Text>
                 </View>
               </LinearGradient>
             </TourTarget>

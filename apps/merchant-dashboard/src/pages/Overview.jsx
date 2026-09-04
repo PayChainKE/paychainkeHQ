@@ -303,16 +303,6 @@ export default function Overview() {
                 <span className="material-symbols-outlined text-[10px]" style={{ fontVariationSettings: "'FILL' 1" }}>trending_up</span>
                 <span>+{formatKES(todaysRevenue)} today</span>
               </div>
-              {/* Account line — wide letter-spacing for legibility, no
-                  pill/border. Icon is account_balance, not credit_card:
-                  this is a paybill/virtual-account number, not a card
-                  number, so the icon shouldn't imply otherwise. */}
-              <div className="flex items-center gap-2 text-white/50">
-                <span className="material-symbols-outlined text-[13px] leading-none">account_balance</span>
-                <span className="text-[12px] lg:text-[13px] font-bold tracking-[0.2em] tabular-nums">
-                  {formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending')}
-                </span>
-              </div>
             </div>
 
             <div className="flex gap-3 lg:gap-4 mt-8 relative">
