@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Dimensions, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Dimensions, ActivityIndicator, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store';
 import { useAuth } from '../context/AuthContext';
+import { showAlert } from '../utils/alert';
 
 const { width } = Dimensions.get('window');
 
@@ -60,7 +61,7 @@ export default function ForgotPin({ navigation }: any) {
 
   const verifyAndReset = async (finalConfirmPin: string) => {
     if (pin !== finalConfirmPin) {
-      Alert.alert('Error', 'PINs do not match. Please try again.');
+      showAlert('Error', 'PINs do not match. Please try again.');
       setPin('');
       setConfirmPin('');
       setStep('setup');
@@ -70,14 +71,21 @@ export default function ForgotPin({ navigation }: any) {
     setChecking(true);
     try {
       await setAppPin(pin, password);
-      await Promise.all([
-        SecureStore.deleteItemAsync(ATTEMPTS_KEY),
-        SecureStore.deleteItemAsync(LOCKED_UNTIL_KEY),
-      ]);
+      // expo-secure-store's web shim doesn't implement these calls (throws
+      // "getValueWithKeyAsync is not a function") — same guard as
+      // PinEntry.tsx's lockout helpers. Without it this throw happens AFTER
+      // the PIN is already saved server-side but BEFORE unlockApp() below,
+      // so the reset silently "succeeds" yet never opens the dashboard.
+      if (Platform.OS !== 'web') {
+        await Promise.all([
+          SecureStore.deleteItemAsync(ATTEMPTS_KEY),
+          SecureStore.deleteItemAsync(LOCKED_UNTIL_KEY),
+        ]);
+      }
       unlockApp();
     } catch (err: any) {
       const message = err?.response?.data?.error || 'Could not reset your PIN. Please try again.';
-      Alert.alert('Could not reset PIN', message);
+      showAlert('Could not reset PIN', message);
       setPin('');
       setConfirmPin('');
       // A wrong/rejected password means going back to the setup step is

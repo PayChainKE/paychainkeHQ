@@ -97,7 +97,6 @@ export default function Dashboard({ navigation }: any) {
   const { merchant } = useAuth();
   const [transactions, setTransactions] = useState<any[]>([]);
   const [trustScore, setTrustScore] = useState<any>({ current: 0, eligibleForAdvance: false });
-  const [approvedLimit, setApprovedLimit] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [now, setNow] = useState(new Date());
@@ -124,10 +123,9 @@ export default function Dashboard({ navigation }: any) {
   const fetchDashboardData = useCallback(async () => {
     if (!merchant) return;
     try {
-      const [txRes, scoreRes, cashAdvRes] = await Promise.all([
+      const [txRes, scoreRes] = await Promise.all([
         api.get('/api/transactions'),
         api.get('/api/trust-score').catch(() => ({ data: { current: 0, eligibleForAdvance: false } })),
-        api.get('/api/cash-advance/my-applications').catch(() => null),
       ]);
 
       const txList = Array.isArray(txRes.data)
@@ -140,10 +138,6 @@ export default function Dashboard({ navigation }: any) {
       // automatically clean — see excludeReversedDuplicates' doc comment.
       setTransactions(excludeReversedDuplicates(txList));
       if (scoreRes.data) setTrustScore(scoreRes.data);
-
-      const applications = cashAdvRes?.data?.applications || [];
-      const latestApproved = applications.find((a: any) => a.status === 'approved' && a.approvedLimit);
-      setApprovedLimit(latestApproved ? latestApproved.approvedLimit : null);
     } catch (error) {
       console.error('Error fetching dashboard data', error);
     } finally {
@@ -224,13 +218,21 @@ export default function Dashboard({ navigation }: any) {
         }
       >
         <View className="w-full max-w-lg mx-auto flex-1">
-          {/* Header Area */}
+          {/* Header Area — styled like a premium bank/Visa card: deeper
+              3-stop gradient, an ambient glow, an EMV-style chip, and a
+              card-number-style account line. */}
           <LinearGradient
-            colors={['#1D9E75', '#0b4d2e']}
+            colors={['#22B589', '#0b4d2e', '#031f13']}
+            locations={[0, 0.55, 1]}
             start={{ x: 0, y: 0 }}
-            end={{ x: 0, y: 1 }}
-            className="px-6 pt-[150px] pb-40 rounded-b-[40px] z-0 shadow-lg shadow-[#0b4d2e]/20"
+            end={{ x: 1, y: 1 }}
+            className="px-6 pt-[150px] pb-40 rounded-b-[40px] z-0 shadow-lg shadow-[#0b4d2e]/20 overflow-hidden"
           >
+            {/* Ambient light — the soft glow real premium card UIs use to
+                avoid a flat, single-tone fill. */}
+            <View pointerEvents="none" style={{ position: 'absolute', top: -70, right: -50, width: 240, height: 240, borderRadius: 120, backgroundColor: 'rgba(94,254,179,0.14)' }} />
+            <View pointerEvents="none" style={{ position: 'absolute', bottom: -60, left: -60, width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(255,255,255,0.04)' }} />
+
             <View className="flex-row justify-between items-center mb-10 mt-4">
               <View className="flex-row items-center gap-3 pl-3">
                 <TouchableOpacity
@@ -263,8 +265,25 @@ export default function Dashboard({ navigation }: any) {
               </View>
             </View>
 
+            {/* EMV-style chip + issuer mark — the two details that read
+                "bank card" at a glance rather than "app balance screen". */}
+            <View className="flex-row items-center justify-between pl-3 pr-1 mb-6">
+              <LinearGradient
+                colors={['#f6e7b4', '#d4af37', '#a8842c']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{ width: 38, height: 28, borderRadius: 6 }}
+                className="justify-center overflow-hidden"
+              >
+                <View style={{ height: 1, backgroundColor: 'rgba(0,0,0,0.25)', marginTop: 6 }} />
+                <View style={{ height: 1, backgroundColor: 'rgba(0,0,0,0.25)', marginTop: 6 }} />
+                <View style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 1, backgroundColor: 'rgba(0,0,0,0.2)' }} />
+              </LinearGradient>
+              <Text className="text-white/50 text-[10px] font-jakarta-extrabold uppercase tracking-[3px]">PayChain</Text>
+            </View>
+
             <TourTarget id="home-balance" className="mb-2 pl-3">
-              <Text className="text-white/80 text-[11px] font-jakarta-bold uppercase tracking-widest mb-1">Total Balance</Text>
+              <Text className="text-white/70 text-[11px] font-jakarta-bold uppercase tracking-widest mb-1">Available Balance</Text>
               <PrivateValue
                 hidden={!showAmounts}
                 tint="dark"
@@ -275,63 +294,79 @@ export default function Dashboard({ navigation }: any) {
               </PrivateValue>
             </TourTarget>
             <View className="pl-3">
-              <View className="flex-row items-center justify-between mt-4">
-                {todayTotal > 0 ? (
-                  <View className="flex-row items-center gap-1.5 bg-[#83f5c6]/20 px-3 py-1.5 rounded-full border border-[#83f5c6]/20">
-                    <Feather name="trending-up" size={14} color="#83f5c6" />
-                    <View className="flex-row items-center">
-                      <Text className="text-[#83f5c6] font-jakarta-bold text-sm">+</Text>
-                      <PrivateValue hidden={!showAmounts} tint="dark" className="text-[#83f5c6] font-jakarta-bold text-sm">
-                        {formatCurrency(todayTotal)}
-                      </PrivateValue>
-                      <Text className="text-[#83f5c6] font-jakarta-bold text-sm"> today</Text>
-                    </View>
+              {todayTotal > 0 && (
+                <View className="flex-row items-center gap-1.5 self-start bg-[#83f5c6]/20 px-3 py-1.5 rounded-full border border-[#83f5c6]/20 mt-4">
+                  <Feather name="trending-up" size={14} color="#83f5c6" />
+                  <View className="flex-row items-center">
+                    <Text className="text-[#83f5c6] font-jakarta-bold text-sm">+</Text>
+                    <PrivateValue hidden={!showAmounts} tint="dark" className="text-[#83f5c6] font-jakarta-bold text-sm">
+                      {formatCurrency(todayTotal)}
+                    </PrivateValue>
+                    <Text className="text-[#83f5c6] font-jakarta-bold text-sm"> today</Text>
                   </View>
-                ) : <View />}
-                <View className="bg-white/10 px-3 py-1.5 rounded-full border border-white/20 mb-1">
-                  <Text className="text-white text-[10px] font-jakarta-bold uppercase tracking-widest">Account No: {formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'PENDING')}</Text>
                 </View>
+              )}
+              {/* Card-number-style account line — same treatment a physical
+                  card gives its embossed digits: wide letter-spacing, no
+                  pill/border boxing it in like a status badge. */}
+              <View className="flex-row items-center gap-2 mt-5">
+                <Feather name="credit-card" size={13} color="rgba(255,255,255,0.55)" />
+                <Text
+                  style={{ letterSpacing: 2.5 }}
+                  className="text-white/70 text-[13px] font-jakarta-bold"
+                >
+                  {formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'PENDING')}
+                </Text>
               </View>
-              <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={() => setShowFundAccount(true)}
-                className="flex-row items-center justify-center gap-2 bg-white/10 border border-white/20 rounded-2xl py-3 mt-4"
-              >
-                <Feather name="plus" size={14} color="#fff" />
-                <Text className="text-white text-[11px] font-jakarta-extrabold uppercase tracking-widest">Fund Account</Text>
-              </TouchableOpacity>
             </View>
           </LinearGradient>
 
           <FundAccountModal visible={showFundAccount} onClose={() => setShowFundAccount(false)} />
 
-          {/* Action Buttons (overlapping) */}
+          {/* Action Buttons (overlapping) — Fund now lives here as its own
+              circle (gold, matching the card chip) instead of the full-width
+              button that used to sit inside the card. */}
           <View className="px-6 flex-row justify-between -mt-6 mb-10 z-10">
             <TouchableOpacity className="items-center" activeOpacity={0.8} onPress={() => navigation?.navigate('Collections')}>
-              <View className="w-[72px] h-[72px] rounded-full bg-white shadow-lg shadow-black/10 items-center justify-center mb-2.5">
-                <View className="w-12 h-12 rounded-full bg-[#5efeb3] items-center justify-center">
-                  <Feather name="plus-circle" size={24} color="#00351d" />
+              <View className="w-16 h-16 rounded-full bg-white shadow-lg shadow-black/10 items-center justify-center mb-2.5">
+                <View className="w-11 h-11 rounded-full bg-[#5efeb3] items-center justify-center">
+                  <Feather name="plus-circle" size={21} color="#00351d" />
                 </View>
               </View>
               <Text className="text-[11px] font-jakarta-bold text-[#0c2010] uppercase tracking-widest">Collect</Text>
             </TouchableOpacity>
 
             <TouchableOpacity className="items-center" activeOpacity={0.8} onPress={() => navigation?.navigate('Pay')}>
-              <View className="w-[72px] h-[72px] rounded-full bg-white shadow-lg shadow-black/10 items-center justify-center mb-2.5">
-                <View className="w-12 h-12 rounded-full bg-[#eff4ef] items-center justify-center">
-                  <MaterialIcons name="payments" size={24} color="#00351d" />
+              <View className="w-16 h-16 rounded-full bg-white shadow-lg shadow-black/10 items-center justify-center mb-2.5">
+                <View className="w-11 h-11 rounded-full bg-[#eff4ef] items-center justify-center">
+                  <MaterialIcons name="payments" size={21} color="#00351d" />
                 </View>
               </View>
               <Text className="text-[11px] font-jakarta-bold text-[#0c2010] uppercase tracking-widest">Pay</Text>
             </TouchableOpacity>
 
             <TouchableOpacity className="items-center" activeOpacity={0.8} onPress={() => navigation?.navigate('Advance')}>
-              <View className="w-[72px] h-[72px] rounded-full bg-white shadow-lg shadow-black/10 items-center justify-center mb-2.5">
-                <View className="w-12 h-12 rounded-full bg-[#e8eaf6] items-center justify-center">
-                  <Feather name="trending-up" size={24} color="#3f51b5" />
+              <View className="w-16 h-16 rounded-full bg-white shadow-lg shadow-black/10 items-center justify-center mb-2.5">
+                <View className="w-11 h-11 rounded-full bg-[#e8eaf6] items-center justify-center">
+                  <Feather name="trending-up" size={21} color="#3f51b5" />
                 </View>
               </View>
               <Text className="text-[11px] font-jakarta-bold text-[#0c2010] uppercase tracking-widest">Advance</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity className="items-center" activeOpacity={0.8} onPress={() => setShowFundAccount(true)}>
+              <View className="w-16 h-16 rounded-full bg-white shadow-lg shadow-black/10 items-center justify-center mb-2.5">
+                <LinearGradient
+                  colors={['#f6e7b4', '#d4af37', '#a8842c']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={{ width: 44, height: 44, borderRadius: 22 }}
+                  className="items-center justify-center"
+                >
+                  <Feather name="plus" size={21} color="#3d2e05" />
+                </LinearGradient>
+              </View>
+              <Text className="text-[11px] font-jakarta-bold text-[#0c2010] uppercase tracking-widest">Fund</Text>
             </TouchableOpacity>
           </View>
 
@@ -604,57 +639,34 @@ export default function Dashboard({ navigation }: any) {
             </View>
           </View>
 
-          {/* Available Cash Advance */}
+          {/* Bulk Payouts shortcut */}
           <View className="px-6 mb-8">
-            <View className={`bg-white rounded-[40px] p-6 shadow-sm border-2 ${trustScore.eligibleForAdvance ? 'border-[#006c4e]' : 'border-[#eff4ef]'}`}>
-              <View className="flex-row justify-between items-start mb-6">
-                <View>
-                  <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-[0.1em] mb-1">Available Cash Advance</Text>
-                  {trustScore.eligibleForAdvance ? (
-                    approvedLimit ? (
-                      <PrivateValue hidden={!showAmounts} tint="light" className="text-3xl font-jakarta-bold tracking-tight text-[#0c2010]">
-                        {formatCurrency(approvedLimit)}
-                      </PrivateValue>
-                    ) : (
-                      <Text className="text-3xl font-jakarta-bold tracking-tight text-[#0c2010]">Apply to see your limit</Text>
-                    )
-                  ) : (
-                    <Text className="text-3xl font-jakarta-bold tracking-tight text-[#707971]">Ksh 0.00</Text>
-                  )}
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => navigation?.navigate('Pay')}
+              className="bg-white rounded-[40px] p-6 shadow-sm border-2 border-[#eff4ef]"
+            >
+              <View className="flex-row items-start justify-between mb-5">
+                <View className="w-14 h-14 rounded-full bg-[#f0fdf4] items-center justify-center">
+                  <Feather name="users" size={22} color="#006c4e" />
                 </View>
-                <View className="w-14 h-14 rounded-full border-4 border-[#006c4e] items-center justify-center border-r-[#eff4ef] rotate-45">
-                  <View className="-rotate-45 items-center justify-center">
-                    <Text className="font-jakarta-bold text-[#0c2010] text-xs">{trustScore.current || 0}</Text>
-                    <Text className="text-[7px] text-[#707971] font-jakarta-bold uppercase tracking-wider">Score</Text>
-                  </View>
+                <View className="w-9 h-9 rounded-full bg-[#eff4ef] items-center justify-center">
+                  <Feather name="arrow-up-right" size={16} color="#0c2010" />
                 </View>
               </View>
 
-              <View className="h-3 w-full bg-[#eff4ef] rounded-full mb-6 overflow-hidden">
-                <View
-                  className="h-full bg-[#006c4e] rounded-full"
-                  style={{ width: `${Math.max(0, Math.min(100, trustScore.current || 0))}%` }}
-                />
-              </View>
+              <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-[0.1em] mb-1">Bulk Payouts</Text>
+              <Text className="text-2xl font-jakarta-bold tracking-tight text-[#0c2010] mb-2">
+                Pay suppliers & staff at once
+              </Text>
+              <Text className="text-[#707971] text-[13px] font-jakarta-medium leading-[18px] mb-6">
+                Upload a list or pick recipients, then settle an entire batch of payouts in a single click.
+              </Text>
 
-              <View className="flex-row items-center justify-between">
-                <View className="flex-row items-center gap-1.5 flex-1 pr-3">
-                  <MaterialIcons name={trustScore.eligibleForAdvance ? "check-circle" : "info"} size={16} color={trustScore.eligibleForAdvance ? "#006c4e" : "#707971"} />
-                  <Text numberOfLines={1} className={`flex-1 text-[11px] font-jakarta-bold uppercase tracking-wider ${trustScore.eligibleForAdvance ? 'text-[#006c4e]' : 'text-[#707971]'}`}>
-                    {trustScore.eligibleForAdvance ? 'Cash Advance Eligible' : 'Keep Processing to Unlock'}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  disabled={!trustScore.eligibleForAdvance}
-                  onPress={() => navigation?.navigate('Advance')}
-                  className={`px-5 py-2.5 rounded-full ${trustScore.eligibleForAdvance ? 'bg-[#002110]' : 'bg-[#eff4ef]'}`}
-                >
-                  <Text className={`text-[11px] font-jakarta-bold uppercase tracking-wider ${trustScore.eligibleForAdvance ? 'text-white' : 'text-[#707971]'}`}>
-                    {approvedLimit ? 'Unlock Funds' : 'Apply Now'}
-                  </Text>
-                </TouchableOpacity>
+              <View className="self-start bg-[#002110] px-5 py-2.5 rounded-full">
+                <Text className="text-white text-[11px] font-jakarta-bold uppercase tracking-wider">Start a Bulk Payout</Text>
               </View>
-            </View>
+            </TouchableOpacity>
           </View>
 
         </View>
