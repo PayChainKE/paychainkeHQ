@@ -39,7 +39,7 @@ const features = [
     borderColor: 'border-blue-100',
     title: 'Manage your business anywhere, anytime',
     description:
-      'Our dedicated merchant dashboard gives you real-time visibility into transactions, customer payments, and analytics, plus professional invoicing and e-TIMS receipts, from any device, at any time.',
+      'Our dedicated merchant dashboard gives you real-time visibility into transactions, customer payments, and analytics, plus professional invoicing, from any device, at any time.',
   },
   {
     icon: 'cash-grow',

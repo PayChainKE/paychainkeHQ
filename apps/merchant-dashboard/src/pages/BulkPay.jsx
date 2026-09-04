@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { jsPDF } from 'jspdf'
-import autoTable from 'jspdf-autotable'
 import domtoimage from 'dom-to-image'
 import { ValidatedInput } from '../components/ValidatedInput'
 import MerchantLayout from '../components/layout/MerchantLayout'
@@ -11,34 +10,15 @@ import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useNotification } from '../context/NotificationContext'
 import { isValidPhoneKE } from '../utils/validators'
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay'
-import { formatAccountNumber } from '../utils/formatAccountNumber'
-import { drawBarcodePdf } from '../utils/barcode'
 import paychainLogo from '../assets/paychain-logo-dark.png'
 import paychainLogoWhite from '../assets/paychain-logo-white.png'
+import paychainMark from '../assets/paychain-mark.png'
 import axios from 'axios'
-
-// Matches Transactions.jsx's identical constants — kept in sync manually
-// since there's no shared constants module between pages in this app.
-const PAYCHAIN_PHONE = '+254 743 283 782'
-const PAYCHAIN_SLOGAN = 'Collect, Pay, Protect, Grow'
-
-// Lipa na M-Pesa (Till/Paybill) outbound payouts are still being verified
-// end-to-end — restricted to Brantech Solutions (the account used for live
-// testing, matching backend/config/lipaNaMpesaBetaAllowlist.js) until
-// confirmed working, then opened up to every merchant.
-const LIPA_NA_MPESA_BETA_MERCHANT_ID = '6a8f30cb228671cacc4361fe' // Brantech Solutions
-
-// Paused 2026-08-31, mirrors backend/config/lipaNaMpesaBetaAllowlist.js's
-// LIVE_TESTING_ENABLED — NCBA callbacks unconfirmed, so Till/Paybill is
-// hidden for everyone (including the beta merchant) until Rose confirms
-// they're working. Flip back to true alongside that backend flag.
-const LIPA_NA_MPESA_LIVE_TESTING_ENABLED = false
 
 export default function BulkPay() {
   const { showAmounts } = usePrivacyMode()
   const { addNotification } = useNotification()
   const { merchant, refreshSession } = useMerchantAuth()
-  const isLipaNaMpesaBetaMerchant = LIPA_NA_MPESA_LIVE_TESTING_ENABLED && merchant?._id === LIPA_NA_MPESA_BETA_MERCHANT_ID
   const [payeesList, setPayeesList] = useState([])
 
   useEffect(() => {
@@ -94,13 +74,6 @@ export default function BulkPay() {
   
   const [selectedPayees, setSelectedPayees] = useState({})
   const [payoutAmounts, setPayoutAmounts] = useState({})
-  // Read-only estimate of the batch's total transaction cost, shown
-  // alongside "Total Payout" so a merchant doesn't only see what
-  // recipients receive — they see the fee too before ever reaching PIN
-  // confirmation. Debounced and re-fetched whenever the selected payees or
-  // their amounts change; never blocks batch review/authorization if it
-  // fails, since it's purely informational.
-  const [estimatedFee, setEstimatedFee] = useState(0)
 
   const [newPayee, setNewPayee] = useState({
     name: '',
@@ -184,14 +157,8 @@ export default function BulkPay() {
     setNewPayee({
       name: p.name,
       type: p.type.charAt(0).toUpperCase() + p.type.slice(1),
-      // Only a real Utility payee should ever populate these — leaving them
-      // truthy for Employee/Supplier/Contractor payees made the Utility-only
-      // "Account Type: Postpaid/Prepaid" step render during their edit too
-      // (see the render guard below), which then bound the KPLC meter
-      // number/notification-phone fields onto this payee's real
-      // accountNumber/phone and broke the save.
-      utilityType: p.type === 'utility' ? (p.utilityType || 'Electricity') : '',
-      utilityProvider: p.type === 'utility' ? (p.utilityProvider || '') : '',
+      utilityType: (p.utilityProvider === 'KPLC' || p.utilityProvider === 'KPLC_PREPAID') ? 'Electricity' : p.utilityProvider === 'WATER' ? 'Water' : 'Electricity',
+      utilityProvider: p.utilityProvider || '',
       paymentMethod: p.paymentMethod || 'Mobile Money',
       mobileMoneyType: p.mobileMoneyType || 'Personal Number',
       mobileNetwork: p.mobileNetwork || 'safaricom',
@@ -408,55 +375,34 @@ export default function BulkPay() {
     });
   }
 
-  // Replaces the old CSV-upload path — same underlying need (build a batch
-  // fast, without re-picking each payee by hand every cycle) but without
-  // requiring a merchant to know how to produce a spreadsheet. Reloads the
-  // most recent batch's payee selection and amounts, straight into Review
-  // (step 2) so they can adjust before sending rather than re-select from
-  // scratch. batchHistory[0] is safe to treat as "most recent" — getBatches
-  // sorts by createdAt descending server-side.
-  const handleRepeatLastBatch = () => {
-    const lastBatch = batchHistory[0];
-    if (!lastBatch || !lastBatch.transactions?.length) {
-      addNotification({ title: 'No Previous Batch', message: "You haven't sent a batch yet — select payees below to get started.", type: 'info' });
-      return;
+  const csvInputRef = React.useRef(null);
+  const [csvPreview, setCsvPreview] = useState(null);
+
+  const handleCSVUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    addNotification({ title: 'Processing CSV', message: 'Analyzing batch payment data...', type: 'info' });
+    
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const token = localStorage.getItem('paychain_merchant_token');
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+      const res = await axios.post(`${API_URL}/api/bulkpay/upload-csv`, formData, {
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      
+      setCsvPreview(res.data);
+      addNotification({ title: 'CSV Loaded', message: res.data.message, type: 'success' });
+      setStep(1); // Reset step or jump to a special review step
+    } catch (error) {
+      addNotification({ title: 'Upload Failed', message: error.response?.data?.message || 'Could not process CSV', type: 'error' });
     }
-
-    const newSelected = {};
-    const newAmounts = {};
-    let matchedCount = 0;
-    let skippedCount = 0;
-
-    for (const row of lastBatch.transactions) {
-      const payeeId = row.payeeId ? String(row.payeeId) : null;
-      // Only pre-select a payee that's still on the current list — one
-      // could have been edited/removed since the last batch was sent, and
-      // there's no safe amount/destination to reuse for a payee that's gone.
-      const stillExists = payeeId && payeesList.some((p) => p.id === payeeId);
-      if (stillExists) {
-        newSelected[payeeId] = true;
-        newAmounts[payeeId] = row.amount || 0;
-        matchedCount++;
-      } else {
-        skippedCount++;
-      }
-    }
-
-    if (matchedCount === 0) {
-      addNotification({ title: 'Nothing to Repeat', message: "None of last batch's payees are still on your list.", type: 'error' });
-      return;
-    }
-
-    setSelectedPayees(newSelected);
-    setPayoutAmounts(newAmounts);
-    setStep(2);
-    addNotification({
-      title: 'Last Batch Loaded',
-      message: skippedCount > 0
-        ? `${matchedCount} payee${matchedCount === 1 ? '' : 's'} reloaded. ${skippedCount} from your last batch ${skippedCount === 1 ? 'is' : 'are'} no longer on your list and were skipped.`
-        : `${matchedCount} payee${matchedCount === 1 ? '' : 's'} reloaded from your last batch — review the amounts before sending.`,
-      type: 'success',
-    });
   };
 
   // Invoice Feature State
@@ -900,37 +846,8 @@ export default function BulkPay() {
     .filter((id) => selectedPayees[id])
     .reduce((sum, id) => sum + (payoutAmounts[id] || 0), 0)
 
-  // availableBalance excludes anything credited in the last 2 minutes and
-  // still held server-side (backend/utils/availableBalance.js) — the same
-  // figure authorizeBatch's debitAvailableBalance actually enforces, so
-  // this warning can't disagree with what submitting the batch will do.
-  const balance = merchant?.availableBalance ?? merchant?.kesBalance ?? 0
+  const balance = merchant?.kesBalance ?? 0
   const isLiquidityLow = batchTotal > balance
-
-  useEffect(() => {
-    const selectedIds = Object.keys(selectedPayees).filter((id) => selectedPayees[id])
-    if (!selectedIds.length) { setEstimatedFee(0); return }
-
-    const timer = setTimeout(async () => {
-      try {
-        const token = localStorage.getItem('paychain_merchant_token')
-        if (!token) return
-        const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
-        const items = selectedIds.map((id) => ({ payeeId: id, amount: payoutAmounts[id] || 0 }))
-        const res = await axios.post(`${API_URL}/api/bulkpay/preview-fees`, { items }, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        setEstimatedFee(res.data?.totalFee || 0)
-      } catch (error) {
-        // Purely informational — a failed estimate shouldn't block review
-        // or authorization, so just leave the last known figure showing.
-        console.error('Error estimating batch fees:', error)
-      }
-    }, 400)
-
-    return () => clearTimeout(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(selectedPayees), JSON.stringify(payoutAmounts)])
 
   const [authorizedReceipts, setAuthorizedReceipts] = useState([])
 
@@ -939,33 +856,26 @@ export default function BulkPay() {
       addNotification({ title: 'Processing', message: 'Authorizing batch...', type: 'info' });
       const token = localStorage.getItem('paychain_merchant_token');
 
-      const batchRows = payeesList
-        .filter(p => selectedPayees[p.id])
-        .map(p => ({
-          payeeMatch: p.id,
-          name: p.name,
-          type: p.type,
-          phone: p.phone,
-          grossAmount: payoutAmounts[p.id] || 0,
-          netAmount: payoutAmounts[p.id] || 0, // Mocked for UI, actual tax comes from backend on real employee runs
-        }));
-
-      // fundingSource is a display-only label stored on the batch (never
-      // used for actual payout routing — every payout always draws from
-      // this merchant's single pooled NCBA balance) — selectedTill previously
-      // ended up literally being the internal option id ('TILL_1'), which is
-      // what showed up as the funding source everywhere this gets displayed
-      // (Batch History detail). Built here instead from the merchant's real
-      // business name + NCBA account number, matching what the funding-source
-      // card above and MyAccounts.jsx both already show.
-      const fundingSourceLabel = merchant?.businessName
-        ? `${merchant.businessName} — ${formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending bank assignment')}`
-        : 'Main Business Account';
+      let batchRows = [];
+      if (csvPreview) {
+        batchRows = csvPreview.rows;
+      } else {
+        batchRows = payeesList
+          .filter(p => selectedPayees[p.id])
+          .map(p => ({
+            payeeMatch: p.id,
+            name: p.name,
+            type: p.type,
+            phone: p.phone,
+            grossAmount: payoutAmounts[p.id] || 0,
+            netAmount: payoutAmounts[p.id] || 0, // Mocked for UI, actual tax comes from backend on real employee runs
+          }));
+      }
 
       const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
       const res = await axios.post(`${API_URL}/api/bulkpay/authorize`, {
         batchRows,
-        fundingSource: fundingSourceLabel,
+        fundingSource: selectedTill || 'Main Business Till',
         pin: pin
       }, {
         headers: { Authorization: `Bearer ${token}` }
@@ -986,12 +896,6 @@ export default function BulkPay() {
         phone: tx.accountReference,
         reference: processedBatch.batchReference,
         status: tx.status, // 'completed' | 'pending' | 'failed'
-        // Why NCBA (or PayChain) rejected this specific row — e.g. "Amount
-        // must be between KES 50 and KES 250,000" — only ever set when
-        // status is 'failed'. Without this, a failed row only ever showed
-        // as a bare "Failed & Refunded" with no way for the merchant to
-        // tell why.
-        failureReason: tx.failureReason || null,
         timestamp: new Date().toLocaleString('en-KE', {
           day: '2-digit', month: 'short', year: 'numeric',
           hour: '2-digit', minute: '2-digit'
@@ -1000,6 +904,7 @@ export default function BulkPay() {
 
       setAuthorizedReceipts(newReceipts);
       setStep(4);
+      setCsvPreview(null); // Clear preview
 
       // Balance was just debited server-side — refresh now instead of
       // waiting for the ambient 5s poll in MerchantAuthContext, so the
@@ -1009,16 +914,10 @@ export default function BulkPay() {
 
       const failedCount = newReceipts.filter(r => r.status === 'failed').length;
       const allFailed = failedCount > 0 && failedCount === newReceipts.length;
-      // Surface the actual rejection reason(s) instead of just "N failed" —
-      // most batches fail for one specific, fixable reason (e.g. an amount
-      // below NCBA's KES 50 Mobile Money minimum), and that reason was
-      // previously only ever visible in the server's own logs.
-      const distinctReasons = [...new Set(newReceipts.filter(r => r.status === 'failed' && r.failureReason).map(r => r.failureReason))];
-      const reasonSuffix = distinctReasons.length ? ` Reason: ${distinctReasons.join(' | ')}` : '';
       addNotification({
         title: allFailed ? 'Batch Failed' : failedCount > 0 ? 'Batch Partially Processed' : 'Batch Processed',
         message: failedCount > 0
-          ? `${failedCount} of ${newReceipts.length} payout${newReceipts.length === 1 ? '' : 's'} failed and ${failedCount === 1 ? 'was' : 'were'} refunded to your balance.${reasonSuffix}`
+          ? `${failedCount} of ${newReceipts.length} payout${newReceipts.length === 1 ? '' : 's'} failed and ${failedCount === 1 ? 'was' : 'were'} refunded to your balance. ${res.data.message}`
           : res.data.message,
         type: allFailed ? 'error' : failedCount > 0 ? 'warning' : 'success'
       });
@@ -1037,267 +936,92 @@ export default function BulkPay() {
     }
   }
 
-  // Status label shown on both the on-screen receipt card and the PDF —
-  // single source so the two can never say something different.
-  const RECEIPT_STATUS_LABEL = { completed: 'CONFIRMED', pending: 'PENDING', failed: 'FAILED & REFUNDED' };
-
-  // Native vector PDF, not a screenshot — a domtoimage/html2canvas capture
-  // of the on-screen card (the previous approach) rasterizes at the DOM
-  // element's CSS pixel size, then gets stretched to fill the PDF page,
-  // which is exactly what produced the blurry, unprofessional-looking
-  // receipts. Every element here (text, lines, the barcode) is drawn
-  // directly by jsPDF instead, so it stays crisp at any zoom or print size
-  // — same approach and layout language as Transactions.jsx's
-  // generateAuditReceipt, adapted for a bulk-payout recipient.
-  const downloadReceipt = (receipt) => {
-    addNotification({ title: 'Generating Receipt', message: `Preparing receipt for ${receipt.name}.`, type: 'info' });
-    try {
-      const doc = new jsPDF({ unit: 'mm', format: [148, 210] }); // A5
-      const pageWidth = doc.internal.pageSize.getWidth();
-
-      // Header band
-      doc.setFillColor(0, 53, 29); // #00351D — matches the on-screen card's header
-      doc.rect(0, 0, pageWidth, 40, 'F');
-
-      const logoW = 42, logoH = logoW * (230 / 968); // source 968x230, aspect-correct
-      try { doc.addImage(paychainLogoWhite, 'PNG', (pageWidth / 2) - (logoW / 2), 7, logoW, logoH); } catch (_) {}
-
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.text('BULK PAYOUT RECEIPT', pageWidth / 2, 35, { align: 'center' });
-
-      // Receipt number
-      doc.setTextColor(0, 53, 29);
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.text('RECEIPT NO.', 20, 55);
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text(receipt.id || '—', 20, 62);
-
-      doc.setDrawColor(230, 230, 230);
-      doc.line(20, 63, pageWidth - 20, 63);
-
-      // Grid details
-      const labelY = 73, rowH = 15;
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(100, 100, 100);
-      doc.text('DATE & TIME', 20, labelY);
-      doc.text('RECIPIENT', 20, labelY + rowH);
-      doc.text('ACCOUNT / PHONE', 20, labelY + rowH * 2);
-      doc.text('PAYMENT METHOD', 20, labelY + rowH * 3);
-      doc.text('STATUS', 20, labelY + rowH * 4);
-
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(0, 53, 29);
-      doc.text(receipt.timestamp || '—', 20, labelY + 7);
-      doc.text(receipt.name || '—', 20, labelY + rowH + 7);
-      doc.text(receipt.phone || '—', 20, labelY + rowH * 2 + 7);
-      doc.text((receipt.method || '—').toUpperCase(), 20, labelY + rowH * 3 + 7);
-      doc.text(RECEIPT_STATUS_LABEL[receipt.status] || 'CONFIRMED', 20, labelY + rowH * 4 + 7);
-
-      // Amount column
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(100, 100, 100);
-      doc.text('AMOUNT PAID', 85, labelY);
-      doc.setFontSize(18);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(0, 53, 29);
-      doc.text(formatKES(receipt.amount), 85, labelY + 10);
-
-      const gridBottom = labelY + rowH * 4 + 7;
-      doc.setDrawColor(230, 230, 230);
-      doc.line(20, gridBottom + 6, pageWidth - 20, gridBottom + 6);
-
-      const stripY = gridBottom + 11;
-      doc.setFillColor(245, 247, 249);
-      doc.rect(20, stripY, pageWidth - 40, 13, 'F');
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(0, 53, 29);
-      doc.text('OFFICIAL PAYCHAIN BULK PAYOUT RECORD', pageWidth / 2, stripY + 8.5, { align: 'center' });
-
-      // Barcode — unique per batch reference
-      const barcodeY = stripY + 17, barcodeW = 100, barcodeH = 14;
-      drawBarcodePdf(doc, receipt.reference, (pageWidth - barcodeW) / 2, barcodeY, barcodeW, barcodeH);
-      doc.setFontSize(8);
-      doc.setFont('courier', 'normal');
-      doc.setTextColor(100, 100, 100);
-      doc.text(receipt.reference || '—', pageWidth / 2, barcodeY + barcodeH + 4, { align: 'center' });
-
-      // Footer
-      const footerY = barcodeY + barcodeH + 9;
-      doc.setFontSize(7.5);
-      doc.setTextColor(150, 150, 150);
-      doc.setFont('helvetica', 'italic');
-      doc.text("This receipt reflects PayChain's record of this bulk payout, identified by the reference above.", pageWidth / 2, footerY, { align: 'center' });
-      doc.setFont('helvetica', 'normal');
-      doc.text(`PayChain Kenya · ${PAYCHAIN_PHONE} · Generated ${new Date().toLocaleDateString()}`, pageWidth / 2, footerY + 4.5, { align: 'center' });
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(0, 53, 29);
-      doc.text(PAYCHAIN_SLOGAN.toUpperCase(), pageWidth / 2, footerY + 9.5, { align: 'center' });
-
-      doc.save(`Receipt_${receipt.id}.pdf`);
-      addNotification({ title: 'Download Complete', message: `Receipt ${receipt.id}.pdf has been saved.`, type: 'success' });
-    } catch (err) {
-      addNotification({ title: 'Error', message: 'Failed to generate receipt: ' + err.message, type: 'error' });
+  const downloadReceipt = async (receipt) => {
+    addNotification({ title: 'Generating PDF', message: `Preparing receipt for ${receipt.name}.`, type: 'info' });
+    const element = document.getElementById(`receipt-${receipt.id}`);
+    if (element) {
+      try {
+        const dataUrl = await domtoimage.toPng(element, { bgcolor: '#ffffff' });
+        const pdf = new jsPDF({
+          orientation: 'portrait',
+          unit: 'px',
+          format: [element.clientWidth, element.clientHeight]
+        });
+        pdf.addImage(dataUrl, 'PNG', 0, 0, element.clientWidth, element.clientHeight);
+        pdf.save(`Receipt_${receipt.id}.pdf`);
+        addNotification({ title: 'Download Complete', message: `Receipt ${receipt.id}.pdf has been saved.`, type: 'success' });
+      } catch (err) {
+        addNotification({ title: 'Error', message: 'Failed to generate PDF: ' + err.message, type: 'error' });
+      }
     }
   };
 
-  // Same house style as Transactions.jsx's generateStatement (dark header
-  // band, summary strip, autoTable ledger, closing strip, repeat-on-page-
-  // break header) — previously this was a plain manual text loop with no
-  // table, no colors, no page-break header, unrecognizable as coming from
-  // the same product as every other PDF in this app.
   const downloadAllReceipts = () => {
     addNotification({ title: 'Processing', message: 'Generating batch receipts...', type: 'info' });
-    try {
-      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-      const W = doc.internal.pageSize.getWidth();
-      const H = doc.internal.pageSize.getHeight();
-      const L = 14;
-      const R = W - 14;
-      const now = new Date();
-      const batchRef = authorizedReceipts[0]?.reference || `BAT-${now.getTime()}`;
+    setTimeout(() => {
+      try {
+        const pdf = new jsPDF();
+        let y = 20;
+        const reportDate = new Date().toLocaleString('en-KE', {
+          day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+        });
 
-      // ── HEADER BAND ──
-      doc.setFillColor(0, 53, 29); // #00351D
-      doc.rect(0, 0, W, 38, 'F');
+        // Logo — transparent PNG, aspect-correct (source 968x230)
+        const logoW = 32, logoH = logoW * (230 / 968);
+        try { pdf.addImage(paychainLogo, 'PNG', 20, y - 8, logoW, logoH, undefined, 'FAST') } catch (_) {}
+        y += logoH + 6;
 
-      const logoW = 32, logoH = logoW * (230 / 968);
-      try { doc.addImage(paychainLogoWhite, 'PNG', L, (38 - logoH) / 2, logoW, logoH, undefined, 'FAST'); } catch (_) {}
+        // Header
+        pdf.setFontSize(16);
+        pdf.setFont("helvetica", "bold");
+        pdf.text('PAYCHAIN FINANCE - BATCH DISBURSEMENT REPORT', 20, y);
+        y += 10;
 
-      doc.setTextColor(255, 255, 255);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(15);
-      doc.text('PayChain Kenya', R, 15, { align: 'right' });
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(94, 254, 179);
-      doc.text('OFFICIAL BATCH DISBURSEMENT REPORT', R, 22, { align: 'right' });
-      doc.setTextColor(200, 220, 210);
-      doc.text(`Batch Ref: ${batchRef}`, R, 27, { align: 'right' });
-      doc.text(`Issued: ${now.toLocaleString('en-KE', { dateStyle: 'medium', timeStyle: 'short' })}`, R, 32, { align: 'right' });
+        pdf.setFontSize(12);
+        pdf.setFont("helvetica", "normal");
+        pdf.text(`Date: ${reportDate}`, 20, y);
+        y += 8;
+        pdf.text(`Total Recipients: ${authorizedReceipts.length}`, 20, y);
+        y += 8;
+        pdf.text(`Total Payout: KES ${batchTotal.toLocaleString()}`, 20, y);
+        y += 15;
+        
+        pdf.setDrawColor(150);
+        pdf.line(20, y, 190, y);
+        y += 15;
 
-      // ── SUMMARY STRIP ──
-      let y = 50;
-      const failedCount = authorizedReceipts.filter(r => r.status === 'failed').length;
-      const pendingCount = authorizedReceipts.filter(r => r.status === 'pending').length;
-      const summaryItems = [
-        { label: 'Total Recipients', value: String(authorizedReceipts.length), color: [0, 53, 29] },
-        { label: 'Total Payout',     value: formatKES(batchTotal),             color: [0, 53, 29] },
-        { label: 'Confirmed',        value: String(authorizedReceipts.length - failedCount - pendingCount), color: [6, 120, 60] },
-        { label: 'Failed / Pending', value: String(failedCount + pendingCount), color: (failedCount + pendingCount) > 0 ? [160, 30, 30] : [0, 53, 29] },
-      ];
-      const boxW = (R - L) / summaryItems.length - 2;
-      summaryItems.forEach((item, i) => {
-        const bx = L + i * (boxW + 2);
-        doc.setFillColor(244, 247, 245);
-        doc.roundedRect(bx, y, boxW, 18, 2, 2, 'F');
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(100, 110, 105);
-        doc.text(item.label.toUpperCase(), bx + boxW / 2, y + 6, { align: 'center' });
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(...item.color);
-        doc.text(item.value, bx + boxW / 2, y + 13, { align: 'center' });
-      });
-
-      // ── RECEIPTS TABLE ──
-      y += 24;
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(0, 53, 29);
-      doc.text('Recipient Receipts', L, y);
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(120, 130, 125);
-      doc.text(`${authorizedReceipts.length} record${authorizedReceipts.length !== 1 ? 's' : ''}`, R, y, { align: 'right' });
-
-      const tableRows = authorizedReceipts.map(r => [
-        r.id || '—',
-        r.name || '—',
-        r.phone || '—',
-        (r.method || '—').toUpperCase(),
-        formatKES(r.amount),
-        RECEIPT_STATUS_LABEL[r.status] || 'CONFIRMED',
-      ]);
-
-      autoTable(doc, {
-        startY: y + 4,
-        head: [['RECEIPT NO.', 'RECIPIENT', 'PHONE', 'METHOD', 'AMOUNT (KES)', 'STATUS']],
-        body: tableRows,
-        theme: 'plain',
-        tableWidth: R - L,
-        headStyles: {
-          fillColor: [0, 53, 29],
-          textColor: [255, 255, 255],
-          fontSize: 7,
-          fontStyle: 'bold',
-          cellPadding: { top: 4, bottom: 4, left: 3, right: 3 },
-          halign: 'left',
-          lineWidth: 0,
-        },
-        bodyStyles: {
-          fontSize: 8,
-          textColor: [30, 40, 35],
-          cellPadding: { top: 3, bottom: 3, left: 3, right: 3 },
-          lineColor: [230, 235, 232],
-          lineWidth: 0.2,
-          valign: 'middle',
-          overflow: 'linebreak',
-        },
-        alternateRowStyles: { fillColor: [246, 249, 247] },
-        columnStyles: {
-          0: { cellWidth: 32, halign: 'left', fontSize: 7 },
-          1: { cellWidth: 40, halign: 'left' },
-          2: { cellWidth: 30, halign: 'left' },
-          3: { cellWidth: 26, halign: 'left', fontSize: 7 },
-          4: { cellWidth: 26, halign: 'right', fontStyle: 'bold' },
-          5: { cellWidth: 28, halign: 'center', fontSize: 7 },
-        },
-        didParseCell(data) {
-          if (data.section === 'body' && data.column.index === 5) {
-            const v = String(data.cell.raw);
-            if (v === 'CONFIRMED') { data.cell.styles.textColor = [6, 120, 60]; data.cell.styles.fontStyle = 'bold'; }
-            if (v === 'PENDING') { data.cell.styles.textColor = [160, 110, 6]; data.cell.styles.fontStyle = 'bold'; }
-            if (v === 'FAILED & REFUNDED') { data.cell.styles.textColor = [160, 30, 30]; data.cell.styles.fontStyle = 'bold'; data.cell.styles.fontSize = 6; }
+        // Receipts Iteration
+        authorizedReceipts.forEach((r, idx) => {
+          if (y > 270) {
+            pdf.addPage();
+            y = 20;
           }
-        },
-        didDrawPage(data) {
-          if (data.pageNumber > 1) {
-            doc.setFillColor(0, 53, 29);
-            doc.rect(0, 0, W, 12, 'F');
-            doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(255, 255, 255);
-            doc.text(`PayChain — ${batchRef} — continued`, L, 8);
-            doc.text(`Page ${data.pageNumber}`, R, 8, { align: 'right' });
-          }
-        },
-        margin: { left: L, right: W - R },
-      });
+          pdf.setFontSize(11);
+          pdf.setFont("helvetica", "bold");
+          pdf.text(`Receipt No: ${r.id}`, 20, y);
+          y += 8;
+          pdf.setFont("helvetica", "normal");
+          pdf.text(`Recipient: ${r.name}`, 20, y);
+          y += 8;
+          pdf.text(`Account/Phone: ${r.phone}`, 20, y);
+          y += 8;
+          pdf.text(`Amount: KES ${r.amount.toLocaleString()}`, 20, y);
+          y += 8;
+          pdf.text(`Reference: ${r.reference}`, 20, y);
+          y += 8;
+          pdf.text(`Method: ${r.method}`, 20, y);
+          y += 15;
+          pdf.setDrawColor(220);
+          pdf.line(20, y, 190, y);
+          y += 10;
+        });
 
-      // ── CLOSING STRIP ──
-      const endY = doc.lastAutoTable.finalY + 4;
-      doc.setFillColor(0, 53, 29);
-      doc.rect(L, endY, R - L, 12, 'F');
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(94, 254, 179);
-      doc.text('Total Disbursed', L + 4, endY + 7.5);
-      doc.setTextColor(255, 255, 255);
-      doc.text(formatKES(batchTotal), R - 4, endY + 7.5, { align: 'right' });
-
-      // ── FOOTER ──
-      const footerY = H - 14;
-      doc.setDrawColor(220, 220, 220);
-      doc.line(L, footerY - 4, R, footerY - 4);
-      doc.setFontSize(7);
-      doc.setFont('helvetica', 'italic');
-      doc.setTextColor(140, 140, 140);
-      doc.text('This is a computer-generated report and requires no signature. For support: support@paychain.co.ke | ' + PAYCHAIN_PHONE, W / 2, footerY, { align: 'center' });
-      doc.setFont('helvetica', 'normal');
-      doc.text(`© ${now.getFullYear()} Paychain Ltd  •  Ref: ${batchRef}  •  Page 1 of ${doc.internal.getNumberOfPages()}`, W / 2, footerY + 5, { align: 'center' });
-
-      doc.save(`Batch_Receipts_${batchRef}.pdf`);
-      addNotification({ title: 'Download Complete', message: 'Batch receipts downloaded successfully as PDF.', type: 'success' });
-    } catch (err) {
-      addNotification({ title: 'Error', message: 'Failed to generate Batch PDF: ' + (err.message || err.toString()), type: 'error' });
-    }
+        pdf.save(`Batch_Receipts_${new Date().getTime()}.pdf`);
+        addNotification({ title: 'Download Complete', message: 'Batch receipts downloaded successfully as PDF.', type: 'success' });
+      } catch (err) {
+        addNotification({ title: 'Error', message: 'Failed to generate Batch PDF: ' + (err.message || err.toString()), type: 'error' });
+      }
+    }, 1000);
   };
 
   const handleReset = () => {
@@ -1427,7 +1151,7 @@ export default function BulkPay() {
                         </div>
                       )}
 
-                      {newPayee.type === 'Utility' && newPayee.utilityType === 'Electricity' && (
+                      {newPayee.utilityType === 'Electricity' && (
                         <div className="space-y-2 pt-2 animate-in fade-in duration-500">
                           <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Account Type</label>
                           <div className="flex gap-2 p-1.5 bg-surface-container-low/50 rounded-2xl border border-outline-variant/5">
@@ -1451,7 +1175,7 @@ export default function BulkPay() {
                         </div>
                       )}
 
-                      {newPayee.type === 'Utility' && DEDICATED_RAIL_UTILITIES.includes(newPayee.utilityProvider) && (() => {
+                      {DEDICATED_RAIL_UTILITIES.includes(newPayee.utilityProvider) && (() => {
                         const isKplc = newPayee.utilityProvider === 'KPLC' || newPayee.utilityProvider === 'KPLC_PREPAID'
                         const isPrepaid = newPayee.utilityProvider === 'KPLC_PREPAID'
                         const logo = isKplc ? '/utilities%20logo/kplc.png' : '/utilities%20logo/ncwsc.png'
@@ -1548,19 +1272,16 @@ export default function BulkPay() {
                         <div className="space-y-4 pt-4 animate-in fade-in duration-500 bg-purple-50/30 p-4 rounded-2xl border border-purple-500/10">
                           <h4 className="text-[10px] text-purple-700 font-black uppercase tracking-widest mb-2 flex items-center gap-2">
                             <span className="material-symbols-outlined text-[14px]">receipt_long</span>
-                            KRA eTIMS Details (Optional)
+                            KRA eTIMS Details
                           </h4>
-                          <p className="text-[10px] text-on-surface-variant/60 font-medium -mt-1 mb-1">
-                            For your own business records.
-                          </p>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-1.5">
-                              <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Supplier KRA PIN</label>
-                              <ValidatedInput kind="kraPin" optional value={newPayee.kraPin} onChange={(e) => setNewPayee({...newPayee, kraPin: e.target.value})} placeholder="P000000000A" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-purple-500/50 uppercase" />
+                              <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Supplier KRA PIN *</label>
+                              <ValidatedInput kind="kraPin" value={newPayee.kraPin} onChange={(e) => setNewPayee({...newPayee, kraPin: e.target.value})} placeholder="P000000000A" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-purple-500/50 uppercase" />
                             </div>
                             <div className="space-y-1.5">
-                              <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">eTIMS Invoice No.</label>
-                              <ValidatedInput kind="etims" optional value={newPayee.etimsInvoiceNumber} onChange={(e) => setNewPayee({...newPayee, etimsInvoiceNumber: e.target.value})} placeholder="e.g. INV-123" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-purple-500/50" />
+                              <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">eTIMS Invoice No. *</label>
+                              <ValidatedInput kind="etims" value={newPayee.etimsInvoiceNumber} onChange={(e) => setNewPayee({...newPayee, etimsInvoiceNumber: e.target.value})} placeholder="e.g. INV-123" className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-purple-500/50" />
                             </div>
                             <div className="space-y-1.5 sm:col-span-2">
                               <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Control Unit (CU) No.</label>
@@ -1582,7 +1303,7 @@ export default function BulkPay() {
                         />
                       </div>
 
-                      {!DEDICATED_RAIL_UTILITIES.includes(newPayee.utilityProvider) && (
+                      {newPayee.utilityProvider !== 'KPLC' && (
                       <div className="space-y-4 pt-4">
                         <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Settlement Method</label>
                         <div className="flex gap-2 p-1.5 bg-surface-container-low/50 rounded-2xl border border-outline-variant/5">
@@ -1601,35 +1322,26 @@ export default function BulkPay() {
                       </div>
                       )}
 
-                      {!DEDICATED_RAIL_UTILITIES.includes(newPayee.utilityProvider) && (
+                      {newPayee.utilityProvider !== 'KPLC' && (
                       <div className="pt-4 transition-all">
                         {newPayee.paymentMethod === 'Mobile Money' && (
                           <div className="space-y-6 animate-in fade-in duration-300">
                             <div className="space-y-3">
                               <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] ml-1 opacity-50">Mobile Money Type</label>
                               <div className="grid grid-cols-3 gap-2">
-                                {['Personal Number', 'Paybill', 'Buy Goods'].map((mType) => {
-                                  const comingSoon = (mType === 'Paybill' || mType === 'Buy Goods') && !isLipaNaMpesaBetaMerchant
-                                  return (
-                                    <button
-                                      key={mType}
-                                      type="button"
-                                      disabled={comingSoon}
-                                      title={comingSoon ? 'Coming Soon' : undefined}
-                                      onClick={() => { if (comingSoon) return; setNewPayee({...newPayee, mobileMoneyType: mType}) }}
-                                      className={`py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border flex flex-col items-center gap-0.5 ${
-                                        comingSoon
-                                          ? 'bg-white text-on-surface-variant/30 border-outline-variant/10 opacity-60 cursor-not-allowed'
-                                          : newPayee.mobileMoneyType === mType
-                                          ? 'bg-[#00351D] text-white border-[#00351D]'
-                                          : 'bg-white text-on-surface-variant/40 border-outline-variant/20 hover:border-emerald-500/30'
-                                      }`}
-                                    >
-                                      <span>{mType}</span>
-                                      {comingSoon && <span className="text-[7px] font-black text-amber-700 normal-case tracking-normal">Coming Soon</span>}
-                                    </button>
-                                  )
-                                })}
+                                {['Personal Number', 'Paybill', 'Buy Goods'].map((mType) => (
+                                  <button
+                                    key={mType}
+                                    onClick={() => setNewPayee({...newPayee, mobileMoneyType: mType})}
+                                    className={`py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border ${
+                                      newPayee.mobileMoneyType === mType 
+                                        ? 'bg-[#00351D] text-white border-[#00351D]' 
+                                        : 'bg-white text-on-surface-variant/40 border-outline-variant/20 hover:border-emerald-500/30'
+                                    }`}
+                                  >
+                                    {mType}
+                                  </button>
+                                ))}
                               </div>
                             </div>
 
@@ -1644,6 +1356,22 @@ export default function BulkPay() {
                                     placeholder="07XX XXX XXX"
                                     className="w-full bg-white border border-outline-variant/20 rounded-2xl px-5 py-3.5 md:px-6 md:py-4 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none"
                                   />
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                  {['safaricom', 'airtel'].map((net) => (
+                                    <button
+                                      key={net}
+                                      type="button"
+                                      onClick={() => setNewPayee({...newPayee, mobileNetwork: net})}
+                                      className={`py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all border ${
+                                        (newPayee.mobileNetwork || 'safaricom') === net
+                                          ? 'bg-[#00351D] text-white border-[#00351D]'
+                                          : 'bg-white text-on-surface-variant/40 border-outline-variant/20 hover:border-emerald-500/30'
+                                      }`}
+                                    >
+                                      {net === 'airtel' ? 'Airtel Money' : 'M-PESA'}
+                                    </button>
+                                  ))}
                                 </div>
                               </div>
                             )}
@@ -1865,15 +1593,8 @@ export default function BulkPay() {
         {/* Right Column: Create Payment Batch */}
         <section className="flex-1 flex flex-col gap-6">
           {/* Step Indicator */}
-          <div className="bg-surface-container-low px-4 py-3 md:px-5 md:py-3.5 rounded-2xl flex items-center justify-between relative editorial-shadow border border-outline-variant/10">
-            {/* Decorative blur gets its own clipped, non-interactive layer
-                instead of `overflow-hidden` on the card itself — that
-                clipped the Liquidity "+" dropdown below (position: absolute,
-                nested inside this card), making it render but stay
-                invisible/cut off every time it opened. */}
-            <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full -mr-12 -mt-12 blur-2xl"></div>
-            </div>
+          <div className="bg-surface-container-low px-4 py-3 md:px-5 md:py-3.5 rounded-2xl flex items-center justify-between relative overflow-hidden editorial-shadow border border-outline-variant/10">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full -mr-12 -mt-12 blur-2xl"></div>
             <div className="flex items-center gap-3 md:gap-8 relative z-10 overflow-x-auto no-scrollbar">
               {[1, 2, 3, 4].map((s) => (
                 <div key={s} className="flex items-center gap-3 md:gap-4 shrink-0">
@@ -1984,20 +1705,25 @@ export default function BulkPay() {
           <div className="bg-white rounded-[32px] overflow-hidden shadow-[0_20px_80px_rgba(0,0,0,0.06)] border border-outline-variant/10">
             <div className="p-6 md:p-10 border-b border-outline-variant/5 flex justify-between items-center">
               <div>
-                <h3 className="font-headline text-xl md:text-3xl text-primary tracking-tight font-bold">New Payout Batch</h3>
-                <p className="text-[10px] md:text-sm text-on-surface-variant font-medium mt-1 md:mt-1.5 opacity-60 italic">Choose who to pay and how much this cycle.</p>
+                <h3 className="font-headline text-xl md:text-3xl text-primary tracking-tight font-bold">Create Payment Batch</h3>
+                <p className="text-[10px] md:text-sm text-on-surface-variant font-medium mt-1 md:mt-1.5 opacity-60 italic">Define specific liquidity distribution for this cycle.</p>
               </div>
-              {batchHistory.length > 0 && (
-                <div>
-                  <button
-                    onClick={handleRepeatLastBatch}
-                    className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2"
-                  >
-                    <span className="material-symbols-outlined text-[14px]">history</span>
-                    Repeat Last Batch
-                  </button>
-                </div>
-              )}
+              <div>
+                <input 
+                  type="file" 
+                  accept=".csv" 
+                  ref={csvInputRef} 
+                  onChange={handleCSVUpload} 
+                  style={{ display: 'none' }} 
+                />
+                <button 
+                  onClick={() => csvInputRef.current.click()}
+                  className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-[14px]">upload_file</span>
+                  Upload CSV
+                </button>
+              </div>
             </div>
             <div className="p-0">
               {/* Desktop Table */}
@@ -2118,22 +1844,7 @@ export default function BulkPay() {
                   <h4 className="text-sm font-bold text-primary uppercase tracking-widest mb-6">Select Funding Source</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {[
-                      // A merchant only ever has one funding source — the
-                      // pooled NCBA wallet balance itself (see the "single
-                      // pooled account" architecture note elsewhere in this
-                      // codebase) — never an actual M-Pesa Till. Previously
-                      // hardcoded 'Till'/paybillAccount (a separate 5-char
-                      // Daraja-era sub-account, not even a real till number)
-                      // here, which showed a fictional destination the
-                      // merchant's money was never routed through. Now shows
-                      // the merchant's real NCBA virtual account number,
-                      // same value MyAccounts.jsx already displays.
-                      {
-                        id: 'MAIN_ACCOUNT',
-                        name: merchant?.businessName || 'Main Business Account',
-                        balance: merchant?.availableBalance ?? merchant?.kesBalance ?? 0,
-                        number: merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending bank assignment',
-                      },
+                      { id: 'TILL_1', name: merchant?.businessName || 'Main Business Till', balance: merchant?.kesBalance ?? 0, number: merchant?.paybillAccount || '852300' },
                     ].map(till => (
                       <div 
                         key={till.id}
@@ -2143,11 +1854,11 @@ export default function BulkPay() {
                         <div className="flex justify-between items-start mb-6">
                           <div className="flex items-center gap-3">
                             <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${selectedTill === till.id ? 'bg-emerald-500 text-white shadow-sm' : 'bg-surface-container-low text-primary'}`}>
-                              <span className="material-symbols-outlined">{selectedTill === till.id ? 'check' : 'account_balance_wallet'}</span>
+                              <span className="material-symbols-outlined">{selectedTill === till.id ? 'check' : 'storefront'}</span>
                             </div>
                             <div>
                               <h5 className="font-bold text-sm text-primary leading-tight">{till.name}</h5>
-                              <p className="text-[10px] text-on-surface-variant font-medium mt-1 opacity-60">Account No: {formatAccountNumber(till.number)}</p>
+                              <p className="text-[10px] text-on-surface-variant font-medium mt-1 opacity-60">Till No: {till.number}</p>
                             </div>
                           </div>
                         </div>
@@ -2166,7 +1877,6 @@ export default function BulkPay() {
                 const failedCount = authorizedReceipts.filter(r => r.status === 'failed').length
                 const pendingCount = authorizedReceipts.filter(r => r.status === 'pending').length
                 const allFailed = failedCount > 0 && failedCount === authorizedReceipts.length
-                const distinctFailureReasons = [...new Set(authorizedReceipts.filter(r => r.status === 'failed' && r.failureReason).map(r => r.failureReason))]
                 return (
                 <div className="p-6 md:p-12 animate-in fade-in zoom-in duration-700">
                   <div className="flex flex-col items-center text-center mb-12">
@@ -2186,16 +1896,6 @@ export default function BulkPay() {
                         ? `Submitted. ${pendingCount} payout${pendingCount === 1 ? '' : 's'} awaiting final confirmation.`
                         : 'Disbursement workflow complete. Receipts generated for all recipients.'}
                     </p>
-                    {distinctFailureReasons.length > 0 && (
-                      <div className="mt-4 max-w-md mx-auto bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-left">
-                        {distinctFailureReasons.map((reason, i) => (
-                          <p key={i} className="text-[11px] font-bold text-red-700 leading-relaxed flex items-start gap-1.5">
-                            <span className="material-symbols-outlined text-red-500 text-[14px] mt-0.5 shrink-0">error_outline</span>
-                            {reason}
-                          </p>
-                        ))}
-                      </div>
-                    )}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar pb-10">
@@ -2256,13 +1956,6 @@ export default function BulkPay() {
                               <p className="text-[9px] sm:text-[10px] text-on-surface-variant font-medium mt-1 opacity-50 italic">via {receipt.method}</p>
                             </div>
                           </div>
-
-                          {receipt.status === 'failed' && receipt.failureReason && (
-                            <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-                              <span className="material-symbols-outlined text-red-500 text-[16px] mt-0.5">error_outline</span>
-                              <p className="text-[11px] font-bold text-red-700 leading-relaxed">{receipt.failureReason}</p>
-                            </div>
-                          )}
                         </div>
                         <div className="px-6 py-4 bg-surface-container-low/30 border-t border-outline-variant/5 flex items-center justify-between">
                           <div className="flex items-center gap-2">
@@ -2300,18 +1993,6 @@ export default function BulkPay() {
                         <span className={`font-headline text-lg md:text-2xl tracking-tighter tabular-nums transition-all duration-300 ${!showAmounts && 'blur-md'}`}>{batchTotal.toLocaleString()}</span>
                       </div>
                     </div>
-                    {estimatedFee > 0 && (
-                      <>
-                        <div className="w-px h-6 bg-white/10 shrink-0"></div>
-                        <div className="flex flex-col min-w-fit">
-                          <span className="text-[8px] text-emerald-300 font-bold uppercase tracking-[0.2em] mb-0.5">Est. Transaction Cost</span>
-                          <div className="flex items-baseline gap-1.5">
-                            <span className="text-[9px] md:text-xs font-bold text-emerald-400">KES</span>
-                            <span className={`font-headline text-lg md:text-2xl tracking-tighter tabular-nums transition-all duration-300 ${!showAmounts && 'blur-md'}`}>{estimatedFee.toLocaleString()}</span>
-                          </div>
-                        </div>
-                      </>
-                    )}
                   </div>
                   <div className="flex items-center gap-4 relative z-10 w-full sm:w-auto justify-center sm:justify-end">
                     {isLiquidityLow && (
@@ -3122,7 +2803,7 @@ export default function BulkPay() {
                         )}
 
                         <div className="mt-auto pt-6 border-t border-outline-variant/10 flex flex-col items-center gap-2">
-                           <img src={paychainLogo} alt="PayChain" className="h-4 object-contain opacity-40" />
+                           <img src={paychainMark} alt="" className="h-4 w-auto object-contain opacity-40" />
                            <p className="text-[9px] text-center text-on-surface-variant font-bold uppercase tracking-widest opacity-50">Powered by PayChain Finance • Nairobi, Kenya</p>
                         </div>
                         </div>

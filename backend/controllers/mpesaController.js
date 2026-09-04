@@ -359,6 +359,14 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
               recipient: { name: merchant.businessName, id: merchant.ncbaMerchantCode },
               balanceAfter: updatedMerchant.kesBalance,
               paymentLinkId: link.linkId,
+              // Pure field copy from the link already fetched above — see
+              // Transaction.js's checkoutPageId/cartItems comment for why
+              // this exists (PaymentLink is TTL-deleted; this is the durable
+              // record checkout-page stock limits count against). Both are
+              // null/undefined for every non-checkout-page link, same as
+              // link.checkoutPageId/link.cartItems already are.
+              checkoutPageId: link.checkoutPageId,
+              cartItems: link.cartItems,
             });
 
             if (customerFee > 0) {

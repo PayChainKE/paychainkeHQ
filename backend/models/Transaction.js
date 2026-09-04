@@ -162,6 +162,19 @@ const transactionSchema = new mongoose.Schema({
   // historical marker even after the source link itself is long gone. Null
   // for every transaction not raised to settle a payment link.
   paymentLinkId: { type: String, default: null, index: true },
+  // Same "stable historical marker outliving a TTL-deleted PaymentLink"
+  // reasoning as paymentLinkId above — set only when paymentLinkId settled a
+  // link that was minted from a CheckoutPage cart (see PaymentLink.js's
+  // checkoutPageId/cartItems and transactionController.js's
+  // checkoutPageCheckout). Copied verbatim from the PaymentLink at
+  // settlement time; never read by any fee/amount logic. This is what lets
+  // stock-limit enforcement count real completed sales durably, since
+  // PaymentLink itself doesn't survive long enough to aggregate against.
+  checkoutPageId: { type: String, default: null, index: true },
+  cartItems: {
+    type: [{ itemId: String, name: String, unitPrice: Number, quantity: Number, _id: false }],
+    default: undefined,
+  },
 }, {
   timestamps: true
 });

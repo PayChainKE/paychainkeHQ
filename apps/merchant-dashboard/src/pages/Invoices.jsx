@@ -8,6 +8,7 @@ import { useNotification } from '../context/NotificationContext'
 import { formatKES } from '../utils/formatCurrency'
 import paychainLogo from '../assets/paychain-logo-dark.png'
 import paychainLogoWhite from '../assets/paychain-logo-white.png'
+import paychainMark from '../assets/paychain-mark.png'
 import axios from 'axios'
 
 // Extracted out of BulkPay.jsx, where this whole feature used to live under
@@ -942,7 +943,7 @@ export default function Invoices() {
                              <p className="text-[8px] text-on-surface-variant font-bold uppercase tracking-widest opacity-40">Scan to view &amp; pay</p>
                            </div>
                          )}
-                         <img src={paychainLogo} alt="PayChain" className="h-4 object-contain opacity-40" />
+                         <img src={paychainMark} alt="" className="h-4 w-auto object-contain opacity-40" />
                          <p className="text-[9px] text-center text-on-surface-variant font-bold uppercase tracking-widest opacity-50">Powered by PayChain Finance • Nairobi, Kenya</p>
                       </div>
                       </div>

@@ -8,6 +8,7 @@ import PinBoxes from '../components/PinBoxes'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { formatKES } from '../utils/formatCurrency'
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay'
+import paychainMark from '../assets/paychain-mark.png'
 import { formatAccountNumber } from '../utils/formatAccountNumber'
 import TransactionSuccessCard from '../components/ui/TransactionSuccessCard'
 
@@ -859,7 +860,8 @@ export default function SendMoney() {
           )}
         </div>
 
-        <p className="mt-6 text-center text-[10px] font-bold text-slate-300 uppercase tracking-widest">
+        <p className="mt-6 flex items-center justify-center gap-2 text-center text-[10px] font-bold text-slate-300 uppercase tracking-widest">
+          <img src={paychainMark} alt="" className="h-3 w-auto object-contain opacity-70" />
           Secured by PayChain KE · PIN-authorised payments
         </p>
       </div>

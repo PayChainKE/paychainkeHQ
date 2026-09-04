@@ -1,6 +1,7 @@
 import Transaction from '../models/Transaction.js';
 import Merchant from '../models/Merchant.js';
 import PaymentLink from '../models/PaymentLink.js';
+import CheckoutPage from '../models/CheckoutPage.js';
 import STKRequest from '../models/STKRequest.js';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
@@ -844,6 +845,305 @@ export const getPublicSTKStatus = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: 'Server error fetching payment status' });
+  }
+};
+
+// Normalizes a raw items payload for CheckoutPage create/update: trims/
+// validates name and unitPrice, keeps a caller-supplied itemId (an
+// existing product being edited, so past cart snapshots and the item's
+// identity survive a reprice) or mints a fresh one (a genuinely new
+// product row). Throws a plain Error with a user-facing message on any
+// invalid row — callers catch and respond 400.
+function normalizeCheckoutItems(rawItems) {
+  if (!Array.isArray(rawItems) || rawItems.length === 0) {
+    throw new Error('At least one product is required.');
+  }
+  return rawItems.map((raw, index) => {
+    const name = String(raw?.name || '').trim();
+    if (!name) throw new Error(`Product ${index + 1} needs a name.`);
+    const unitPrice = Number(raw?.unitPrice);
+    if (!Number.isFinite(unitPrice) || unitPrice < 1) {
+      throw new Error(`"${name}" needs a valid price.`);
+    }
+    // Blank/undefined means unlimited (null) — merchants aren't required to
+    // set a stock limit unless they actually want one enforced.
+    let stockLimit = null;
+    if (raw?.stockLimit !== undefined && raw?.stockLimit !== null && raw?.stockLimit !== '') {
+      stockLimit = Number(raw.stockLimit);
+      if (!Number.isInteger(stockLimit) || stockLimit < 1) {
+        throw new Error(`"${name}"'s stock limit must be a whole number of 1 or more.`);
+      }
+    }
+    return {
+      itemId: raw?.itemId ? String(raw.itemId) : crypto.randomBytes(4).toString('hex'),
+      name,
+      description: String(raw?.description || '').trim(),
+      unitPrice,
+      active: raw?.active === false ? false : true,
+      stockLimit,
+    };
+  });
+}
+
+// Sums each item's completed-sale quantity from Transaction — the durable
+// record a stock count can safely aggregate against, since PaymentLink
+// itself is TTL-deleted ~15 minutes after creation regardless of payment
+// outcome (see Transaction.js's checkoutPageId/cartItems comment). Returns
+// a Map<itemId, soldQty>; an item with no completed sales simply isn't a key.
+async function getSoldQuantities(pageId) {
+  const rows = await Transaction.aggregate([
+    { $match: { checkoutPageId: pageId, status: 'completed' } },
+    { $unwind: '$cartItems' },
+    { $group: { _id: '$cartItems.itemId', soldQty: { $sum: '$cartItems.quantity' } } },
+  ]);
+  return new Map(rows.map((r) => [r._id, r.soldQty]));
+}
+
+// Attaches sold/remaining to each item, based on its own stockLimit (null
+// stockLimit -> remaining stays null, meaning unlimited).
+function withStockInfo(items, soldByItemId) {
+  return items.map((item) => {
+    const sold = soldByItemId.get(item.itemId) || 0;
+    const remaining = item.stockLimit == null ? null : Math.max(0, item.stockLimit - sold);
+    return {
+      itemId: item.itemId,
+      name: item.name,
+      description: item.description,
+      unitPrice: item.unitPrice,
+      active: item.active,
+      stockLimit: item.stockLimit,
+      sold,
+      remaining,
+    };
+  });
+}
+
+// @desc    Create a Checkout Page — a merchant-owned, reusable, non-expiring
+//          product catalog. This is the backing data for the "storefront"
+//          no-code embed (data-paychain-checkout): the page itself is never
+//          paid directly — a customer's finalized cart mints an ordinary
+//          PaymentLink (see checkoutPageCheckout below), so settlement stays
+//          entirely on the existing, unmodified PaymentLink/STK path.
+// @route   POST /api/transactions/checkout-page
+// @access  Private
+export const createCheckoutPage = async (req, res) => {
+  try {
+    const title = String(req.body?.title || '').trim();
+    if (!title) return res.status(400).json({ error: 'A page title is required.' });
+
+    let items;
+    try {
+      items = normalizeCheckoutItems(req.body?.items);
+    } catch (e) {
+      return res.status(400).json({ error: e.message });
+    }
+
+    const pageId = crypto.randomBytes(4).toString('hex');
+    const page = await CheckoutPage.create({
+      merchantId: req.merchant._id,
+      pageId,
+      title,
+      description: String(req.body?.description || '').trim(),
+      items,
+      collectBuyerName: !!req.body?.collectBuyerName,
+    });
+
+    res.status(201).json({ success: true, page });
+  } catch (error) {
+    console.error('❌ Error creating checkout page:', error);
+    res.status(500).json({ error: 'Failed to create checkout page.' });
+  }
+};
+
+// @desc    List merchant's checkout pages
+// @route   GET /api/transactions/checkout-page
+// @access  Private
+export const listCheckoutPages = async (req, res) => {
+  try {
+    const pages = await CheckoutPage.find({ merchantId: req.merchant._id }).sort({ createdAt: -1 });
+    const withStock = await Promise.all(pages.map(async (page) => {
+      const sold = await getSoldQuantities(page.pageId);
+      return { ...page.toObject(), items: withStockInfo(page.items, sold) };
+    }));
+    res.json({ success: true, pages: withStock });
+  } catch (error) {
+    console.error('❌ Error listing checkout pages:', error);
+    res.status(500).json({ error: 'Failed to fetch checkout pages.' });
+  }
+};
+
+// @desc    Get one of the merchant's own checkout pages, full detail, for editing
+// @route   GET /api/transactions/checkout-page/:pageId
+// @access  Private
+export const getCheckoutPageForMerchant = async (req, res) => {
+  try {
+    const page = await CheckoutPage.findOne({ pageId: req.params.pageId, merchantId: req.merchant._id });
+    if (!page) return res.status(404).json({ error: 'Checkout page not found.' });
+    const sold = await getSoldQuantities(page.pageId);
+    res.json({ success: true, page: { ...page.toObject(), items: withStockInfo(page.items, sold) } });
+  } catch (error) {
+    console.error('❌ Error fetching checkout page:', error);
+    res.status(500).json({ error: 'Failed to fetch checkout page.' });
+  }
+};
+
+// @desc    Edit a checkout page's title/description/active state and/or its
+//          full product list. Editing products never rewrites a past
+//          order — each paid cart already snapshotted its own itemId/name/
+//          unitPrice/quantity onto the PaymentLink it minted.
+// @route   PATCH /api/transactions/checkout-page/:pageId
+// @access  Private
+export const updateCheckoutPage = async (req, res) => {
+  try {
+    const page = await CheckoutPage.findOne({ pageId: req.params.pageId, merchantId: req.merchant._id });
+    if (!page) return res.status(404).json({ error: 'Checkout page not found.' });
+
+    if (req.body?.title !== undefined) {
+      const title = String(req.body.title).trim();
+      if (!title) return res.status(400).json({ error: 'A page title is required.' });
+      page.title = title;
+    }
+    if (req.body?.description !== undefined) page.description = String(req.body.description).trim();
+    if (req.body?.active !== undefined) page.active = !!req.body.active;
+    if (req.body?.collectBuyerName !== undefined) page.collectBuyerName = !!req.body.collectBuyerName;
+    if (req.body?.items !== undefined) {
+      try {
+        page.items = normalizeCheckoutItems(req.body.items);
+      } catch (e) {
+        return res.status(400).json({ error: e.message });
+      }
+    }
+
+    await page.save();
+    res.json({ success: true, page });
+  } catch (error) {
+    console.error('❌ Error updating checkout page:', error);
+    res.status(500).json({ error: 'Failed to update checkout page.' });
+  }
+};
+
+// @desc    Public storefront view of a checkout page — active products only,
+//          no internal/merchant fields. Powers the customer-facing cart
+//          page (CartCheckoutPage.jsx) opened from the embed button.
+// @route   GET /api/transactions/checkout-page/:pageId/public
+// @access  Public
+export const getCheckoutPagePublic = async (req, res) => {
+  try {
+    const page = await CheckoutPage.findOne({ pageId: req.params.pageId }).populate('merchantId', 'businessName');
+    if (!page || !page.active) {
+      return res.status(404).json({ error: 'This checkout page is not available.' });
+    }
+    const sold = await getSoldQuantities(page.pageId);
+    res.json({
+      success: true,
+      pageId: page.pageId,
+      title: page.title,
+      description: page.description,
+      merchantName: page.merchantId?.businessName || '',
+      collectBuyerName: page.collectBuyerName,
+      items: withStockInfo(page.items.filter((item) => item.active), sold)
+        .map(({ itemId, name, description, unitPrice, remaining }) => ({ itemId, name, description, unitPrice, remaining })),
+    });
+  } catch (error) {
+    console.error('❌ Error fetching public checkout page:', error);
+    res.status(500).json({ error: 'Failed to fetch checkout page.' });
+  }
+};
+
+// @desc    Turn a customer's cart into something payable. Validates every
+//          line against the merchant's own stored, current prices (a
+//          client-submitted total/price is never trusted), computes the
+//          subtotal server-side, then mints an ordinary, short-lived,
+//          single-use PaymentLink for that exact subtotal — from here the
+//          customer is simply paying a Payment Link, so the existing
+//          processPaymentLink/initiateAndTrackNcbaStk/resolveStkOutcome
+//          flow (fee split, Transaction record, both SMS) runs completely
+//          unmodified. cartItems is snapshotted onto the link so the
+//          merchant can see what was actually bought at the price it was
+//          bought at, even after the catalog itself is later edited.
+// @route   POST /api/transactions/checkout-page/:pageId/checkout
+// @access  Public
+export const checkoutPageCheckout = async (req, res) => {
+  try {
+    const page = await CheckoutPage.findOne({ pageId: req.params.pageId });
+    if (!page || !page.active) {
+      return res.status(404).json({ error: 'This checkout page is not available.' });
+    }
+
+    const cartLines = Array.isArray(req.body?.items) ? req.body.items : [];
+    if (cartLines.length === 0) {
+      return res.status(400).json({ error: 'Your cart is empty.' });
+    }
+
+    let buyerName = null;
+    if (page.collectBuyerName) {
+      buyerName = String(req.body?.buyerName || '').trim();
+      if (!buyerName) return res.status(400).json({ error: 'Enter your name to continue.' });
+    }
+
+    const itemsById = new Map(page.items.filter((i) => i.active).map((i) => [i.itemId, i]));
+    let subtotal = 0;
+    const cartItems = [];
+    for (const line of cartLines) {
+      const catalogItem = itemsById.get(String(line?.itemId));
+      if (!catalogItem) return res.status(400).json({ error: 'One of the items in your cart is no longer available.' });
+
+      const quantity = Number(line?.quantity);
+      if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100) {
+        return res.status(400).json({ error: `Enter a valid quantity for "${catalogItem.name}".` });
+      }
+
+      subtotal += catalogItem.unitPrice * quantity;
+      cartItems.push({ itemId: catalogItem.itemId, name: catalogItem.name, unitPrice: catalogItem.unitPrice, quantity });
+    }
+
+    // Stock check — against Transaction (durable completed sales), not
+    // PaymentLink (TTL-deleted, and includes carts that were minted but
+    // never paid). One aggregation call for the whole cart, then a per-line
+    // check only for items that actually have a limit set. Checked here,
+    // right before minting, rather than hard-reserved — see
+    // checkoutPageCheckout's own doc comment / CheckoutPage.js's stockLimit
+    // comment for the accepted small race-window trade-off.
+    const linesWithLimit = cartItems.filter((line) => itemsById.get(line.itemId)?.stockLimit != null);
+    if (linesWithLimit.length > 0) {
+      const sold = await getSoldQuantities(page.pageId);
+      for (const line of linesWithLimit) {
+        const catalogItem = itemsById.get(line.itemId);
+        const alreadySold = sold.get(line.itemId) || 0;
+        const remaining = Math.max(0, catalogItem.stockLimit - alreadySold);
+        if (line.quantity > remaining) {
+          return res.status(400).json({
+            error: remaining === 0
+              ? `"${catalogItem.name}" is sold out.`
+              : `Only ${remaining} of "${catalogItem.name}" left.`,
+          });
+        }
+      }
+    }
+
+    subtotal = Math.round(subtotal * 100) / 100;
+
+    const linkId = crypto.randomBytes(4).toString('hex');
+    // A cart-checkout session is short-lived — long enough for a customer
+    // to review their cart and pay, unlike a merchant-shared PaymentLink
+    // (48h), since this link is minted fresh per cart rather than shared.
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+    await PaymentLink.create({
+      merchantId: page.merchantId,
+      linkId,
+      amount: subtotal,
+      expiresAt,
+      status: 'active',
+      checkoutPageId: page.pageId,
+      cartItems,
+      buyerName,
+    });
+
+    res.status(201).json({ success: true, linkId });
+  } catch (error) {
+    console.error('❌ Error processing cart checkout:', error);
+    res.status(500).json({ error: 'Failed to start checkout.' });
   }
 };
 

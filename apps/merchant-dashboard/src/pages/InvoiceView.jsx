@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import { ValidatedInput } from '../components/ValidatedInput';
 import paychainLogoWhite from '../assets/paychain-logo-white.png';
+import paychainMark from '../assets/paychain-mark.png';
 import kraLogo from '../assets/kra-logo.png';
 import { formatKES } from '../utils/formatCurrency';
 
@@ -330,7 +331,7 @@ export default function InvoiceView() {
             </form>
 
             <div className="mt-8 flex items-center justify-center gap-2 text-on-surface-variant/50">
-              <span className="material-symbols-outlined text-[14px]">lock</span>
+              <img src={paychainMark} alt="" className="h-3 w-auto object-contain opacity-70" />
               <p className="text-[9px] font-black uppercase tracking-widest">Secured by PayChain</p>
             </div>
           </div>
