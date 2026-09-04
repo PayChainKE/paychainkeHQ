@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
-import { getTransactions, simulateIncomingPayment, swapKesToUsdc, activateWallet, getLiveRate, sendMoney, syncWalletBalance, generatePaymentLink, listPaymentLinks, getPaymentLink, processPaymentLink, getMerchantByAccount, payToMerchantAccount, emailStatement, downloadSticker, getPublicSTKStatus, getCheckoutPreview, createCheckoutPage, listCheckoutPages, getCheckoutPageForMerchant, updateCheckoutPage, getCheckoutPagePublic, checkoutPageCheckout } from '../controllers/transactionController.js';
+import { getTransactions, simulateIncomingPayment, swapKesToUsdc, activateWallet, getLiveRate, sendMoney, syncWalletBalance, generatePaymentLink, listPaymentLinks, getPaymentLink, processPaymentLink, getMerchantByAccount, payToMerchantAccount, emailStatement, downloadSticker, getPublicSTKStatus, getCheckoutPreview, createCheckoutPage, listCheckoutPages, getCheckoutPageForMerchant, updateCheckoutPage, deleteCheckoutPage, getCheckoutPagePublic, checkoutPageCheckout } from '../controllers/transactionController.js';
 import { protectMerchant } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -48,6 +48,7 @@ router.post('/checkout-page', protectMerchant, createCheckoutPage);
 router.get('/checkout-page', protectMerchant, listCheckoutPages);
 router.get('/checkout-page/:pageId', protectMerchant, getCheckoutPageForMerchant);
 router.patch('/checkout-page/:pageId', protectMerchant, updateCheckoutPage);
+router.delete('/checkout-page/:pageId', protectMerchant, deleteCheckoutPage);
 
 // Public payment routes — unauthenticated by design (a customer paying a
 // link/QR has no PayChain account), so both get the same throttle: without

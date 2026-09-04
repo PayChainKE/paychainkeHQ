@@ -1022,6 +1022,27 @@ export const updateCheckoutPage = async (req, res) => {
   }
 };
 
+// @desc    Permanently delete a checkout page. Safe to do at any time —
+//          every past order already snapshotted its own cart onto the
+//          Transaction it settled as (see checkoutPageCheckout below), so
+//          deleting the source catalog never corrupts transaction history.
+//          The one real consequence: any embed button still pasted on a
+//          merchant's site pointing at this pageId starts 404ing the
+//          moment this runs — the frontend confirms that with the
+//          merchant before calling this.
+// @route   DELETE /api/transactions/checkout-page/:pageId
+// @access  Private
+export const deleteCheckoutPage = async (req, res) => {
+  try {
+    const page = await CheckoutPage.findOneAndDelete({ pageId: req.params.pageId, merchantId: req.merchant._id });
+    if (!page) return res.status(404).json({ error: 'Checkout page not found.' });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Error deleting checkout page:', error);
+    res.status(500).json({ error: 'Failed to delete checkout page.' });
+  }
+};
+
 // @desc    Public storefront view of a checkout page — active products only,
 //          no internal/merchant fields. Powers the customer-facing cart
 //          page (CartCheckoutPage.jsx) opened from the embed button.

@@ -146,6 +146,20 @@ export default function CheckoutPages() {
     }
   }
 
+  const handleDelete = async (page) => {
+    const confirmed = window.confirm(
+      `Delete "${page.title}"? If you've pasted its embed code on your website, that button will stop working immediately. Past orders are not affected. This cannot be undone.`
+    )
+    if (!confirmed) return
+    try {
+      await axios.delete(`${API_URL}/api/transactions/checkout-page/${page.pageId}`, { headers: authHeaders() })
+      setPages((prev) => prev.filter((p) => p.pageId !== page.pageId))
+      addNotification({ title: 'Deleted', message: `"${page.title}" has been deleted.`, type: 'success' })
+    } catch (err) {
+      addNotification({ title: 'Delete Failed', message: err.response?.data?.error || 'Could not delete this checkout page.', type: 'error' })
+    }
+  }
+
   return (
     <MerchantLayout title="Checkout Pages">
       <div className="max-w-4xl mx-auto animate-fade-in-up">
@@ -189,6 +203,7 @@ export default function CheckoutPages() {
                 onToggleEmbed={() => setExpandedEmbedFor((cur) => (cur === page.pageId ? null : page.pageId))}
                 onEdit={() => openEditModal(page)}
                 onToggleActive={() => toggleActive(page)}
+                onDelete={() => handleDelete(page)}
               />
             ))}
           </div>
@@ -308,7 +323,7 @@ export default function CheckoutPages() {
   )
 }
 
-function CheckoutPageCard({ page, isEmbedOpen, onToggleEmbed, onEdit, onToggleActive }) {
+function CheckoutPageCard({ page, isEmbedOpen, onToggleEmbed, onEdit, onToggleActive, onDelete }) {
   const embedPreviewRef = useRef(null)
 
   const embedSnippet = `<script src="${getAppUrl()}/paychain-button.js" defer></script>\n<div data-paychain-checkout="${page.pageId}" data-paychain-label="Shop ${page.title}"></div>`
@@ -378,6 +393,13 @@ function CheckoutPageCard({ page, isEmbedOpen, onToggleEmbed, onEdit, onToggleAc
           </button>
           <button onClick={onToggleEmbed} className="px-4 py-2 bg-[#00351D] text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:brightness-110 transition-all">
             {isEmbedOpen ? 'Hide Embed' : 'Get Embed Code'}
+          </button>
+          <button
+            onClick={onDelete}
+            aria-label="Delete checkout page"
+            className="w-9 h-9 shrink-0 rounded-lg flex items-center justify-center text-on-surface-variant hover:bg-error/10 hover:text-error transition-colors"
+          >
+            <span className="material-symbols-outlined text-lg">delete</span>
           </button>
         </div>
       </div>
