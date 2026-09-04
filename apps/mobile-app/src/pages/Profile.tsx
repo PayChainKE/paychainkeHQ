@@ -34,6 +34,7 @@ const MENU_ITEMS: Array<{
 ];
 
 function MenuButton({
+  label,
   icon,
   active,
   onPress,
@@ -44,10 +45,16 @@ function MenuButton({
   onPress: () => void;
 }) {
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.8} className="mb-1.5 items-center">
-      <View className={`w-10 h-10 rounded-xl items-center justify-center ${active ? 'bg-[#00351d] shadow-md shadow-[#00351d]/25' : 'bg-[#f0fdf4]'}`}>
+    <TouchableOpacity onPress={onPress} activeOpacity={0.8} className="mb-3 items-center">
+      <View className={`w-10 h-10 rounded-xl items-center justify-center mb-1 ${active ? 'bg-[#00351d] shadow-md shadow-[#00351d]/25' : 'bg-[#f0fdf4]'}`}>
         <MaterialIcons name={icon} size={18} color={active ? '#ffffff' : '#00351d'} />
       </View>
+      <Text
+        numberOfLines={2}
+        className={`text-center text-[8px] font-jakarta-bold leading-[10px] ${active ? 'text-[#00351d]' : 'text-[#707971]'}`}
+      >
+        {label}
+      </Text>
     </TouchableOpacity>
   );
 }
@@ -374,9 +381,9 @@ export default function Profile({ navigation }: any) {
 
   return (
     <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
-      <TopBar title="Profile" showBack={false} />
+      <TopBar title="Profile" showBack={false} titleAvatar />
       <View className="flex-1 flex-row bg-[#f0fdf4]">
-        <View className="w-[80px] bg-white border-r border-[#eff4ef] shadow-sm shadow-[#00351d]/5">
+        <View className="w-[88px] bg-white border-r border-[#eff4ef] shadow-sm shadow-[#00351d]/5">
           <View className="items-center pt-6 pb-5 border-b border-[#eff4ef]">
             <LinearGradient colors={['#006c4e', '#00351d']} className="w-10 h-10 rounded-2xl items-center justify-center shadow-lg shadow-[#006c4e]/20">
               <Text className="text-white font-jakarta-bold text-[11px]">
@@ -399,9 +406,10 @@ export default function Profile({ navigation }: any) {
             <View className="h-px bg-[#eff4ef] my-2" />
 
             <TouchableOpacity onPress={logout} activeOpacity={0.8} className="items-center">
-              <View className="w-10 h-10 rounded-xl items-center justify-center bg-[#fff5f5]">
+              <View className="w-10 h-10 rounded-xl items-center justify-center bg-[#fff5f5] mb-1">
                 <Feather name="log-out" size={16} color="#ba1a1a" />
               </View>
+              <Text className="text-center text-[8px] font-jakarta-bold leading-[10px] text-[#ba1a1a]">Log Out</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>

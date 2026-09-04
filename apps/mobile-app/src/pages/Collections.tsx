@@ -648,22 +648,26 @@ export default function Collections() {
                   </View>
                 </View>
                 <Text className="text-[9.5px] font-jakarta-bold text-white/60 uppercase tracking-[0.15em] mb-1.5">Today</Text>
-                <Text className="text-[21px] font-jakarta-extrabold text-white tracking-tight leading-tight" numberOfLines={1} adjustsFontSizeToFit>
+                <Text className="text-[21px] font-jakarta-extrabold text-white tracking-tight leading-tight" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
                   {formatCurrency(stats.today.total)}
                 </Text>
               </LinearGradient>
             </View>
 
+            {/* This Week / This Month / All Time previously used unrelated
+                blue, orange, and navy accents — swapped for the shared
+                brand palette (green tint, gold, deep green) so all four
+                cards read as one deliberate set, matching the dashboard. */}
             <View className="w-1/2 px-1.5 mb-3">
-              <View className="bg-white rounded-[26px] p-5 shadow-sm shadow-[#00351d]/5 border border-[#eff4ef]" style={{ minHeight: 132 }}>
+              <View className="bg-[#dcf5da] rounded-[26px] p-5 shadow-sm shadow-[#00351d]/5 border border-[#c9ecc6]" style={{ minHeight: 132 }}>
                 <View className="flex-row items-center justify-between mb-4">
-                  <View className="w-9 h-9 rounded-xl bg-[#eef2ff] items-center justify-center">
-                    <Feather name="trending-up" size={15} color="#1d4ed8" />
+                  <View className="w-9 h-9 rounded-xl bg-white items-center justify-center">
+                    <Feather name="trending-up" size={15} color="#006c4e" />
                   </View>
-                  <Feather name="arrow-up-right" size={14} color="#a5b4fc" />
+                  <Feather name="arrow-up-right" size={14} color="#68dbae" />
                 </View>
-                <Text className="text-[9.5px] font-jakarta-bold text-[#707971] uppercase tracking-[0.15em] mb-1.5">This Week</Text>
-                <Text className="text-[21px] font-jakarta-extrabold text-[#00351d] tracking-tight leading-tight" numberOfLines={1} adjustsFontSizeToFit>
+                <Text className="text-[9.5px] font-jakarta-bold text-[#00351d]/60 uppercase tracking-[0.15em] mb-1.5">This Week</Text>
+                <Text className="text-[21px] font-jakarta-extrabold text-[#00351d] tracking-tight leading-tight" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
                   {formatCurrency(stats.week.total)}
                 </Text>
               </View>
@@ -672,28 +676,34 @@ export default function Collections() {
             <View className="w-1/2 px-1.5">
               <View className="bg-white rounded-[26px] p-5 shadow-sm shadow-[#00351d]/5 border border-[#eff4ef]" style={{ minHeight: 132 }}>
                 <View className="flex-row items-center justify-between mb-4">
-                  <View className="w-9 h-9 rounded-xl bg-[#fef3e7] items-center justify-center">
-                    <Feather name="calendar" size={15} color="#b87333" />
-                  </View>
+                  <LinearGradient
+                    colors={['#f6e7b4', '#d4af37', '#a8842c']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={{ width: 36, height: 36, borderRadius: 12 }}
+                    className="items-center justify-center"
+                  >
+                    <Feather name="calendar" size={15} color="#3d2e05" />
+                  </LinearGradient>
                   <Feather name="arrow-up-right" size={14} color="#e7c9a3" />
                 </View>
                 <Text className="text-[9.5px] font-jakarta-bold text-[#707971] uppercase tracking-[0.15em] mb-1.5">This Month</Text>
-                <Text className="text-[21px] font-jakarta-extrabold text-[#00351d] tracking-tight leading-tight" numberOfLines={1} adjustsFontSizeToFit>
+                <Text className="text-[21px] font-jakarta-extrabold text-[#00351d] tracking-tight leading-tight" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
                   {formatCurrency(stats.month.total)}
                 </Text>
               </View>
             </View>
 
             <View className="w-1/2 px-1.5">
-              <View className="bg-[#1b1c2e] rounded-[26px] p-5 shadow-lg shadow-[#1b1c2e]/25 border border-white/5" style={{ minHeight: 132 }}>
+              <View className="bg-[#0b4d2e] rounded-[26px] p-5 shadow-lg shadow-[#00351d]/25 border border-white/5" style={{ minHeight: 132 }}>
                 <View className="flex-row items-center justify-between mb-4">
                   <View className="w-9 h-9 rounded-xl bg-white/10 items-center justify-center border border-white/10">
-                    <Feather name="award" size={15} color="#e5c07b" />
+                    <Feather name="award" size={15} color="#5efeb3" />
                   </View>
                   <Text className="text-[8.5px] font-jakarta-bold text-white/50 uppercase tracking-[0.15em]">Lifetime</Text>
                 </View>
                 <Text className="text-[9.5px] font-jakarta-bold text-white/60 uppercase tracking-[0.15em] mb-1.5">All Time</Text>
-                <Text className="text-[21px] font-jakarta-extrabold text-white tracking-tight leading-tight" numberOfLines={1} adjustsFontSizeToFit>
+                <Text className="text-[21px] font-jakarta-extrabold text-white tracking-tight leading-tight" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
                   {formatCurrency(stats.allTime.total)}
                 </Text>
               </View>
