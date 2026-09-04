@@ -12,6 +12,7 @@ import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { useNavigate } from 'react-router-dom'
 import FundAccountModal from '../components/modals/FundAccountModal'
+import paychainMark from '../assets/paychain-mark.png'
 
 export default function Overview() {
   const navigate = useNavigate()
@@ -235,7 +236,7 @@ export default function Overview() {
       {/* Section 1: Balance Cards Row */}
       <section className="grid grid-cols-1 gap-8 animate-fade-in-up [animation-delay:100ms] relative z-20">
         {/* KES Balance Card */}
-        <div data-tour="balance-card" className="bg-gradient-to-br from-[#00351D] via-[#022916] to-[#011C0F] text-white p-6 lg:p-8 rounded-[24px] shadow-[0_20px_40px_-15px_rgba(0,53,29,0.5)] relative z-20 group border border-emerald-900/50 hover:border-emerald-500/30 transition-all duration-500">
+        <div data-tour="balance-card" className="bg-gradient-to-br from-[#00351D] via-[#022916] to-[#011C0F] text-white p-6 lg:p-8 rounded-[24px] shadow-[0_28px_60px_-15px_rgba(0,53,29,0.65)] relative z-20 group border border-emerald-900/50 hover:border-emerald-500/30 transition-all duration-500">
           {/* Ambient Glow */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-[24px]">
             <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-400/10 rounded-full -mr-20 -mt-20 blur-[80px] group-hover:scale-110 transition-transform duration-1000"></div>
@@ -263,25 +264,38 @@ export default function Overview() {
               </div>
             </div>
 
-            {/* EMV-style chip + issuer mark — the detail that reads "bank
-                card" rather than "app balance panel" at a glance. */}
-            <div className="flex items-center justify-between mb-6">
-              <div
-                className="w-[38px] h-[28px] rounded-[6px] relative overflow-hidden"
-                style={{ background: 'linear-gradient(135deg, #f6e7b4, #d4af37 55%, #a8842c)' }}
-              >
-                <div className="absolute inset-x-0 top-[9px] h-px bg-black/25" />
-                <div className="absolute inset-x-0 top-[16px] h-px bg-black/25" />
-                <div className="absolute inset-y-0 left-1/2 w-px bg-black/20" />
-              </div>
-              <span className="text-white/40 text-[9px] lg:text-[10px] font-black uppercase tracking-[0.25em]">PayChain</span>
-            </div>
-
             <div className="flex-1">
               <p className="text-white/60 text-[9px] lg:text-[10px] font-bold uppercase tracking-[0.15em] mb-1.5">Available Balance</p>
-              <h3 className={`font-headline font-bold text-3xl lg:text-4xl tracking-tighter tabular-nums mb-1 transition-all duration-300 ${!showAmounts && 'blur-lg grayscale'}`}>
-                {formatKES(merchant?.kesBalance || 0)}
-              </h3>
+
+              {/* Balance on the left, chip + contactless icon on the right
+                  — beside the amount rather than stacked above it. */}
+              <div className="flex items-start justify-between gap-4">
+                <h3 className={`font-headline font-bold text-3xl lg:text-4xl tracking-tighter tabular-nums mb-1 transition-all duration-300 ${!showAmounts && 'blur-lg grayscale'}`}>
+                  {formatKES(merchant?.kesBalance || 0)}
+                </h3>
+
+                <div className="flex flex-col items-center gap-2 pt-1 shrink-0">
+                  {/* Contactless indicator — the Material Symbols "wifi"
+                      glyph rotated 90° reads as the standard tap-to-pay
+                      icon. Sits above the chip, the same order a real card
+                      prints it in (contactless mark near the top edge,
+                      chip below). */}
+                  <span className="material-symbols-outlined text-white/65 text-[19px] leading-none" style={{ transform: 'rotate(90deg)' }}>wifi</span>
+                  {/* EMV-style chip with the PayChain mark set into it, like
+                      a brand emblem debossed on a metal card. */}
+                  <div
+                    className="w-[42px] h-[32px] rounded-[7px] relative overflow-hidden flex items-center justify-center"
+                    style={{ background: 'linear-gradient(135deg, #f6e7b4, #d4af37 55%, #a8842c)' }}
+                  >
+                    <div className="absolute inset-x-0 top-[6px] h-px bg-black/20" />
+                    <div className="absolute inset-x-0 bottom-[6px] h-px bg-black/20" />
+                    <div className="w-[18px] h-[18px] rounded-full bg-[#fffbeb]/90 flex items-center justify-center relative">
+                      <img src={paychainMark} alt="" className="w-[12px] h-[12px] object-contain" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className={`flex items-center gap-2 text-[#5EFEB3] font-bold text-[9px] lg:text-[10px] tracking-wide transition-all duration-300 mb-3 ${!showAmounts && 'blur-sm grayscale'}`}>
                 <span className="material-symbols-outlined text-[10px]" style={{ fontVariationSettings: "'FILL' 1" }}>trending_up</span>
                 <span>+{formatKES(todaysRevenue)} today</span>
