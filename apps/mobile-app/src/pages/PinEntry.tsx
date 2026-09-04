@@ -53,7 +53,7 @@ function formatRetryTime(ms: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-export default function PinEntry() {
+export default function PinEntry({ navigation }: any) {
   const { appPin, unlockApp, logout, isBiometricsEnabled } = useAuth();
   const { support, authenticate } = useBiometrics();
   const [pin, setPin] = useState('');
@@ -234,8 +234,12 @@ export default function PinEntry() {
           ))}
         </View>
 
+        <TouchableOpacity onPress={() => navigation.navigate('ForgotPin')} disabled={isLocked} className="mt-4">
+          <Text className={`font-jakarta-bold text-[14px] ${isLocked ? 'text-[#3d4f45]' : 'text-[#68dbae]'}`}>Forgot PIN?</Text>
+        </TouchableOpacity>
+
         <TouchableOpacity onPress={logout} className="mt-4">
-          <Text className="text-[#68dbae] font-jakarta-bold text-[14px]">Log out instead</Text>
+          <Text className="text-white/40 font-jakarta-bold text-[13px]">Log out instead</Text>
         </TouchableOpacity>
 
       </View>

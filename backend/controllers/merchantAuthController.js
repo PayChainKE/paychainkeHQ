@@ -1421,7 +1421,13 @@ export const setAppPin = async (req, res) => {
         return res.status(400).json({ error: 'Your account has no password on file — contact support to change your payment PIN.' });
       }
       if (!currentPassword) {
-        return res.status(400).json({ error: 'Enter your current password to change your payment PIN.' });
+        // pinAlreadySet lets the client (PinSetup.tsx's first-time flow, which
+        // doesn't collect a password) distinguish "you need to re-auth" from
+        // a generic failure and prompt for the password inline instead of
+        // just failing — e.g. a merchant reinstalling the app or setting up
+        // a second device, where the server already has an appPin from
+        // before but this device has never captured one locally.
+        return res.status(400).json({ error: 'Enter your current password to change your payment PIN.', pinAlreadySet: true });
       }
       const isMatch = await merchant.matchPassword(currentPassword);
       if (!isMatch) {

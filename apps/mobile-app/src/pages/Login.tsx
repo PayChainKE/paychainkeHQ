@@ -35,7 +35,6 @@ export default function Login({ route }: any) {
   // way biometricLogin's own "Session expired" message already renders.
   useEffect(() => {
     const REASON_MESSAGES: Record<string, string> = {
-      'idle-timeout': 'You were signed out after 15 minutes of inactivity. Please sign in again.',
       'session-invalid': 'Your session is no longer valid. Please sign in again.',
     };
     if (logoutReason && REASON_MESSAGES[logoutReason]) {
