@@ -56,6 +56,14 @@ export default function Introduction() {
         </Link>
       </div>
 
+      <p className="text-[13px] text-ink-muted mb-7">
+        Not writing code? See the{" "}
+        <Link to="/no-code-integration" className="text-brand-bright font-semibold hover:underline">
+          no-code integration guide
+        </Link>{" "}
+        — a working payment button on your site in a few minutes, no account here needed.
+      </p>
+
       <CodeGroup
         className="mb-3"
         tabs={[

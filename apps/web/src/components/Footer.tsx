@@ -77,6 +77,7 @@ const Footer: React.FC = () => {
                   <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-400/70 border border-emerald-400/30 rounded-full px-2 py-0.5">Soon</span>
                 </Link>
               </li>
+              <li><Link to="/integrations" className="hover:text-emerald-400 transition-colors">No-Code Integrations</Link></li>
               <li>
                 <Link to="/docs" className="flex items-center gap-2 hover:text-emerald-400 transition-colors">
                   <span>Developer API</span>
