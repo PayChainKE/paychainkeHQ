@@ -1,9 +1,27 @@
 import express from 'express';
+import cors from 'cors';
 import rateLimit from 'express-rate-limit';
-import { getTransactions, simulateIncomingPayment, swapKesToUsdc, activateWallet, getLiveRate, sendMoney, syncWalletBalance, generatePaymentLink, listPaymentLinks, getPaymentLink, processPaymentLink, getMerchantByAccount, payToMerchantAccount, emailStatement, downloadSticker, getPublicSTKStatus, getCheckoutPreview } from '../controllers/transactionController.js';
+import { getTransactions, simulateIncomingPayment, swapKesToUsdc, activateWallet, getLiveRate, sendMoney, syncWalletBalance, generatePaymentLink, listPaymentLinks, getPaymentLink, processPaymentLink, getMerchantByAccount, payToMerchantAccount, emailStatement, downloadSticker, getPublicSTKStatus, getCheckoutPreview, createCheckoutPage, listCheckoutPages, getCheckoutPageForMerchant, updateCheckoutPage, getCheckoutPagePublic, checkoutPageCheckout } from '../controllers/transactionController.js';
 import { protectMerchant } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
+
+// The embed widget (public/paychain-button.js) now renders its own inline
+// checkout UI directly on a merchant's third-party site and calls these
+// five already-public endpoints via fetch() — that needs the browser to be
+// allowed to read the response cross-origin, which server.js's main cors()
+// deliberately does NOT allow (strict allowlist, credentials:true, gates
+// every merchant/admin route). This is a second, narrowly-scoped cors()
+// instance, mounted only on these specific paths below, not a change to the
+// global policy. Safe to leave wide open (origin: true, reflecting any
+// caller) because: (1) all five routes are already public/unauthenticated
+// and already rate-limited — this only changes whether a *browser* can read
+// the response, not whether the endpoint is reachable, which it already was
+// to any server-to-server or same-origin caller; (2) credentials: false —
+// none of these routes ever need a cookie/Authorization header, so there's
+// no credential-leak surface from reflecting an arbitrary origin. Every
+// other route in this app keeps going through only the strict global cors().
+const embedCors = cors({ origin: true, credentials: false, methods: ['GET', 'POST', 'OPTIONS'] });
 
 // sendMoney checks a 4-digit PIN inline — same brute-force exposure as
 // every other PIN-guarded endpoint in the app.
@@ -22,6 +40,14 @@ router.post('/sync-wallet', protectMerchant, syncWalletBalance);
 router.post('/send-money', protectMerchant, pinLimiter, sendMoney);
 router.post('/payment-link', protectMerchant, generatePaymentLink);
 router.get('/payment-link', protectMerchant, listPaymentLinks);
+
+// Checkout Pages — merchant-owned multi-product catalog backing the
+// "storefront" no-code embed. Management routes are merchant-authenticated;
+// the public/checkout routes below (with the other public routes) are not.
+router.post('/checkout-page', protectMerchant, createCheckoutPage);
+router.get('/checkout-page', protectMerchant, listCheckoutPages);
+router.get('/checkout-page/:pageId', protectMerchant, getCheckoutPageForMerchant);
+router.patch('/checkout-page/:pageId', protectMerchant, updateCheckoutPage);
 
 // Public payment routes — unauthenticated by design (a customer paying a
 // link/QR has no PayChain account), so both get the same throttle: without
@@ -51,9 +77,22 @@ const lookupLimiter = rateLimit({
   message: { error: 'Too many lookup attempts. Try again in 15 minutes.' },
 });
 
-// Public Payment Link Routes
+// Public Payment Link Routes — embedCors mounted via router.use (not on the
+// .get/.post calls themselves) so it also covers the OPTIONS preflight a
+// cross-origin fetch() sends first, which Express would otherwise 404
+// before ever reaching a verb-specific handler.
+router.use('/payment-link/:linkId', embedCors);
+router.use('/payment-link/:linkId/pay', embedCors);
 router.get('/payment-link/:linkId', lookupLimiter, getPaymentLink);
 router.post('/payment-link/:linkId/pay', payAccountLimiter, processPaymentLink);
+
+// Public Checkout Page routes — the storefront view a customer sees after
+// opening the embed button, and the cart submission that mints a fresh
+// PaymentLink for them to pay (see checkoutPageCheckout's doc comment).
+router.use('/checkout-page/:pageId/public', embedCors);
+router.use('/checkout-page/:pageId/checkout', embedCors);
+router.get('/checkout-page/:pageId/public', lookupLimiter, getCheckoutPagePublic);
+router.post('/checkout-page/:pageId/checkout', payAccountLimiter, checkoutPageCheckout);
 
 // Public direct-account payment — powers the static "Settlement QR" on a
 // merchant's Wallet page (open amount, no pre-generated link), as opposed
@@ -77,6 +116,7 @@ const pollStatusLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Too many status checks. Please refresh and try again shortly.' },
 });
+router.use('/public-stk-status/:checkoutId', embedCors);
 router.get('/public-stk-status/:checkoutId', pollStatusLimiter, getPublicSTKStatus);
 
 router.post('/statement/email', protectMerchant, emailStatement);

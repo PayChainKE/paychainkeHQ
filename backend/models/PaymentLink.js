@@ -37,7 +37,36 @@ const paymentLinkSchema = new mongoose.Schema({
     type: Date,
     required: true,
     index: { expires: '1m' }, // Automatically delete document after expiration + 1 minute (MongoDB TTL)
-  }
+  },
+  // Set only when this link was minted on the fly from a CheckoutPage cart
+  // (see transactionController.js's checkoutPageCheckout). Null for every
+  // other kind of payment link. Never used to decide settlement amounts —
+  // resolveStkOutcome still only ever charges/credits based on linkId/amount.
+  // It does copy these two fields onto the resulting Transaction verbatim
+  // (a pure field copy, no new logic) since this PaymentLink doc itself gets
+  // TTL-deleted ~15 minutes after creation regardless of payment outcome —
+  // Transaction is where checkout-page order history and stock counts
+  // actually live.
+  checkoutPageId: {
+    type: String,
+    default: null,
+  },
+  cartItems: {
+    type: [{
+      itemId: String,
+      name: String,
+      unitPrice: Number,
+      quantity: Number,
+      _id: false,
+    }],
+    default: undefined,
+  },
+  // Set only when the CheckoutPage that minted this link has
+  // collectBuyerName: true. Null for every other kind of payment link.
+  buyerName: {
+    type: String,
+    default: null,
+  },
 }, { timestamps: true });
 
 // Check expiration before returning

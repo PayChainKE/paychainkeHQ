@@ -26,6 +26,8 @@ const Notifications = lazy(() => import('./pages/Notifications'))
 const MyAccounts = lazy(() => import('./pages/MyAccounts'))
 const SendMoney = lazy(() => import('./pages/SendMoney'))
 const RequestMoney = lazy(() => import('./pages/RequestMoney'))
+const CheckoutPages = lazy(() => import('./pages/CheckoutPages'))
+const CartCheckoutPage = lazy(() => import('./pages/CartCheckoutPage'))
 const PaymentPage = lazy(() => import('./pages/PaymentPage'))
 const PayAccountPage = lazy(() => import('./pages/PayAccountPage'))
 const InvoiceView = lazy(() => import('./pages/InvoiceView'))
@@ -74,6 +76,7 @@ export default function App(){
               <Route path="/kyc-resubmit" element={<KycResubmit/>} />
               <Route path="/pay/account/:account" element={<PayAccountPage />} />
               <Route path="/pay/:linkId" element={<PaymentPage />} />
+              <Route path="/checkout/:pageId" element={<CartCheckoutPage />} />
               <Route path="/invoice/:publicToken" element={<InvoiceView />} />
               <Route path="/" element={<Navigate to="/overview" replace />} />
               <Route path="/overview" element={<Protected><Overview/></Protected>} />
@@ -89,6 +92,7 @@ export default function App(){
               <Route path="/notifications" element={<Protected><Notifications/></Protected>} />
               <Route path="/send-money" element={<Protected><SendMoney/></Protected>} />
               <Route path="/request-money" element={<Protected><RequestMoney/></Protected>} />
+              <Route path="/checkout-pages" element={<Protected><CheckoutPages/></Protected>} />
               {/* Catch-all route for 404s and refreshes */}
               <Route path="*" element={<Navigate to="/overview" replace />} />
             </Routes>

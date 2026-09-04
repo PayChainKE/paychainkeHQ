@@ -121,6 +121,15 @@ export default function RequestMoney() {
       color: 'bg-emerald-50',
       textColor: 'text-emerald-700',
       tag: 'Versatile'
+    },
+    {
+      id: 'checkout',
+      title: 'Checkout Page',
+      description: 'List multiple products, let customers build a cart',
+      icon: 'storefront',
+      color: 'bg-emerald-50',
+      textColor: 'text-emerald-700',
+      tag: 'For stores'
     }
   ]
 
@@ -134,6 +143,13 @@ export default function RequestMoney() {
   }
 
   const handleSelect = (opt) => {
+    // Checkout Pages are a multi-product catalog, not a single amount — they
+    // don't fit this wizard's amount/phone shape at all, so this option
+    // hands off to its own dedicated management screen instead of step 2.
+    if (opt.id === 'checkout') {
+      navigate('/checkout-pages')
+      return
+    }
     setSelectedOption(opt)
     resetForm()
     setStep(2)
@@ -353,7 +369,7 @@ export default function RequestMoney() {
 
         {/* Main Content Area */}
         {step === 1 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
             {options.map((opt) => (
               <div
                 key={opt.id}
