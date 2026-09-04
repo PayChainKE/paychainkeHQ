@@ -49,6 +49,16 @@ const Docs: React.FC = () => {
               </span>
             ))}
           </div>
+
+          <a
+            href="https://developer.paychain.co.ke/"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center justify-center gap-2 px-6 py-3 mt-8 text-sm font-bold text-white bg-[#0A192F] hover:bg-[#112240] rounded-lg transition-colors shadow-sm"
+          >
+            View Developer Docs
+            <ArrowRight className="w-4 h-4" />
+          </a>
         </div>
 
         <div className="max-w-2xl mx-auto mt-14">
