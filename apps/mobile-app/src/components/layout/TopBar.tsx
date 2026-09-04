@@ -9,9 +9,14 @@ type TopBarProps = {
   subtitle?: string;
   showBack?: boolean;
   onBack?: () => void;
+  // Shows the merchant's avatar chip in place of the text title — used on
+  // the Profile/More screen itself, where the TopBar's own avatar button
+  // (bottom right) is already suppressed since you're already there, so a
+  // plain "Profile" label was the only thing left in that slot.
+  titleAvatar?: boolean;
 };
 
-export default function TopBar({ title, subtitle, showBack = true, onBack }: TopBarProps) {
+export default function TopBar({ title, subtitle, showBack = true, onBack, titleAvatar = false }: TopBarProps) {
   const navigation = useNavigation<any>();
   const route = useRoute();
   const { merchant } = useAuth();
@@ -35,15 +40,24 @@ export default function TopBar({ title, subtitle, showBack = true, onBack }: Top
               <Feather name="arrow-left" size={18} color="#00351d" />
             </TouchableOpacity>
           )}
-          <View className="flex-1">
-            <Text numberOfLines={1} className="font-jakarta-bold text-[17px] text-[#0c2010] tracking-tight">
-              {title}
-            </Text>
-            {!!subtitle && (
-              <Text numberOfLines={1} className="text-[11px] font-jakarta-medium text-[#707971] mt-0.5">
-                {subtitle}
-              </Text>
+          <View className="flex-1 flex-row items-center gap-3">
+            {titleAvatar && (
+              <View className="w-9 h-9 rounded-full bg-[#00351d] items-center justify-center">
+                <Text className="text-white text-[12px] font-jakarta-bold">{initials}</Text>
+              </View>
             )}
+            <View className="flex-1">
+              {!titleAvatar && (
+                <Text numberOfLines={1} className="font-jakarta-bold text-[17px] text-[#0c2010] tracking-tight">
+                  {title}
+                </Text>
+              )}
+              {!!subtitle && (
+                <Text numberOfLines={1} className="text-[11px] font-jakarta-medium text-[#707971] mt-0.5">
+                  {subtitle}
+                </Text>
+              )}
+            </View>
           </View>
         </View>
 

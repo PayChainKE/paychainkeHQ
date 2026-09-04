@@ -255,16 +255,20 @@ export default function Overview() {
           {/* Tech/blockchain background art — the actual supplied image
               (cube cluster + binary digits + glow), right-anchored so its
               brightest detail sits behind the chip/wifi corner rather than
-              behind the balance text, at an opacity that still reads as
-              texture rather than a competing image. */}
-          <div
-            className="absolute inset-0 opacity-40 pointer-events-none rounded-[24px] overflow-hidden"
-            style={{
-              backgroundImage: `url(${walletCardBg})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'right center',
-            }}
-          ></div>
+              behind the balance text. Darkened (lower opacity + a dark
+              scrim on top) so the glowing cubes read as texture, not as
+              the loudest thing on the card. */}
+          <div className="absolute inset-0 pointer-events-none rounded-[24px] overflow-hidden">
+            <div
+              className="absolute inset-0 opacity-[0.14]"
+              style={{
+                backgroundImage: `url(${walletCardBg})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'right center',
+              }}
+            ></div>
+            <div className="absolute inset-0 bg-black/60"></div>
+          </div>
 
           {/* Glass Top Highlight */}
           <div className="absolute top-0 inset-x-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-400/30 to-transparent rounded-t-[24px]"></div>

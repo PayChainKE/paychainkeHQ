@@ -221,23 +221,32 @@ export default function Dashboard({ navigation }: any) {
           {/* Greeting backdrop — just page chrome now (avatar, greeting,
               eye toggle, notifications). The wallet card below is its own
               element, sized and shadowed like a real card, not stretched
-              full-bleed into this. */}
+              full-bleed into this. Gradient tones match the merchant
+              dashboard's own primary/primary-container palette for visual
+              unison between the two apps. */}
           <LinearGradient
-            colors={['#22B589', '#0b4d2e']}
+            colors={['#0b4d2e', '#00351d']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            className="px-6 pt-16 pb-24 rounded-b-[40px] z-0"
+            style={{
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.15,
+              shadowRadius: 16,
+              elevation: 6,
+            }}
+            className="px-6 pt-16 pb-10 rounded-b-[40px]"
           >
             <View className="flex-row justify-between items-center mt-4">
               <View className="flex-row items-center gap-3 pl-3">
                 <TouchableOpacity
                   onPress={() => navigation?.navigate('More')}
-                  className="w-10 h-10 rounded-full bg-white/20 items-center justify-center border border-white/30"
+                  className="w-11 h-11 rounded-2xl bg-[#5efeb3] items-center justify-center shadow-md shadow-black/20"
                 >
-                  <Text className="text-white font-jakarta-bold text-sm">{initials}</Text>
+                  <Text className="text-[#00351d] font-jakarta-extrabold text-sm">{initials}</Text>
                 </TouchableOpacity>
                 <View>
-                  <Text className="text-white/80 text-[11px] font-jakarta-bold uppercase tracking-wider mb-0.5">{greeting} 👋</Text>
+                  <Text className="text-white/70 text-[11px] font-jakarta-bold uppercase tracking-wider mb-0.5">{greeting} 👋</Text>
                   <Text className="text-white text-base font-jakarta-bold tracking-tight">{merchant?.businessName || 'Merchant'}</Text>
                 </View>
               </View>
@@ -265,7 +274,11 @@ export default function Dashboard({ navigation }: any) {
               proportion (ISO card ratio, ~1.586:1) instead of a full-bleed
               banner, with a real drop shadow so it reads as a physical
               object sitting on the page. */}
-          <View className="px-6 -mt-16 mb-10 z-10">
+          {/* Sits in normal document flow below the greeting backdrop —
+              deliberately not a negative-margin overlap onto the backdrop
+              (that positioning trick was unreliable across platforms and
+              put the card above the header bar on device). */}
+          <View className="px-6 mt-6 mb-10">
             <View style={{ position: 'relative' }}>
               {/* A second card's edge, peeking out behind the front one —
                   offset down-right and dimmer, like real cards sitting
@@ -300,30 +313,37 @@ export default function Dashboard({ navigation }: any) {
                   aspectRatio: 1.586,
                   borderRadius: 24,
                   padding: 22,
+                  overflow: 'hidden',
                   shadowColor: '#000',
                   shadowOffset: { width: 0, height: 18 },
                   shadowOpacity: 0.35,
                   shadowRadius: 28,
                   elevation: 18,
                 }}
-                className="overflow-hidden justify-between"
+                className="justify-between"
               >
+                {/* Tech/blockchain background art — the actual supplied
+                    image (cube cluster + binary digits + glow), clipped to
+                    the card's own rounded rect (the wrapper below owns the
+                    clipping, not the Image itself, since an absolutely
+                    positioned Image sizing purely from inset values is the
+                    more fragile of the two across platforms). Darkened
+                    (lower opacity + a dark scrim on top) so the glowing
+                    cubes read as texture, not as the loudest thing on the
+                    card. */}
+                <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden', borderRadius: 24 }}>
+                  <Image
+                    source={require('../../assets/wallet-card-bg.png')}
+                    resizeMode="cover"
+                    style={{ width: '100%', height: '100%', opacity: 0.14 }}
+                  />
+                  <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)' }} />
+                </View>
+
                 {/* Ambient light — the soft glow real premium card UIs use
                     to avoid a flat, single-tone fill. */}
                 <View pointerEvents="none" style={{ position: 'absolute', top: -70, right: -50, width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(94,254,179,0.14)' }} />
                 <View pointerEvents="none" style={{ position: 'absolute', bottom: -60, left: -60, width: 180, height: 180, borderRadius: 90, backgroundColor: 'rgba(255,255,255,0.04)' }} />
-
-                {/* Tech/blockchain background art — the actual supplied
-                    image (cube cluster + binary digits + glow), right-
-                    anchored so its brightest detail sits behind the
-                    chip/wifi corner rather than behind the balance text,
-                    at an opacity that still reads as texture rather than a
-                    competing image. */}
-                <Image
-                  source={require('../../assets/wallet-card-bg.png')}
-                  resizeMode="cover"
-                  style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.4 }}
-                />
 
                 <Text className="text-white/60 text-[10px] font-jakarta-bold uppercase tracking-[0.15em]">Available Balance</Text>
 
@@ -393,14 +413,16 @@ export default function Dashboard({ navigation }: any) {
 
           <FundAccountModal visible={showFundAccount} onClose={() => setShowFundAccount(false)} />
 
-          {/* Action Buttons — Fund now lives here as its own circle (gold,
-              matching the card chip) instead of the full-width button that
-              used to sit inside the card. The wallet card above now has its
-              own bottom margin (it's no longer a full-bleed hero this row
-              overlapped), so no negative offset needed here anymore. */}
+          {/* Action Buttons — Fund lives here as its own circle (gold,
+              matching the card chip) instead of a full-width button inside
+              the card. Inner-circle colors are now drawn only from the
+              shared brand palette (bright mint, secondary green, primary
+              green, gold) instead of two washed-out/unrelated tones, so the
+              row reads as one deliberate branded set rather than default
+              Material colors. */}
           <View className="px-6 flex-row justify-between mb-10 z-10">
             <TouchableOpacity className="items-center" activeOpacity={0.8} onPress={() => navigation?.navigate('Collections')}>
-              <View className="w-16 h-16 rounded-full bg-white shadow-lg shadow-black/10 items-center justify-center mb-2.5">
+              <View className="w-16 h-16 rounded-full bg-white shadow-lg shadow-black/15 items-center justify-center mb-2.5">
                 <View className="w-11 h-11 rounded-full bg-[#5efeb3] items-center justify-center">
                   <Feather name="plus-circle" size={21} color="#00351d" />
                 </View>
@@ -409,25 +431,25 @@ export default function Dashboard({ navigation }: any) {
             </TouchableOpacity>
 
             <TouchableOpacity className="items-center" activeOpacity={0.8} onPress={() => navigation?.navigate('Pay')}>
-              <View className="w-16 h-16 rounded-full bg-white shadow-lg shadow-black/10 items-center justify-center mb-2.5">
-                <View className="w-11 h-11 rounded-full bg-[#eff4ef] items-center justify-center">
-                  <MaterialIcons name="payments" size={21} color="#00351d" />
+              <View className="w-16 h-16 rounded-full bg-white shadow-lg shadow-black/15 items-center justify-center mb-2.5">
+                <View className="w-11 h-11 rounded-full bg-[#006c4e] items-center justify-center">
+                  <MaterialIcons name="payments" size={21} color="#ffffff" />
                 </View>
               </View>
               <Text className="text-[11px] font-jakarta-bold text-[#0c2010] uppercase tracking-widest">Pay</Text>
             </TouchableOpacity>
 
             <TouchableOpacity className="items-center" activeOpacity={0.8} onPress={() => navigation?.navigate('Advance')}>
-              <View className="w-16 h-16 rounded-full bg-white shadow-lg shadow-black/10 items-center justify-center mb-2.5">
-                <View className="w-11 h-11 rounded-full bg-[#e8eaf6] items-center justify-center">
-                  <Feather name="trending-up" size={21} color="#3f51b5" />
+              <View className="w-16 h-16 rounded-full bg-white shadow-lg shadow-black/15 items-center justify-center mb-2.5">
+                <View className="w-11 h-11 rounded-full bg-[#0b4d2e] items-center justify-center">
+                  <Feather name="trending-up" size={21} color="#5efeb3" />
                 </View>
               </View>
               <Text className="text-[11px] font-jakarta-bold text-[#0c2010] uppercase tracking-widest">Advance</Text>
             </TouchableOpacity>
 
             <TouchableOpacity className="items-center" activeOpacity={0.8} onPress={() => setShowFundAccount(true)}>
-              <View className="w-16 h-16 rounded-full bg-white shadow-lg shadow-black/10 items-center justify-center mb-2.5">
+              <View className="w-16 h-16 rounded-full bg-white shadow-lg shadow-black/15 items-center justify-center mb-2.5">
                 <LinearGradient
                   colors={['#f6e7b4', '#d4af37', '#a8842c']}
                   start={{ x: 0, y: 0 }}

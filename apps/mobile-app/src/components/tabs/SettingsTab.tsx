@@ -124,9 +124,20 @@ export default function SettingsTab() {
                   )}
                 </View>
                 <View className="relative">
+                  {/* Right padding reserved to match whichever overlay is
+                      showing — previously fixed at px-5 regardless, so the
+                      "eTIMS Verified" pill (the widest of the two) sat
+                      directly on top of the typed PIN's tail end instead of
+                      beside it. */}
                   <ValidatedTextInput kind="kraPin" value={kraPin} onChangeText={setKraPin}
                     placeholder="e.g. P051892647A" placeholderTextColor="#b3b9b4" editable={!kraPinLocked}
-                    className={`w-full bg-white border border-[#eff4ef] rounded-2xl py-4 px-5 text-[15px] font-jakarta-extrabold text-[#00351d] tracking-tight ${kraPinLocked ? 'bg-[#f0fdf4] text-[#707971]' : 'shadow-md shadow-[#006c4e]/10 border-[#006c4e]/30'}`} />
+                    className={`w-full bg-white border border-[#eff4ef] rounded-2xl py-4 pl-5 text-[15px] font-jakarta-extrabold text-[#00351d] tracking-tight ${
+                      kraPinLocked
+                        ? 'bg-[#f0fdf4] text-[#707971] pr-12'
+                        : merchant?.isKRAVerified && merchant?.kraPin === kraPin
+                        ? 'shadow-md shadow-[#006c4e]/10 border-[#006c4e]/30 pr-[128px]'
+                        : 'shadow-md shadow-[#006c4e]/10 border-[#006c4e]/30 pr-5'
+                    }`} />
                   {kraPinLocked && (
                     <MaterialIcons name="lock-outline" size={16} color="#b3b9b4" style={{ position: 'absolute', right: 20, top: 18 }} />
                   )}
