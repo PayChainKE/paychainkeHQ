@@ -567,7 +567,7 @@ export default function Collections() {
         onPress={() => setActiveQuickFilter(value)}
         className={`px-6 py-2.5 rounded-full mr-2 ${active ? 'bg-[#00351d] shadow-md shadow-[#00351d]/10' : 'bg-[#e7ece7]'}`}
       >
-        <Text className={`text-[13px] ${active ? 'text-white font-jakarta-bold' : 'text-[#404942] font-jakarta-semibold'}`}>{label}</Text>
+        <Text className={`text-[13px] ${active ? 'text-white font-jakarta-bold' : 'text-[#404942] font-jakarta-bold'}`}>{label}</Text>
       </TouchableOpacity>
     );
   };
@@ -591,7 +591,7 @@ export default function Collections() {
       }`}
     >
       {icon && <Feather name={icon} size={14} color={active ? '#a7f3d0' : '#707971'} />}
-      <Text className={`${icon ? 'ml-2' : ''} text-[13px] ${active ? 'text-white font-jakarta-bold' : 'text-[#404942] font-jakarta-semibold'}`}>
+      <Text className={`${icon ? 'ml-2' : ''} text-[13px] ${active ? 'text-white font-jakarta-bold' : 'text-[#404942] font-jakarta-bold'}`}>
         {label}
       </Text>
     </TouchableOpacity>
@@ -722,7 +722,7 @@ export default function Collections() {
               </View>
               <View>
                 <Text className="font-jakarta-bold text-[#0c2010] text-[14px]">Download Statement</Text>
-                <Text className="text-[#707971] text-[11px] font-jakarta-medium mt-0.5">Choose a period · PDF export</Text>
+                <Text className="text-[#707971] text-[11px] font-jakarta-bold mt-0.5">Choose a period · PDF export</Text>
               </View>
             </View>
             <Feather name="chevron-right" size={18} color="#707971" />
@@ -733,7 +733,7 @@ export default function Collections() {
             <View className="flex-1 flex-row items-center bg-white rounded-full px-4 py-3 shadow-sm border border-[#bfc9bf]/20">
               <Feather name="search" size={18} color="#707971" />
               <TextInput
-                className="flex-1 ml-2 text-[#0c2010] font-jakarta-medium text-[14px]"
+                className="flex-1 ml-2 text-[#0c2010] font-jakarta-bold text-[14px]"
                 placeholder="Search transactions..."
                 placeholderTextColor="#a1a1aa"
                 value={searchQuery}
@@ -774,7 +774,7 @@ export default function Collections() {
               <Text className="text-[11px] font-jakarta-extrabold uppercase tracking-[0.15em] text-[#707971]">
                 {currentListLabel}
               </Text>
-              <Text className="text-[11px] font-jakarta-medium text-[#707971]">{filteredTransactions.length} Results</Text>
+              <Text className="text-[11px] font-jakarta-bold text-[#707971]">{filteredTransactions.length} Results</Text>
             </View>
 
             <View className="bg-white rounded-[32px] p-2 shadow-sm border border-[#bfc9bf]/10 mb-6">
@@ -823,7 +823,7 @@ export default function Collections() {
                           {verified && <MaterialIcons name="verified" size={12} color="#006c4e" style={{ marginLeft: 4 }} />}
                         </View>
                         <Text
-                          className="text-[#707971] text-[10px] font-jakarta-medium mt-0.5"
+                          className="text-[#707971] text-[10px] font-jakarta-bold mt-0.5"
                           numberOfLines={1}
                           ellipsizeMode="tail"
                         >
@@ -846,7 +846,7 @@ export default function Collections() {
                     <Feather name="inbox" size={22} color="#707971" />
                   </View>
                   <Text className="text-[#0c2010] font-jakarta-bold text-[14px]">No transactions found</Text>
-                  <Text className="text-[#707971] font-jakarta-medium text-[12px] mt-1">Try adjusting your filters or search</Text>
+                  <Text className="text-[#707971] font-jakarta-bold text-[12px] mt-1">Try adjusting your filters or search</Text>
                   {(advancedFiltersActive || activeQuickFilter !== 'all' || searchQuery) && (
                     <TouchableOpacity
                       onPress={() => {
@@ -978,7 +978,7 @@ export default function Collections() {
                 <Feather name="file-text" size={22} color="#006c4e" />
               </View>
               <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[26px] text-[#0c2010]">Download Statement</Text>
-              <Text className="text-[13px] font-jakarta-medium text-[#707971] mt-1 text-center">
+              <Text className="text-[13px] font-jakarta-bold text-[#707971] mt-1 text-center">
                 Select a period — we'll prepare a premium PDF
               </Text>
             </View>
@@ -1027,7 +1027,7 @@ export default function Collections() {
               )}
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setShowStatementSheet(false)} className="items-center py-3 mt-2">
-              <Text className="text-[#707971] font-jakarta-semibold text-[13px]">Cancel</Text>
+              <Text className="text-[#707971] font-jakarta-bold text-[13px]">Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>

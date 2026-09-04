@@ -8,6 +8,7 @@ import { Text, TextInput } from 'react-native';
 import MobileLayout from './src/components/layout/MobileLayout';
 import AppNavigator from './src/navigation/AppNavigator';
 import { AuthProvider } from './src/context/AuthContext';
+import BrandedLoadingScreen from './src/components/BrandedLoadingScreen';
 import Sentry from './src/lib/sentry';
 
 // Prevent system text scaling and default font overrides across the entire application
@@ -32,7 +33,7 @@ function App() {
   });
 
   if (!fontsLoaded) {
-    return null;
+    return <BrandedLoadingScreen />;
   }
 
   return (

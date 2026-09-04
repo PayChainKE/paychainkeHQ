@@ -38,7 +38,7 @@ export default function SettingsTab() {
         {/* Header Section */}
         <View className="mb-8">
           <Text className="font-jakarta-extrabold text-[28px] text-[#00351d] tracking-tight leading-tight mb-2">Global Settings</Text>
-          <Text className="text-[#707971] text-[14px] font-jakarta-medium leading-relaxed opacity-80">
+          <Text className="text-[#707971] text-[14px] font-jakarta-bold leading-relaxed opacity-80">
             Manage your business profile and workspace preferences.
           </Text>
         </View>

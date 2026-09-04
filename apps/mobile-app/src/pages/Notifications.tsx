@@ -156,7 +156,7 @@ export default function Notifications({ navigation }: any) {
               <View className="w-16 h-16 rounded-full bg-white border border-[#eff4ef] items-center justify-center mb-4">
                 <Feather name="bell-off" size={24} color="#b3b9b4" />
               </View>
-              <Text className="text-[14px] text-[#707971] font-jakarta-medium">
+              <Text className="text-[14px] text-[#707971] font-jakarta-bold">
                 {filter === 'unread' ? "You're all caught up" : 'No notifications yet'}
               </Text>
             </View>
@@ -186,7 +186,7 @@ export default function Notifications({ navigation }: any) {
                               </Text>
                               {!item.read && <View className="w-2 h-2 rounded-full bg-[#006c4e]" />}
                             </View>
-                            <Text className="text-[12.5px] text-[#707971] font-jakarta-medium leading-relaxed mb-1.5">
+                            <Text className="text-[12.5px] text-[#707971] font-jakarta-bold leading-relaxed mb-1.5">
                               {item.message}
                             </Text>
                             <View className="flex-row items-center justify-between">

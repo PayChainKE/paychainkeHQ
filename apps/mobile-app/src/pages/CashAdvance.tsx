@@ -47,7 +47,7 @@ function UnavailableNotice() {
     <View className="flex-row items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 mb-6">
       <MaterialIcons name="info" size={18} color="#f59e0b" style={{ marginTop: 2 }} />
       <View className="flex-1">
-        <Text className="text-[13px] text-amber-900 font-jakarta-medium leading-relaxed">
+        <Text className="text-[13px] text-amber-900 font-jakarta-bold leading-relaxed">
           Cash advance is not available at this time. Keep using your PayChain account and check for your loan limit updates.{' '}
           <Text
             onPress={() => Linking.openURL(CASH_ADVANCE_LEARN_MORE_URL)}
@@ -68,7 +68,7 @@ function PageHeader() {
   return (
     <View className="mb-8">
       <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[30px] text-[#00351d] tracking-tight leading-tight">Cash Advance</Text>
-      <Text className="text-[#707971] text-[13px] font-jakarta-medium mt-1.5 opacity-80 leading-relaxed">
+      <Text className="text-[#707971] text-[13px] font-jakarta-bold mt-1.5 opacity-80 leading-relaxed">
         Get extra cash for your business today. We take back a small bit from your daily sales until it's paid — no paperwork needed.
       </Text>
     </View>
@@ -92,7 +92,7 @@ function StatusCard({ application, celebratory }: { application: any; celebrator
             </View>
           )}
           <Text className="font-jakarta-extrabold text-[24px] text-white tracking-tight mb-2 text-center">{meta.label}</Text>
-          <Text className="text-[13px] text-white/70 font-jakarta-medium text-center leading-relaxed max-w-[300px]">{meta.sub}</Text>
+          <Text className="text-[13px] text-white/70 font-jakarta-bold text-center leading-relaxed max-w-[300px]">{meta.sub}</Text>
         </View>
 
         {application.status === 'approved' && application.approvedLimit ? (
@@ -137,8 +137,8 @@ function DeclinedBanner({ application, onApplyAgain }: { application: any; onApp
         </View>
         <View className="flex-1">
           <Text className="font-jakarta-extrabold text-[16px] text-[#00351d] mb-1">Your previous application wasn't approved</Text>
-          <Text className="text-[13px] text-[#707971] font-jakarta-medium opacity-80 leading-relaxed mb-1">
-            {application.reviewNotes || 'Keep building your transaction history and trust score, then feel free to apply again.'}
+          <Text className="text-[13px] text-[#707971] font-jakarta-bold opacity-80 leading-relaxed mb-1">
+            {application.reviewNotes || 'Keep building your transaction history and eligibility score, then feel free to apply again.'}
           </Text>
           <TouchableOpacity onPress={onApplyAgain} className="mt-3 flex-row items-center gap-1.5">
             <Text className="text-[11px] font-jakarta-extrabold uppercase tracking-widest text-[#00351d]">Apply again</Text>
@@ -299,7 +299,7 @@ export default function CashAdvance({ navigation }: any) {
                 <MaterialIcons name="lock" size={36} color="#707971" />
               </View>
               <Text className="text-[22px] font-jakarta-extrabold text-[#00351d] mb-3 text-center">Applications Are Currently Paused</Text>
-              <Text className="text-[15px] text-[#707971] font-jakarta-medium text-center leading-relaxed max-w-[280px] opacity-80 mb-6">
+              <Text className="text-[15px] text-[#707971] font-jakarta-bold text-center leading-relaxed max-w-[280px] opacity-80 mb-6">
                 {globallyDisabled
                   ? 'Cash advance applications are temporarily paused for all merchants. Please check back later.'
                   : "Cash advance applications aren't open for your account right now. Contact support for details."}
@@ -330,9 +330,9 @@ export default function CashAdvance({ navigation }: any) {
               <View className="w-24 h-24 rounded-full bg-[#f7faf7] items-center justify-center mb-6 border border-[#eff4ef]">
                 <Feather name="shield" size={32} color="#00351d" />
               </View>
-              <Text className="text-[22px] font-jakarta-extrabold text-[#00351d] mb-3 text-center">Keep building your Trust Score</Text>
-              <Text className="text-[15px] text-[#707971] font-jakarta-medium text-center leading-relaxed max-w-[280px] opacity-80 mb-6">
-                Your Trust Score needs to reach 60 before you can get a Cash Advance. Keep transacting through your PayChain account and your score will keep going up!
+              <Text className="text-[22px] font-jakarta-extrabold text-[#00351d] mb-3 text-center">Keep building your Eligibility Score</Text>
+              <Text className="text-[15px] text-[#707971] font-jakarta-bold text-center leading-relaxed max-w-[280px] opacity-80 mb-6">
+                Your Eligibility Score needs to reach 60 before you can get a Cash Advance. Keep transacting through your PayChain account and your score will keep going up!
               </Text>
               <TouchableOpacity
                 onPress={() => Linking.openURL(CASH_ADVANCE_LEARN_MORE_URL)}
@@ -395,8 +395,8 @@ export default function CashAdvance({ navigation }: any) {
 
             <View className="items-center mb-8">
               <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[28px] text-[#00351d] tracking-tight mb-2 text-center">Cash Advance Application</Text>
-              <Text className="text-[#707971] font-jakarta-medium opacity-70 text-center text-[13px] leading-relaxed max-w-[280px]">
-                A quick, three-step application. Based on your Trust Score of {trustData.current}, our credit team will review and respond within 1-2 business days.
+              <Text className="text-[#707971] font-jakarta-bold opacity-70 text-center text-[13px] leading-relaxed max-w-[280px]">
+                A quick, three-step application. Based on your Eligibility Score of {trustData.current}, our credit team will review and respond within 1-2 business days.
               </Text>
             </View>
 
@@ -458,7 +458,7 @@ export default function CashAdvance({ navigation }: any) {
                       placeholder="e.g. Restocking inventory ahead of the festive season..."
                       placeholderTextColor="#a1a1aa"
                       textAlignVertical="top"
-                      className="bg-[#f7faf7] border border-[#eff4ef] rounded-3xl px-6 py-5 text-[14px] font-jakarta-medium text-[#00351d] min-h-[110px]"
+                      className="bg-[#f7faf7] border border-[#eff4ef] rounded-3xl px-6 py-5 text-[14px] font-jakarta-bold text-[#00351d] min-h-[110px]"
                     />
                   </View>
                 </View>
@@ -498,7 +498,7 @@ export default function CashAdvance({ navigation }: any) {
                       onChangeText={setBusinessAddress}
                       placeholder="Optional"
                       placeholderTextColor="#a1a1aa"
-                      className="bg-[#f7faf7] border border-[#eff4ef] rounded-3xl px-5 py-4 text-[14px] font-jakarta-medium text-[#00351d]"
+                      className="bg-[#f7faf7] border border-[#eff4ef] rounded-3xl px-5 py-4 text-[14px] font-jakarta-bold text-[#00351d]"
                     />
                   </View>
 
@@ -524,7 +524,7 @@ export default function CashAdvance({ navigation }: any) {
                       <MaterialIcons name="fact-check" size={26} color="#00351d" />
                     </View>
                     <Text className="text-[18px] font-jakarta-extrabold text-[#00351d] mb-1">Review your application</Text>
-                    <Text className="text-[13px] text-[#707971] font-jakarta-medium opacity-70">Double-check the details below before submitting.</Text>
+                    <Text className="text-[13px] text-[#707971] font-jakarta-bold opacity-70">Double-check the details below before submitting.</Text>
                   </View>
 
                   <View className="bg-[#f7faf7] rounded-3xl border border-[#eff4ef]">
@@ -535,10 +535,10 @@ export default function CashAdvance({ navigation }: any) {
                     {!!yearsInOperation && <SummaryRow label="Years in operation" value={yearsInOperation} />}
                     {!!businessAddress && <SummaryRow label="Business address" value={businessAddress} />}
                     {!!contactPhone && <SummaryRow label="Contact number" value={contactPhone} />}
-                    <SummaryRow label="Current Trust Score" value={`${trustData.current} / 100`} isLast />
+                    <SummaryRow label="Current Eligibility Score" value={`${trustData.current} / 100`} isLast />
                   </View>
 
-                  <Text className="text-[11px] text-[#707971]/60 font-jakarta-medium text-center leading-relaxed px-4">
+                  <Text className="text-[11px] text-[#707971]/60 font-jakarta-bold text-center leading-relaxed px-4">
                     By submitting, you confirm the information above is accurate. Our credit team will review your application and get back to you within 1-2 business days.
                   </Text>
                 </View>
@@ -546,7 +546,7 @@ export default function CashAdvance({ navigation }: any) {
 
               {!!formError && (
                 <View className="bg-[#fef2f2] border border-[#fecaca] rounded-2xl px-4 py-3 mt-6">
-                  <Text className="text-[#b91c1c] text-[12px] font-jakarta-semibold">{formError}</Text>
+                  <Text className="text-[#b91c1c] text-[12px] font-jakarta-bold">{formError}</Text>
                 </View>
               )}
 
@@ -608,8 +608,8 @@ export default function CashAdvance({ navigation }: any) {
                 <MaterialIcons name="verified" size={36} color="#5efeb3" />
               </View>
               <Text className="font-jakarta-extrabold text-[24px] text-white tracking-tight mb-2 text-center">You are Eligible!</Text>
-              <Text className="text-[14px] text-white/70 font-jakarta-medium text-center max-w-[300px] leading-relaxed mb-8">
-                Based on your Trust Score of {trustData.current}, you are eligible to apply for a cash advance. Complete a short application and our lending team will review it within 1-2 business days.
+              <Text className="text-[14px] text-white/70 font-jakarta-bold text-center max-w-[300px] leading-relaxed mb-8">
+                Based on your Eligibility Score of {trustData.current}, you are eligible to apply for a cash advance. Complete a short application and our lending team will review it within 1-2 business days.
               </Text>
               <TouchableOpacity onPress={startForm} className="bg-[#5efeb3] px-8 py-4 rounded-xl w-full items-center">
                 <Text className="text-[#00351d] font-jakarta-extrabold text-[12px] uppercase tracking-widest">Start Application</Text>

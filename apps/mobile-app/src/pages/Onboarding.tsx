@@ -22,11 +22,6 @@ const ONBOARDING_DATA = [
     image: require('../../assets/vectors/bulk payout.png')
   },
   {
-    title: 'Inflation Shield',
-    description: 'Protect your revenue using secure stablecoin balances.',
-    image: require('../../assets/vectors/inflation shield.png')
-  },
-  {
     title: 'Cash Advance',
     description: 'Access instant, collateral-free credit to grow your business.',
     image: require('../../assets/vectors/grow.png')
@@ -75,7 +70,7 @@ export default function Onboarding({ navigation }: any) {
           <Text className="text-[#0c2010] text-[32px] font-jakarta-bold text-center mb-4 tracking-tight">
             {currentSlide.title}
           </Text>
-          <Text className="text-[#707971] text-[16px] font-jakarta-medium text-center leading-relaxed px-4">
+          <Text className="text-[#707971] text-[16px] font-jakarta-bold text-center leading-relaxed px-4">
             {currentSlide.description}
           </Text>
         </View>

@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, ActivityIndicator, Platform } from 'react
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store';
+import { usePreventScreenCapture } from 'expo-screen-capture';
 import { useAuth } from '../context/AuthContext';
 import { useBiometrics, biometricLabel } from '../hooks/useBiometrics';
 import { showAlert } from '../utils/alert';
@@ -70,6 +71,7 @@ function formatRetryTime(ms: number): string {
 }
 
 export default function PinEntry({ navigation }: any) {
+  usePreventScreenCapture(); // no-op on web, same as the SecureStore guards above
   const { appPin, unlockApp, logout, isBiometricsEnabled } = useAuth();
   const { support, authenticate } = useBiometrics();
   const [pin, setPin] = useState('');
@@ -176,7 +178,7 @@ export default function PinEntry({ navigation }: any) {
         <Text className="text-white text-[24px] font-jakarta-bold mb-2">
           Unlock PayChain
         </Text>
-        <Text className={`text-[14px] font-jakarta-medium text-center mb-8 ${isLocked ? 'text-red-400' : 'text-[#68dbae]'}`}>
+        <Text className={`text-[14px] font-jakarta-bold text-center mb-8 ${isLocked ? 'text-red-400' : 'text-[#68dbae]'}`}>
           {isLocked
             ? `Too many incorrect attempts. Try again in ${formatRetryTime(lockedUntil! - now)}.`
             : 'Enter your 4-digit PIN to access your dashboard.'}

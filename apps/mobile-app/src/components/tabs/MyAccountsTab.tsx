@@ -102,7 +102,7 @@ export default function MyAccountsTab() {
         {/* Page Header */}
         <View className="mb-6">
           <Text className="font-jakarta-extrabold text-[28px] text-[#00351d] tracking-tight leading-tight mb-2">My Accounts</Text>
-          <Text className="text-[#707971] text-[14px] font-jakarta-medium leading-relaxed opacity-80">
+          <Text className="text-[#707971] text-[14px] font-jakarta-bold leading-relaxed opacity-80">
             Manage your registered PayChain accounts, linked transfer accounts, and assigned managers.
           </Text>
         </View>
@@ -112,7 +112,7 @@ export default function MyAccountsTab() {
           <Feather name="search" size={20} color="#b3b9b4" style={{ position: 'absolute', left: 16, top: 16, zIndex: 1 }} />
           <TextInput
             placeholder="Search accounts..."
-            className="w-full bg-white border border-[#eff4ef] rounded-2xl py-4 pl-12 pr-4 text-[15px] font-jakarta-medium text-[#00351d]"
+            className="w-full bg-white border border-[#eff4ef] rounded-2xl py-4 pl-12 pr-4 text-[15px] font-jakarta-bold text-[#00351d]"
             value={searchTerm}
             onChangeText={setSearchTerm}
             placeholderTextColor="#b3b9b4"
@@ -164,7 +164,7 @@ export default function MyAccountsTab() {
                   <View className="flex-row justify-between items-center">
                     <View className="flex-row items-center gap-2">
                       <MaterialIcons name="account-balance" size={14} color="#707971" />
-                      <Text className="text-[12px] text-[#707971] font-jakarta-medium">{account.linkedTransferAccount}</Text>
+                      <Text className="text-[12px] text-[#707971] font-jakarta-bold">{account.linkedTransferAccount}</Text>
                     </View>
                     <Feather name="chevron-right" size={18} color="#b3b9b4" />
                   </View>

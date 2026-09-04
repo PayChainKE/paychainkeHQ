@@ -291,43 +291,24 @@ export default function Overview() {
             <div className="flex-1">
               <p className="text-white/60 text-[9px] lg:text-[10px] font-bold uppercase tracking-[0.15em] mb-1.5">Available Balance</p>
 
-              {/* Balance on the left, chip + contactless icon on the right
-                  — beside the amount rather than stacked above it. */}
-              <div className="flex items-start justify-between gap-4">
-                <h3 className={`font-headline font-bold text-3xl lg:text-4xl tracking-tighter tabular-nums mb-1 transition-all duration-300 ${!showAmounts && 'blur-lg grayscale'}`}>
-                  {formatKES(merchant?.kesBalance || 0)}
-                </h3>
-
-                <div className="flex flex-col items-center gap-2 pt-1 shrink-0">
-                  {/* Contactless indicator — the Material Symbols "wifi"
-                      glyph rotated 90° reads as the standard tap-to-pay
-                      icon. Sits above the chip, the same order a real card
-                      prints it in (contactless mark near the top edge,
-                      chip below). */}
-                  <span className="material-symbols-outlined text-white/65 text-[19px] leading-none" style={{ transform: 'rotate(90deg)' }}>wifi</span>
-                  {/* EMV-style chip — left plain gold, same as a real chip:
-                      banks never brand the chip itself, so this reads more
-                      authentic without a logo on it. */}
-                  <div
-                    className="w-[42px] h-[32px] rounded-[7px] relative overflow-hidden"
-                    style={{ background: 'linear-gradient(135deg, #f6e7b4, #d4af37 55%, #a8842c)' }}
-                  >
-                    <div className="absolute inset-x-0 top-[6px] h-px bg-black/20" />
-                    <div className="absolute inset-x-0 bottom-[6px] h-px bg-black/20" />
-                    <div className="absolute inset-y-0 left-1/2 w-px bg-black/15" />
-                  </div>
-                </div>
-              </div>
+              {/* Chip/contactless icons removed: this is a paybill/virtual-
+                  account wallet, not an issued card, so those symbols
+                  implied a tap/insert capability that doesn't actually
+                  exist here. */}
+              <h3 className={`font-headline font-bold text-3xl lg:text-4xl tracking-tighter tabular-nums mb-1 transition-all duration-300 ${!showAmounts && 'blur-lg grayscale'}`}>
+                {formatKES(merchant?.kesBalance || 0)}
+              </h3>
 
               <div className={`flex items-center gap-2 text-[#5EFEB3] font-bold text-[9px] lg:text-[10px] tracking-wide transition-all duration-300 mb-3 ${!showAmounts && 'blur-sm grayscale'}`}>
                 <span className="material-symbols-outlined text-[10px]" style={{ fontVariationSettings: "'FILL' 1" }}>trending_up</span>
                 <span>+{formatKES(todaysRevenue)} today</span>
               </div>
-              {/* Card-number-style account line — wide letter-spacing and no
-                  pill/border, the same treatment a physical card's embossed
-                  digits get, instead of a small badge tucked in the corner. */}
+              {/* Account line — wide letter-spacing for legibility, no
+                  pill/border. Icon is account_balance, not credit_card:
+                  this is a paybill/virtual-account number, not a card
+                  number, so the icon shouldn't imply otherwise. */}
               <div className="flex items-center gap-2 text-white/50">
-                <span className="material-symbols-outlined text-[13px] leading-none">credit_card</span>
+                <span className="material-symbols-outlined text-[13px] leading-none">account_balance</span>
                 <span className="text-[12px] lg:text-[13px] font-bold tracking-[0.2em] tabular-nums">
                   {formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending')}
                 </span>

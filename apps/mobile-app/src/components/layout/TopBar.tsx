@@ -53,7 +53,7 @@ export default function TopBar({ title, subtitle, showBack = true, onBack, title
                 </Text>
               )}
               {!!subtitle && (
-                <Text numberOfLines={1} className="text-[11px] font-jakarta-medium text-[#707971] mt-0.5">
+                <Text numberOfLines={1} className="text-[11px] font-jakarta-bold text-[#707971] mt-0.5">
                   {subtitle}
                 </Text>
               )}

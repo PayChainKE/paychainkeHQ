@@ -198,7 +198,7 @@ export default function FundAccountModal({ visible, onClose }: { visible: boolea
                       </View>
                       <View>
                         <Text className="font-jakarta-bold text-[15px] text-[#0c2010]">{m.name}</Text>
-                        <Text className="text-[11px] text-[#707971] font-jakarta-medium">{m.desc}</Text>
+                        <Text className="text-[11px] text-[#707971] font-jakarta-bold">{m.desc}</Text>
                       </View>
                     </View>
                     <Feather name="chevron-right" size={18} color="#b3b9b4" />
@@ -212,7 +212,7 @@ export default function FundAccountModal({ visible, onClose }: { visible: boolea
                     <Feather name="send" size={32} color="#059669" />
                   </View>
                   <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[22px] text-[#0c2010] mb-1">Check Your Phone</Text>
-                  <Text className="text-[13px] text-[#707971] font-jakarta-medium text-center mb-4">
+                  <Text className="text-[13px] text-[#707971] font-jakarta-bold text-center mb-4">
                     An M-PESA prompt has been sent to <Text className="font-jakarta-extrabold text-[#0c2010]">{phone}</Text>.{'\n'}Enter your PIN to complete the top-up.
                   </Text>
                   <View className="flex-row items-center gap-2 mb-4">
@@ -230,13 +230,13 @@ export default function FundAccountModal({ visible, onClose }: { visible: boolea
                     <Feather name="check-circle" size={40} color="#059669" />
                   </View>
                   <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[22px] text-[#0c2010] mb-1">Top-Up Received!</Text>
-                  <Text className="text-[13px] text-[#707971] font-jakarta-medium">{formatKES(amount)} added to your account.</Text>
+                  <Text className="text-[13px] text-[#707971] font-jakarta-bold">{formatKES(amount)} added to your account.</Text>
                 </View>
               ) : (
                 <View className="gap-5">
                   <View className="bg-[#e7f8ef] p-4 rounded-2xl border border-emerald-100 flex-row items-start gap-3">
                     <Feather name="smartphone" size={15} color="#059669" style={{ marginTop: 1 }} />
-                    <Text className="flex-1 text-[12px] text-[#065f46] font-jakarta-medium leading-relaxed">
+                    <Text className="flex-1 text-[12px] text-[#065f46] font-jakarta-bold leading-relaxed">
                       Enter the amount and your mobile number. We'll send an <Text className="font-jakarta-extrabold">STK Push</Text> to your phone for instant top-up.
                     </Text>
                   </View>
@@ -280,14 +280,14 @@ export default function FundAccountModal({ visible, onClose }: { visible: boolea
                       </>
                     )}
                   </TouchableOpacity>
-                  <Text className="text-center text-[10px] text-[#a1a1aa] font-jakarta-medium">Secured by M-PESA · No PIN shared with PayChain</Text>
+                  <Text className="text-center text-[10px] text-[#a1a1aa] font-jakarta-bold">Secured by M-PESA · No PIN shared with PayChain</Text>
                 </View>
               )
             ) : method === 'bank' ? (
               <View>
                 <View className="bg-[#e7f8ef] border border-emerald-100 rounded-2xl p-4 mb-5 flex-row items-start gap-3">
                   <Feather name="info" size={15} color="#059669" style={{ marginTop: 1 }} />
-                  <Text className="flex-1 text-[12px] text-[#065f46] font-jakarta-medium leading-relaxed">
+                  <Text className="flex-1 text-[12px] text-[#065f46] font-jakarta-bold leading-relaxed">
                     {merchant?.ncbaVirtualAccountNumber
                       ? 'Pay via M-Pesa Paybill above, or transfer directly from your bank using this account number. Funds reflect automatically once cleared.'
                       : ncbaAccountIsUsable
@@ -307,7 +307,7 @@ export default function FundAccountModal({ visible, onClose }: { visible: boolea
               <View>
                 <View className="bg-[#e7f8ef] border border-emerald-100 rounded-2xl p-4 mb-5 flex-row items-start gap-3">
                   <Feather name="info" size={15} color="#059669" style={{ marginTop: 1 }} />
-                  <Text className="flex-1 text-[12px] text-[#065f46] font-jakarta-medium leading-relaxed">
+                  <Text className="flex-1 text-[12px] text-[#065f46] font-jakarta-bold leading-relaxed">
                     {ncbaAccountIsUsable
                       ? 'Share these steps with your customers, or use them yourself to top up — funds reflect on your balance automatically once M-PESA confirms.'
                       : 'Your dedicated account number is still being assigned — this account is not ready to receive Paybill payments yet.'}
@@ -320,7 +320,7 @@ export default function FundAccountModal({ visible, onClose }: { visible: boolea
                       <View className="w-6 h-6 rounded-full bg-[#00351d] items-center justify-center mt-0.5">
                         <Text className="text-[#5efeb3] text-[11px] font-jakarta-extrabold">{i + 1}</Text>
                       </View>
-                      <Text className="flex-1 text-[13px] font-jakarta-medium text-[#0c2010] leading-relaxed">{step}</Text>
+                      <Text className="flex-1 text-[13px] font-jakarta-bold text-[#0c2010] leading-relaxed">{step}</Text>
                     </View>
                   ))}
                 </View>
