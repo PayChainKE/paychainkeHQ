@@ -23,6 +23,8 @@ import TermsOfService from "@/pages/TermsOfService";
 import Signup from "@/pages/auth/Signup";
 import Login from "@/pages/auth/Login";
 import VerifyOtp from "@/pages/auth/VerifyOtp";
+import ForgotPassword from "@/pages/auth/ForgotPassword";
+import ResetPassword from "@/pages/auth/ResetPassword";
 import Overview from "@/pages/dashboard/Overview";
 import ApiKeys from "@/pages/dashboard/ApiKeys";
 import DashboardWebhooks from "@/pages/dashboard/Webhooks";
@@ -72,6 +74,8 @@ export default function App() {
             <Route path="/signup" element={<Signup />} />
             <Route path="/login" element={<Login />} />
             <Route path="/verify-email" element={<VerifyOtp />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
 
             <Route element={<DashboardPages />}>
               <Route path="/dashboard" element={<Overview />} />
