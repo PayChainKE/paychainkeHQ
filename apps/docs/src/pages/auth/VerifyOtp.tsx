@@ -79,7 +79,7 @@ export default function VerifyOtp() {
         <button
           type="submit"
           disabled={loading || otp.length !== 6}
-          className="w-full mt-2 px-4 py-2.5 rounded-lg bg-brand text-white text-[14px] font-semibold hover:bg-brand-dim transition-colors disabled:opacity-60"
+          className="w-full mt-2 px-4 py-2.5 rounded-lg bg-brand text-white text-[14px] font-semibold shadow-sm shadow-brand/30 hover:bg-brand-dim hover:shadow-md hover:shadow-brand/30 transition-all disabled:opacity-60 disabled:shadow-none"
         >
           {loading ? "Verifying…" : "Verify and continue"}
         </button>

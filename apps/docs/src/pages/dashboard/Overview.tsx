@@ -29,6 +29,7 @@ export default function Overview() {
     { done: linked === true, label: "Link a merchant account" },
     { done: null, label: "Create a test-mode key and make your first call" },
   ];
+  const doneCount = steps.filter((s) => s.done).length;
 
   return (
     <>
@@ -36,7 +37,16 @@ export default function Overview() {
       <p className="text-[14px] text-ink-muted mb-8">{developer.companyName} · {developer.email}</p>
 
       <div className="rounded-xl border border-border bg-surface p-4 mb-8">
-        <p className="text-[11px] font-bold uppercase tracking-widest text-ink-faint mb-3">Setup checklist</p>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-ink-faint">Setup checklist</p>
+          <p className="text-[11px] font-semibold text-ink-faint tabular-nums">{doneCount}/{steps.length}</p>
+        </div>
+        <div className="h-1 rounded-full bg-surface-raised overflow-hidden mb-4">
+          <div
+            className="h-full rounded-full bg-brand transition-all duration-300"
+            style={{ width: `${(doneCount / steps.length) * 100}%` }}
+          />
+        </div>
         <div className="space-y-2.5">
           {steps.map((s) => (
             <div key={s.label} className="flex items-center gap-2.5">
@@ -63,7 +73,7 @@ export default function Overview() {
             <Link
               key={c.to}
               to={c.to}
-              className="group flex items-start gap-3 p-4 rounded-xl border border-border bg-surface hover:border-brand/30 hover:bg-surface-raised transition-all"
+              className="group flex items-start gap-3 p-4 rounded-xl border border-border bg-surface hover:border-brand/30 hover:bg-surface-raised hover:shadow-md hover:shadow-black/[0.03] dark:hover:shadow-black/20 hover:-translate-y-0.5 transition-all"
             >
               <div className="w-9 h-9 rounded-lg bg-surface-raised border border-border-subtle flex items-center justify-center shrink-0 group-hover:border-brand/30">
                 <Icon className="w-4 h-4 text-brand-bright" />
