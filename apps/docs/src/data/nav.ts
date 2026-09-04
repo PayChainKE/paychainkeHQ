@@ -14,7 +14,7 @@ export const nav: NavGroup[] = [
     label: "Get started",
     items: [
       { title: "Introduction", path: "/", description: "What the PayChain API does and how the pieces fit together." },
-      { title: "No-code integration", path: "/no-code-integration", description: "Add a working payment button to Wix, Shopify, or WordPress — no code, no developer account." },
+      { title: "No-code integration", path: "/no-code-integration", description: "Add a working payment button to Wix, Shopify, or WordPress. No code, no developer account." },
       { title: "Integration guide", path: "/integration-guide", description: "The account model, the sandbox, and the full path from signup to live traffic." },
       { title: "Authentication", path: "/authentication", description: "Test vs. live API keys, and how to send them." },
     ],

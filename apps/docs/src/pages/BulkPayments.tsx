@@ -12,14 +12,14 @@ export default function BulkPayments() {
       <h1 className="text-3xl font-extrabold text-ink tracking-tight mb-4">Bulk Payments</h1>
       <p>
         Pay many destinations in one call: monthly payroll, a batch of contractor or vendor
-        settlements, or a mix of both — to any combination of mobile wallets, Paybills, Tills, and
+        settlements, or a mix of both, to any combination of mobile wallets, Paybills, Tills, and
         bank accounts. One PIN entry, one idempotency key, one response with a per-row result.
         Base path <code>https://api.paychain.co.ke/api/v1/developer</code>.
       </p>
 
       <Callout variant="warning" title="Utility bill payments aren't on the API yet">
         KPLC and water-utility bulk payments are currently only available from the PayChain
-        merchant dashboard's Bulk Pay page — there's no API endpoint for those specific rails yet.
+        merchant dashboard's Bulk Pay page; there's no API endpoint for those specific rails yet.
         Employee, contractor, and vendor payments below are fully live.
       </Callout>
 
@@ -34,7 +34,7 @@ export default function BulkPayments() {
 
       <ParamsTable
         params={[
-          { name: "payments", type: "array", required: true, description: "1–200 payment objects, each shaped like a single Send Money payout (see below)." },
+          { name: "payments", type: "array", required: true, description: "1 to 200 payment objects, each shaped like a single Send Money payout (see below)." },
           { name: "apiPayoutPin", type: "string", required: true, description: "Required in live mode only. Checked once for the whole batch, not per row." },
         ]}
       />
@@ -43,16 +43,16 @@ export default function BulkPayments() {
       <ParamsTable
         params={[
           { name: "amount", type: "number", required: true, description: "For payeeType \"employee\": gross pay before deductions. For \"contract\": the exact amount paid, no deductions." },
-          { name: "payeeType", type: "\"employee\" | \"contract\"", description: "Defaults to \"contract\". \"employee\" rows are automatically PAYE/NSSF/SHIF-deducted — see below — and must be paid to a phone (mobile money); no other destination type is valid for payroll." },
+          { name: "payeeType", type: "\"employee\" | \"contract\"", description: "Defaults to \"contract\". \"employee\" rows are automatically PAYE/NSSF/SHIF-deducted (see below) and must be paid to a phone (mobile money); no other destination type is valid for payroll." },
           { name: "narration", type: "string", description: "Shown on the receiving statement. Defaults to \"Developer API bulk payout\"." },
           { name: "bankCode + accountNumber / phone / paybillNumber + accountReference / tillNumber", type: "destination", description: "Exactly one, same rules as a single Send Money payout." },
         ]}
       />
 
-      <Callout variant="info" title="Employee rows are real payroll — statutory deductions included">
+      <Callout variant="info" title="Employee rows are real payroll: statutory deductions included">
         Send the gross salary as <code>amount</code>. PayChain computes real PAYE, NSSF, and SHIF
-        (the same calculator the dashboard's own Bulk Pay CSV upload uses) and pays out the net —
-        never the raw amount you sent — to the employee's phone. The breakdown comes back on each
+        (the same calculator the dashboard's own Bulk Pay CSV upload uses) and pays out the net,
+        never the raw amount you sent, to the employee's phone. The breakdown comes back on each
         row as <code>grossAmount</code> and <code>taxDeductions</code>.
       </Callout>
 
@@ -67,8 +67,8 @@ curl -X POST https://api.paychain.co.ke/api/v1/developer/bulk-payments \\
   -d '{
     "apiPayoutPin": "4821",
     "payments": [
-      { "payeeType": "employee", "amount": 65000, "phone": "0712345678", "narration": "August salary — J. Njeri" },
-      { "payeeType": "employee", "amount": 48000, "phone": "0798765432", "narration": "August salary — O. Kiptoo" },
+      { "payeeType": "employee", "amount": 65000, "phone": "0712345678", "narration": "August salary (J. Njeri)" },
+      { "payeeType": "employee", "amount": 48000, "phone": "0798765432", "narration": "August salary (O. Kiptoo)" },
       { "payeeType": "contract", "amount": 22000, "tillNumber": "654321", "narration": "Freelance design work" }
     ]
   }'`,
@@ -85,8 +85,8 @@ const res = await fetch('https://api.paychain.co.ke/api/v1/developer/bulk-paymen
   body: JSON.stringify({
     apiPayoutPin: '4821',
     payments: [
-      { payeeType: 'employee', amount: 65000, phone: '0712345678', narration: 'August salary — J. Njeri' },
-      { payeeType: 'employee', amount: 48000, phone: '0798765432', narration: 'August salary — O. Kiptoo' },
+      { payeeType: 'employee', amount: 65000, phone: '0712345678', narration: 'August salary (J. Njeri)' },
+      { payeeType: 'employee', amount: 48000, phone: '0798765432', narration: 'August salary (O. Kiptoo)' },
       { payeeType: 'contract', amount: 22000, tillNumber: '654321', narration: 'Freelance design work' },
     ],
   }),
@@ -107,8 +107,8 @@ res = requests.post(
     json={
         'apiPayoutPin': '4821',
         'payments': [
-            {'payeeType': 'employee', 'amount': 65000, 'phone': '0712345678', 'narration': 'August salary — J. Njeri'},
-            {'payeeType': 'employee', 'amount': 48000, 'phone': '0798765432', 'narration': 'August salary — O. Kiptoo'},
+            {'payeeType': 'employee', 'amount': 65000, 'phone': '0712345678', 'narration': 'August salary (J. Njeri)'},
+            {'payeeType': 'employee', 'amount': 48000, 'phone': '0798765432', 'narration': 'August salary (O. Kiptoo)'},
             {'payeeType': 'contract', 'amount': 22000, 'tillNumber': '654321', 'narration': 'Freelance design work'},
         ],
     },
@@ -131,8 +131,8 @@ curl_setopt_array($ch, [
     CURLOPT_POSTFIELDS => json_encode([
         'apiPayoutPin' => '4821',
         'payments' => [
-            ['payeeType' => 'employee', 'amount' => 65000, 'phone' => '0712345678', 'narration' => 'August salary — J. Njeri'],
-            ['payeeType' => 'employee', 'amount' => 48000, 'phone' => '0798765432', 'narration' => 'August salary — O. Kiptoo'],
+            ['payeeType' => 'employee', 'amount' => 65000, 'phone' => '0712345678', 'narration' => 'August salary (J. Njeri)'],
+            ['payeeType' => 'employee', 'amount' => 48000, 'phone' => '0798765432', 'narration' => 'August salary (O. Kiptoo)'],
             ['payeeType' => 'contract', 'amount' => 22000, 'tillNumber' => '654321', 'narration' => 'Freelance design work'],
         ],
     ]),
@@ -155,8 +155,8 @@ req = Net::HTTP::Post.new(uri, {
 req.body = {
   apiPayoutPin: '4821',
   payments: [
-    { payeeType: 'employee', amount: 65000, phone: '0712345678', narration: 'August salary — J. Njeri' },
-    { payeeType: 'employee', amount: 48000, phone: '0798765432', narration: 'August salary — O. Kiptoo' },
+    { payeeType: 'employee', amount: 65000, phone: '0712345678', narration: 'August salary (J. Njeri)' },
+    { payeeType: 'employee', amount: 48000, phone: '0798765432', narration: 'August salary (O. Kiptoo)' },
     { payeeType: 'contract', amount: 22000, tillNumber: '654321', narration: 'Freelance design work' },
   ],
 }.to_json
@@ -216,7 +216,7 @@ batch_id, payments = body['batchId'], body['payments']`,
         <code>amount</code> on an employee row is the real net figure that was actually paid, not
         what you sent. Mobile money and Paybill/Till rows start <code>pending</code> and resolve
         asynchronously (same as a single payout); Till and bank rows can resolve synchronously.
-        <strong> One row failing doesn't fail the batch</strong> — check each row's own{" "}
+        <strong> One row failing doesn't fail the batch:</strong> check each row's own{" "}
         <code>status</code>/<code>failureReason</code> rather than assuming a <code>201</code>
         means every payment went through.
       </p>
@@ -225,7 +225,7 @@ batch_id, payments = body['batchId'], body['payments']`,
         The merchant's daily API payout cap is checked against the batch's total <em>net</em>{" "}
         spend (post-tax for employee rows), and the per-transaction cap against each row's net
         amount individually. A batch that would exceed either is rejected in full,{" "}
-        <em>before</em> any row is paid — never a partial batch because the cap was hit halfway
+        <em>before</em> any row is paid; never a partial batch because the cap was hit halfway
         through.
       </Callout>
 
@@ -250,14 +250,14 @@ batch_id, payments = body['batchId'], body['payments']`,
       />
       <p>
         See <Link to="/send-money">Send Money</Link> for every other field (<code>id</code>,{" "}
-        <code>mode</code>, <code>status</code>, <code>counterparty</code>, etc.) — identical
+        <code>mode</code>, <code>status</code>, <code>counterparty</code>, etc.), identical
         meaning here.
       </p>
 
       <h2>Webhooks</h2>
       <p>
         Each row fires its own <code>payment.payout.succeeded</code> /{" "}
-        <code>payment.payout.failed</code> event as it resolves — the exact same events a single
+        <code>payment.payout.failed</code> event as it resolves, the exact same events a single
         Send Money payout fires, so nothing about your webhook handler needs to change. Once every
         row has settled, one summary <code>bulk_payment.completed</code> event fires with the
         batch's final tally. See <Link to="/webhooks">Webhooks</Link>.

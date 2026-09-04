@@ -8,8 +8,8 @@ export default function TermsOfService() {
       <p className="text-[13px] text-ink-faint">Last updated August 20, 2026 · Developer &amp; API addendum</p>
 
       <Callout variant="info" title="This page covers the Developer API specifically">
-        For PayChain's full Terms of Service — covering the merchant dashboard, account
-        eligibility, and platform-wide terms — see the{" "}
+        For PayChain's full Terms of Service (covering the merchant dashboard, account
+        eligibility, and platform-wide terms), see the{" "}
         <a href="https://paychain.co.ke/terms-of-service">canonical Terms of Service</a> at
         paychain.co.ke. This page adds what's specific to using the Developer API.
       </Callout>
@@ -17,8 +17,8 @@ export default function TermsOfService() {
       <h2>Using the API</h2>
       <ul>
         <li>A developer account must be linked to a real, active PayChain merchant account before any API call that touches money (collections, payouts, invoices, bulk payments) will work.</li>
-        <li><strong>Live</strong> API keys require the linked merchant to explicitly enable API access, and — for payouts — set an API payout PIN and per-transaction/daily caps from their dashboard. You may not attempt to circumvent those caps.</li>
-        <li><strong>Test</strong> keys work immediately, with no approval needed, and simulate every request — no real rail is touched and no real balance changes.</li>
+        <li><strong>Live</strong> API keys require the linked merchant to explicitly enable API access, and (for payouts) set an API payout PIN and per-transaction/daily caps from their dashboard. You may not attempt to circumvent those caps.</li>
+        <li><strong>Test</strong> keys work immediately, with no approval needed, and simulate every request: no real rail is touched and no real balance changes.</li>
         <li>You're responsible for the security of your API keys and webhook secrets. Treat a live key with the same care as a password: never commit it to a public repository, never expose it in client-side code.</li>
       </ul>
 
@@ -32,12 +32,12 @@ export default function TermsOfService() {
 
       <h2>Liability for API usage</h2>
       <p>
-        PayChain processes exactly what your integration submits — an amount, a destination, an
+        PayChain processes exactly what your integration submits: an amount, a destination, an
         invoice's line items. We're not responsible for losses caused by a bug in your own
         integration (sending the wrong amount, the wrong destination, or double-submitting
         without an idempotency key). Using <code>Idempotency-Key</code> correctly on every
         write, and verifying webhook signatures before acting on a delivery, are documented
-        specifically so this class of mistake is avoidable — see{" "}
+        specifically so this class of mistake is avoidable; see{" "}
         <a href="/send-money">Send Money</a> and <a href="/webhooks">Webhooks</a>.
       </p>
 

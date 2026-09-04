@@ -58,7 +58,7 @@ const ProblemSolution = () => {
                   <TrendingUp className="w-6 h-6" />
                 </div>
                 <p className="text-base sm:text-lg text-white/90 leading-relaxed font-medium">
-                  From the same dashboard you can pay all your staff in one click, swap your KES to USDC to protect it from shilling drops, and after 3 months of using PayChain your transaction history automatically qualifies you for working capital/cash advance—<span className="font-bold text-emerald-400 block mt-3">no collateral, no bank queue, no title deed.</span>
+                  From the same dashboard you can pay all your staff in one click, swap your KES to USDC to protect it from shilling drops, and after 3 months of using PayChain your transaction history automatically qualifies you for working capital/cash advance.<span className="font-bold text-emerald-400 block mt-3">No collateral, no bank queue, no title deed.</span>
                 </p>
               </div>
             </motion.div>

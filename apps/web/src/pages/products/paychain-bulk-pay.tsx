@@ -28,7 +28,7 @@ const useCases = [
 ];
 
 const comparisonRows = [
-  ['Time to pay 20 staff', '40–60 minutes', 'Under 2 minutes'],
+  ['Time to pay 20 staff', '40 to 60 minutes', 'Under 2 minutes'],
   ['Error risk', 'High (manual entry)', 'Zero (saved lists)'],
   ['Audit trail', 'None', 'Full downloadable report'],
   ['Scheduling', 'Manual every time', 'Automated recurring'],

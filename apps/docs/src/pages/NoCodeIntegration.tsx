@@ -10,13 +10,13 @@ export default function NoCodeIntegration() {
       <h1 className="text-3xl font-extrabold text-ink tracking-tight mb-4">No-code integration</h1>
       <p>
         Everything else on this site assumes you're writing code against the API. This page
-        doesn't — it's for selling tickets, taking orders, or collecting payments on a website you
+        doesn't: it's for selling tickets, taking orders, or collecting payments on a website you
         did <em>not</em> build yourself: Wix, Shopify, WordPress, Squarespace, or anywhere else
         that lets you paste a block of HTML. No developer account, no API key, no code.
       </p>
 
       <Callout variant="tip" title="You only need a PayChain merchant account">
-        Not the developer account the rest of this site is about — the regular business account
+        Not the developer account the rest of this site is about, the regular business account
         you'd sign up for at{" "}
         <a href="https://app.paychain.co.ke/signup" target="_blank" rel="noreferrer">app.paychain.co.ke/signup</a>.
         If you already take payments through the PayChain dashboard, you have everything you need
@@ -36,7 +36,7 @@ export default function NoCodeIntegration() {
 <div data-paychain-link="YOUR_LINK_ID" data-paychain-label="Pay KES 2,500"></div>`}
       />
       <p className="text-[13.5px] text-ink-muted leading-6">
-        You never type this by hand — your dashboard generates it with your real link ID already
+        You never type this by hand; your dashboard generates it with your real link ID already
         filled in. It's shown here so you know what you're looking for.
       </p>
 
@@ -46,7 +46,7 @@ export default function NoCodeIntegration() {
       <p className="text-[13.5px] text-ink-muted leading-6">
         At{" "}
         <a href="https://app.paychain.co.ke" target="_blank" rel="noreferrer">app.paychain.co.ke</a>.
-        If you don't have an account yet, sign up there first — it takes a few minutes and needs
+        If you don't have an account yet, sign up there first; it takes a few minutes and needs
         no technical knowledge.
       </p>
 
@@ -54,7 +54,7 @@ export default function NoCodeIntegration() {
       <p className="text-[13.5px] text-ink-muted leading-6">
         From the dashboard, go to <strong>Request Money → Payment Link</strong>. Enter the amount
         (a ticket price, a product price, a booking fee) and generate it. Each link is for one
-        fixed price — selling three different products means three different links, each with its
+        fixed price: selling three different products means three different links, each with its
         own button.
       </p>
 
@@ -73,14 +73,14 @@ export default function NoCodeIntegration() {
         editors. Look for a block or section named something like:
       </p>
       <ul>
-        <li><strong>Wix</strong> — an "Embed" or "Custom Element" block, added from the Elements/Add panel.</li>
-        <li><strong>WordPress</strong> — a "Custom HTML" block in the page/post editor.</li>
-        <li><strong>Shopify</strong> — a "Custom Liquid" section, or a rich-text block's HTML/source view, depending on your theme.</li>
-        <li><strong>Squarespace</strong> — a "Code" block, added like any other content block.</li>
+        <li><strong>Wix</strong>: an "Embed" or "Custom Element" block, added from the Elements/Add panel.</li>
+        <li><strong>WordPress</strong>: a "Custom HTML" block in the page/post editor.</li>
+        <li><strong>Shopify</strong>: a "Custom Liquid" section, or a rich-text block's HTML/source view, depending on your theme.</li>
+        <li><strong>Squarespace</strong>: a "Code" block, added like any other content block.</li>
       </ul>
       <p className="text-[13.5px] text-ink-muted leading-6">
         Paste the whole snippet in as-is, don't split the two lines apart. If your builder shows a
-        warning about pasting HTML/code, that's normal and expected — it's not PayChain-specific.
+        warning about pasting HTML/code, that's normal and expected; it's not PayChain-specific.
       </p>
 
       <Callout variant="info" title="Why a popup window, not something embedded on the page">
@@ -92,7 +92,7 @@ export default function NoCodeIntegration() {
 
       <h3>5. Publish your site, then test it yourself</h3>
       <p className="text-[13.5px] text-ink-muted leading-6">
-        Save/publish like you normally would. Then load the live page and click your own button —
+        Save/publish like you normally would. Then load the live page and click your own button;
         you should see the popup open with your amount and business name on it. You don't need to
         actually pay to confirm it's wired up correctly; seeing the right page open is enough.
       </p>
@@ -106,9 +106,9 @@ export default function NoCodeIntegration() {
 
       <h2>Good to know</h2>
       <ul>
-        <li>A Payment Link expires 48 hours after you create it, and can only be paid once. For something you sell repeatedly (a recurring ticket type, a standing product), generate a fresh link — and a fresh embed snippet — each time the old one is used or expires, rather than reusing one indefinitely.</li>
-        <li>One button is one fixed price. This is the right fit for a ticket tier, a single product, a booking fee — not a shopping cart with quantities or multiple items in one checkout.</li>
-        <li>If you need a real cart, subscriptions, or a fully custom checkout flow, that needs actual code — see the <Link to="/integration-guide">Integration guide</Link> for the full API, or hand this page to a developer.</li>
+        <li>A Payment Link expires 48 hours after you create it, and can only be paid once. For something you sell repeatedly (a recurring ticket type, a standing product), generate a fresh link (and a fresh embed snippet) each time the old one is used or expires, rather than reusing one indefinitely.</li>
+        <li>One button is one fixed price. This is the right fit for a ticket tier, a single product, a booking fee, not a shopping cart with quantities or multiple items in one checkout.</li>
+        <li>If you need a real cart, subscriptions, or a fully custom checkout flow, that needs actual code; see the <Link to="/integration-guide">Integration guide</Link> for the full API, or hand this page to a developer.</li>
       </ul>
 
       <h2>Where to go next</h2>

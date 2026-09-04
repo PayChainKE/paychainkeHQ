@@ -13,7 +13,7 @@ export default function PaymentCollection() {
       <p>
         Four ways to collect from a customer: trigger an STK push directly, redirect to a hosted
         checkout page, share a payment link, or show a dynamic QR code. All four settle into the
-        same place — your linked merchant's wallet — and resolve through the same webhook events.
+        same place (your linked merchant's wallet) and resolve through the same webhook events.
         Base path <code>https://api.paychain.co.ke/api/v1/developer</code>.
       </p>
 
@@ -21,7 +21,7 @@ export default function PaymentCollection() {
         Use <strong>STK push</strong> when your own backend already has the customer's phone
         number (an ISP billing run, a saved payment method). Use <strong>Checkout</strong> or a{" "}
         <strong>payment link</strong> when you need a page to send someone to. Use a{" "}
-        <strong>QR code</strong> when the customer is physically present — a till, a delivery
+        <strong>QR code</strong> when the customer is physically present: a till, a delivery
         rider, a printed invoice.
       </Callout>
 
@@ -178,7 +178,7 @@ puts payment['status'] # "pending"`,
           { name: "description", type: "string", description: "Shown on the payment page under the amount (e.g. \"Order #4821\"). Max 200 characters." },
           { name: "callbackUrl", type: "string", description: "Must be https://. Where the customer's browser is redirected after a successful payment. If omitted, the page just shows a \"you may close this window\" success state." },
           { name: "customer", type: "object", description: "Optional { phone, email, name }. Phone prefills the payment page's input, but the customer can still change it before paying." },
-          { name: "expiresInMinutes", type: "number", description: "How long the link stays payable. Defaults to 30. Accepts up to 10080 (7 days) — set this higher for a payment link you're sharing directly rather than redirecting a customer to mid-purchase." },
+          { name: "expiresInMinutes", type: "number", description: "How long the link stays payable. Defaults to 30. Accepts up to 10080 (7 days); set this higher for a payment link you're sharing directly rather than redirecting a customer to mid-purchase." },
         ]}
       />
 
@@ -302,7 +302,7 @@ redirect_to session['checkoutUrl'] # send the customer here`,
       <p>
         Redirect the customer's browser to <code>session.checkoutUrl</code>, or render{" "}
         <code>session.qrCodeDataUri</code> directly in an <code>&lt;img&gt;</code> tag for them to
-        scan — see <a href="#dynamic-qr-codes">Dynamic QR codes</a> below. Sessions expire 30
+        scan; see <a href="#dynamic-qr-codes">Dynamic QR codes</a> below. Sessions expire 30
         minutes after creation by default if never paid.
       </p>
 
@@ -311,7 +311,7 @@ redirect_to session['checkoutUrl'] # send the customer here`,
       <ul>
         <li>On success: the page shows a confirmation, then redirects to your <code>callbackUrl</code> (if you set one) after a couple of seconds</li>
         <li>On failure: the page shows why, and lets the customer try again with a different number, the same session, no new link needed</li>
-        <li>Either way, a normal <code>payment.collect.succeeded</code> / <code>payment.collect.failed</code> <Link to="/webhooks">webhook</Link> fires — checkout payments go through the exact same pipeline as a direct <code>POST /payments/collect</code> call</li>
+        <li>Either way, a normal <code>payment.collect.succeeded</code> / <code>payment.collect.failed</code> <Link to="/webhooks">webhook</Link> fires; checkout payments go through the exact same pipeline as a direct <code>POST /payments/collect</code> call</li>
       </ul>
       <Callout variant="warning" title="Treat callbackUrl as a UX redirect, not a confirmation">
         A customer can close the tab before the redirect fires, or the redirect can fail to load.
@@ -334,11 +334,11 @@ redirect_to session['checkoutUrl'] # send the customer here`,
         A payment link, in the Paystack/Stripe sense, is a <code>checkoutUrl</code> you share
         directly instead of one you redirect a customer through mid-purchase: dropped into a
         WhatsApp message, an SMS, an email, or printed on an invoice, then paid whenever the
-        customer gets to it. There's no separate endpoint for this — it's the exact same{" "}
+        customer gets to it. There's no separate endpoint for this: it's the exact same{" "}
         <code>POST /checkout</code> above, used two ways:
       </p>
       <ul>
-        <li>Skip <code>callbackUrl</code> — there's nothing to redirect back to for a link with no specific purchase flow behind it</li>
+        <li>Skip <code>callbackUrl</code>: there's nothing to redirect back to for a link with no specific purchase flow behind it</li>
         <li>Set <code>expiresInMinutes</code> to however long the link should stay valid: a day, a week, up to 10080 minutes (7 days)</li>
       </ul>
       <CodeBlock
@@ -363,20 +363,20 @@ redirect_to session['checkoutUrl'] # send the customer here`,
 
       <h2 id="dynamic-qr-codes">Dynamic QR codes</h2>
       <p>
-        Every checkout session's response includes <code>qrCodeDataUri</code> — a PayChain-branded,
+        Every checkout session's response includes <code>qrCodeDataUri</code>, a PayChain-branded,
         scannable PNG (as a <code>data:image/png;base64,...</code> URI, no separate download or
         image-hosting step) encoding that exact session's <code>checkoutUrl</code>. "Dynamic"
-        because it's generated fresh per session and amount — printed on a till receipt, shown on
+        because it's generated fresh per session and amount: printed on a till receipt, shown on
         a delivery rider's phone, or embedded on an invoice, each one only ever pays that one
         specific amount into that one specific session.
       </p>
       <CodeBlock
         lang="text"
-        label="Render it directly — no extra request needed"
+        label="Render it directly, no extra request needed"
         code={`<img src="{session.qrCodeDataUri}" alt="Scan to pay" width="240" height="240" />`}
       />
       <Callout variant="info" title="No separate QR endpoint">
-        There's nothing to call beyond <code>POST /checkout</code> above — the QR is just another
+        There's nothing to call beyond <code>POST /checkout</code> above; the QR is just another
         field on the same response. Scanning it and paying resolves through the identical{" "}
         <code>payment.collect.succeeded</code> webhook as every other collection method here.
       </Callout>

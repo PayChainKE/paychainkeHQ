@@ -26,16 +26,16 @@ const features = [
 ];
 
 const timeline = [
-  { title: 'Transact Through PayChain (Months 1–3)', desc: 'Every verified collection through your PayChain Virtual Account builds your merchant ledger, a tamper-proof record of your real business activity.' },
+  { title: 'Transact Through PayChain (Months 1 to 3)', desc: 'Every verified collection through your PayChain Virtual Account builds your merchant ledger, a tamper-proof record of your real business activity.' },
   { title: 'Your Trust Score Builds Automatically', desc: "PayChain's Trust Score algorithm analyzes your revenue consistency, transaction frequency, and growth trajectory. Watch it build in real time on your dashboard. No action required." },
   { title: 'You Receive a Cash Advance Offer', desc: 'At month 3, if eligible, PayChain presents a personalized offer on your dashboard: approved limit, repayment terms, origination fee, and total cost. Fully visible before you commit.' },
-  { title: 'Accept and Receive Funds', desc: 'Accept your offer. Funds arrive in your PayChain merchant balance immediately, ready for Bulk Pay, supplier payments, or M-PESA withdrawal. No 3–5 day bank delays.' },
+  { title: 'Accept and Receive Funds', desc: 'Accept your offer. Funds arrive in your PayChain merchant balance immediately, ready for Bulk Pay, supplier payments, or M-PESA withdrawal. No 3 to 5 day bank delays.' },
   { title: 'Repay as You Earn', desc: 'Repayment is a fixed percentage of your daily PayChain collections: automatic, no manual transfers. Strong month = repay faster. Slow week = smaller repayment. Works with your cash flow, not against it.' },
 ];
 
 const comparisonRows = [
   ['Eligibility', 'Title deed + audited accounts', 'Savings + membership', '3 months of PayChain transactions'],
-  ['Application', 'Weeks of paperwork', '1–2 weeks', 'Automatic dashboard offer'],
+  ['Application', 'Weeks of paperwork', '1 to 2 weeks', 'Automatic dashboard offer'],
   ['Disbursement', 'Days to weeks', 'Days', 'Immediate'],
   ['Repayment', 'Fixed monthly installment', 'Fixed monthly installment', '% of daily collections'],
   ['Collateral', 'Required', 'Required', 'None'],

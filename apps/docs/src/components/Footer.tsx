@@ -11,7 +11,7 @@ export default function Footer() {
           <div>
             <Logo />
             <p className="text-[12.5px] text-ink-faint leading-6 mt-3 max-w-xs">
-              The financial operating system built for how business works in Kenya — collect, pay,
+              The financial operating system built for how business works in Kenya: collect, pay,
               and reconcile from one API.
             </p>
             <div className="flex items-center gap-3 mt-4">

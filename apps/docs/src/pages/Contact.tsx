@@ -32,7 +32,7 @@ export default function Contact() {
     <>
       <h1 className="text-3xl font-extrabold text-ink tracking-tight mb-4">Contact Us</h1>
       <p>
-        Questions about the API, a partnership enquiry, press, or anything else — reach us
+        Questions about the API, a partnership enquiry, press, or anything else: reach us
         directly, or send a message below. For integration troubleshooting and FAQs, see{" "}
         <a href="/help">Help &amp; Support</a> first; it usually resolves faster.
       </p>
@@ -68,7 +68,7 @@ export default function Contact() {
           <div>
             <p className="text-[13.5px] font-semibold text-ink">Phone</p>
             <p className="text-[13px] text-ink-muted">+254 743 283 782</p>
-            <p className="text-[12px] text-ink-faint mt-1">Mon–Sat, 7am–9pm EAT.</p>
+            <p className="text-[12px] text-ink-faint mt-1">Mon to Sat, 7am to 9pm EAT.</p>
           </div>
         </a>
         <div className="flex items-start gap-3 rounded-lg border border-border bg-surface/60 p-4">
