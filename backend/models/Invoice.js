@@ -63,8 +63,13 @@ const invoiceSchema = new mongoose.Schema({
     type: [invoiceItemSchema],
     default: [],
   },
+  // Locked to KES at the schema level, not just in invoiceController.js —
+  // every settlement rail an invoice can actually be paid through only
+  // ever moves KES, so nothing should ever be able to set this to
+  // anything else.
   currency: {
     type: String,
+    enum: ['KES'],
     default: 'KES',
   },
   issueDate: {
