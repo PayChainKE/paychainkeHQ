@@ -12,12 +12,13 @@ import api from '../api/config';
 // doesn't stay unlocked indefinitely.
 const REAUTH_BACKGROUND_MS = 30_000;
 
-// Full-session idle timeout — 15 min with no touch activity while the app is
-// foregrounded and unlocked, matching the web dashboards' idle-logout policy
-// (see useIdleTimer.js in the web apps). Also reused as the threshold for a
-// full logout (not just a PIN re-lock) when the app returns from background
-// after being away this long — someone leaving the phone unattended for real
-// should have to sign in again, not just re-enter a 4-digit PIN.
+// Foreground idle re-lock — 15 min with no touch activity while the app is
+// open and unlocked re-arms the PIN gate, matching the web dashboards' idle
+// timeout in spirit (see useIdleTimer.js in the web apps). Bank-app style:
+// this and REAUTH_BACKGROUND_MS above only ever re-lock to the PIN screen,
+// never sign the merchant all the way out — a dead/expired session is
+// instead caught by the 401 handling in refreshSession() below, which is
+// the only remaining path that does a full logout.
 const IDLE_TIMEOUT_MS = 15 * 60 * 1000;
 const IDLE_POLL_MS = 15_000;
 
@@ -99,14 +100,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (backgroundedAt === null) return;
 
       const awayMs = Date.now() - backgroundedAt;
-
-      // Away long enough that this is the same "left it unattended" scenario
-      // as the foreground idle timer below — a full sign-out, not just a
-      // PIN re-lock.
-      if (awayMs >= IDLE_TIMEOUT_MS) {
-        logout('idle-timeout');
-        return;
-      }
       if (awayMs < REAUTH_BACKGROUND_MS) return;
 
       // Only matters once the user has actually unlocked into the app with
@@ -138,7 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const interval = setInterval(() => {
       if (Date.now() - lastActiveAtRef.current >= IDLE_TIMEOUT_MS) {
-        logout('idle-timeout');
+        setIsPinUnlocked(false);
       }
     }, IDLE_POLL_MS);
     return () => clearInterval(interval);
@@ -410,8 +403,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // app fine, then get "Invalid PIN" on every real payment. Now it rethrows
   // so callers (PinSetup, BulkPay's setup modal) can surface the failure
   // and the local PIN is only stored once the server has actually accepted it.
-  async function setAppPin(pin: string) {
-    await api.post('/api/auth/merchant/set-app-pin', { pin });
+  //
+  // currentPassword is required by the backend whenever an appPin already
+  // exists (see setAppPin in merchantAuthController.js) — first-time setup
+  // omits it, ForgotPin.tsx (the "I don't remember my PIN" recovery path,
+  // as opposed to reset-app-pin which needs the OLD pin) passes it.
+  async function setAppPin(pin: string, currentPassword?: string) {
+    await api.post('/api/auth/merchant/set-app-pin', currentPassword ? { pin, currentPassword } : { pin });
     await storeAppPin(pin);
     setAppPinState(pin);
   }

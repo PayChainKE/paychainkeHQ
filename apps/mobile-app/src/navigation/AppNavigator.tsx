@@ -18,6 +18,7 @@ import Transactions from '../pages/Transactions';
 import Onboarding from '../pages/Onboarding';
 import PinSetup from '../pages/PinSetup';
 import PinEntry from '../pages/PinEntry';
+import ForgotPin from '../pages/ForgotPin';
 import BiometricSetup from '../pages/BiometricSetup';
 import TourTarget from '../components/TourTarget';
 
@@ -153,7 +154,10 @@ export default function AppNavigator() {
         ) : !hasSetBiometrics ? (
           <Stack.Screen name="BiometricSetup" component={BiometricSetup} />
         ) : !isPinUnlocked ? (
-          <Stack.Screen name="PinEntry" component={PinEntry} />
+          <>
+            <Stack.Screen name="PinEntry" component={PinEntry} />
+            <Stack.Screen name="ForgotPin" component={ForgotPin} />
+          </>
         ) : (
           <Stack.Screen name="Main" component={MainTabs} />
         )}
