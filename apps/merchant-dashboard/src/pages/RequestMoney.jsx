@@ -49,6 +49,9 @@ export default function RequestMoney() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [statusText, setStatusText] = useState('')
   const [generatedLink, setGeneratedLink] = useState('')
+  const [linkId, setLinkId] = useState('')
+  const [showEmbed, setShowEmbed] = useState(false)
+  const embedPreviewRef = useRef(null)
   // Previously a failed/timed-out STK request only showed a toast and reset
   // back to the same plain amount/phone form — indistinguishable from never
   // having submitted at all, so a merchant glancing back at the screen had
@@ -236,6 +239,8 @@ export default function RequestMoney() {
 
       if (res.data?.success) {
         setGeneratedLink(`${getAppUrl()}/pay/${res.data.linkId}`)
+        setLinkId(res.data.linkId)
+        setShowEmbed(false)
         addNotification({ title: 'Link Generated', message: 'Secure payment link created. Expires in 48 hours.', type: 'success' })
         setStep(3)
       }
@@ -267,6 +272,44 @@ export default function RequestMoney() {
       copyLink()
     }
   }
+
+  // What a non-technical merchant pastes into Wix/Shopify/WordPress/any
+  // page editor that accepts a code block — turns this one Payment Link
+  // into a real button on their own site instead of a bare URL. See
+  // public/paychain-button.js for what the script actually does (renders a
+  // button, opens the real hosted payment page in a centered popup — never
+  // an iframe, so it works regardless of the host site's own CSP).
+  const embedSnippet = linkId
+    ? `<script src="${getAppUrl()}/paychain-button.js" defer></script>\n<div data-paychain-link="${linkId}" data-paychain-label="Pay ${formatKES(amount)}"></div>`
+    : ''
+
+  const copyEmbedSnippet = () => {
+    navigator.clipboard.writeText(embedSnippet)
+    addNotification({ title: 'Snippet Copied', message: 'Paste this into your site’s HTML/code block.', type: 'success' })
+  }
+
+  // Live preview: load the real widget script (once) and let it render an
+  // actual working button right here — if it renders correctly on this
+  // page, it renders correctly anywhere else the same snippet is pasted.
+  useEffect(() => {
+    if (!showEmbed || !linkId) return
+    const renderPreview = () => window.PayChainEmbed?.scan()
+    if (window.PayChainEmbed) {
+      renderPreview()
+      return
+    }
+    const existing = document.querySelector('script[data-paychain-embed-loader]')
+    if (existing) {
+      existing.addEventListener('load', renderPreview, { once: true })
+      return
+    }
+    const script = document.createElement('script')
+    script.src = `${getAppUrl()}/paychain-button.js`
+    script.defer = true
+    script.setAttribute('data-paychain-embed-loader', 'true')
+    script.addEventListener('load', renderPreview, { once: true })
+    document.body.appendChild(script)
+  }, [showEmbed, linkId])
 
   return (
     <MerchantLayout title="Request Money">
@@ -520,6 +563,35 @@ export default function RequestMoney() {
                       <span className="material-symbols-outlined text-base">share</span> Share
                     </button>
                   </div>
+
+                  <button
+                    onClick={() => setShowEmbed((v) => !v)}
+                    className="text-xs font-bold text-primary/70 hover:text-primary underline underline-offset-4 decoration-dotted mb-2"
+                  >
+                    {showEmbed ? 'Hide website embed code' : 'Have a website? Embed this as a button →'}
+                  </button>
+
+                  {showEmbed && (
+                    <div className="text-left bg-[#00351D] rounded-2xl p-6 mb-6">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-[#5EFEB3] mb-1">Embed on your website</p>
+                      <p className="text-emerald-100/60 text-xs mb-4 leading-relaxed">
+                        No coding needed — paste this into a "Custom HTML"/"Embed" block on Wix, Shopify, WordPress, Squarespace, or any page builder. It renders a real "Pay with PayChain" button that opens this same payment page in a popup.
+                      </p>
+                      <pre className="bg-black/30 rounded-xl p-4 text-emerald-100 text-[11px] font-mono overflow-x-auto whitespace-pre-wrap break-all mb-4">{embedSnippet}</pre>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <button
+                          onClick={copyEmbedSnippet}
+                          className="px-5 py-2.5 bg-[#5EFEB3] text-[#00351D] rounded-xl text-xs font-black uppercase tracking-widest hover:brightness-105 transition-all flex items-center gap-2"
+                        >
+                          <span className="material-symbols-outlined text-base">content_copy</span> Copy Snippet
+                        </button>
+                        <div className="flex items-center gap-2">
+                          <span className="text-emerald-100/50 text-[10px] font-bold uppercase tracking-widest">Live preview</span>
+                          <div key={linkId} ref={embedPreviewRef} data-paychain-link={linkId} data-paychain-label={`Pay ${formatKES(amount)}`} data-paychain-theme="light" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
 

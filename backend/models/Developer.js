@@ -22,8 +22,11 @@ const developerSchema = new mongoose.Schema({
     unique: true,
     lowercase: true,
     trim: true,
+    // Linear-time shape check — see models/Merchant.js's identical field
+    // for why the old pattern was a catastrophic-backtracking DoS,
+    // reachable here from the public POST /api/auth/developer/register.
     match: [
-      /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
+      /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/,
       'Please add a valid email',
     ],
   },

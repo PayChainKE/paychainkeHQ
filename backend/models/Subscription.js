@@ -7,7 +7,9 @@ const SubscriptionSchema = new mongoose.Schema({
     unique: true,
     trim: true,
     lowercase: true,
-    match: [/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/, 'Please add a valid email']
+    // Linear-time shape check — see models/Merchant.js's identical field
+    // for why the old pattern was a catastrophic-backtracking DoS.
+    match: [/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/, 'Please add a valid email']
   },
   active: {
     type: Boolean,

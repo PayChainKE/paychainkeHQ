@@ -77,6 +77,7 @@ import { runWalletAudit } from '../controllers/walletAuditController.js';
 import { adminListInvoices } from '../controllers/invoiceController.js';
 import { sendSmsBroadcast, getSmsBroadcasts, deleteSmsBroadcast, clearSmsBroadcasts } from '../controllers/smsBroadcastController.js';
 import { getRevenue, getRevenueSweeps, archiveRevenueSweep, unarchiveRevenueSweep, exportRevenueSweeps, triggerRevenueSweep, getReconciliations, submitReconciliation, archiveReconciliation, unarchiveReconciliation, bulkArchiveReconciliations, getExpectedPoolBalance, getLivePoolBalance, getPoolAccountStatement, getBankCharges, recordBankCharge, updateBankCharge, archiveBankCharge, writeOffRevenueDeficit, getRevenueTransactions } from '../controllers/revenueController.js';
+import { getApiTransactions, getApiTransactionsSummary } from '../controllers/apiTransactionsController.js';
 import { getTariffs, requestTariffUpdate, confirmTariffUpdate } from '../controllers/tariffController.js';
 import { adminListStuckOpenBankingPayouts, adminResolveStuckOpenBankingPayout, adminDeleteStuckOpenBankingPayout } from '../controllers/ncbaOpenBankingController.js';
 import { adminManualCreditNcbaCollection, adminListMissedNcbaCollections, adminDismissMissedNcbaCollection } from '../controllers/ncbaAccountNotificationController.js';
@@ -192,6 +193,8 @@ router.get('/ledger', protect, excludeOfficer, getLedger);
 // top fee-generating merchants, projected ARR.
 router.get('/revenue', protect, excludeOfficer, getRevenue);
 router.get('/revenue/transactions', protect, excludeOfficer, getRevenueTransactions);
+router.get('/api-transactions', protect, excludeOfficer, getApiTransactions);
+router.get('/api-transactions/summary', protect, excludeOfficer, getApiTransactionsSummary);
 
 // Real weekly sweep history (actual PesaLink transfers of accrued fee
 // revenue to PayChain's own account) + a manual "run now" trigger.

@@ -13,6 +13,7 @@ import FloatingWhatsApp from "./components/FloatingWhatsApp";
 // Each page now loads its own chunk on first visit to that route.
 const Index = lazy(() => import("./pages/Index"));
 const Docs = lazy(() => import("./pages/Docs"));
+const Integrations = lazy(() => import("./pages/Integrations"));
 const HowItWorks = lazy(() => import("./pages/HowItWorks"));
 const FAQ = lazy(() => import('./pages/FAQ'));
 const ContactUs = lazy(() => import("./pages/ContactUs"));
@@ -48,6 +49,7 @@ const App = () => {
             <Route path="/" element={<Index />} />
             <Route path="/how-it-works" element={<HowItWorks />} />
             <Route path="/docs" element={<Docs />} />
+            <Route path="/integrations" element={<Integrations />} />
             <Route path="/blog" element={<Blog />} />
             <Route path="/products" element={<Products />} />
             <Route path="/overview" element={<Overview />} />

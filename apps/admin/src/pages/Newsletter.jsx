@@ -6,7 +6,11 @@ import TablePagination from '../components/ui/TablePagination';
 import NewsletterComposer from '../components/newsletter/NewsletterComposer';
 
 const PAGE_SIZE = 25;
-const EMAIL_RE = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
+// Linear-time shape check — the old \w+([\.-]?\w+)*@... pattern
+// catastrophically backtracks on a plain email whose domain ends in a
+// segment longer than 3 characters (e.g. name@company.internal), freezing
+// this tab's own JS thread. See backend/models/Merchant.js for the same fix.
+const EMAIL_RE = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 
 function relativeTime(iso) {
   if (!iso) return '—';

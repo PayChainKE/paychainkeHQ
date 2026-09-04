@@ -353,7 +353,9 @@ export const requestMerchantAction = async (req, res) => {
       if (!newEmail && !newPhone) {
         return res.status(400).json({ error: 'Provide a new email and/or phone number to reset.' });
       }
-      if (newEmail && !/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/.test(newEmail)) {
+      // Linear-time shape check — see models/Merchant.js's identical field
+      // for why the old pattern was a catastrophic-backtracking DoS.
+      if (newEmail && !/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(newEmail)) {
         return res.status(400).json({ error: 'Enter a valid email address.' });
       }
       if (newEmail && newEmail === merchant.email) {

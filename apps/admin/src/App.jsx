@@ -23,6 +23,7 @@ import CallCentre from './pages/CallCentre';
 import AuditLog from './pages/AuditLog';
 import TransactionAudit from './pages/TransactionAudit';
 import PaymentLinkAudit from './pages/PaymentLinkAudit';
+import ApiTransactions from './pages/ApiTransactions';
 import TransactionTariffs from './pages/TransactionTariffs';
 import Security from './pages/Security';
 import Revenue from './pages/Revenue';
@@ -80,6 +81,7 @@ export default function App(){
             <Route path="/trash" element={<Protected><Trash/></Protected>} />
             <Route path="/transaction-audit" element={<Protected><TransactionAudit/></Protected>} />
             <Route path="/payment-link-audit" element={<Protected><PaymentLinkAudit/></Protected>} />
+            <Route path="/api-transactions" element={<Protected><ApiTransactions/></Protected>} />
             <Route path="/transaction-tariffs" element={<Protected><TransactionTariffs/></Protected>} />
             <Route path="/security" element={<Protected><Security/></Protected>} />
             <Route path="/settings" element={<Protected><Settings/></Protected>} />

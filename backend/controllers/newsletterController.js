@@ -5,7 +5,10 @@ import NewsletterDraft from '../models/NewsletterDraft.js';
 import { sendNewsletterConfirmation, sendNewsletterEmail } from '../utils/resend.js';
 import { v2 as cloudinary } from 'cloudinary';
 
-const EMAIL_RE = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
+// Linear-time shape check — see models/Merchant.js's identical field for
+// why the old \w+([\.-]?\w+)*@... pattern was a catastrophic-backtracking
+// DoS. Reachable here from the public, unauthenticated POST /newsletter/subscribe.
+const EMAIL_RE = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 
 // ── Public ────────────────────────────────────────────────────────────
 

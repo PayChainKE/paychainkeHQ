@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, Users, Menu, X, ChevronRight, Copyright, ChevronDown, ShoppingCart, HelpCircle, Mail, BookOpen, Code2 } from 'lucide-react';
+import { Home, Users, Menu, X, ChevronRight, Copyright, ChevronDown, ShoppingCart, HelpCircle, Mail, BookOpen, Code2, Puzzle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface NavbarProps {
@@ -208,6 +208,13 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
                   </Link>
                 );
               })}
+
+              <Link
+                to="/integrations"
+                className="flex items-center gap-2 px-3 py-2 text-sm font-bold text-gray-700 hover:text-gray-900 transition-all duration-200"
+              >
+                Integrations
+              </Link>
 
               <Link
                 to="/docs"
@@ -437,6 +444,18 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
                 </div>
 
                 <div className="my-3 border-t border-gray-100" />
+
+                <Link
+                  to="/integrations"
+                  onClick={closeMobileMenu}
+                  className="flex items-center justify-between gap-3 px-3 py-3 rounded-xl text-gray-800 hover:bg-gray-50 transition-colors"
+                >
+                  <span className="flex items-center gap-3">
+                    <Puzzle className="w-[18px] h-[18px] text-gray-400" />
+                    <span className="font-semibold text-[15px]">Integrations</span>
+                  </span>
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-[#00bf63] border border-[#00bf63]/30 rounded-full px-2 py-0.5">No code</span>
+                </Link>
 
                 {/* Developer API isn't publicly self-serve yet — links to
                     the on-site "coming soon" page (pages/Docs.tsx), not the
