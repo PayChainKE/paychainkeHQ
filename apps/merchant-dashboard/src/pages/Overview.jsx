@@ -235,16 +235,36 @@ export default function Overview() {
 
       {/* Section 1: Balance Cards Row */}
       <section className="grid grid-cols-1 gap-8 animate-fade-in-up [animation-delay:100ms] relative z-20">
-        {/* KES Balance Card */}
-        <div data-tour="balance-card" className="bg-gradient-to-br from-[#00351D] via-[#022916] to-[#011C0F] text-white p-6 lg:p-8 rounded-[24px] shadow-[0_28px_60px_-15px_rgba(0,53,29,0.65)] relative z-20 group border border-emerald-900/50 hover:border-emerald-500/30 transition-all duration-500">
+        {/* Wallet card, with a second card's edge peeking out behind it —
+            offset down-right and dimmer, like real cards sitting stacked
+            in a wallet. Purely decorative, sits behind the real card. */}
+        <div className="relative">
+          <div
+            aria-hidden="true"
+            className="absolute rounded-[24px] pointer-events-none"
+            style={{ top: 14, left: 12, right: -10, bottom: -14, background: '#0a3322', opacity: 0.55, boxShadow: '0 20px 40px -15px rgba(0,0,0,0.35)' }}
+          />
+          {/* KES Balance Card */}
+          <div data-tour="balance-card" className="bg-gradient-to-br from-[#00351D] via-[#022916] to-[#011C0F] text-white p-6 lg:p-8 rounded-[24px] shadow-[0_28px_60px_-15px_rgba(0,53,29,0.65)] relative z-20 group border border-emerald-900/50 hover:border-emerald-500/30 transition-all duration-500">
           {/* Ambient Glow */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-[24px]">
             <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-400/10 rounded-full -mr-20 -mt-20 blur-[80px] group-hover:scale-110 transition-transform duration-1000"></div>
             <div className="absolute bottom-0 left-0 w-64 h-64 bg-emerald-600/10 rounded-full -ml-20 -mb-20 blur-[60px] group-hover:scale-110 transition-transform duration-1000"></div>
           </div>
           
-          {/* Card Texture/Pattern */}
-          <div className="absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-overlay rounded-[24px] overflow-hidden" style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: '16px 16px' }}></div>
+          {/* Card Texture/Pattern — a kitenge-inspired diamond/chevron
+              lattice (a common East African textile motif), replacing a
+              generic dot-grid so the card carries some local character
+              instead of a stock bank-card feel. */}
+          <div
+            className="absolute inset-0 opacity-[0.05] pointer-events-none mix-blend-overlay rounded-[24px] overflow-hidden"
+            style={{
+              backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(
+                "<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'><path d='M0 12 L6 0 L12 12 L18 0 L24 12 M0 12 L6 24 L12 12 L18 24 L24 12' stroke='white' stroke-width='1' fill='none'/></svg>"
+              )}")`,
+              backgroundSize: '24px 24px',
+            }}
+          ></div>
           
           {/* Glass Top Highlight */}
           <div className="absolute top-0 inset-x-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-400/30 to-transparent rounded-t-[24px]"></div>
@@ -265,7 +285,13 @@ export default function Overview() {
             </div>
 
             <div className="flex-1">
-              <p className="text-white/60 text-[9px] lg:text-[10px] font-bold uppercase tracking-[0.15em] mb-1.5">Available Balance</p>
+              {/* Balance label on the left, PayChain mark (plain,
+                  transparent background — no medallion) in the corner on
+                  the right, the way an issuer logo sits on a real card face. */}
+              <div className="flex items-start justify-between mb-1.5">
+                <p className="text-white/60 text-[9px] lg:text-[10px] font-bold uppercase tracking-[0.15em]">Available Balance</p>
+                <img src={paychainMark} alt="PayChain" className="w-[18px] h-[18px] object-contain opacity-85" />
+              </div>
 
               {/* Balance on the left, chip + contactless icon on the right
                   — beside the amount rather than stacked above it. */}
@@ -281,17 +307,16 @@ export default function Overview() {
                       prints it in (contactless mark near the top edge,
                       chip below). */}
                   <span className="material-symbols-outlined text-white/65 text-[19px] leading-none" style={{ transform: 'rotate(90deg)' }}>wifi</span>
-                  {/* EMV-style chip with the PayChain mark set into it, like
-                      a brand emblem debossed on a metal card. */}
+                  {/* EMV-style chip — left plain gold, same as a real chip:
+                      banks never brand the chip itself, so this reads more
+                      authentic without a logo on it. */}
                   <div
-                    className="w-[42px] h-[32px] rounded-[7px] relative overflow-hidden flex items-center justify-center"
+                    className="w-[42px] h-[32px] rounded-[7px] relative overflow-hidden"
                     style={{ background: 'linear-gradient(135deg, #f6e7b4, #d4af37 55%, #a8842c)' }}
                   >
                     <div className="absolute inset-x-0 top-[6px] h-px bg-black/20" />
                     <div className="absolute inset-x-0 bottom-[6px] h-px bg-black/20" />
-                    <div className="w-[18px] h-[18px] rounded-full bg-[#fffbeb]/90 flex items-center justify-center relative">
-                      <img src={paychainMark} alt="" className="w-[12px] h-[12px] object-contain" />
-                    </div>
+                    <div className="absolute inset-y-0 left-1/2 w-px bg-black/15" />
                   </div>
                 </div>
               </div>
@@ -436,6 +461,7 @@ export default function Overview() {
               )}
             </div>
           </div>
+        </div>
         </div>
       </section>
 
