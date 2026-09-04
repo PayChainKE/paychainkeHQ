@@ -14,8 +14,18 @@ const merchantSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Please add an email'],
     unique: true,
+    // Linear-time shape check (mirrors utils/emailValidator.js's
+    // EMAIL_SHAPE_REGEX) — the previous pattern here
+    // (/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/) has ambiguous
+    // nested quantifiers on both sides of the @ and catastrophically
+    // backtracks (multi-second-to-effectively-infinite CPU spin, blocking
+    // the whole Node event loop) on a plain, realistic email whose domain
+    // ends in a segment longer than 3 characters after the last dot (e.g.
+    // anything@company.internal) — confirmed live, 2026-09-04. This was a
+    // single-request DoS reachable from the public, unauthenticated
+    // POST /api/auth/merchant/register endpoint.
     match: [
-      /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
+      /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/,
       'Please add a valid email',
     ],
   },
