@@ -76,7 +76,7 @@ const allArticlesData: Record<string, ArticleData> = {
       </blockquote>
 
       <h2>What This Means for Merchants</h2>
-      <p>PayChain merchants don't need to do anything differently. This registration sits behind the scenes, alongside PayChain's existing NCBA Bank-backed verification and KRA eTIMS integration, as part of a broader commitment to operating as a fully compliant financial infrastructure provider in Kenya.</p>
+      <p>PayChain merchants don't need to do anything differently. This registration sits behind the scenes, alongside PayChain's existing NCBA Bank-backed verification, as part of a broader commitment to operating as a fully compliant financial infrastructure provider in Kenya.</p>
       <p>Merchants can request a full export of their data at any time, and PayChain does not sell or share merchant or customer data with advertisers or third parties.</p>
     `,
   },

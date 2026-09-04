@@ -4,7 +4,6 @@ import Footer from '@/components/Footer';
 import { motion } from 'framer-motion';
 import {
   LayoutDashboard,
-  FileCheck,
   TrendingUp,
   Users,
   BarChart2,
@@ -18,7 +17,6 @@ import Breadcrumbs from '@/components/Breadcrumbs';
 
 const features = [
   { icon: LayoutDashboard, title: 'Real-Time Merchant Dashboard', body: 'Every transaction (collections, payments, FX swaps, cash advance activity) updated in real time. Your full financial picture, always current.' },
-  { icon: FileCheck, title: 'KRA e-TIMS Tax Compliance', body: 'Every sale is signed as a real KRA fiscal receipt through eTIMS OSCU the moment it happens, with a verifiable QR code, not a batch report reconstructed later.' },
   { icon: TrendingUp, title: 'Trust Score Monitor', body: 'Track your Trust Score in real time: see exactly how close you are to unlocking your next Cash Advance tier.' },
   { icon: Users, title: 'Team Access & Spending Controls', body: 'Add team members with defined roles, set spending limits, require approval for large transactions, without giving up full account access.' },
   { icon: BarChart2, title: 'Business Analytics & Insights', body: 'Revenue trends, peak payment periods, top customers by volume, month-on-month growth, all visualized clearly. Decisions based on data, not guesswork.' },
@@ -212,50 +210,6 @@ const OperationsTools = () => {
               );
             })}
           </div>
-        </div>
-      </section>
-
-      {/* KRA SPOTLIGHT */}
-      <section className="py-20 bg-gray-50 border-y border-gray-200">
-        <div className="container mx-auto px-6 lg:px-8">
-          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="max-w-5xl mx-auto bg-white rounded-3xl border border-gray-200 shadow-sm p-8 lg:p-12">
-            <h3 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4">Tax Compliance Without the Headache.</h3>
-            <p className="text-gray-600 leading-relaxed max-w-3xl mb-10">
-              KRA's eTIMS system requires a signed fiscal receipt for every taxable sale. For most Kenyan businesses, this means manual data entry, spreadsheets, and accountants charging by the hour. PayChain eliminates all of that: every sale is signed through KRA's eTIMS OSCU in real time, with a verifiable QR receipt and full VAT breakdown, no manual submission step. Period summaries are ready for download whenever you or your accountant need them.
-            </p>
-
-            <div className="grid lg:grid-cols-3 gap-4 items-stretch">
-              <div className="lg:col-span-2 bg-gray-50 border border-gray-100 rounded-2xl p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <div>
-                    <div className="text-xs uppercase tracking-widest text-gray-500 mb-1">Period</div>
-                    <div className="font-bold text-gray-900">Jan 2026–Mar 2026</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-xs uppercase tracking-widest text-gray-500 mb-1">Total transactions</div>
-                    <div className="font-bold text-gray-900">1,248</div>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <div className="text-xs uppercase tracking-widest text-gray-500 mb-1">Total revenue</div>
-                    <div className="text-xl font-extrabold text-gray-900">Ksh 3,412,800.00</div>
-                  </div>
-                  <div>
-                    <div className="text-xs uppercase tracking-widest text-gray-500 mb-1">VAT summary</div>
-                    <div className="text-xl font-extrabold text-gray-900">Ksh 280,400.00</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col justify-center gap-3">
-                <button className="w-full inline-flex items-center justify-center gap-2 bg-[#0a0a0a] text-white font-bold px-4 py-3 rounded-xl hover:bg-gray-800 transition-colors">
-                  <Download className="w-4 h-4" /> Download e-TIMS report
-                </button>
-                <div className="text-xs text-gray-500 text-center">Official format, ready for KRA</div>
-              </div>
-            </div>
-          </motion.div>
         </div>
       </section>
 

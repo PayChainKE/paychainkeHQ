@@ -10,7 +10,7 @@ const features = [
   { title: 'Suppliers & Contractors', icon: Package, desc: 'Save supplier and contractor details once: bank account, mobile money, Paybill, or Till. Pay them all simultaneously when invoices are due. No manual transfers, no errors, no delays.' },
   { title: 'Utility Bill Settlement', icon: Zap, desc: 'Settle KPLC tokens (prepaid or postpaid), water, internet, and other utilities from one dashboard. Never miss a bill again.' },
   { title: 'Scheduled & Recurring Payments', icon: Calendar, desc: 'Set payments to run automatically: weekly wages, monthly rent, recurring orders. PayChain executes on time, every time.' },
-  { title: 'Full Audit Trail', icon: FileText, desc: 'Every payment logged with amount, recipient, timestamp, and reference. Download full reports for accounting and KRA eTIMS compliance.' },
+  { title: 'Full Audit Trail', icon: FileText, desc: 'Every payment logged with amount, recipient, timestamp, and reference. Download full reports for accounting.' },
   { title: 'Payment Approval Workflow', icon: CheckCircle, desc: 'Require a second sign-off before large payments are released. Protect your business from unauthorized transfers.' },
 ];
 
@@ -33,7 +33,6 @@ const comparisonRows = [
   ['Audit trail', 'None', 'Full downloadable report'],
   ['Scheduling', 'Manual every time', 'Automated recurring'],
   ['Approval controls', 'None', 'Multi-level authorization'],
-  ['KRA compliance', 'Manual records', 'Auto-generated reports'],
 ];
 
 const batch = [

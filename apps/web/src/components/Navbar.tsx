@@ -99,12 +99,12 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
       hasDropdown: true,
         dropdownItems: [
         { path: '/products/virtual-account', label: 'PayChain Virtual Account', description: 'Paybill, payment links, STK push, and invoicing, all verified instantly' },
-        { path: '/products/inflation-shield', label: 'The Inflation Shield', description: 'Stablecoin protection (in development)', soon: true },
         { path: '/products/bulk-pay', label: 'Paychain Bulk Pay', description: 'Payroll, suppliers, and utility bills in one click' },
-        { path: '/products/cash-advance', label: 'Cash Advance', description: 'Working capital and short-term advances' },
         { path: '/products/operations-tools', label: 'Operations tools', description: 'Reconciliation, disputes, and dashboards' },
+        { path: '/products/cash-advance', label: 'Cash Advance', description: 'Working capital and short-term advances' },
         { path: '/integrations', label: 'No Code Integration', description: 'Paste a snippet and add PayChain checkout to any website, no developer needed' },
         { path: '/docs', label: 'API Integration', description: 'Build custom payment flows on PayChain\'s REST API', soon: true },
+        { path: '/products/inflation-shield', label: 'The Inflation Shield', description: 'Stablecoin protection (in development)', soon: true },
       ],
     },
     // Removed Dashboard from nav bar
