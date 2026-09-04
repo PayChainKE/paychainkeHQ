@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, Image, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Defs, Pattern, Path, Rect } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
@@ -266,6 +267,30 @@ export default function Dashboard({ navigation }: any) {
               banner, with a real drop shadow so it reads as a physical
               object sitting on the page. */}
           <View className="px-6 -mt-16 mb-10 z-10">
+            <View style={{ position: 'relative' }}>
+              {/* A second card's edge, peeking out behind the front one —
+                  offset down-right and dimmer, like real cards sitting
+                  stacked in a wallet. Inset from the top-left (hidden under
+                  the front card there) and extended past the bottom-right
+                  (the visible sliver). Purely decorative. */}
+              <View
+                pointerEvents="none"
+                style={{
+                  position: 'absolute',
+                  top: 12,
+                  left: 10,
+                  right: -8,
+                  bottom: -12,
+                  borderRadius: 24,
+                  backgroundColor: '#0a3322',
+                  opacity: 0.55,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 10 },
+                  shadowOpacity: 0.25,
+                  shadowRadius: 16,
+                  elevation: 8,
+                }}
+              />
             <TourTarget id="home-balance">
               <LinearGradient
                 colors={['#22B589', '#0b4d2e', '#031f13']}
@@ -289,7 +314,27 @@ export default function Dashboard({ navigation }: any) {
                 <View pointerEvents="none" style={{ position: 'absolute', top: -70, right: -50, width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(94,254,179,0.14)' }} />
                 <View pointerEvents="none" style={{ position: 'absolute', bottom: -60, left: -60, width: 180, height: 180, borderRadius: 90, backgroundColor: 'rgba(255,255,255,0.04)' }} />
 
-                <Text className="text-white/60 text-[10px] font-jakarta-bold uppercase tracking-[0.15em]">Available Balance</Text>
+                {/* Kitenge-inspired texture — a diamond/chevron lattice
+                    (a common East African textile motif) tiled at very low
+                    opacity, replacing a generic dot-grid so the card carries
+                    some local character instead of a stock bank-card feel. */}
+                <Svg pointerEvents="none" width="100%" height="100%" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+                  <Defs>
+                    <Pattern id="kitenge" width={24} height={24} patternUnits="userSpaceOnUse">
+                      <Path d="M0 12 L6 0 L12 12 L18 0 L24 12 M0 12 L6 24 L12 12 L18 24 L24 12" stroke="white" strokeWidth={1} fill="none" opacity={0.5} />
+                    </Pattern>
+                  </Defs>
+                  <Rect width="100%" height="100%" fill="url(#kitenge)" opacity={0.07} />
+                </Svg>
+
+                {/* Top row — balance label on the left, the PayChain mark
+                    (plain, transparent background — no medallion) in the
+                    corner on the right, the way an issuer logo sits on a
+                    real card face. */}
+                <View className="flex-row items-start justify-between">
+                  <Text className="text-white/60 text-[10px] font-jakarta-bold uppercase tracking-[0.15em]">Available Balance</Text>
+                  <Image source={require('../../assets/icon.png')} style={{ width: 18, height: 18, opacity: 0.85 }} resizeMode="contain" />
+                </View>
 
                 {/* Main row — balance on the left, chip + contactless icon
                     stacked on the right, side by side instead of stacked
@@ -310,8 +355,9 @@ export default function Dashboard({ navigation }: any) {
                         above the chip, the same order real cards print it
                         in (contactless mark near the top edge, chip below). */}
                     <MaterialIcons name="wifi" size={19} color="rgba(255,255,255,0.65)" style={{ transform: [{ rotate: '90deg' }] }} />
-                    {/* EMV-style chip with the PayChain mark set into it,
-                        like a brand emblem debossed on a metal card. */}
+                    {/* EMV-style chip — left plain gold, same as a real
+                        chip: banks never brand the chip itself, so this
+                        reads more authentic without a logo on it. */}
                     <LinearGradient
                       colors={['#f6e7b4', '#d4af37', '#a8842c']}
                       start={{ x: 0, y: 0 }}
@@ -321,9 +367,7 @@ export default function Dashboard({ navigation }: any) {
                     >
                       <View style={{ position: 'absolute', top: 5, left: 0, right: 0, height: 1, backgroundColor: 'rgba(0,0,0,0.22)' }} />
                       <View style={{ position: 'absolute', bottom: 5, left: 0, right: 0, height: 1, backgroundColor: 'rgba(0,0,0,0.22)' }} />
-                      <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: 'rgba(255,251,235,0.92)', alignItems: 'center', justifyContent: 'center' }}>
-                        <Image source={require('../../assets/icon.png')} style={{ width: 12, height: 12 }} resizeMode="contain" />
-                      </View>
+                      <View style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 1, backgroundColor: 'rgba(0,0,0,0.18)' }} />
                     </LinearGradient>
                   </View>
                 </View>
@@ -353,6 +397,7 @@ export default function Dashboard({ navigation }: any) {
                 </View>
               </LinearGradient>
             </TourTarget>
+            </View>
           </View>
 
           <FundAccountModal visible={showFundAccount} onClose={() => setShowFundAccount(false)} />
