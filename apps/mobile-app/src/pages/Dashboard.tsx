@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, Image, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -218,22 +218,17 @@ export default function Dashboard({ navigation }: any) {
         }
       >
         <View className="w-full max-w-lg mx-auto flex-1">
-          {/* Header Area — styled like a premium bank/Visa card: deeper
-              3-stop gradient, an ambient glow, an EMV-style chip, and a
-              card-number-style account line. */}
+          {/* Greeting backdrop — just page chrome now (avatar, greeting,
+              eye toggle, notifications). The wallet card below is its own
+              element, sized and shadowed like a real card, not stretched
+              full-bleed into this. */}
           <LinearGradient
-            colors={['#22B589', '#0b4d2e', '#031f13']}
-            locations={[0, 0.55, 1]}
+            colors={['#22B589', '#0b4d2e']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            className="px-6 pt-[150px] pb-40 rounded-b-[40px] z-0 shadow-lg shadow-[#0b4d2e]/20 overflow-hidden"
+            className="px-6 pt-16 pb-24 rounded-b-[40px] z-0"
           >
-            {/* Ambient light — the soft glow real premium card UIs use to
-                avoid a flat, single-tone fill. */}
-            <View pointerEvents="none" style={{ position: 'absolute', top: -70, right: -50, width: 240, height: 240, borderRadius: 120, backgroundColor: 'rgba(94,254,179,0.14)' }} />
-            <View pointerEvents="none" style={{ position: 'absolute', bottom: -60, left: -60, width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(255,255,255,0.04)' }} />
-
-            <View className="flex-row justify-between items-center mb-10 mt-4">
+            <View className="flex-row justify-between items-center mt-4">
               <View className="flex-row items-center gap-3 pl-3">
                 <TouchableOpacity
                   onPress={() => navigation?.navigate('More')}
@@ -264,69 +259,110 @@ export default function Dashboard({ navigation }: any) {
                 </TouchableOpacity>
               </View>
             </View>
+          </LinearGradient>
 
-            {/* EMV-style chip + issuer mark — the two details that read
-                "bank card" at a glance rather than "app balance screen". */}
-            <View className="flex-row items-center justify-between pl-3 pr-1 mb-6">
+          {/* Wallet card — floats over the backdrop at a real e-wallet card
+              proportion (ISO card ratio, ~1.586:1) instead of a full-bleed
+              banner, with a real drop shadow so it reads as a physical
+              object sitting on the page. */}
+          <View className="px-6 -mt-16 mb-10 z-10">
+            <TourTarget id="home-balance">
               <LinearGradient
-                colors={['#f6e7b4', '#d4af37', '#a8842c']}
+                colors={['#22B589', '#0b4d2e', '#031f13']}
+                locations={[0, 0.55, 1]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={{ width: 38, height: 28, borderRadius: 6 }}
-                className="justify-center overflow-hidden"
+                style={{
+                  aspectRatio: 1.586,
+                  borderRadius: 24,
+                  padding: 22,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 18 },
+                  shadowOpacity: 0.35,
+                  shadowRadius: 28,
+                  elevation: 18,
+                }}
+                className="overflow-hidden justify-between"
               >
-                <View style={{ height: 1, backgroundColor: 'rgba(0,0,0,0.25)', marginTop: 6 }} />
-                <View style={{ height: 1, backgroundColor: 'rgba(0,0,0,0.25)', marginTop: 6 }} />
-                <View style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 1, backgroundColor: 'rgba(0,0,0,0.2)' }} />
-              </LinearGradient>
-              <Text className="text-white/50 text-[10px] font-jakarta-extrabold uppercase tracking-[3px]">PayChain</Text>
-            </View>
+                {/* Ambient light — the soft glow real premium card UIs use
+                    to avoid a flat, single-tone fill. */}
+                <View pointerEvents="none" style={{ position: 'absolute', top: -70, right: -50, width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(94,254,179,0.14)' }} />
+                <View pointerEvents="none" style={{ position: 'absolute', bottom: -60, left: -60, width: 180, height: 180, borderRadius: 90, backgroundColor: 'rgba(255,255,255,0.04)' }} />
 
-            <TourTarget id="home-balance" className="mb-2 pl-3">
-              <Text className="text-white/70 text-[11px] font-jakarta-bold uppercase tracking-widest mb-1">Available Balance</Text>
-              <PrivateValue
-                hidden={!showAmounts}
-                tint="dark"
-                style={{ fontFamily: 'PlusJakartaSans_700Bold', letterSpacing: -1 }}
-                className="text-4xl text-white leading-none"
-              >
-                {formatCurrency(merchant?.kesBalance || 0)}
-              </PrivateValue>
-            </TourTarget>
-            <View className="pl-3">
-              {todayTotal > 0 && (
-                <View className="flex-row items-center gap-1.5 self-start bg-[#83f5c6]/20 px-3 py-1.5 rounded-full border border-[#83f5c6]/20 mt-4">
-                  <Feather name="trending-up" size={14} color="#83f5c6" />
-                  <View className="flex-row items-center">
-                    <Text className="text-[#83f5c6] font-jakarta-bold text-sm">+</Text>
-                    <PrivateValue hidden={!showAmounts} tint="dark" className="text-[#83f5c6] font-jakarta-bold text-sm">
-                      {formatCurrency(todayTotal)}
-                    </PrivateValue>
-                    <Text className="text-[#83f5c6] font-jakarta-bold text-sm"> today</Text>
+                <Text className="text-white/60 text-[10px] font-jakarta-bold uppercase tracking-[0.15em]">Available Balance</Text>
+
+                {/* Main row — balance on the left, chip + contactless icon
+                    stacked on the right, side by side instead of stacked
+                    above the amount. */}
+                <View className="flex-row items-start justify-between mt-2">
+                  <PrivateValue
+                    hidden={!showAmounts}
+                    tint="dark"
+                    style={{ fontFamily: 'PlusJakartaSans_700Bold', letterSpacing: -1, flexShrink: 1 }}
+                    className="text-[34px] text-white leading-none"
+                  >
+                    {formatCurrency(merchant?.kesBalance || 0)}
+                  </PrivateValue>
+
+                  <View className="items-center gap-2 pl-3">
+                    {/* Contactless indicator — MaterialIcons "wifi" rotated
+                        90° reads as the standard tap-to-pay glyph. Sits
+                        above the chip, the same order real cards print it
+                        in (contactless mark near the top edge, chip below). */}
+                    <MaterialIcons name="wifi" size={19} color="rgba(255,255,255,0.65)" style={{ transform: [{ rotate: '90deg' }] }} />
+                    {/* EMV-style chip with the PayChain mark set into it,
+                        like a brand emblem debossed on a metal card. */}
+                    <LinearGradient
+                      colors={['#f6e7b4', '#d4af37', '#a8842c']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={{ width: 42, height: 32, borderRadius: 7 }}
+                      className="items-center justify-center overflow-hidden"
+                    >
+                      <View style={{ position: 'absolute', top: 5, left: 0, right: 0, height: 1, backgroundColor: 'rgba(0,0,0,0.22)' }} />
+                      <View style={{ position: 'absolute', bottom: 5, left: 0, right: 0, height: 1, backgroundColor: 'rgba(0,0,0,0.22)' }} />
+                      <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: 'rgba(255,251,235,0.92)', alignItems: 'center', justifyContent: 'center' }}>
+                        <Image source={require('../../assets/icon.png')} style={{ width: 12, height: 12 }} resizeMode="contain" />
+                      </View>
+                    </LinearGradient>
                   </View>
                 </View>
-              )}
-              {/* Card-number-style account line — same treatment a physical
-                  card gives its embossed digits: wide letter-spacing, no
-                  pill/border boxing it in like a status badge. */}
-              <View className="flex-row items-center gap-2 mt-5">
-                <Feather name="credit-card" size={13} color="rgba(255,255,255,0.55)" />
-                <Text
-                  style={{ letterSpacing: 2.5 }}
-                  className="text-white/70 text-[13px] font-jakarta-bold"
-                >
-                  {formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'PENDING')}
-                </Text>
-              </View>
-            </View>
-          </LinearGradient>
+
+                <View>
+                  {todayTotal > 0 && (
+                    <View className="flex-row items-center gap-1.5 self-start bg-[#83f5c6]/20 px-2.5 py-1 rounded-full border border-[#83f5c6]/20 mb-3">
+                      <Feather name="trending-up" size={12} color="#83f5c6" />
+                      <View className="flex-row items-center">
+                        <Text className="text-[#83f5c6] font-jakarta-bold text-[11px]">+</Text>
+                        <PrivateValue hidden={!showAmounts} tint="dark" className="text-[#83f5c6] font-jakarta-bold text-[11px]">
+                          {formatCurrency(todayTotal)}
+                        </PrivateValue>
+                        <Text className="text-[#83f5c6] font-jakarta-bold text-[11px]"> today</Text>
+                      </View>
+                    </View>
+                  )}
+                  {/* Card-number-style account line — same treatment a
+                      physical card gives its embossed digits: wide
+                      letter-spacing, no pill/border boxing it in. */}
+                  <Text
+                    style={{ letterSpacing: 2.5 }}
+                    className="text-white/70 text-[13px] font-jakarta-bold"
+                  >
+                    {formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'PENDING')}
+                  </Text>
+                </View>
+              </LinearGradient>
+            </TourTarget>
+          </View>
 
           <FundAccountModal visible={showFundAccount} onClose={() => setShowFundAccount(false)} />
 
-          {/* Action Buttons (overlapping) — Fund now lives here as its own
-              circle (gold, matching the card chip) instead of the full-width
-              button that used to sit inside the card. */}
-          <View className="px-6 flex-row justify-between -mt-6 mb-10 z-10">
+          {/* Action Buttons — Fund now lives here as its own circle (gold,
+              matching the card chip) instead of the full-width button that
+              used to sit inside the card. The wallet card above now has its
+              own bottom margin (it's no longer a full-bleed hero this row
+              overlapped), so no negative offset needed here anymore. */}
+          <View className="px-6 flex-row justify-between mb-10 z-10">
             <TouchableOpacity className="items-center" activeOpacity={0.8} onPress={() => navigation?.navigate('Collections')}>
               <View className="w-16 h-16 rounded-full bg-white shadow-lg shadow-black/10 items-center justify-center mb-2.5">
                 <View className="w-11 h-11 rounded-full bg-[#5efeb3] items-center justify-center">
