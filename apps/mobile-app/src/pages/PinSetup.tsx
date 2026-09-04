@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Dimensions, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Dimensions, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import { showAlert } from '../utils/alert';
 
 const { width } = Dimensions.get('window');
 
@@ -53,7 +54,7 @@ export default function PinSetup() {
 
   const verifyPins = async (finalConfirmPin: string) => {
     if (pin !== finalConfirmPin) {
-      Alert.alert('Error', 'PINs do not match. Please try again.');
+      showAlert('Error', 'PINs do not match. Please try again.');
       setPin('');
       setConfirmPin('');
       setStep('setup');
@@ -71,7 +72,7 @@ export default function PinSetup() {
         setStep('password');
         return;
       }
-      Alert.alert('Could not save PIN', err?.response?.data?.error || 'Please check your connection and try again.');
+      showAlert('Could not save PIN', err?.response?.data?.error || 'Please check your connection and try again.');
       setPin('');
       setConfirmPin('');
       setStep('setup');

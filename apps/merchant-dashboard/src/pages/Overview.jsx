@@ -252,7 +252,6 @@ export default function Overview() {
             <div className="flex justify-between items-start mb-8 lg:mb-10">
               <span className="bg-[#1F4D3C] text-[#5EFEB3] px-3 lg:px-4 py-1.5 rounded-full text-[8px] lg:text-[9px] font-black tracking-[0.15em] uppercase border border-white/10">Business Account</span>
               <div className="flex items-center gap-3 lg:gap-4 text-[8px] lg:text-[9px]">
-                <span className="text-white/40 uppercase font-bold tracking-[0.15em] hidden sm:inline">Acc: {formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending')}</span>
                 <button
                   onClick={togglePrivacy}
                   className="text-white/40 hover:text-white transition-colors p-1"
@@ -263,14 +262,38 @@ export default function Overview() {
                 </button>
               </div>
             </div>
-            
+
+            {/* EMV-style chip + issuer mark — the detail that reads "bank
+                card" rather than "app balance panel" at a glance. */}
+            <div className="flex items-center justify-between mb-6">
+              <div
+                className="w-[38px] h-[28px] rounded-[6px] relative overflow-hidden"
+                style={{ background: 'linear-gradient(135deg, #f6e7b4, #d4af37 55%, #a8842c)' }}
+              >
+                <div className="absolute inset-x-0 top-[9px] h-px bg-black/25" />
+                <div className="absolute inset-x-0 top-[16px] h-px bg-black/25" />
+                <div className="absolute inset-y-0 left-1/2 w-px bg-black/20" />
+              </div>
+              <span className="text-white/40 text-[9px] lg:text-[10px] font-black uppercase tracking-[0.25em]">PayChain</span>
+            </div>
+
             <div className="flex-1">
+              <p className="text-white/60 text-[9px] lg:text-[10px] font-bold uppercase tracking-[0.15em] mb-1.5">Available Balance</p>
               <h3 className={`font-headline font-bold text-3xl lg:text-4xl tracking-tighter tabular-nums mb-1 transition-all duration-300 ${!showAmounts && 'blur-lg grayscale'}`}>
                 {formatKES(merchant?.kesBalance || 0)}
               </h3>
-              <div className={`flex items-center gap-2 text-[#5EFEB3] font-bold text-[9px] lg:text-[10px] tracking-wide transition-all duration-300 ${!showAmounts && 'blur-sm grayscale'}`}>
+              <div className={`flex items-center gap-2 text-[#5EFEB3] font-bold text-[9px] lg:text-[10px] tracking-wide transition-all duration-300 mb-3 ${!showAmounts && 'blur-sm grayscale'}`}>
                 <span className="material-symbols-outlined text-[10px]" style={{ fontVariationSettings: "'FILL' 1" }}>trending_up</span>
                 <span>+{formatKES(todaysRevenue)} today</span>
+              </div>
+              {/* Card-number-style account line — wide letter-spacing and no
+                  pill/border, the same treatment a physical card's embossed
+                  digits get, instead of a small badge tucked in the corner. */}
+              <div className="flex items-center gap-2 text-white/50">
+                <span className="material-symbols-outlined text-[13px] leading-none">credit_card</span>
+                <span className="text-[12px] lg:text-[13px] font-bold tracking-[0.2em] tabular-nums">
+                  {formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending')}
+                </span>
               </div>
             </div>
 

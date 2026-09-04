@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store';
 import { useAuth } from '../context/AuthContext';
 import { useBiometrics, biometricLabel } from '../hooks/useBiometrics';
+import { showAlert } from '../utils/alert';
 
 // Give the screen a beat to actually finish mounting/transitioning before
 // invoking the OS biometric sheet — calling authenticateAsync the instant
@@ -28,7 +29,13 @@ const LOCKOUT_MS = 15 * 60 * 1000;
 const ATTEMPTS_KEY = 'paychain_pin_failed_attempts';
 const LOCKED_UNTIL_KEY = 'paychain_pin_locked_until';
 
+// expo-secure-store's web shim doesn't actually implement these calls (they
+// throw "getValueWithKeyAsync is not a function") — same reasoning as the
+// Platform.OS guards already in AuthContext.tsx for the JWT/appPin storage.
+// Lockout tracking simply doesn't apply on the web preview; every other
+// platform still gets the real persisted counter.
 async function loadLockoutState(): Promise<{ attempts: number; lockedUntil: number | null }> {
+  if (Platform.OS === 'web') return { attempts: 0, lockedUntil: null };
   const [attemptsRaw, lockedUntilRaw] = await Promise.all([
     SecureStore.getItemAsync(ATTEMPTS_KEY),
     SecureStore.getItemAsync(LOCKED_UNTIL_KEY),
@@ -40,9 +47,18 @@ async function loadLockoutState(): Promise<{ attempts: number; lockedUntil: numb
 }
 
 async function clearLockoutState() {
+  if (Platform.OS === 'web') return;
   await Promise.all([
     SecureStore.deleteItemAsync(ATTEMPTS_KEY),
     SecureStore.deleteItemAsync(LOCKED_UNTIL_KEY),
+  ]);
+}
+
+async function setLockoutState(attempts: number, lockedUntil?: number) {
+  if (Platform.OS === 'web') return;
+  await Promise.all([
+    SecureStore.setItemAsync(ATTEMPTS_KEY, String(attempts)),
+    ...(lockedUntil ? [SecureStore.setItemAsync(LOCKED_UNTIL_KEY, String(lockedUntil))] : []),
   ]);
 }
 
@@ -140,18 +156,15 @@ export default function PinEntry({ navigation }: any) {
 
     if (nextAttempts >= MAX_ATTEMPTS) {
       const until = Date.now() + LOCKOUT_MS;
-      await Promise.all([
-        SecureStore.setItemAsync(ATTEMPTS_KEY, String(nextAttempts)),
-        SecureStore.setItemAsync(LOCKED_UNTIL_KEY, String(until)),
-      ]);
+      await setLockoutState(nextAttempts, until);
       setLockedUntil(until);
       setNow(Date.now());
-      Alert.alert('Too Many Attempts', 'Your account is temporarily locked for 15 minutes.');
+      showAlert('Too Many Attempts', 'Your account is temporarily locked for 15 minutes.');
       return;
     }
 
-    await SecureStore.setItemAsync(ATTEMPTS_KEY, String(nextAttempts));
-    Alert.alert('Incorrect PIN', `Please try again. ${MAX_ATTEMPTS - nextAttempts} attempt${MAX_ATTEMPTS - nextAttempts === 1 ? '' : 's'} remaining.`);
+    await setLockoutState(nextAttempts);
+    showAlert('Incorrect PIN', `Please try again. ${MAX_ATTEMPTS - nextAttempts} attempt${MAX_ATTEMPTS - nextAttempts === 1 ? '' : 's'} remaining.`);
   };
 
   return (
