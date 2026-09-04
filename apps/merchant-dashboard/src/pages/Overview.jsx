@@ -12,7 +12,7 @@ import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { useNavigate } from 'react-router-dom'
 import FundAccountModal from '../components/modals/FundAccountModal'
-import paychainMark from '../assets/paychain-mark.png'
+import walletCardBg from '../assets/wallet-card-bg.png'
 
 export default function Overview() {
   const navigate = useNavigate()
@@ -251,21 +251,21 @@ export default function Overview() {
             <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-400/10 rounded-full -mr-20 -mt-20 blur-[80px] group-hover:scale-110 transition-transform duration-1000"></div>
             <div className="absolute bottom-0 left-0 w-64 h-64 bg-emerald-600/10 rounded-full -ml-20 -mb-20 blur-[60px] group-hover:scale-110 transition-transform duration-1000"></div>
           </div>
-          
-          {/* Card Texture/Pattern — a kitenge-inspired diamond/chevron
-              lattice (a common East African textile motif), replacing a
-              generic dot-grid so the card carries some local character
-              instead of a stock bank-card feel. */}
+
+          {/* Tech/blockchain background art — the actual supplied image
+              (cube cluster + binary digits + glow), right-anchored so its
+              brightest detail sits behind the chip/wifi corner rather than
+              behind the balance text, at an opacity that still reads as
+              texture rather than a competing image. */}
           <div
-            className="absolute inset-0 opacity-[0.05] pointer-events-none mix-blend-overlay rounded-[24px] overflow-hidden"
+            className="absolute inset-0 opacity-40 pointer-events-none rounded-[24px] overflow-hidden"
             style={{
-              backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(
-                "<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'><path d='M0 12 L6 0 L12 12 L18 0 L24 12 M0 12 L6 24 L12 12 L18 24 L24 12' stroke='white' stroke-width='1' fill='none'/></svg>"
-              )}")`,
-              backgroundSize: '24px 24px',
+              backgroundImage: `url(${walletCardBg})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'right center',
             }}
           ></div>
-          
+
           {/* Glass Top Highlight */}
           <div className="absolute top-0 inset-x-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-400/30 to-transparent rounded-t-[24px]"></div>
 
@@ -285,13 +285,7 @@ export default function Overview() {
             </div>
 
             <div className="flex-1">
-              {/* Balance label on the left, PayChain mark (plain,
-                  transparent background — no medallion) in the corner on
-                  the right, the way an issuer logo sits on a real card face. */}
-              <div className="flex items-start justify-between mb-1.5">
-                <p className="text-white/60 text-[9px] lg:text-[10px] font-bold uppercase tracking-[0.15em]">Available Balance</p>
-                <img src={paychainMark} alt="PayChain" className="w-[18px] h-[18px] object-contain opacity-85" />
-              </div>
+              <p className="text-white/60 text-[9px] lg:text-[10px] font-bold uppercase tracking-[0.15em] mb-1.5">Available Balance</p>
 
               {/* Balance on the left, chip + contactless icon on the right
                   — beside the amount rather than stacked above it. */}

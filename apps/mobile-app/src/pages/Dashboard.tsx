@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, Image, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Defs, Pattern, Path, Rect } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
@@ -314,27 +313,19 @@ export default function Dashboard({ navigation }: any) {
                 <View pointerEvents="none" style={{ position: 'absolute', top: -70, right: -50, width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(94,254,179,0.14)' }} />
                 <View pointerEvents="none" style={{ position: 'absolute', bottom: -60, left: -60, width: 180, height: 180, borderRadius: 90, backgroundColor: 'rgba(255,255,255,0.04)' }} />
 
-                {/* Kitenge-inspired texture — a diamond/chevron lattice
-                    (a common East African textile motif) tiled at very low
-                    opacity, replacing a generic dot-grid so the card carries
-                    some local character instead of a stock bank-card feel. */}
-                <Svg pointerEvents="none" width="100%" height="100%" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
-                  <Defs>
-                    <Pattern id="kitenge" width={24} height={24} patternUnits="userSpaceOnUse">
-                      <Path d="M0 12 L6 0 L12 12 L18 0 L24 12 M0 12 L6 24 L12 12 L18 24 L24 12" stroke="white" strokeWidth={1} fill="none" opacity={0.5} />
-                    </Pattern>
-                  </Defs>
-                  <Rect width="100%" height="100%" fill="url(#kitenge)" opacity={0.07} />
-                </Svg>
+                {/* Tech/blockchain background art — the actual supplied
+                    image (cube cluster + binary digits + glow), right-
+                    anchored so its brightest detail sits behind the
+                    chip/wifi corner rather than behind the balance text,
+                    at an opacity that still reads as texture rather than a
+                    competing image. */}
+                <Image
+                  source={require('../../assets/wallet-card-bg.png')}
+                  resizeMode="cover"
+                  style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.4 }}
+                />
 
-                {/* Top row — balance label on the left, the PayChain mark
-                    (plain, transparent background — no medallion) in the
-                    corner on the right, the way an issuer logo sits on a
-                    real card face. */}
-                <View className="flex-row items-start justify-between">
-                  <Text className="text-white/60 text-[10px] font-jakarta-bold uppercase tracking-[0.15em]">Available Balance</Text>
-                  <Image source={require('../../assets/icon.png')} style={{ width: 18, height: 18, opacity: 0.85 }} resizeMode="contain" />
-                </View>
+                <Text className="text-white/60 text-[10px] font-jakarta-bold uppercase tracking-[0.15em]">Available Balance</Text>
 
                 {/* Main row — balance on the left, chip + contactless icon
                     stacked on the right, side by side instead of stacked
