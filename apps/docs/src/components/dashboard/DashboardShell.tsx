@@ -15,10 +15,18 @@ const NAV = [
 ];
 
 function DashboardNav({ onNavigate, developer, onSignOut }: { onNavigate?: () => void; developer: { companyName: string; email: string }; onSignOut: () => void }) {
+  const initial = developer.companyName?.trim()?.[0]?.toUpperCase() || "?";
   return (
     <div className="px-4 py-6">
-      <p className="px-2.5 text-[13px] font-semibold text-ink truncate">{developer.companyName}</p>
-      <p className="px-2.5 text-[12px] text-ink-faint truncate mb-6">{developer.email}</p>
+      <div className="flex items-center gap-2.5 px-2.5 mb-6">
+        <div className="w-8 h-8 rounded-lg bg-brand/10 border border-brand/20 flex items-center justify-center shrink-0">
+          <span className="text-[13px] font-bold text-brand-bright">{initial}</span>
+        </div>
+        <div className="min-w-0">
+          <p className="text-[13px] font-semibold text-ink truncate">{developer.companyName}</p>
+          <p className="text-[12px] text-ink-faint truncate">{developer.email}</p>
+        </div>
+      </div>
       <nav className="space-y-0.5">
         {NAV.map((item) => {
           const Icon = item.icon;
@@ -30,8 +38,8 @@ function DashboardNav({ onNavigate, developer, onSignOut }: { onNavigate?: () =>
               onClick={onNavigate}
               className={({ isActive }) =>
                 cn(
-                  "flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[13.5px] font-medium transition-colors",
-                  isActive ? "bg-brand/10 text-brand-bright" : "text-ink-muted hover:text-ink hover:bg-surface-raised"
+                  "flex items-center gap-2.5 pl-3 pr-2.5 py-1.5 -ml-px rounded-r-md border-l-2 text-[13.5px] font-medium transition-colors",
+                  isActive ? "border-brand bg-brand/10 text-brand-bright" : "border-transparent text-ink-muted hover:text-ink hover:bg-surface-raised"
                 )
               }
             >

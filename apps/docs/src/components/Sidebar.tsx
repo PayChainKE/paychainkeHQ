@@ -19,10 +19,10 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                 onClick={onNavigate}
                 className={({ isActive }) =>
                   cn(
-                    "block px-2.5 py-1.5 rounded-md text-[13.5px] font-medium transition-colors",
+                    "block pl-3 pr-2.5 py-1.5 -ml-px rounded-r-md border-l-2 text-[13.5px] font-medium transition-colors",
                     isActive
-                      ? "bg-brand/10 text-brand-bright"
-                      : "text-ink-muted hover:text-ink hover:bg-surface-raised"
+                      ? "border-brand bg-brand/10 text-brand-bright"
+                      : "border-transparent text-ink-muted hover:text-ink hover:bg-surface-raised"
                   )
                 }
               >

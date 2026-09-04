@@ -115,6 +115,27 @@ export function logoutDeveloper() {
   return request<{ success: boolean }>("/api/developer/logout", { method: "POST" });
 }
 
+export function forgotDeveloperPassword(body: { email: string }) {
+  return request<{ success: boolean; message: string; maskedEmail: string | null }>("/api/auth/developer/forgot-password", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function verifyDeveloperResetOtp(body: { email: string; otp: string }) {
+  return request<{ success: boolean; message: string; resetToken: string; expiresInSeconds: number }>("/api/auth/developer/verify-reset-otp", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function resetDeveloperPassword(body: { resetToken: string; newPassword: string }) {
+  return request<{ success: boolean; message: string }>("/api/auth/developer/reset-password", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
 // --- Account (private) ---
 
 export function getMe() {

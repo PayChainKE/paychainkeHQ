@@ -61,7 +61,7 @@ export default function Introduction() {
         <Link to="/no-code-integration" className="text-brand-bright font-semibold hover:underline">
           no-code integration guide
         </Link>{" "}
-        — a working payment button on your site in a few minutes, no account here needed.
+        for a working payment button on your site in a few minutes, no account here needed.
       </p>
 
       <CodeGroup
@@ -180,7 +180,7 @@ payment = JSON.parse(res.body)['payment']`,
       <h2>Get your key</h2>
       <p>
         <Link to="/signup">Sign up</Link> for a free account, link the merchant you're building for, and
-        create a test-mode key from your dashboard — under two minutes, no approval needed. Then
+        create a test-mode key from your dashboard, under two minutes, no approval needed. Then
         drop the key into the example above and it runs. Prefer the API directly? The same three
         calls (register, link merchant, create key) are in the{" "}
         <Link to="/integration-guide">Integration Guide</Link>, along with the account model and

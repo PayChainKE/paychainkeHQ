@@ -60,7 +60,7 @@ export default function MerchantLink() {
     <>
       <h1 className="text-2xl font-extrabold text-ink tracking-tight mb-1.5">Merchant</h1>
       <p className="text-[14px] text-ink-muted mb-8">
-        Every API key acts on behalf of one PayChain merchant account — this proves you control it, once.
+        Every API key acts on behalf of one PayChain merchant account; this proves you control it, once.
       </p>
 
       {step === "loading" && <p className="text-[13px] text-ink-faint">Loading…</p>}
@@ -81,7 +81,7 @@ export default function MerchantLink() {
           {error && <Callout variant="warning">{error}</Callout>}
           <form onSubmit={handleStart} className="rounded-xl border border-border bg-surface p-4">
             <p className="text-[13px] text-ink-muted mb-4">
-              Sign in with the merchant account's own credentials — the ones for its PayChain merchant dashboard login,
+              Sign in with the merchant account's own credentials, the ones for its PayChain merchant dashboard login,
               not a developer account.
             </p>
             <FormField label="Merchant email" type="email" required value={merchantEmail} onChange={(e) => setMerchantEmail(e.target.value)} />
@@ -102,7 +102,7 @@ export default function MerchantLink() {
           {error && <Callout variant="warning">{error}</Callout>}
           <form onSubmit={handleVerify} className="rounded-xl border border-border bg-surface p-4">
             <p className="text-[13px] text-ink-muted mb-4">
-              A verification code was sent to <strong className="text-ink">{merchantEmail}</strong> — the merchant's own
+              A verification code was sent to <strong className="text-ink">{merchantEmail}</strong>, the merchant's own
               inbox, not yours, so someone else can't link their wallet with only your session.
             </p>
             <FormField

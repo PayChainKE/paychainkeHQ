@@ -56,13 +56,13 @@ export default function ApiKeys() {
     <>
       <h1 className="text-2xl font-extrabold text-ink tracking-tight mb-1.5">API keys</h1>
       <p className="text-[14px] text-ink-muted mb-8">
-        Test keys work immediately — everything's simulated. Live keys need approval; see{" "}
+        Test keys work immediately: everything's simulated. Live keys need approval; see{" "}
         <Link to="/dashboard/live-access" className="text-brand hover:text-brand-bright">Live access</Link>.
       </p>
 
       {revealedKey && (
         <div className="rounded-xl border border-brand/30 bg-brand/[0.06] p-4 mb-6">
-          <p className="text-[13.5px] font-semibold text-ink mb-2">Your new key — copy it now, it won't be shown again</p>
+          <p className="text-[13.5px] font-semibold text-ink mb-2">Your new key: copy it now, it won't be shown again</p>
           <div className="flex items-center gap-2 rounded-lg bg-code-bg border border-code-border px-3 py-2.5">
             <code className="flex-1 font-mono text-[13px] text-code-text truncate">{revealedKey}</code>
             <CopyButton text={revealedKey} />
@@ -122,7 +122,7 @@ export default function ApiKeys() {
           </thead>
           <tbody className="divide-y divide-border-subtle">
             {keys?.length === 0 && (
-              <tr><td colSpan={5} className="px-4 py-6 text-center text-[13px] text-ink-faint">No keys yet — create one above.</td></tr>
+              <tr><td colSpan={5} className="px-4 py-6 text-center text-[13px] text-ink-faint">No keys yet, create one above.</td></tr>
             )}
             {keys?.map((k) => (
               <tr key={k._id}>

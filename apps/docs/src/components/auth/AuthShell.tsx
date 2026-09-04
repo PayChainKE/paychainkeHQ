@@ -6,8 +6,12 @@ import { useTheme } from "@/context/ThemeContext";
 export default function AuthShell({ children }: { children: React.ReactNode }) {
   const { theme, toggleTheme } = useTheme();
   return (
-    <div className="min-h-screen bg-canvas flex flex-col">
-      <header className="h-14 px-4 lg:px-6 flex items-center border-b border-border-subtle">
+    <div className="min-h-screen bg-canvas flex flex-col relative overflow-hidden">
+      <div
+        className="pointer-events-none absolute -top-40 left-1/2 -translate-x-1/2 w-[42rem] h-[28rem] rounded-full blur-3xl opacity-[0.12] bg-brand"
+        aria-hidden="true"
+      />
+      <header className="relative h-14 px-4 lg:px-6 flex items-center border-b border-border-subtle">
         <Logo />
         <button
           onClick={toggleTheme}
@@ -17,8 +21,10 @@ export default function AuthShell({ children }: { children: React.ReactNode }) {
           {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </button>
       </header>
-      <main className="flex-1 flex items-center justify-center px-4 py-12">
-        <div className="w-full max-w-sm">{children}</div>
+      <main className="relative flex-1 flex items-center justify-center px-4 py-12">
+        <div className="w-full max-w-sm rounded-2xl border border-border-subtle bg-surface/60 backdrop-blur-sm p-7 shadow-xl shadow-black/[0.03] dark:shadow-black/20">
+          {children}
+        </div>
       </main>
     </div>
   );

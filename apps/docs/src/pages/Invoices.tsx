@@ -12,7 +12,7 @@ export default function Invoices() {
       <h1 className="text-3xl font-extrabold text-ink tracking-tight mb-4">Invoices</h1>
       <p>
         Create a real invoice, email it to a customer with a payable link, and get notified the
-        moment it's paid — the same invoicing engine behind the PayChain merchant dashboard's own
+        moment it's paid, the same invoicing engine behind the PayChain merchant dashboard's own
         Invoices page, driven from your own system instead. Base path{" "}
         <code>https://api.paychain.co.ke/api/v1/developer</code>.
       </p>
@@ -22,7 +22,7 @@ export default function Invoices() {
       <ParamsTable
         params={[
           { name: "customer.name", type: "string", required: true, description: "Who the invoice is billed to." },
-          { name: "customer.email", type: "string", description: "Required before you can send it — see below." },
+          { name: "customer.email", type: "string", description: "Required before you can send it; see below." },
           { name: "customer.phone", type: "string", description: "Optional. Normalized to 0XXXXXXXXX if it looks like a Kenyan mobile number." },
           { name: "customer.address", type: "string", description: "Optional, shown on the invoice." },
           { name: "items", type: "array", required: true, description: "[{ description, qty, price }, ...]. price is in the invoice's currency, per unit." },
@@ -43,7 +43,7 @@ curl -X POST https://api.paychain.co.ke/api/v1/developer/invoices \\
   -d '{
     "customer": { "name": "Amani Traders Ltd", "email": "accounts@amani.co.ke", "phone": "0712345678" },
     "items": [
-      { "description": "Consulting — August", "qty": 1, "price": 45000 },
+      { "description": "Consulting (August)", "qty": 1, "price": 45000 },
       { "description": "Onboarding support", "qty": 2, "price": 5000 }
     ],
     "dueDate": "2026-09-15"
@@ -60,7 +60,7 @@ const res = await fetch('https://api.paychain.co.ke/api/v1/developer/invoices', 
   body: JSON.stringify({
     customer: { name: 'Amani Traders Ltd', email: 'accounts@amani.co.ke', phone: '0712345678' },
     items: [
-      { description: 'Consulting — August', qty: 1, price: 45000 },
+      { description: 'Consulting (August)', qty: 1, price: 45000 },
       { description: 'Onboarding support', qty: 2, price: 5000 },
     ],
     dueDate: '2026-09-15',
@@ -79,7 +79,7 @@ res = requests.post(
     json={
         'customer': {'name': 'Amani Traders Ltd', 'email': 'accounts@amani.co.ke', 'phone': '0712345678'},
         'items': [
-            {'description': 'Consulting — August', 'qty': 1, 'price': 45000},
+            {'description': 'Consulting (August)', 'qty': 1, 'price': 45000},
             {'description': 'Onboarding support', 'qty': 2, 'price': 5000},
         ],
         'dueDate': '2026-09-15',
@@ -101,7 +101,7 @@ curl_setopt_array($ch, [
     CURLOPT_POSTFIELDS => json_encode([
         'customer' => ['name' => 'Amani Traders Ltd', 'email' => 'accounts@amani.co.ke', 'phone' => '0712345678'],
         'items' => [
-            ['description' => 'Consulting — August', 'qty' => 1, 'price' => 45000],
+            ['description' => 'Consulting (August)', 'qty' => 1, 'price' => 45000],
             ['description' => 'Onboarding support', 'qty' => 2, 'price' => 5000],
         ],
         'dueDate' => '2026-09-15',
@@ -123,7 +123,7 @@ req = Net::HTTP::Post.new(uri, {
 req.body = {
   customer: { name: 'Amani Traders Ltd', email: 'accounts@amani.co.ke', phone: '0712345678' },
   items: [
-    { description: 'Consulting — August', qty: 1, price: 45000 },
+    { description: 'Consulting (August)', qty: 1, price: 45000 },
     { description: 'Onboarding support', qty: 2, price: 5000 },
   ],
   dueDate: '2026-09-15',
@@ -146,7 +146,7 @@ invoice = JSON.parse(res.body)['invoice']`,
     "status": "draft",
     "customer": { "name": "Amani Traders Ltd", "email": "accounts@amani.co.ke", "phone": "0712345678", "address": null },
     "items": [
-      { "description": "Consulting — August", "qty": 1, "price": 45000 },
+      { "description": "Consulting (August)", "qty": 1, "price": 45000 },
       { "description": "Onboarding support", "qty": 2, "price": 5000 }
     ],
     "currency": "KES",
@@ -163,7 +163,7 @@ invoice = JSON.parse(res.body)['invoice']`,
 }`}
       />
       <p>
-        A draft isn't visible to the customer yet — <code>payUrl</code> is <code>null</code> and{" "}
+        A draft isn't visible to the customer yet: <code>payUrl</code> is <code>null</code> and{" "}
         <code>qrCodeDataUri</code> encodes a placeholder view link until it's sent. Edit line
         items freely at this stage; there's no update endpoint on the API yet, so get the draft
         right before sending, or delete and recreate it from the dashboard if needed.
@@ -200,9 +200,9 @@ invoice = JSON.parse(res.body)['invoice']`,
         <code>400</code> otherwise, before anything is emailed.
       </Callout>
       <p>
-        Fires an <code>invoice.sent</code> webhook immediately, and later —{" "}
+        Fires an <code>invoice.sent</code> webhook immediately, and later,{" "}
         <em>only</em> once the customer actually pays via <code>payUrl</code> or scans{" "}
-        <code>qrCodeDataUri</code> — an <code>invoice.paid</code> webhook. See{" "}
+        <code>qrCodeDataUri</code>, an <code>invoice.paid</code> webhook. See{" "}
         <Link to="/webhooks">Webhooks</Link>.
       </p>
 
@@ -225,7 +225,7 @@ invoice = JSON.parse(res.body)['invoice']`,
   -H "Authorization: Bearer pc_live_..."`}
       />
       <p>
-        Returns up to your 100 most recent invoices, newest first — every invoice created via any
+        Returns up to your 100 most recent invoices, newest first: every invoice created via any
         of your API keys, both test and live. Only invoices created through this API appear here;
         ones created directly from the PayChain merchant dashboard don't (view those in the
         dashboard's own Invoices page instead).
@@ -239,7 +239,7 @@ invoice = JSON.parse(res.body)['invoice']`,
           { name: "status", type: "\"draft\" | \"sent\" | \"paid\"", description: "" },
           { name: "customer", type: "object", description: "{ name, email, phone, address }." },
           { name: "items", type: "array", description: "[{ description, qty, price }, ...]." },
-          { name: "subtotal / total", type: "number", description: "Sum of qty × price across all items. Equal today — there's no tax/discount layer yet." },
+          { name: "subtotal / total", type: "number", description: "Sum of qty × price across all items. Equal today; there's no tax/discount layer yet." },
           { name: "payUrl", type: "string | null", description: "The real, payable link. null until sent." },
           { name: "qrCodeDataUri", type: "string", description: "A scannable PNG (data URI) encoding payUrl once sent, or a placeholder view link before that." },
           { name: "sentAt / paidAt", type: "string | null", description: "ISO timestamps, null until each happens." },

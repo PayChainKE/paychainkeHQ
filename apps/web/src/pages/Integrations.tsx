@@ -15,7 +15,7 @@ const steps = [
   {
     icon: LinkIcon,
     title: '1. Create a Payment Link',
-    description: 'From your PayChain dashboard, Request Money → Payment Link. Set the amount, generate it — takes a few seconds, no setup.',
+    description: 'From your PayChain dashboard, Request Money → Payment Link. Set the amount and generate it in a few seconds, no setup.',
   },
   {
     icon: ClipboardCopy,
@@ -58,7 +58,7 @@ const Integrations: React.FC = () => {
             <pre className="text-emerald-300 text-xs sm:text-sm font-mono leading-relaxed whitespace-pre">{snippet}</pre>
           </div>
           <p className="text-xs text-gray-500 mt-2 text-center">
-            That's the whole integration. <code className="text-gray-700">YOUR_LINK_ID</code> comes from your dashboard — nothing to install, nothing to configure.
+            That's the whole integration. <code className="text-gray-700">YOUR_LINK_ID</code> comes from your dashboard. Nothing to install, nothing to configure.
           </p>
         </div>
 

@@ -49,6 +49,9 @@ import {
   resendDeveloperOtp,
   loginDeveloper,
   logoutDeveloper,
+  forgotDeveloperPassword,
+  verifyDeveloperResetOtp,
+  resetDeveloperPassword,
 } from '../controllers/developerAuthController.js';
 import {
   getApiPayoutStatus,
@@ -164,6 +167,17 @@ const developerOtpLimiter = rateLimit({
   message: { error: 'Too many verification attempts. Restart the login flow.' },
 });
 
+// Same per-account-email throttle as forgotPasswordAccountLimiter above,
+// stacked on developerLoginLimiter's per-IP one on the route itself.
+const developerForgotPasswordAccountLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => String(req.body?.email || '').trim().toLowerCase() || 'unknown',
+  message: { error: 'Too many reset requests for this account. Try again in an hour.' },
+});
+
 // Admin Auth Routes
 router.post('/login', adminLoginLimiter, login);
 router.post('/verify-otp', adminOtpLimiter, verifyOTP);
@@ -269,5 +283,8 @@ router.post('/developer/verify-otp', developerOtpLimiter, verifyDeveloperOtp);
 router.post('/developer/resend-otp', developerOtpLimiter, resendDeveloperOtp);
 router.post('/developer/login', developerLoginLimiter, loginDeveloper);
 router.post('/developer/logout', protectDeveloper, logoutDeveloper);
+router.post('/developer/forgot-password',  developerLoginLimiter, developerForgotPasswordAccountLimiter, forgotDeveloperPassword);
+router.post('/developer/verify-reset-otp', developerOtpLimiter,   verifyDeveloperResetOtp);
+router.post('/developer/reset-password',   developerOtpLimiter,   resetDeveloperPassword);
 
 export default router;

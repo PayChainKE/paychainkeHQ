@@ -132,7 +132,7 @@ export default function Webhooks() {
 
       {revealedSecret && (
         <div className="rounded-xl border border-brand/30 bg-brand/[0.06] p-4 mb-6">
-          <p className="text-[13.5px] font-semibold text-ink mb-2">Signing secret — copy it now, it won't be shown again</p>
+          <p className="text-[13.5px] font-semibold text-ink mb-2">Signing secret: copy it now, it won't be shown again</p>
           <div className="flex items-center gap-2 rounded-lg bg-code-bg border border-code-border px-3 py-2.5">
             <code className="flex-1 font-mono text-[13px] text-code-text truncate">{revealedSecret}</code>
             <CopyButton text={revealedSecret} />

@@ -3,14 +3,11 @@ import { Link, useNavigate } from "react-router-dom";
 import AuthShell from "@/components/auth/AuthShell";
 import FormField from "@/components/FormField";
 import Callout from "@/components/Callout";
-import { loginDeveloper } from "@/lib/api";
-import { useDeveloperAuth } from "@/context/DeveloperAuthContext";
+import { forgotDeveloperPassword } from "@/lib/api";
 
-export default function Login() {
+export default function ForgotPassword() {
   const navigate = useNavigate();
-  const { signIn } = useDeveloperAuth();
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -18,45 +15,37 @@ export default function Login() {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    const res = await loginDeveloper({ email, password });
+    const res = await forgotDeveloperPassword({ email });
     setLoading(false);
-
     if (!res.ok) {
-      if (res.data.code === "VERIFICATION_REQUIRED") {
-        navigate(`/verify-email?email=${encodeURIComponent(email)}`);
-        return;
-      }
-      setError(res.data.error || "Invalid email or password.");
+      setError(res.data.error || "Something went wrong. Try again.");
       return;
     }
-    signIn(res.data.token, res.data.developer);
-    navigate("/dashboard");
+    navigate(`/reset-password?email=${encodeURIComponent(email)}`);
   }
 
   return (
     <AuthShell>
-      <h1 className="text-2xl font-extrabold text-ink tracking-tight mb-1.5">Sign in</h1>
-      <p className="text-[13.5px] text-ink-muted mb-6">Manage your API keys, webhooks, and live access.</p>
+      <h1 className="text-2xl font-extrabold text-ink tracking-tight mb-1.5">Reset your password</h1>
+      <p className="text-[13.5px] text-ink-muted mb-6">
+        Enter the email on your developer account and we'll send a 6-digit code to reset your password.
+      </p>
 
       {error && <Callout variant="warning">{error}</Callout>}
 
       <form onSubmit={handleSubmit}>
         <FormField label="Email" name="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-        <FormField label="Password" name="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
-        <div className="text-right -mt-2.5 mb-4">
-          <Link to="/forgot-password" className="text-[12.5px] text-ink-faint hover:text-ink font-medium">Forgot password?</Link>
-        </div>
         <button
           type="submit"
           disabled={loading}
           className="w-full mt-2 px-4 py-2.5 rounded-lg bg-brand text-white text-[14px] font-semibold shadow-sm shadow-brand/30 hover:bg-brand-dim hover:shadow-md hover:shadow-brand/30 transition-all disabled:opacity-60 disabled:shadow-none"
         >
-          {loading ? "Signing in…" : "Sign in"}
+          {loading ? "Sending code…" : "Send reset code"}
         </button>
       </form>
 
       <p className="text-center text-[13px] text-ink-faint mt-6">
-        New here? <Link to="/signup" className="text-brand hover:text-brand-bright font-medium">Create a free sandbox account</Link>
+        Remembered it? <Link to="/login" className="text-brand hover:text-brand-bright font-medium">Sign in</Link>
       </p>
     </AuthShell>
   );

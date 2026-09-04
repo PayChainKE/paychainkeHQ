@@ -18,6 +18,39 @@ const liveAccessMeta = (d) => {
   return { label: 'Sandbox Only', pill: 'bg-gray-100 text-gray-700 border-gray-200' };
 };
 
+// Ran automatically the moment the developer submitted their live-access
+// request (see backend requestLiveAccess) — shown right on the pending
+// row so an admin sees a pass/fail signal before ever opening the "Test"
+// modal, not just after clicking it.
+const AutoTestBadge = ({ developer }) => {
+  if (developer.liveAccess?.approved || !developer.liveAccess?.requestedAt) return null;
+  const test = developer.liveAccess?.autoTest;
+  if (!test) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-bold uppercase tracking-widest border bg-gray-100 text-gray-500 border-gray-200" title="The automatic check didn't run — use the Test button to check manually.">
+        <span className="material-symbols-outlined text-xs">help</span>
+        No auto-check
+      </span>
+    );
+  }
+  const passed = test.collectTest?.passed;
+  const webhooksPassed = test.webhookTests?.filter((w) => w.passed).length ?? 0;
+  const webhooksTotal = test.webhookTests?.length ?? 0;
+  const title = [
+    `Collect test: ${passed ? 'passed' : 'FAILED'} — ${test.collectTest?.message || ''}`,
+    test.noWebhooksRegistered ? 'No webhook registered (polling-only integration).' : `Webhooks: ${webhooksPassed}/${webhooksTotal} acked.`,
+  ].join('\n');
+  return (
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-bold uppercase tracking-widest border ${passed ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'}`}
+      title={title}
+    >
+      <span className="material-symbols-outlined text-xs">{passed ? 'check_circle' : 'error'}</span>
+      {passed ? 'Auto-check passed' : 'Auto-check failed'}
+    </span>
+  );
+};
+
 const Developers = () => {
   const { admin: currentAdmin } = useAuth();
   const canManage = currentAdmin?.role === 'owner' || currentAdmin?.role === 'admin';
@@ -330,9 +363,12 @@ const DeveloperRow = ({ developer, canManage, busy, onApprove, onReject, onViewW
         </span>
       </td>
       <td className="px-3 py-2 border-b border-outline-variant/5">
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-bold uppercase tracking-widest border ${liveStyle.pill}`}>
-          {liveStyle.label}
-        </span>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-bold uppercase tracking-widest border ${liveStyle.pill}`}>
+            {liveStyle.label}
+          </span>
+          <AutoTestBadge developer={developer} />
+        </div>
       </td>
       <td className="px-3 py-2 border-b border-outline-variant/5 text-2xs text-on-surface-variant/50">
         {developer.createdAt ? new Date(developer.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
@@ -374,6 +410,7 @@ const DeveloperCard = ({ developer, canManage, busy, onApprove, onReject, onView
           <div className="mt-2 flex items-center gap-1.5 flex-wrap">
             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-bold uppercase tracking-widest border ${statusStyle.pill}`}>{statusStyle.label}</span>
             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-bold uppercase tracking-widest border ${liveStyle.pill}`}>{liveStyle.label}</span>
+            <AutoTestBadge developer={developer} />
           </div>
           <div className="mt-3 flex items-center gap-2 flex-wrap">
             <DeveloperActions developer={developer} canManage={canManage} busy={busy} onApprove={onApprove} onReject={onReject} />

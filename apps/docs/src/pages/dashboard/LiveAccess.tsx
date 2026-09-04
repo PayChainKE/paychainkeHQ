@@ -31,7 +31,7 @@ export default function LiveAccess() {
     <>
       <h1 className="text-2xl font-extrabold text-ink tracking-tight mb-1.5">Live access</h1>
       <p className="text-[14px] text-ink-muted mb-8">
-        Test-mode keys work immediately with no approval — build and fully exercise your integration there first.
+        Test-mode keys work immediately with no approval: build and fully exercise your integration there first.
         Live keys move real money and need a PayChain admin to review your account.
       </p>
 
@@ -52,7 +52,7 @@ export default function LiveAccess() {
             <p className="text-[14px] font-semibold text-ink">Request pending review</p>
             <p className="text-[13px] text-ink-muted mt-0.5">
               Submitted {requestedAt ? new Date(requestedAt).toLocaleDateString() : "just now"}. A PayChain admin will
-              review your account — you'll be able to create live-mode keys as soon as it's approved.
+              review your account; you'll be able to create live-mode keys as soon as it's approved.
             </p>
           </div>
         </div>
@@ -64,7 +64,7 @@ export default function LiveAccess() {
               <p className="text-[14px] font-semibold text-ink">Not requested yet</p>
               <p className="text-[13px] text-ink-muted mt-0.5">
                 Worth checking your test-mode integration handles idempotency, webhook signature verification,
-                and failure events first — see the <a href="/integration-guide" className="text-brand hover:text-brand-bright">Integration Guide</a>.
+                and failure events first; see the <a href="/integration-guide" className="text-brand hover:text-brand-bright">Integration Guide</a>.
               </p>
             </div>
           </div>

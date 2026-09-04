@@ -62,6 +62,14 @@ const developerSchema = new mongoose.Schema({
     requestedAt: { type: Date, default: null },
     approvedAt: { type: Date, default: null },
     approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null },
+    // Result of the automatic integration test requestLiveAccess runs the
+    // moment a developer submits their request (see
+    // services/developerIntegrationTestService.js for what it checks) —
+    // shown to the admin reviewing the request so they aren't approving
+    // blind. Mixed, not fully typed: it's a read-only snapshot mirroring
+    // the same shape the admin's on-demand re-run endpoint returns, not a
+    // field anything queries into.
+    autoTest: { type: mongoose.Schema.Types.Mixed, default: null },
   },
   // Set once this developer proves control of a Merchant account (see
   // developerMerchantLinkController.js) — the public payment API operates
@@ -105,6 +113,36 @@ const developerSchema = new mongoose.Schema({
     default: 0,
   },
   otpLockedUntil: {
+    type: Date,
+    select: false,
+    default: null,
+  },
+  // Password reset token (sha256 hex of the raw token emailed to the
+  // developer) — same shape as models/Merchant.js's identical fields.
+  passwordResetToken: {
+    type: String,
+    select: false,
+    default: null,
+  },
+  passwordResetExpires: {
+    type: Date,
+    select: false,
+    default: null,
+  },
+  // Account-level login lockout (see utils/loginLockout.js) — closes the
+  // gap the per-IP developerLoginLimiter alone can't: a distributed
+  // attacker spreading password guesses across many IPs against one
+  // account never trips a single-IP rate limit. Deliberately separate
+  // fields from failedOtpAttempts/otpLockedUntil above rather than
+  // reusing them — conflating "wrong password" with "wrong OTP code"
+  // would misattribute admin lockout alerts and let one kind of failure
+  // silently consume the other's attempt budget.
+  failedLoginAttempts: {
+    type: Number,
+    select: false,
+    default: 0,
+  },
+  loginLockedUntil: {
     type: Date,
     select: false,
     default: null,

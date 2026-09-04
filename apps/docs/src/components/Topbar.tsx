@@ -106,12 +106,12 @@ export default function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
             </Link>
           ) : (
             <div className="flex items-center gap-2">
-              <Link to="/login" className="hidden sm:inline-flex text-[13px] font-medium text-ink-muted hover:text-ink transition-colors">
+              <Link to="/login" className="inline-flex text-[13px] font-medium text-ink-muted hover:text-ink transition-colors">
                 Sign in
               </Link>
               <Link
                 to="/signup"
-                className="px-3 py-1.5 rounded-lg bg-brand text-white text-[13px] font-semibold hover:bg-brand-dim transition-colors"
+                className="px-3 py-1.5 rounded-lg bg-brand text-white text-[13px] font-semibold shadow-sm shadow-brand/30 hover:bg-brand-dim hover:shadow-md hover:shadow-brand/30 transition-all"
               >
                 Sign up
               </Link>

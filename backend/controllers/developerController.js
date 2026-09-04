@@ -3,6 +3,7 @@ import Developer from '../models/Developer.js';
 import ApiKey from '../models/ApiKey.js';
 import { logAudit } from '../utils/auditLog.js';
 import { notifyAdmins, escapeHtml } from '../utils/securityAlerts.js';
+import { runIntegrationTestForDeveloper } from '../services/developerIntegrationTestService.js';
 
 const publicApiKey = (key) => ({
   _id: key._id,
@@ -126,7 +127,17 @@ export const revokeApiKey = async (req, res) => {
   }
 };
 
-// @desc    Ask an admin to review this account for live (real-money) API access
+// @desc    Ask an admin to review this account for live (real-money) API
+//          access. Before notifying anyone, automatically runs the same
+//          integration test an admin could otherwise only trigger by hand
+//          (see services/developerIntegrationTestService.js) and attaches
+//          the result to both the stored request and the admin
+//          notification — so whoever reviews this sees "collect test
+//          passed, 2/2 webhooks acked" (or exactly what's broken) instead
+//          of approving on trust alone. Takes a few seconds longer than a
+//          bare status flip because of that; a failure to run the check
+//          itself is logged but never blocks the request from going
+//          through — the check is a signal for the admin, not a gate.
 // @route   POST /api/developer/live-access/request
 // @access  Private (Developer)
 export const requestLiveAccess = async (req, res) => {
@@ -136,17 +147,43 @@ export const requestLiveAccess = async (req, res) => {
       return res.status(400).json({ error: 'Live access is already approved for this account.' });
     }
 
+    let autoTest = null;
+    try {
+      autoTest = await runIntegrationTestForDeveloper(developer);
+    } catch (err) {
+      console.error('requestLiveAccess: auto integration test failed to run:', err?.message || err);
+    }
+
     developer.liveAccess = developer.liveAccess || {};
     developer.liveAccess.requestedAt = new Date();
+    developer.liveAccess.autoTest = autoTest;
     await developer.save();
+
+    const webhookSummary = autoTest?.noWebhooksRegistered
+      ? 'no webhook registered (polling-only integration)'
+      : `${autoTest?.webhookTests?.filter((w) => w.passed).length ?? 0}/${autoTest?.webhookTests?.length ?? 0} webhooks acked`;
+    const testSummary = autoTest
+      ? `Auto-check: collect test ${autoTest.collectTest.passed ? 'passed' : 'FAILED'} (${escapeHtml(autoTest.collectTest.message)}), ${webhookSummary}.`
+      : 'Auto-check could not be run — review manually.';
+
+    logAudit({
+      action: 'developer.live_access.requested', category: 'security', severity: 'info',
+      message: 'Requested live API access',
+      req, actor: { type: 'self', id: developer._id, email: developer.email, name: developer.name },
+      metadata: {
+        collectTestPassed: autoTest?.collectTest?.passed ?? null,
+        webhookCount: autoTest?.webhookTests?.length ?? 0,
+        webhookTestsPassed: autoTest?.webhookTests?.filter((w) => w.passed).length ?? 0,
+      },
+    });
 
     notifyAdmins({
       type: 'developer_live_access_requested',
-      severity: 'info',
+      severity: autoTest && !autoTest.collectTest.passed ? 'warning' : 'info',
       subject: 'Developer requested live API access',
       heading: 'Live API Access Requested',
-      details: `<strong>${escapeHtml(developer.companyName)}</strong> (${escapeHtml(developer.email)}) requested approval for live-mode API keys.`,
-      metadata: { developerId: String(developer._id), companyName: developer.companyName, email: developer.email },
+      details: `<strong>${escapeHtml(developer.companyName)}</strong> (${escapeHtml(developer.email)}) requested approval for live-mode API keys.<br><br>${testSummary}`,
+      metadata: { developerId: String(developer._id), companyName: developer.companyName, email: developer.email, autoTestPassed: autoTest?.collectTest?.passed ?? null },
     });
 
     res.json({ success: true, message: 'Request submitted. An admin will review your account.' });

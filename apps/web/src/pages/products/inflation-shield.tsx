@@ -26,7 +26,7 @@ const features = [
 ];
 
 const stats = [
-  { value: '30%', label: 'KES depreciation vs USD (2021–2024)' },
+  { value: '30%', label: 'KES depreciation vs USD (2021 to 2024)' },
   { value: 'KES 150K', label: 'Purchasing power lost on KES 500K held in cash' },
   { value: '0.5%', label: 'PayChain flat FX spread' },
   { value: '< 10s', label: 'USDC transfer time on Base Network' },

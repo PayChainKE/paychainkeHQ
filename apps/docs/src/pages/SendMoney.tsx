@@ -12,13 +12,13 @@ export default function SendMoney() {
       <h1 className="text-3xl font-extrabold text-ink tracking-tight mb-4">Send Money</h1>
       <p>
         Pay out from your linked merchant's wallet to a bank account, an M-Pesa/Airtel Money
-        number, a Paybill, or a Till (Buy Goods) — the same rails the merchant dashboard's own
+        number, a Paybill, or a Till (Buy Goods): the same rails the merchant dashboard's own
         "Send Money" already uses. Base path{" "}
         <code>https://api.paychain.co.ke/api/v1/developer</code>.
       </p>
 
       <Callout variant="tip" title="Paying more than one destination at once?">
-        Use <Link to="/bulk-payments">Bulk Payments</Link> instead — payroll, contractors, or
+        Use <Link to="/bulk-payments">Bulk Payments</Link> instead: payroll, contractors, or
         vendors, all in a single call, with a single PIN entry and a per-row result.
       </Callout>
 
