@@ -254,14 +254,14 @@ export default function RequestMoney({ navigation, route }: any) {
                     </View>
                   </View>
                   <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[20px] text-[#00351d] mb-1.5">{opt.title}</Text>
-                  <Text className="text-[12px] text-[#707971] font-jakarta-medium leading-relaxed">{opt.description}</Text>
+                  <Text className="text-[12px] text-[#707971] font-jakarta-bold leading-relaxed">{opt.description}</Text>
                 </TouchableOpacity>
               ))}
 
               <View className="bg-[#00351d] rounded-[28px] p-6 mt-3">
                 <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#5efeb3] mb-1 opacity-80">Developer Friendly</Text>
                 <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[19px] text-white mb-1">Integrate our Request API</Text>
-                <Text className="text-[12px] text-white/60 font-jakarta-medium">Automate collections with our REST endpoints. Contact support@paychain.co.ke.</Text>
+                <Text className="text-[12px] text-white/60 font-jakarta-bold">Automate collections with our REST endpoints. Contact support@paychain.co.ke.</Text>
               </View>
             </View>
           )}
@@ -274,7 +274,7 @@ export default function RequestMoney({ navigation, route }: any) {
               </View>
               <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#006c4e] mb-2">STK Push Sent · Live Status</Text>
               <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[22px] text-[#00351d] mb-2 text-center">{statusText || 'Processing...'}</Text>
-              <Text className="text-[13px] text-[#707971] font-jakarta-medium text-center leading-relaxed px-4 mb-8">
+              <Text className="text-[13px] text-[#707971] font-jakarta-bold text-center leading-relaxed px-4 mb-8">
                 We're tracking this request in real time. This page updates the moment they respond.
               </Text>
 
@@ -303,7 +303,7 @@ export default function RequestMoney({ navigation, route }: any) {
                 <View className="w-16 h-16 rounded-2xl bg-[#00351d] items-center justify-center mb-4">
                   <OptionIcon icon={selected.icon} size={26} color="#5efeb3" />
                 </View>
-                <Text className="text-[13px] text-[#707971] font-jakarta-medium text-center leading-relaxed px-4">
+                <Text className="text-[13px] text-[#707971] font-jakarta-bold text-center leading-relaxed px-4">
                   {selected.id === 'mpesa'
                     ? "We'll send an M-PESA prompt to this number for them to complete."
                     : "Set an amount and we'll generate a secure, shareable link."}
@@ -322,11 +322,11 @@ export default function RequestMoney({ navigation, route }: any) {
               {feePreview && (
                 <View className="mb-5 px-1">
                   <View className="flex-row justify-between">
-                    <Text className="text-[12px] text-[#707971] font-jakarta-medium">They'll be asked to pay</Text>
+                    <Text className="text-[12px] text-[#707971] font-jakarta-bold">They'll be asked to pay</Text>
                     <Text className="text-[12px] font-jakarta-extrabold text-[#00351d]">{formatKES(feePreview.total)}</Text>
                   </View>
                   {feePreview.fee > 0 && (
-                    <Text className="text-[10px] text-[#707971] font-jakarta-medium opacity-70 mt-0.5">
+                    <Text className="text-[10px] text-[#707971] font-jakarta-bold opacity-70 mt-0.5">
                       Includes a {formatKES(feePreview.fee)} transaction fee on top of your {formatKES(feePreview.baseAmount)} request.
                     </Text>
                   )}
@@ -372,7 +372,7 @@ export default function RequestMoney({ navigation, route }: any) {
                     <>
                       <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#a1a1aa] mb-1.5">STK Push Status</Text>
                       <Text style={{ fontFamily: 'DMSerifDisplay_400Regular', color: outcome.fg }} className="text-[24px] mb-2 text-center">{outcome.label}</Text>
-                      <Text className="text-[13px] text-[#707971] font-jakarta-medium text-center leading-relaxed px-4 mb-8">
+                      <Text className="text-[13px] text-[#707971] font-jakarta-bold text-center leading-relaxed px-4 mb-8">
                         {failureReason}
                       </Text>
                     </>
@@ -381,7 +381,7 @@ export default function RequestMoney({ navigation, route }: any) {
                   <>
                     <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#006c4e] mb-1.5">STK Push Status</Text>
                     <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#00351d] mb-2 text-center">Paid</Text>
-                    <Text className="text-[13px] text-[#707971] font-jakarta-medium text-center leading-relaxed px-4 mb-8">
+                    <Text className="text-[13px] text-[#707971] font-jakarta-bold text-center leading-relaxed px-4 mb-8">
                       {formatKES(amount)} has been credited to your PayChain balance.
                     </Text>
                   </>
@@ -389,7 +389,7 @@ export default function RequestMoney({ navigation, route }: any) {
               ) : (
                 <>
                   <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#00351d] mb-2 text-center">Link Ready to Share</Text>
-                  <Text className="text-[13px] text-[#707971] font-jakarta-medium text-center leading-relaxed px-4 mb-5">
+                  <Text className="text-[13px] text-[#707971] font-jakarta-bold text-center leading-relaxed px-4 mb-5">
                     Share this link to collect {formatKES(amount)}.
                   </Text>
                   <View className="w-full bg-white border border-[#eff4ef] rounded-2xl p-4 mb-5">

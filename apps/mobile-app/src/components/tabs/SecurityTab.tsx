@@ -316,7 +316,7 @@ export default function SecurityTab() {
             </View>
             <View>
               <Text className="text-[16px] font-jakarta-extrabold text-white tracking-tight">Password</Text>
-              <Text className="text-[10px] text-white/50 font-jakarta-medium mt-0.5">Change your access credentials</Text>
+              <Text className="text-[10px] text-white/50 font-jakarta-bold mt-0.5">Change your access credentials</Text>
             </View>
           </View>
 
@@ -329,7 +329,7 @@ export default function SecurityTab() {
                 placeholderTextColor="rgba(255,255,255,0.2)"
                 value={currentPassword}
                 onChangeText={setCurrentPassword}
-                className="w-full bg-black/20 border border-white/5 rounded-2xl py-4 px-5 text-[15px] font-jakarta-medium text-white focus:border-[#5efeb3]/30"
+                className="w-full bg-black/20 border border-white/5 rounded-2xl py-4 px-5 text-[15px] font-jakarta-bold text-white focus:border-[#5efeb3]/30"
               />
             </View>
             <View>
@@ -340,7 +340,7 @@ export default function SecurityTab() {
                 placeholderTextColor="rgba(255,255,255,0.2)"
                 value={newPassword}
                 onChangeText={setNewPassword}
-                className="w-full bg-black/20 border border-white/5 rounded-2xl py-4 px-5 text-[15px] font-jakarta-medium text-white focus:border-[#5efeb3]/30"
+                className="w-full bg-black/20 border border-white/5 rounded-2xl py-4 px-5 text-[15px] font-jakarta-bold text-white focus:border-[#5efeb3]/30"
               />
             </View>
             <View>
@@ -351,7 +351,7 @@ export default function SecurityTab() {
                 placeholderTextColor="rgba(255,255,255,0.2)"
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
-                className="w-full bg-black/20 border border-white/5 rounded-2xl py-4 px-5 text-[15px] font-jakarta-medium text-white focus:border-[#5efeb3]/30"
+                className="w-full bg-black/20 border border-white/5 rounded-2xl py-4 px-5 text-[15px] font-jakarta-bold text-white focus:border-[#5efeb3]/30"
               />
             </View>
           </View>
@@ -367,7 +367,7 @@ export default function SecurityTab() {
             </View>
             <View>
               <Text className="text-[16px] font-jakarta-extrabold text-white tracking-tight">Advanced Methods</Text>
-              <Text className="text-[10px] text-white/50 font-jakarta-medium mt-0.5">Biometrics & Bulk Pay authorization</Text>
+              <Text className="text-[10px] text-white/50 font-jakarta-bold mt-0.5">Biometrics & Bulk Pay authorization</Text>
             </View>
           </View>
 
@@ -424,7 +424,7 @@ export default function SecurityTab() {
                 </View>
                 <View>
                   <Text className="text-[15px] font-jakarta-extrabold text-white">Security Questions</Text>
-                  <Text className="text-[11px] text-white/50 font-jakarta-medium mt-0.5">
+                  <Text className="text-[11px] text-white/50 font-jakarta-bold mt-0.5">
                     {questionsConfigured ? `${questionsCount} questions configured` : 'Not configured yet'}
                   </Text>
                 </View>
@@ -440,7 +440,7 @@ export default function SecurityTab() {
                 </View>
                 <View>
                   <Text className="text-[15px] font-jakarta-extrabold text-white">Biometric Login</Text>
-                  <Text className="text-[11px] text-white/50 font-jakarta-medium mt-0.5">
+                  <Text className="text-[11px] text-white/50 font-jakarta-bold mt-0.5">
                     {merchant?.mobileBiometricUnlockEnabled ? 'Active on this device' : 'Use Touch ID or Face ID'}
                   </Text>
                 </View>
@@ -472,7 +472,7 @@ export default function SecurityTab() {
             </View>
             <View>
               <Text className="text-[16px] font-jakarta-extrabold text-white tracking-tight">Active Sessions & Devices</Text>
-              <Text className="text-[10px] text-white/50 font-jakarta-medium mt-0.5">Biometric devices with access to your account</Text>
+              <Text className="text-[10px] text-white/50 font-jakarta-bold mt-0.5">Biometric devices with access to your account</Text>
             </View>
           </View>
 
@@ -486,7 +486,7 @@ export default function SecurityTab() {
                 <MaterialIcons name="fingerprint" size={22} color="rgba(255,255,255,0.4)" />
               </View>
               <Text className="text-white text-[13px] font-jakarta-bold">No devices registered yet</Text>
-              <Text className="text-white/40 text-[11px] font-jakarta-medium mt-1 text-center max-w-[220px]">
+              <Text className="text-white/40 text-[11px] font-jakarta-bold mt-1 text-center max-w-[220px]">
                 Add Face ID, Touch ID, or Windows Hello from the web dashboard for passwordless sign-in.
               </Text>
             </View>
@@ -539,7 +539,7 @@ export default function SecurityTab() {
                         </View>
                       </TouchableOpacity>
                     )}
-                    <Text className="text-white/40 text-[10px] font-jakarta-medium mt-0.5">
+                    <Text className="text-white/40 text-[10px] font-jakarta-bold mt-0.5">
                       Registered {relativeTime(pk.createdAt)}
                       {pk.lastUsed ? ` · Last signed in ${relativeTime(pk.lastUsed)}` : ''}
                     </Text>
@@ -607,7 +607,7 @@ export default function SecurityTab() {
             </View>
 
             {questionsConfigured && (
-              <Text className="text-[11px] text-white/50 font-jakarta-medium mb-5 italic">
+              <Text className="text-[11px] text-white/50 font-jakarta-bold mb-5 italic">
                 You already have {questionsCount} questions on file. Submitting below replaces all of them — for your security, previous answers are never shown back to you.
               </Text>
             )}
@@ -622,7 +622,7 @@ export default function SecurityTab() {
                       placeholderTextColor="rgba(255,255,255,0.2)"
                       value={questionAnswers[i]}
                       onChangeText={(v) => setQuestionAnswers((prev) => prev.map((a, idx) => (idx === i ? v : a)))}
-                      className="w-full bg-black/20 border border-white/5 rounded-2xl py-3.5 px-5 text-[14px] font-jakarta-medium text-white"
+                      className="w-full bg-black/20 border border-white/5 rounded-2xl py-3.5 px-5 text-[14px] font-jakarta-bold text-white"
                     />
                   </View>
                 ))}
@@ -634,7 +634,7 @@ export default function SecurityTab() {
                     placeholderTextColor="rgba(255,255,255,0.2)"
                     value={questionsPassword}
                     onChangeText={setQuestionsPassword}
-                    className="w-full bg-black/20 border border-white/5 rounded-2xl py-4 px-5 text-[15px] font-jakarta-medium text-white"
+                    className="w-full bg-black/20 border border-white/5 rounded-2xl py-4 px-5 text-[15px] font-jakarta-bold text-white"
                   />
                 </View>
               </View>
@@ -752,7 +752,7 @@ function ApiPayoutPanel() {
           </Text>
         </View>
       </View>
-      <Text className="text-[11px] text-white/50 font-jakarta-medium mb-4">
+      <Text className="text-[11px] text-white/50 font-jakarta-bold mb-4">
         Lets a linked Developer account's own backend trigger real payouts through the API, unattended — guarded by a separate PIN from your payment PIN, with hard per-transaction and daily limits.
       </Text>
 

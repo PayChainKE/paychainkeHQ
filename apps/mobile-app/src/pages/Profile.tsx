@@ -149,7 +149,7 @@ function PaymentLinkPanel() {
       <View className="w-full max-w-lg mx-auto px-6 pt-2 pb-12">
         <View className="mb-6">
           <Text className="font-jakarta-extrabold text-[28px] text-[#00351d] tracking-tight leading-tight mb-2">Payment Link</Text>
-          <Text className="text-[#707971] text-[14px] font-jakarta-medium leading-relaxed opacity-80">Generate a secure, one-time link for a specific amount and share it with your customer.</Text>
+          <Text className="text-[#707971] text-[14px] font-jakarta-bold leading-relaxed opacity-80">Generate a secure, one-time link for a specific amount and share it with your customer.</Text>
         </View>
 
         <View className="bg-white rounded-[32px] border border-[#eff4ef] shadow-sm shadow-[#00351d]/5 p-6 mb-6">
@@ -167,7 +167,7 @@ function PaymentLinkPanel() {
               placeholderTextColor="#b3b9b4"
               containerClassName="flex-1"
               className="py-4 text-[18px] font-jakarta-extrabold text-[#00351d] tracking-tight"
-              errorClassName="text-red-600 text-[11px] font-jakarta-medium mb-2"
+              errorClassName="text-red-600 text-[11px] font-jakarta-bold mb-2"
             />
           </View>
 
@@ -225,7 +225,7 @@ function PaymentLinkPanel() {
             </View>
           ) : history.length === 0 ? (
             <View className="bg-white rounded-[32px] border border-[#eff4ef] p-6 items-center">
-              <Text className="text-[13px] text-[#707971] font-jakarta-medium text-center">No payment links yet. Generate one above to see it here.</Text>
+              <Text className="text-[13px] text-[#707971] font-jakarta-bold text-center">No payment links yet. Generate one above to see it here.</Text>
             </View>
           ) : (
             <View className="bg-white rounded-[32px] border border-[#eff4ef] shadow-sm shadow-[#00351d]/5 overflow-hidden">
@@ -247,7 +247,7 @@ function PaymentLinkPanel() {
                         <Text style={{ color: meta.color }} className="text-[9px] font-jakarta-bold uppercase tracking-widest">{meta.label}</Text>
                       </View>
                     </View>
-                    <Text className="text-[11px] text-[#707971] font-jakarta-medium mb-3">
+                    <Text className="text-[11px] text-[#707971] font-jakarta-bold mb-3">
                       {created.toLocaleDateString('en-KE', { day: '2-digit', month: 'short' })} · {created.toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })}
                     </Text>
                     <View className="flex-row gap-2">
@@ -277,7 +277,7 @@ function PaymentLinkPanel() {
 
         <View className="bg-[#f7faf7] rounded-[28px] border border-[#bfc9bf]/20 p-5 flex-row items-start gap-3">
           <MaterialIcons name="info-outline" size={18} color="#707971" />
-          <Text className="flex-1 text-[12px] text-[#707971] font-jakarta-medium leading-relaxed">
+          <Text className="flex-1 text-[12px] text-[#707971] font-jakarta-bold leading-relaxed">
             Each link is tied to the amount you enter and can only be paid once. Share it in invoices, WhatsApp, or on your website.
           </Text>
         </View>
@@ -292,13 +292,13 @@ function AccountStatementPanel({ navigation, merchant }: { navigation: any; merc
       <View className="w-full max-w-lg mx-auto px-6 pt-2 pb-12">
         <View className="mb-6">
           <Text className="font-jakarta-extrabold text-[28px] text-[#00351d] tracking-tight leading-tight mb-2">Account Statement</Text>
-          <Text className="text-[#707971] text-[14px] font-jakarta-medium leading-relaxed opacity-80">Review recent activity and open the statement export screen.</Text>
+          <Text className="text-[#707971] text-[14px] font-jakarta-bold leading-relaxed opacity-80">Review recent activity and open the statement export screen.</Text>
         </View>
 
         <View className="bg-white rounded-[32px] border border-[#eff4ef] shadow-sm shadow-[#00351d]/5 p-6 mb-6">
           <Text className="text-[10px] text-[#707971] font-jakarta-bold uppercase tracking-[0.2em] mb-2">Statement summary</Text>
           <Text className="text-[18px] font-jakarta-extrabold text-[#00351d] tracking-tight mb-2">{merchant?.businessName || 'Merchant'} account</Text>
-          <Text className="text-[13px] text-[#707971] font-jakarta-medium leading-relaxed">Open Collections to download a PDF statement for today, the last 7 days, this month, or any custom range.</Text>
+          <Text className="text-[13px] text-[#707971] font-jakarta-bold leading-relaxed">Open Collections to download a PDF statement for today, the last 7 days, this month, or any custom range.</Text>
         </View>
 
         <View className="gap-3">
@@ -320,7 +320,7 @@ function BusinessProfilePanel({ merchant }: { merchant: any }) {
       <View className="w-full max-w-lg mx-auto px-6 pt-2 pb-12">
         <View className="mb-6">
           <Text className="font-jakarta-extrabold text-[28px] text-[#00351d] tracking-tight leading-tight mb-2">Business Profile</Text>
-          <Text className="text-[#707971] text-[14px] font-jakarta-medium leading-relaxed opacity-80">Your registered business identity and key merchant details.</Text>
+          <Text className="text-[#707971] text-[14px] font-jakarta-bold leading-relaxed opacity-80">Your registered business identity and key merchant details.</Text>
         </View>
 
         <TourTarget id="profile-identity-card" className="bg-white rounded-[32px] border border-[#eff4ef] shadow-sm shadow-[#00351d]/5 p-6 gap-5">

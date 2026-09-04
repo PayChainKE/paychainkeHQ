@@ -334,7 +334,7 @@ function TourCard({
           </View>
         </View>
 
-        <Text className="font-jakarta-medium text-[13px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.6)', marginTop: 10, marginBottom: 20 }}>
+        <Text className="font-jakarta-bold text-[13px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.6)', marginTop: 10, marginBottom: 20 }}>
           {step.body}
         </Text>
 

@@ -7,6 +7,7 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
+      "bundleIdentifier": "co.ke.paychain.mobile",
       "supportsTablet": true,
       "infoPlist": {
         "LSApplicationQueriesSchemes": ["whatsapp"]
@@ -14,6 +15,7 @@
     },
     "android": {
       "package": "co.ke.paychain.mobile",
+      "allowBackup": false,
       "adaptiveIcon": {
         "backgroundColor": "#faf9f6",
         "foregroundImage": "./assets/android-icon-foreground.png",

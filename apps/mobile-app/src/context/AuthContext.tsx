@@ -24,7 +24,7 @@ const IDLE_POLL_MS = 15_000;
 
 const AuthContext = createContext<any>(null);
 
-const STORAGE_KEY        = 'paychain_merchant_session'; // merchant profile (non-sensitive)
+const STORAGE_KEY        = 'paychain_merchant_session'; // merchant profile, minus CACHE_STRIP_FIELDS below
 const TOKEN_KEY          = 'paychain_merchant_token';   // JWT in OS secure enclave
 const PIN_KEY            = 'paychain_app_pin';          // app-unlock PIN in OS secure enclave
 const BIOMETRIC_DONE_KEY = 'paychain_biometrics_setup'; // 'true' once setup screen is shown
@@ -53,6 +53,22 @@ async function storeAppPin(pin: string) {
 async function loadAppPin(): Promise<string | null> {
   if (Platform.OS === 'web') return null;
   return SecureStore.getItemAsync(PIN_KEY);
+}
+
+// Fields stripped before the merchant profile is cached to AsyncStorage
+// (plain, unencrypted storage — unlike TOKEN_KEY/PIN_KEY above). The full
+// profile including these fields always stays in React state for the
+// live session; only what hits disk is trimmed. Safe to omit here because
+// refreshSession() re-fetches the full profile from the server within one
+// request on every cold start and every 5s thereafter (see the poll
+// effect below), so nothing is permanently unavailable — it's just never
+// left sitting in a plain SQLite/plist file for adb backup, a rooted
+// device, or (absent android.allowBackup: false) Google auto-backup to read.
+const CACHE_STRIP_FIELDS = ['kraPin', 'settlementBankAccount', 'settlementBankCode', 'settlementMobile', 'stellarPublicKey'];
+function sanitizeMerchantForCache(merchant: any) {
+  const copy = { ...merchant };
+  for (const field of CACHE_STRIP_FIELDS) delete copy[field];
+  return copy;
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -171,7 +187,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               if (res.data.success && res.data.merchant) {
                 const fresh = res.data.merchant;
                 setMerchant(fresh);
-                await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(fresh));
+                await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(sanitizeMerchantForCache(fresh)));
                 applyBiometricsEnabled(!!fresh.mobileBiometricUnlockEnabled);
               }
             })
@@ -209,7 +225,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function persistSession(userData: any, jwt: string) {
     setMerchant(userData);
     setToken(jwt);
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(sanitizeMerchantForCache(userData)));
     await storeToken(jwt);
     api.defaults.headers.common['Authorization'] = `Bearer ${jwt}`;
     setHasBiometricToken(true);
@@ -236,7 +252,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (res.data.success && res.data.merchant) {
         const fresh = res.data.merchant;
         setMerchant(fresh);
-        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(fresh));
+        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(sanitizeMerchantForCache(fresh)));
         applyBiometricsEnabled(!!fresh.mobileBiometricUnlockEnabled);
       }
     } catch (err: any) {

@@ -347,7 +347,7 @@ export default function Transactions({ navigation }: any) {
                   >
                     {formatKES(statCards[0].value)}
                   </Text>
-                  <Text className="text-[12px] font-jakarta-medium mt-2" style={{ color: statCards[0].style.subLabelColor }}>
+                  <Text className="text-[12px] font-jakarta-bold mt-2" style={{ color: statCards[0].style.subLabelColor }}>
                     {new Date().toLocaleDateString('en-KE', { weekday: 'long', day: 'numeric', month: 'long' })}
                   </Text>
                 </View>
@@ -412,7 +412,7 @@ export default function Transactions({ navigation }: any) {
               onChangeText={setSearchQuery}
               placeholder="Search by name or reference"
               placeholderTextColor="#a1a1aa"
-              className="flex-1 text-[13px] font-jakarta-medium text-[#0c2010]"
+              className="flex-1 text-[13px] font-jakarta-bold text-[#0c2010]"
             />
             {!!searchQuery && (
               <TouchableOpacity onPress={() => setSearchQuery('')}>
@@ -439,7 +439,7 @@ export default function Transactions({ navigation }: any) {
             {isLoading ? (
               <View className="py-20 items-center justify-center">
                 <ActivityIndicator color="#00351d" size="large" />
-                <Text className="text-[#707971] font-jakarta-medium text-[13px] mt-3">Loading…</Text>
+                <Text className="text-[#707971] font-jakarta-bold text-[13px] mt-3">Loading…</Text>
               </View>
             ) : currentTransactions.length === 0 ? (
               <View className="py-20 items-center justify-center px-8">
@@ -449,7 +449,7 @@ export default function Transactions({ navigation }: any) {
                 <Text className="text-[#0c2010] font-jakarta-bold text-[16px] mb-1">
                   {searchQuery || activeFilter !== 'All' ? 'No matching transactions' : 'No transactions yet'}
                 </Text>
-                <Text className="text-[#707971] font-jakarta-medium text-[13px] text-center leading-relaxed">
+                <Text className="text-[#707971] font-jakarta-bold text-[13px] text-center leading-relaxed">
                   {searchQuery || activeFilter !== 'All'
                     ? 'Try a different search term or filter.'
                     : 'Inbound payments to your account will appear here.'}
@@ -491,13 +491,13 @@ export default function Transactions({ navigation }: any) {
                         <Text className="font-jakarta-bold text-[14px] text-[#0c2010] flex-shrink" numberOfLines={1} ellipsizeMode="tail">{name}</Text>
                         {verified && <MaterialIcons name="verified" size={12} color="#006c4e" style={{ marginLeft: 4 }} />}
                       </View>
-                      <Text className="text-[#707971] text-[11px] font-jakarta-medium mt-0.5" numberOfLines={1} ellipsizeMode="tail">
+                      <Text className="text-[#707971] text-[11px] font-jakarta-bold mt-0.5" numberOfLines={1} ellipsizeMode="tail">
                         {dateStr}, {timeStr} · {typeLabel}
                       </Text>
                       {isFailed ? (
                         <Text className="text-[#b91c1c] text-[10px] font-jakarta-bold mt-0.5 uppercase tracking-wider">Failed & Refunded</Text>
                       ) : !!phoneStr && (
-                        <Text className="text-[#707971]/70 text-[10px] font-jakarta-medium mt-0.5" numberOfLines={1} ellipsizeMode="tail">
+                        <Text className="text-[#707971]/70 text-[10px] font-jakarta-bold mt-0.5" numberOfLines={1} ellipsizeMode="tail">
                           {phoneStr}
                         </Text>
                       )}
@@ -662,7 +662,7 @@ export default function Transactions({ navigation }: any) {
             <View className="items-center mb-4"><View className="w-12 h-1.5 bg-[#e7ece7] rounded-full" /></View>
             <ScrollView showsVerticalScrollIndicator={false}>
               <Text className="font-jakarta-extrabold text-[20px] text-[#0c2010] mb-1">Download Statement</Text>
-              <Text className="text-[#707971] font-jakarta-medium text-[13px] mb-6">Choose a period — we'll also email you a copy.</Text>
+              <Text className="text-[#707971] font-jakarta-bold text-[13px] mb-6">Choose a period — we'll also email you a copy.</Text>
 
               <View className="gap-2 mb-2">
                 {EXPORT_PRESETS.map((p) => (

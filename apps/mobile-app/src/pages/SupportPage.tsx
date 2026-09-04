@@ -46,7 +46,7 @@ const FAQItem = ({ question, answer }: { question: string, answer: string }) => 
       </TouchableOpacity>
       {expanded && (
         <View className="px-6 pb-6 pt-2">
-          <Text className="text-[14px] text-[#404942] font-jakarta-medium leading-relaxed">
+          <Text className="text-[14px] text-[#404942] font-jakarta-bold leading-relaxed">
             {answer}
           </Text>
         </View>
@@ -99,7 +99,7 @@ const SupportMessageForm = () => {
             <Feather name="check-circle" size={28} color="#059669" />
           </View>
           <Text className="font-jakarta-extrabold text-[16px] text-[#00351d] mb-1.5">Message sent!</Text>
-          <Text className="font-jakarta-medium text-[#404942] text-[13px] text-center mb-4">
+          <Text className="font-jakarta-bold text-[#404942] text-[13px] text-center mb-4">
             Our team has received it and will get back to you at {merchant?.email || 'your email'} shortly.
           </Text>
           <TouchableOpacity onPress={() => setSent(false)}>
@@ -108,7 +108,7 @@ const SupportMessageForm = () => {
         </View>
       ) : (
         <View>
-          <Text className="font-jakarta-medium text-[#707971] text-[13px] mb-6">Prefer to write it down? We'll reply straight to your email.</Text>
+          <Text className="font-jakarta-bold text-[#707971] text-[13px] mb-6">Prefer to write it down? We'll reply straight to your email.</Text>
           <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-2">Subject</Text>
           <TextInput
             value={subject}
@@ -116,7 +116,7 @@ const SupportMessageForm = () => {
             placeholder="What's this about?"
             placeholderTextColor="#a1a1aa"
             editable={!sending}
-            className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl px-4 py-3.5 text-[#0c2010] font-jakarta-semibold text-[14px] mb-4"
+            className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl px-4 py-3.5 text-[#0c2010] font-jakarta-bold text-[14px] mb-4"
           />
           <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-2">Message</Text>
           <TextInput
@@ -128,7 +128,7 @@ const SupportMessageForm = () => {
             multiline
             numberOfLines={5}
             textAlignVertical="top"
-            className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl px-4 py-3.5 text-[#0c2010] font-jakarta-medium text-[14px] mb-5 min-h-[120px]"
+            className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl px-4 py-3.5 text-[#0c2010] font-jakarta-bold text-[14px] mb-5 min-h-[120px]"
           />
           <TouchableOpacity
             onPress={submitMessage}
@@ -162,7 +162,7 @@ export default function SupportPage({ navigation }: any) {
           <View className="mb-12">
             <Text style={{ fontFamily: 'DMSerifDisplay_400Regular_Italic' }} className="text-[22px] text-[#00351d] mb-4 tracking-wide">Collect. Pay. Grow.</Text>
             <Text className="font-jakarta-extrabold text-4xl text-[#00351d] leading-tight tracking-tight mb-4">Help &{'\n'}Support</Text>
-            <Text className="font-jakarta-medium text-[#404942] text-[16px] leading-relaxed max-w-[280px]">
+            <Text className="font-jakarta-bold text-[#404942] text-[16px] leading-relaxed max-w-[280px]">
               How can we assist your business growth today?
             </Text>
           </View>
@@ -180,7 +180,7 @@ export default function SupportPage({ navigation }: any) {
                 </View>
               </View>
               <Text className="font-jakarta-extrabold text-[24px] tracking-tight text-[#00351d] mb-2">Chat on WhatsApp</Text>
-              <Text className="font-jakarta-medium text-[#404942] text-[15px] mb-8">{SUPPORT_HOURS}.</Text>
+              <Text className="font-jakarta-bold text-[#404942] text-[15px] mb-8">{SUPPORT_HOURS}.</Text>
               <View className="bg-[#25D366] py-4 rounded-full items-center justify-center shadow-md shadow-[#25D366]/20">
                 <Text className="font-jakarta-bold text-white text-[16px]">Chat Now</Text>
               </View>
@@ -194,7 +194,7 @@ export default function SupportPage({ navigation }: any) {
                 </View>
               </View>
               <Text className="font-jakarta-extrabold text-[24px] tracking-tight text-[#00351d] mb-2">Email Support</Text>
-              <Text className="font-jakarta-medium text-[#404942] text-[15px] mb-8">{SUPPORT_EMAIL}</Text>
+              <Text className="font-jakarta-bold text-[#404942] text-[15px] mb-8">{SUPPORT_EMAIL}</Text>
               <View className="border-[2px] border-[#0c2010] py-4 rounded-full items-center justify-center">
                 <Text className="font-jakarta-bold text-[#0c2010] text-[16px]">Send Email</Text>
               </View>
@@ -208,7 +208,7 @@ export default function SupportPage({ navigation }: any) {
                 </View>
               </View>
               <Text className="font-jakarta-extrabold text-[24px] tracking-tight text-[#00351d] mb-2">Call Us</Text>
-              <Text className="font-jakarta-medium text-[#404942] text-[15px] mb-8">{SUPPORT_PHONE_DISPLAY}</Text>
+              <Text className="font-jakarta-bold text-[#404942] text-[15px] mb-8">{SUPPORT_PHONE_DISPLAY}</Text>
               <View className="border-[2px] border-[#0c2010] py-4 rounded-full items-center justify-center">
                 <Text className="font-jakarta-bold text-[#0c2010] text-[16px]">Call Now</Text>
               </View>
@@ -247,8 +247,8 @@ export default function SupportPage({ navigation }: any) {
                 answer="It's the dedicated NCBA account number tied to your business, shown on your home screen. Anyone can pay into it directly by bank transfer or M-PESA, and it settles straight into your PayChain balance."
               />
               <FAQItem
-                question="How do I increase my Trust Score?"
-                answer="Trust Score is built purely from your completed collection volume on PayChain — the more payments you process through your Virtual Account, the higher it climbs. Once it reaches 60, you're eligible to apply for a Cash Advance."
+                question="How do I increase my Eligibility Score?"
+                answer="Your Eligibility Score is built purely from your completed collection volume on PayChain — the more payments you process through your Virtual Account, the higher it climbs. Once it reaches 60, you're eligible to apply for a Cash Advance."
               />
               <FAQItem
                 question="Is my money safe?"

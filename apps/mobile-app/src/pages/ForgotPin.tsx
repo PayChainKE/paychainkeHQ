@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, Dimensions, ActivityIndicator,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store';
+import { usePreventScreenCapture } from 'expo-screen-capture';
 import { useAuth } from '../context/AuthContext';
 import { showAlert } from '../utils/alert';
 
@@ -13,7 +14,17 @@ const { width } = Dimensions.get('window');
 const ATTEMPTS_KEY = 'paychain_pin_failed_attempts';
 const LOCKED_UNTIL_KEY = 'paychain_pin_locked_until';
 
+// Same weak-PIN blocklist PinSetup.tsx rejects — a reset shouldn't be able
+// to land back on a trivially guessable PIN either.
+const WEAK_PINS = new Set([
+  '0000', '1111', '2222', '3333', '4444', '5555', '6666', '7777', '8888', '9999',
+  '0123', '1234', '2345', '3456', '4567', '5678', '6789',
+  '9876', '8765', '7654', '6543', '5432', '4321', '3210',
+]);
+
 export default function ForgotPin({ navigation }: any) {
+  usePreventScreenCapture(); // no-op on web
+
   const { setAppPin, unlockApp } = useAuth();
 
   // password: prove it's really them (the one thing a stranger holding the
@@ -43,7 +54,16 @@ export default function ForgotPin({ navigation }: any) {
       if (pin.length < 4) {
         const newPin = pin + digit;
         setPin(newPin);
-        if (newPin.length === 4) setTimeout(() => setStep('confirm'), 300);
+        if (newPin.length === 4) {
+          if (WEAK_PINS.has(newPin)) {
+            setTimeout(() => {
+              showAlert('Choose a Stronger PIN', 'Repeated or sequential digits (like 1234 or 0000) are too easy to guess. Please choose a different PIN.');
+              setPin('');
+            }, 300);
+          } else {
+            setTimeout(() => setStep('confirm'), 300);
+          }
+        }
       }
     } else if (step === 'confirm') {
       if (confirmPin.length < 4) {
@@ -113,7 +133,7 @@ export default function ForgotPin({ navigation }: any) {
             <Feather name="key" size={26} color="white" />
           </View>
           <Text className="text-white text-[24px] font-jakarta-bold mb-2">Reset Your PIN</Text>
-          <Text className="text-[#68dbae] text-[14px] font-jakarta-medium mb-8">
+          <Text className="text-[#68dbae] text-[14px] font-jakarta-bold mb-8">
             Enter your account password to confirm it's you, then set a new 4-digit PIN.
           </Text>
 
@@ -127,7 +147,7 @@ export default function ForgotPin({ navigation }: any) {
           <Text className="text-[#68dbae] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Password</Text>
           <View className="flex-row items-center w-full bg-white/5 border border-white/10 rounded-2xl pr-4 mb-8">
             <TextInput
-              className="flex-1 py-4 px-5 text-[16px] font-jakarta-medium text-white"
+              className="flex-1 py-4 px-5 text-[16px] font-jakarta-bold text-white"
               placeholder="••••••••"
               placeholderTextColor="#5c7168"
               secureTextEntry={!showPassword}
@@ -157,7 +177,7 @@ export default function ForgotPin({ navigation }: any) {
         <Text className="text-white text-[24px] font-jakarta-bold mb-2">
           {step === 'setup' ? 'Set a New PIN' : 'Confirm Your New PIN'}
         </Text>
-        <Text className="text-[#68dbae] text-[14px] font-jakarta-medium text-center mb-12">
+        <Text className="text-[#68dbae] text-[14px] font-jakarta-bold text-center mb-12">
           {step === 'setup' ? 'Choose a new 4-digit PIN.' : 'Enter the same 4-digit PIN to confirm.'}
         </Text>
 

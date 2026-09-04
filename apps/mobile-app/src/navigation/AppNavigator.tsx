@@ -126,17 +126,13 @@ function MainTabs() {
 }
 
 import { useAuth } from '../context/AuthContext';
-import { View, ActivityIndicator } from 'react-native';
+import BrandedLoadingScreen from '../components/BrandedLoadingScreen';
 
 export default function AppNavigator() {
   const { isAuthenticated, isLoading, hasCompletedOnboarding, appPin, isPinUnlocked, hasSetBiometrics } = useAuth();
 
   if (isLoading) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0fdf4' }}>
-        <ActivityIndicator size="large" color="#0b4d2e" />
-      </View>
-    );
+    return <BrandedLoadingScreen />;
   }
 
   return (

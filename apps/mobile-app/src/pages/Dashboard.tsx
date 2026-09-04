@@ -84,19 +84,9 @@ function computeChartData(transactions: any[]) {
   };
 }
 
-function estateTier(score: number): string {
-  // Backend calculateTrustScore caps the score at 80 (trustScoreController.js)
-  // — 85 was above the ceiling and could never actually be reached.
-  if (score >= 80) return 'Elite';
-  if (score >= 70) return 'Trusted';
-  if (score >= 40) return 'Established';
-  return 'Growing';
-}
-
 export default function Dashboard({ navigation }: any) {
   const { merchant } = useAuth();
   const [transactions, setTransactions] = useState<any[]>([]);
-  const [trustScore, setTrustScore] = useState<any>({ current: 0, eligibleForAdvance: false });
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [now, setNow] = useState(new Date());
@@ -123,10 +113,7 @@ export default function Dashboard({ navigation }: any) {
   const fetchDashboardData = useCallback(async () => {
     if (!merchant) return;
     try {
-      const [txRes, scoreRes] = await Promise.all([
-        api.get('/api/transactions'),
-        api.get('/api/trust-score').catch(() => ({ data: { current: 0, eligibleForAdvance: false } })),
-      ]);
+      const txRes = await api.get('/api/transactions');
 
       const txList = Array.isArray(txRes.data)
         ? txRes.data
@@ -137,7 +124,6 @@ export default function Dashboard({ navigation }: any) {
       // at the source, so every downstream stat/chart in this file is
       // automatically clean — see excludeReversedDuplicates' doc comment.
       setTransactions(excludeReversedDuplicates(txList));
-      if (scoreRes.data) setTrustScore(scoreRes.data);
     } catch (error) {
       console.error('Error fetching dashboard data', error);
     } finally {
@@ -219,9 +205,12 @@ export default function Dashboard({ navigation }: any) {
       >
         <View className="w-full max-w-lg mx-auto flex-1">
           {/* Greeting backdrop — just page chrome now (avatar, greeting,
-              eye toggle, notifications). The wallet card below is its own
-              element, sized and shadowed like a real card, not stretched
-              full-bleed into this. Gradient tones match the merchant
+              notifications; the eye/visibility toggle now lives on the
+              wallet card itself, next to the balance it actually controls).
+              Sized for the avatar chip and greeting text to sit with real
+              breathing room (was pt-4/pb-6 — too tight, misaligned-looking
+              next to the larger avatar) without going back to the original
+              excessive pt-16/pb-10. Gradient tones match the merchant
               dashboard's own primary/primary-container palette for visual
               unison between the two apps. */}
           <LinearGradient
@@ -235,38 +224,33 @@ export default function Dashboard({ navigation }: any) {
               shadowRadius: 16,
               elevation: 6,
             }}
-            className="px-6 pt-16 pb-10 rounded-b-[40px]"
+            className="px-6 pt-12 pb-11 rounded-b-[32px]"
           >
-            <View className="flex-row justify-between items-center mt-4">
-              <View className="flex-row items-center gap-3 pl-3">
+            {/* ~0.3cm (11px) gap above and below the row, so the avatar/
+                greeting text doesn't sit flush against the header's own
+                top/bottom edges regardless of the outer padding. */}
+            <View className="flex-row justify-between items-center" style={{ marginTop: 11, marginBottom: 11 }}>
+              <View className="flex-row items-center gap-3.5">
                 <TouchableOpacity
                   onPress={() => navigation?.navigate('More')}
-                  className="w-11 h-11 rounded-2xl bg-[#5efeb3] items-center justify-center shadow-md shadow-black/20"
+                  className="w-10 h-10 rounded-2xl bg-[#5efeb3] items-center justify-center shadow-md shadow-black/20"
                 >
                   <Text className="text-[#00351d] font-jakarta-extrabold text-sm">{initials}</Text>
                 </TouchableOpacity>
                 <View>
-                  <Text className="text-white/70 text-[11px] font-jakarta-bold uppercase tracking-wider mb-0.5">{greeting} 👋</Text>
-                  <Text className="text-white text-base font-jakarta-bold tracking-tight">{merchant?.businessName || 'Merchant'}</Text>
+                  <Text className="text-white/70 text-[12px] font-jakarta-bold uppercase tracking-wider mb-1">{greeting} 👋</Text>
+                  <Text className="text-white text-lg font-jakarta-bold tracking-tight">{merchant?.businessName || 'Merchant'}</Text>
                 </View>
               </View>
-              <View className="flex-row items-center gap-2 mr-3">
-                <TouchableOpacity
-                  onPress={() => setShowAmounts((v) => !v)}
-                  className="w-10 h-10 rounded-full bg-white/10 items-center justify-center border border-white/10"
-                >
-                  <Feather name={showAmounts ? 'eye' : 'eye-off'} size={17} color="white" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => navigation?.navigate('Notifications')}
-                  className="w-10 h-10 rounded-full bg-white/10 items-center justify-center border border-white/10"
-                >
-                  <MaterialIcons name="notifications" size={20} color="white" />
-                  {unreadCount > 0 && (
-                    <View className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#ff5a5f] border border-[#0b4d2e]" />
-                  )}
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity
+                onPress={() => navigation?.navigate('Notifications')}
+                className="w-11 h-11 rounded-full bg-white/10 items-center justify-center border border-white/10"
+              >
+                <MaterialIcons name="notifications" size={21} color="white" />
+                {unreadCount > 0 && (
+                  <View className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#ff5a5f] border border-[#0b4d2e]" />
+                )}
+              </TouchableOpacity>
             </View>
           </LinearGradient>
 
@@ -345,43 +329,28 @@ export default function Dashboard({ navigation }: any) {
                 <View pointerEvents="none" style={{ position: 'absolute', top: -70, right: -50, width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(94,254,179,0.14)' }} />
                 <View pointerEvents="none" style={{ position: 'absolute', bottom: -60, left: -60, width: 180, height: 180, borderRadius: 90, backgroundColor: 'rgba(255,255,255,0.04)' }} />
 
-                <Text className="text-white/60 text-[10px] font-jakarta-bold uppercase tracking-[0.15em]">Available Balance</Text>
-
-                {/* Main row — balance on the left, chip + contactless icon
-                    stacked on the right, side by side instead of stacked
-                    above the amount. */}
-                <View className="flex-row items-start justify-between mt-2">
-                  <PrivateValue
-                    hidden={!showAmounts}
-                    tint="dark"
-                    style={{ fontFamily: 'PlusJakartaSans_700Bold', letterSpacing: -1, flexShrink: 1 }}
-                    className="text-[34px] text-white leading-none"
+                <View className="flex-row items-center gap-2">
+                  <Text className="text-white/60 text-[10px] font-jakarta-bold uppercase tracking-[0.15em]">Available Balance</Text>
+                  <TouchableOpacity
+                    onPress={() => setShowAmounts((v) => !v)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
-                    {formatCurrency(merchant?.kesBalance || 0)}
-                  </PrivateValue>
-
-                  <View className="items-center gap-2 pl-3">
-                    {/* Contactless indicator — MaterialIcons "wifi" rotated
-                        90° reads as the standard tap-to-pay glyph. Sits
-                        above the chip, the same order real cards print it
-                        in (contactless mark near the top edge, chip below). */}
-                    <MaterialIcons name="wifi" size={19} color="rgba(255,255,255,0.65)" style={{ transform: [{ rotate: '90deg' }] }} />
-                    {/* EMV-style chip — left plain gold, same as a real
-                        chip: banks never brand the chip itself, so this
-                        reads more authentic without a logo on it. */}
-                    <LinearGradient
-                      colors={['#f6e7b4', '#d4af37', '#a8842c']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={{ width: 42, height: 32, borderRadius: 7 }}
-                      className="items-center justify-center overflow-hidden"
-                    >
-                      <View style={{ position: 'absolute', top: 5, left: 0, right: 0, height: 1, backgroundColor: 'rgba(0,0,0,0.22)' }} />
-                      <View style={{ position: 'absolute', bottom: 5, left: 0, right: 0, height: 1, backgroundColor: 'rgba(0,0,0,0.22)' }} />
-                      <View style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 1, backgroundColor: 'rgba(0,0,0,0.18)' }} />
-                    </LinearGradient>
-                  </View>
+                    <Feather name={showAmounts ? 'eye' : 'eye-off'} size={13} color="rgba(255,255,255,0.6)" />
+                  </TouchableOpacity>
                 </View>
+
+                {/* Balance — chip/contactless icons removed: this is a
+                    paybill/virtual-account wallet, not an issued card, so
+                    those symbols implied a tap/insert capability that
+                    doesn't actually exist here. */}
+                <PrivateValue
+                  hidden={!showAmounts}
+                  tint="dark"
+                  style={{ fontFamily: 'PlusJakartaSans_700Bold', letterSpacing: -1 }}
+                  className="text-[34px] text-white leading-none mt-2"
+                >
+                  {formatCurrency(merchant?.kesBalance || 0)}
+                </PrivateValue>
 
                 <View>
                   {todayTotal > 0 && (
@@ -421,6 +390,19 @@ export default function Dashboard({ navigation }: any) {
               row reads as one deliberate branded set rather than default
               Material colors. */}
           <View className="px-6 flex-row justify-between mb-10 z-10">
+            <TouchableOpacity className="items-center" activeOpacity={0.8} onPress={() => setShowFundAccount(true)}>
+              <View className="w-16 h-16 rounded-full bg-white shadow-lg shadow-black/15 items-center justify-center mb-2.5">
+                {/* alignItems/justifyContent moved into style — className
+                    centering wasn't reliably applying on this component
+                    (same issue as LinearGradient's overflow className
+                    elsewhere), leaving the plus icon off-center. */}
+                <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#1d9e75', alignItems: 'center', justifyContent: 'center' }}>
+                  <Feather name="plus" size={21} color="#ffffff" />
+                </View>
+              </View>
+              <Text className="text-[11px] font-jakarta-bold text-[#0c2010] uppercase tracking-widest">Fund</Text>
+            </TouchableOpacity>
+
             <TouchableOpacity className="items-center" activeOpacity={0.8} onPress={() => navigation?.navigate('Collections')}>
               <View className="w-16 h-16 rounded-full bg-white shadow-lg shadow-black/15 items-center justify-center mb-2.5">
                 <View className="w-11 h-11 rounded-full bg-[#5efeb3] items-center justify-center">
@@ -447,21 +429,6 @@ export default function Dashboard({ navigation }: any) {
               </View>
               <Text className="text-[11px] font-jakarta-bold text-[#0c2010] uppercase tracking-widest">Advance</Text>
             </TouchableOpacity>
-
-            <TouchableOpacity className="items-center" activeOpacity={0.8} onPress={() => setShowFundAccount(true)}>
-              <View className="w-16 h-16 rounded-full bg-white shadow-lg shadow-black/15 items-center justify-center mb-2.5">
-                <LinearGradient
-                  colors={['#f6e7b4', '#d4af37', '#a8842c']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={{ width: 44, height: 44, borderRadius: 22 }}
-                  className="items-center justify-center"
-                >
-                  <Feather name="plus" size={21} color="#3d2e05" />
-                </LinearGradient>
-              </View>
-              <Text className="text-[11px] font-jakarta-bold text-[#0c2010] uppercase tracking-widest">Fund</Text>
-            </TouchableOpacity>
           </View>
 
           {/* Growth Ribbon */}
@@ -470,9 +437,6 @@ export default function Dashboard({ navigation }: any) {
               <View>
                 <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[22px] text-[#00351d] mb-1">
                   Collect. Pay. Protect. Grow.
-                </Text>
-                <Text className="text-[#006c4e] text-[10px] font-jakarta-bold uppercase tracking-widest">
-                  Merchant Estate Status: {estateTier(trustScore.current || 0)}
                 </Text>
               </View>
               <View className="w-8 h-8 rounded-full bg-[#83f5c6] items-center justify-center">
@@ -525,7 +489,7 @@ export default function Dashboard({ navigation }: any) {
                   <Feather name="arrow-up-right" size={16} color="rgba(255,255,255,0.3)" />
                 </View>
                 <Text className="text-white text-[12px] font-jakarta-bold uppercase tracking-wide mb-1">Send STK Push</Text>
-                <Text className="text-white/40 text-[10px] font-jakarta-medium leading-snug">Prompt a customer to pay instantly</Text>
+                <Text className="text-white/40 text-[10px] font-jakarta-bold leading-snug">Prompt a customer to pay instantly</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -540,7 +504,7 @@ export default function Dashboard({ navigation }: any) {
                   <Feather name="arrow-up-right" size={16} color="rgba(255,255,255,0.3)" />
                 </View>
                 <Text className="text-white text-[12px] font-jakarta-bold uppercase tracking-wide mb-1">Get Payment Link</Text>
-                <Text className="text-white/40 text-[10px] font-jakarta-medium leading-snug">Share a link for any amount</Text>
+                <Text className="text-white/40 text-[10px] font-jakarta-bold leading-snug">Share a link for any amount</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -563,15 +527,9 @@ export default function Dashboard({ navigation }: any) {
                 </View>
                 <View className="w-[1px] h-full bg-[#eff4ef]" />
                 <View>
-                  <Text className="text-[#0c2010] text-[10px] font-jakarta-bold uppercase tracking-wider mb-1">Trust Score</Text>
-                  <View className="flex-row items-center gap-1.5">
-                    <Text className="text-[#0c2010] text-[16px] font-jakarta-extrabold">{trustScore.current || 0}/100</Text>
-                  </View>
+                  <Text className="text-[#0c2010] text-[10px] font-jakarta-bold uppercase tracking-wider mb-1">All-Time</Text>
+                  <Text className="text-[#0c2010] text-[16px] font-jakarta-extrabold">{transactions.length}</Text>
                 </View>
-              </View>
-              <View className="flex-row items-center justify-between mt-5 pt-5 border-t border-[#eff4ef]">
-                <Text className="text-[#707971] text-[10px] font-jakarta-bold uppercase tracking-wider">All-Time Transactions</Text>
-                <Text className="text-[#0c2010] text-[14px] font-jakarta-extrabold">{transactions.length}</Text>
               </View>
             </View>
           </View>
@@ -584,7 +542,7 @@ export default function Dashboard({ navigation }: any) {
               </View>
               <View className="flex-1">
                 <Text className="text-[9px] font-jakarta-extrabold text-emerald-800 uppercase tracking-[0.2em] mb-1">Growth Tip</Text>
-                <Text className="text-[11px] text-emerald-900 font-jakarta-medium leading-relaxed opacity-80">
+                <Text className="text-[11px] text-emerald-900 font-jakarta-bold leading-relaxed opacity-80">
                   Instruct your customers to pay via M-Pesa Paybill 880100, Account Number {formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || '...')}, to increase your daily volume.
                 </Text>
               </View>
@@ -597,7 +555,7 @@ export default function Dashboard({ navigation }: any) {
               <View className="flex-row items-center justify-between mb-1">
                 <View>
                   <Text className="text-lg font-jakarta-bold text-[#0c2010]">Revenue Overview</Text>
-                  <Text className="text-[#707971] text-[11px] font-jakarta-medium mt-0.5">Money moving in and out</Text>
+                  <Text className="text-[#707971] text-[11px] font-jakarta-bold mt-0.5">Money moving in and out</Text>
                 </View>
                 <View className="flex-row bg-[#f0fdf4] p-0.5 rounded-lg border border-[#e7ece7]">
                   {(['7D', '30D', '6M'] as Timeframe[]).map((period) => (
@@ -633,7 +591,7 @@ export default function Dashboard({ navigation }: any) {
 
               {periodInboundTotal === 0 && periodOutboundTotal === 0 ? (
                 <View className="h-[120px] items-center justify-center">
-                  <Text className="text-[#707971] font-jakarta-medium text-[12px]">No activity in this period</Text>
+                  <Text className="text-[#707971] font-jakarta-bold text-[12px]">No activity in this period</Text>
                 </View>
               ) : (
                 <View className="flex-row items-end justify-between h-[120px]">
@@ -681,7 +639,7 @@ export default function Dashboard({ navigation }: any) {
                 </View>
               ) : transactions.length === 0 ? (
                 <View className="py-10 items-center justify-center">
-                  <Text className="text-[#707971] font-jakarta-medium">No recent activity</Text>
+                  <Text className="text-[#707971] font-jakarta-bold">No recent activity</Text>
                 </View>
               ) : (
                 transactions.slice(0, 10).map((tx, index) => {
@@ -712,7 +670,7 @@ export default function Dashboard({ navigation }: any) {
                         {isFailed ? (
                           <Text className="text-[#b91c1c] text-[10px] font-jakarta-bold mt-0.5 uppercase tracking-wider">Failed & Refunded</Text>
                         ) : (
-                          <Text className="text-[#707971] text-[10px] font-jakarta-medium mt-0.5" numberOfLines={1} ellipsizeMode="tail">
+                          <Text className="text-[#707971] text-[10px] font-jakarta-bold mt-0.5" numberOfLines={1} ellipsizeMode="tail">
                             {new Date(tx.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} · {refText}
                           </Text>
                         )}
@@ -753,7 +711,7 @@ export default function Dashboard({ navigation }: any) {
               <Text className="text-2xl font-jakarta-bold tracking-tight text-[#0c2010] mb-2">
                 Pay suppliers & staff at once
               </Text>
-              <Text className="text-[#707971] text-[13px] font-jakarta-medium leading-[18px] mb-6">
+              <Text className="text-[#707971] text-[13px] font-jakarta-bold leading-[18px] mb-6">
                 Upload a list or pick recipients, then settle an entire batch of payouts in a single click.
               </Text>
 

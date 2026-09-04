@@ -64,7 +64,7 @@ export function ValidatedTextInput({
         className={`${className || ''} ${showError ? 'border-red-400' : ''}`}
       />
       {showError && (
-        <Text className={errorClassName || 'text-red-600 text-[11px] font-jakarta-medium mt-1 ml-1'}>
+        <Text className={errorClassName || 'text-red-600 text-[11px] font-jakarta-bold mt-1 ml-1'}>
           {result.error}
         </Text>
       )}

@@ -2,12 +2,25 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Dimensions, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { usePreventScreenCapture } from 'expo-screen-capture';
 import { useAuth } from '../context/AuthContext';
 import { showAlert } from '../utils/alert';
 
 const { width } = Dimensions.get('window');
 
+// Rejected outright at entry — repeated digits and ascending/descending runs
+// account for a disproportionate share of successful PIN guesses, and the
+// 5-attempt lockout in PinEntry.tsx only limits how many guesses an attacker
+// gets, not how likely the first few are to land.
+const WEAK_PINS = new Set([
+  '0000', '1111', '2222', '3333', '4444', '5555', '6666', '7777', '8888', '9999',
+  '0123', '1234', '2345', '3456', '4567', '5678', '6789',
+  '9876', '8765', '7654', '6543', '5432', '4321', '3210',
+]);
+
 export default function PinSetup() {
+  usePreventScreenCapture(); // no-op on web
+
   const { setAppPin } = useAuth();
 
   const [step, setStep] = useState<'setup' | 'confirm' | 'password'>('setup');
@@ -30,7 +43,14 @@ export default function PinSetup() {
         const newPin = pin + digit;
         setPin(newPin);
         if (newPin.length === 4) {
-          setTimeout(() => setStep('confirm'), 300);
+          if (WEAK_PINS.has(newPin)) {
+            setTimeout(() => {
+              showAlert('Choose a Stronger PIN', 'Repeated or sequential digits (like 1234 or 0000) are too easy to guess. Please choose a different PIN.');
+              setPin('');
+            }, 300);
+          } else {
+            setTimeout(() => setStep('confirm'), 300);
+          }
         }
       }
     } else if (step === 'confirm') {
@@ -102,7 +122,7 @@ export default function PinSetup() {
             <Feather name="shield" size={26} color="white" />
           </View>
           <Text className="text-white text-[24px] font-jakarta-bold mb-2">Confirm It's You</Text>
-          <Text className="text-[#68dbae] text-[14px] font-jakarta-medium mb-8">
+          <Text className="text-[#68dbae] text-[14px] font-jakarta-bold mb-8">
             This account already has a PIN set from another device. Enter your account password to replace it with the one you just chose.
           </Text>
 
@@ -116,7 +136,7 @@ export default function PinSetup() {
           <Text className="text-[#68dbae] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Password</Text>
           <View className="flex-row items-center w-full bg-white/5 border border-white/10 rounded-2xl pr-4 mb-8">
             <TextInput
-              className="flex-1 py-4 px-5 text-[16px] font-jakarta-medium text-white"
+              className="flex-1 py-4 px-5 text-[16px] font-jakarta-bold text-white"
               placeholder="••••••••"
               placeholderTextColor="#5c7168"
               secureTextEntry={!showPassword}
@@ -153,7 +173,7 @@ export default function PinSetup() {
         <Text className="text-white text-[24px] font-jakarta-bold mb-2">
           {step === 'setup' ? 'Set Your App PIN' : 'Confirm Your PIN'}
         </Text>
-        <Text className="text-[#68dbae] text-[14px] font-jakarta-medium text-center mb-12">
+        <Text className="text-[#68dbae] text-[14px] font-jakarta-bold text-center mb-12">
           {step === 'setup' ? 'Secure your PayChain app with a 4-digit PIN.' : 'Enter the same 4-digit PIN to confirm.'}
         </Text>
 
