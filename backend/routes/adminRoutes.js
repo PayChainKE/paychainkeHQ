@@ -45,6 +45,7 @@ import {
 import {
   getAuditLog,
   getMerchantAuditLog,
+  getDeveloperAuditLog,
 } from '../controllers/auditLogController.js';
 import {
   getSecurityAlerts,
@@ -308,6 +309,7 @@ router.get('/monitoring/sentry', protect, excludeOfficer, getSentryOverview);
 // first, same shape as merchant KYB. See developerAdminController.js.
 router.get('/developers', protect, excludeOfficer, listDevelopers);
 router.get('/developers/:id/webhooks', protect, excludeOfficer, getDeveloperWebhooks);
+router.get('/developers/:id/audit-log', protect, excludeOfficer, getDeveloperAuditLog);
 router.patch('/developers/:id/approve-live', protect, requireMutator, approveLiveAccess);
 router.patch('/developers/:id/reject-live', protect, requireMutator, rejectLiveAccess);
 

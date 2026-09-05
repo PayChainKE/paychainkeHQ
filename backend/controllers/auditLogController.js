@@ -278,3 +278,40 @@ export const getMerchantAuditLog = async (req, res) => {
     res.status(500).json({ error: 'Server Error' });
   }
 };
+
+// @desc    Per-developer log convenience endpoint. Developer actions are
+//          written into the SAME AuditLog collection merchant events use
+//          (see utils/auditLog.js's logAudit), but AuditLog has no
+//          developerId field — a developer acting on themselves is written
+//          with actor.type 'self' + actor.id = their own _id and
+//          merchantId left null, while an admin acting ON a developer
+//          (approve/reject live access, run integration test — see
+//          developerAdminController.js) is written with actor.type 'admin'
+//          and the developer's id only in metadata.developerId. This
+//          endpoint reconstructs "this developer's full activity" by
+//          matching either shape.
+// @route   GET /api/admin/developers/:id/audit-log
+// @access  Private (Admin)
+export const getDeveloperAuditLog = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid developer id.' });
+    }
+    const { limit = 50 } = req.query;
+    const cap = Math.min(200, Math.max(1, parseInt(limit, 10) || 50));
+    const rows = await AuditLog.find({
+      $or: [
+        { 'actor.type': 'self', 'actor.id': id },
+        { 'metadata.developerId': String(id) },
+      ],
+    })
+      .sort({ createdAt: -1 })
+      .limit(cap)
+      .lean();
+    res.json({ success: true, data: rows, total: rows.length });
+  } catch (error) {
+    console.error('Developer Audit Log Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};

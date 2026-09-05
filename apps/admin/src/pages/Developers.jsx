@@ -12,6 +12,54 @@ const STATUS_META = {
   suspended:            { label: 'Suspended',  pill: 'bg-red-50 text-red-700 border-red-200' },
 };
 
+// Friendly label + icon for each developer-side audit action. Falls back to
+// the raw action string for anything not listed (matches AuditLog.jsx's
+// ACTION_META fallback behaviour), so a new backend action never breaks
+// this drawer.
+const DEV_ACTION_META = {
+  'developer.registered':                     { label: 'Account created',        icon: 'person_add' },
+  'developer.verified':                       { label: 'Email verified',         icon: 'verified' },
+  'developer.login.success':                  { label: 'Signed in',              icon: 'login' },
+  'developer.login.failed':                   { label: 'Failed sign-in',         icon: 'warning' },
+  'developer.login.blocked':                  { label: 'Sign-in blocked',        icon: 'block' },
+  'developer.password.reset_requested':       { label: 'Password reset requested', icon: 'lock_reset' },
+  'developer.password.reset_attempt_unknown': { label: 'Reset attempt · unknown', icon: 'help' },
+  'developer.password.reset_verified':        { label: 'Reset OTP verified',     icon: 'verified' },
+  'developer.password.reset_completed':       { label: 'Password reset',         icon: 'key' },
+  'developer.api_key.created':                { label: 'API key created',        icon: 'vpn_key' },
+  'developer.api_key.revoked':                { label: 'API key revoked',        icon: 'key_off' },
+  'developer.webhook.created':                { label: 'Webhook registered',     icon: 'webhook' },
+  'developer.merchant_link.verified':         { label: 'Linked merchant account', icon: 'link' },
+  'developer.live_access.requested':          { label: 'Requested live access',  icon: 'rocket_launch' },
+  'developer.payment.payout_executed':        { label: 'Payout executed (API)',  icon: 'call_made' },
+  'admin.developer.live_access_approved':     { label: 'Admin · live access approved', icon: 'check_circle' },
+  'admin.developer.live_access_rejected':     { label: 'Admin · live access rejected/revoked', icon: 'cancel' },
+  'admin.developer.integration_test_run':     { label: 'Admin · ran integration test', icon: 'science' },
+};
+
+const DEV_SEVERITY_TONE = {
+  info:     'bg-blue-50    text-blue-700   border-blue-200',
+  success:  'bg-emerald-50 text-emerald-700 border-emerald-200',
+  warning:  'bg-amber-50   text-amber-700  border-amber-200',
+  critical: 'bg-red-50     text-red-700    border-red-200',
+};
+
+const DEV_ACTOR_TONE = {
+  self:  'text-emerald-700',
+  admin: 'text-amber-700',
+};
+
+function relTime(iso) {
+  if (!iso) return '—';
+  const sec = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (sec < 60)    return 'Just now';
+  if (sec < 3600)  return `${Math.floor(sec / 60)}m ago`;
+  if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`;
+  const days = Math.floor(sec / 86400);
+  if (days < 30)   return `${days}d ago`;
+  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 const liveAccessMeta = (d) => {
   if (d.liveAccess?.approved) return { label: 'Live Approved', pill: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
   if (d.liveAccess?.requestedAt) return { label: 'Pending Review', pill: 'bg-amber-50 text-amber-700 border-amber-200' };
@@ -71,6 +119,10 @@ const Developers = () => {
   const [testResult, setTestResult] = useState(null);
   const [testRunning, setTestRunning] = useState(false);
   const [testError, setTestError] = useState('');
+  const [activityDeveloper, setActivityDeveloper] = useState(null);
+  const [activityData, setActivityData] = useState(null);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [activityError, setActivityError] = useState('');
 
   const fetchDevelopers = useCallback(async () => {
     setLoading(true);
@@ -168,6 +220,20 @@ const Developers = () => {
     } finally { setWebhooksLoading(false); }
   }
 
+  async function openActivity(developer) {
+    setActivityDeveloper(developer);
+    setActivityData(null);
+    setActivityError('');
+    setActivityLoading(true);
+    try {
+      const res = await api.get(`/api/admin/developers/${developer._id}/audit-log`, { params: { limit: 100 } });
+      if (res.data?.success) setActivityData(res.data.data || []);
+      else setActivityError(res.data?.error || 'Could not load activity.');
+    } catch (e) {
+      setActivityError(e?.response?.data?.error || 'Could not load activity.');
+    } finally { setActivityLoading(false); }
+  }
+
   return (
     <Layout>
       <div className="space-y-6 pb-12">
@@ -227,7 +293,7 @@ const Developers = () => {
                   <Th>Status</Th>
                   <Th>Live Access</Th>
                   <Th>Joined</Th>
-                  <Th>Webhooks</Th>
+                  <Th>Integration</Th>
                   <Th></Th>
                 </tr>
               </thead>
@@ -239,7 +305,7 @@ const Developers = () => {
                 ) : filtered.length === 0 ? (
                   <tr><td colSpan={6} className="px-4 py-10 text-center text-on-surface-variant/40 text-sm">{error || 'No developer accounts yet.'}</td></tr>
                 ) : pagedDevelopers.map((d) => (
-                  <DeveloperRow key={d._id} developer={d} canManage={canManage} busy={busyId === d._id} onApprove={() => handleApprove(d)} onReject={() => handleReject(d)} onViewWebhooks={() => openWebhooks(d)} onTestIntegration={() => openIntegrationTest(d)} />
+                  <DeveloperRow key={d._id} developer={d} canManage={canManage} busy={busyId === d._id} onApprove={() => handleApprove(d)} onReject={() => handleReject(d)} onViewWebhooks={() => openWebhooks(d)} onTestIntegration={() => openIntegrationTest(d)} onViewActivity={() => openActivity(d)} />
                 ))}
               </tbody>
             </table>
@@ -251,7 +317,7 @@ const Developers = () => {
           {loading ? <div className="p-8 text-center text-on-surface-variant/40 text-sm">Loading developers…</div> :
             filtered.length === 0 ? <div className="p-8 text-center text-on-surface-variant/40 text-sm">{error || 'No developer accounts yet.'}</div> :
             pagedDevelopers.map((d) => (
-              <DeveloperCard key={d._id} developer={d} canManage={canManage} busy={busyId === d._id} onApprove={() => handleApprove(d)} onReject={() => handleReject(d)} onViewWebhooks={() => openWebhooks(d)} onTestIntegration={() => openIntegrationTest(d)} />
+              <DeveloperCard key={d._id} developer={d} canManage={canManage} busy={busyId === d._id} onApprove={() => handleApprove(d)} onReject={() => handleReject(d)} onViewWebhooks={() => openWebhooks(d)} onTestIntegration={() => openIntegrationTest(d)} onViewActivity={() => openActivity(d)} />
             ))}
           {!loading && filtered.length > 0 && (
             <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/20 shadow-editorial overflow-hidden">
@@ -282,6 +348,16 @@ const Developers = () => {
             error={testError}
             onRun={runIntegrationTest}
             onClose={() => setTestDeveloper(null)}
+          />
+        )}
+
+        {activityDeveloper && (
+          <ActivityDrawer
+            developer={activityDeveloper}
+            data={activityData}
+            loading={activityLoading}
+            error={activityError}
+            onClose={() => setActivityDeveloper(null)}
           />
         )}
       </div>
@@ -340,7 +416,7 @@ const DeveloperActions = ({ developer, canManage, busy, onApprove, onReject }) =
   return <span className="text-2xs text-on-surface-variant/40">No action needed</span>;
 };
 
-const DeveloperRow = ({ developer, canManage, busy, onApprove, onReject, onViewWebhooks, onTestIntegration }) => {
+const DeveloperRow = ({ developer, canManage, busy, onApprove, onReject, onViewWebhooks, onTestIntegration, onViewActivity }) => {
   const statusStyle = STATUS_META[developer.status] || STATUS_META.active;
   const liveStyle = liveAccessMeta(developer);
   const initials = (developer.companyName || developer.email).split(/\s+/).map((s) => s[0]).slice(0, 2).join('').toUpperCase();
@@ -374,10 +450,16 @@ const DeveloperRow = ({ developer, canManage, busy, onApprove, onReject, onViewW
         {developer.createdAt ? new Date(developer.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
       </td>
       <td className="px-3 py-2 border-b border-outline-variant/5">
-        <button onClick={onViewWebhooks} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-outline-variant/30 text-2xs font-bold uppercase tracking-widest text-on-surface-variant/70 hover:bg-surface-container-low hover:text-on-surface transition-colors">
-          <span className="material-symbols-outlined text-sm">webhook</span>
-          View
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button onClick={onViewWebhooks} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-outline-variant/30 text-2xs font-bold uppercase tracking-widest text-on-surface-variant/70 hover:bg-surface-container-low hover:text-on-surface transition-colors">
+            <span className="material-symbols-outlined text-sm">webhook</span>
+            View
+          </button>
+          <button onClick={onViewActivity} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-outline-variant/30 text-2xs font-bold uppercase tracking-widest text-on-surface-variant/70 hover:bg-surface-container-low hover:text-on-surface transition-colors">
+            <span className="material-symbols-outlined text-sm">manage_history</span>
+            Activity
+          </button>
+        </div>
       </td>
       <td className="px-3 py-2 border-b border-outline-variant/5 text-right">
         <div className="flex items-center justify-end gap-2">
@@ -394,7 +476,7 @@ const DeveloperRow = ({ developer, canManage, busy, onApprove, onReject, onViewW
   );
 };
 
-const DeveloperCard = ({ developer, canManage, busy, onApprove, onReject, onViewWebhooks, onTestIntegration }) => {
+const DeveloperCard = ({ developer, canManage, busy, onApprove, onReject, onViewWebhooks, onTestIntegration, onViewActivity }) => {
   const statusStyle = STATUS_META[developer.status] || STATUS_META.active;
   const liveStyle = liveAccessMeta(developer);
   const initials = (developer.companyName || developer.email).split(/\s+/).map((s) => s[0]).slice(0, 2).join('').toUpperCase();
@@ -417,6 +499,10 @@ const DeveloperCard = ({ developer, canManage, busy, onApprove, onReject, onView
             <button onClick={onViewWebhooks} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-outline-variant/30 text-2xs font-bold uppercase tracking-widest text-on-surface-variant/70">
               <span className="material-symbols-outlined text-sm">webhook</span>
               Webhooks
+            </button>
+            <button onClick={onViewActivity} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-outline-variant/30 text-2xs font-bold uppercase tracking-widest text-on-surface-variant/70">
+              <span className="material-symbols-outlined text-sm">manage_history</span>
+              Activity
             </button>
             {canManage && (
               <button onClick={onTestIntegration} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 text-2xs font-bold uppercase tracking-widest">
@@ -510,6 +596,70 @@ const WebhooksDrawer = ({ developer, data, loading, error, onClose }) => {
                 )}
               </div>
             ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Slide-over panel showing everything a developer has done on their
+// account — logins, API key/webhook changes, live-access requests — plus
+// the admin-side decisions made on that account (approve/reject live
+// access, integration test runs). Backed by GET
+// /api/admin/developers/:id/audit-log, which reads the same AuditLog
+// collection the merchant-facing Audit Log page does (see
+// getDeveloperAuditLog in auditLogController.js).
+const ActivityDrawer = ({ developer, data, loading, error, onClose }) => {
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-lg h-full bg-white shadow-2xl overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-outline-variant/10 px-5 py-4 flex items-start justify-between z-10">
+          <div>
+            <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-0.5">Activity Log</p>
+            <h3 className="text-base font-bold text-on-surface tracking-tight">{developer.companyName}</h3>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-lg flex items-center justify-center text-on-surface-variant/60 hover:bg-surface-container-low">
+            <span className="material-symbols-outlined text-lg">close</span>
+          </button>
+        </div>
+
+        <div className="p-5">
+          {loading ? (
+            <div className="space-y-2">
+              {[...Array(6)].map((_, i) => <div key={i} className="h-12 bg-surface-container-low rounded-xl animate-pulse" />)}
+            </div>
+          ) : error ? (
+            <p className="text-sm text-red-600">{error}</p>
+          ) : !data || data.length === 0 ? (
+            <p className="text-sm text-on-surface-variant/50 text-center py-10">No recorded activity for this developer yet.</p>
+          ) : (
+            <div className="divide-y divide-outline-variant/10">
+              {data.map((row) => {
+                const meta = DEV_ACTION_META[row.action] || { label: row.action, icon: 'radio_button_checked' };
+                const tone = DEV_SEVERITY_TONE[row.severity] || DEV_SEVERITY_TONE.info;
+                const actorTone = DEV_ACTOR_TONE[row.actor?.type] || 'text-on-surface-variant/60';
+                return (
+                  <div key={row._id} className="py-3 flex items-start gap-3">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border ${tone}`}>
+                      <span className="material-symbols-outlined text-sm">{meta.icon}</span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-bold text-on-surface truncate">{meta.label}</p>
+                        <span className="text-2xs text-on-surface-variant/40 shrink-0" title={new Date(row.createdAt).toLocaleString()}>{relTime(row.createdAt)}</span>
+                      </div>
+                      {row.message && <p className="text-2xs text-on-surface-variant/60 mt-0.5 break-words">{row.message}</p>}
+                      <div className="mt-1 flex items-center gap-2 flex-wrap">
+                        <span className={`text-2xs font-bold ${actorTone}`}>{row.actor?.type === 'admin' ? (row.actor?.name || 'Admin') : 'Developer'}</span>
+                        {row.ip && <span className="text-2xs text-on-surface-variant/30">· {row.ip}</span>}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
       </div>
