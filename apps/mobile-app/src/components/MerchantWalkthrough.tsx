@@ -37,8 +37,8 @@ const STEPS = [
   },
   {
     icon: 'arrow-down-circle' as const,
-    title: 'Collections',
-    body: 'Create invoices and collect payments, then track who has paid.',
+    title: 'Transactions',
+    body: 'See every payment in and out of your account, track your collections at a glance, and download a statement any time.',
     screen: 'Home',
     targetId: 'tab-collections',
   },

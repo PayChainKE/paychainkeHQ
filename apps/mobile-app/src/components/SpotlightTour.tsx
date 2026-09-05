@@ -325,7 +325,7 @@ function TourCard({
             <Feather name={step.icon} size={20} color="#6ee7b7" />
           </View>
           <View style={{ flex: 1, paddingTop: 2 }}>
-            <Text className="font-jakarta-bold text-[9px] uppercase" style={{ color: 'rgba(110,231,183,0.8)', letterSpacing: 1.5, marginBottom: 4 }}>
+            <Text className="font-jakarta-bold text-[10px] uppercase" style={{ color: 'rgba(110,231,183,0.8)', letterSpacing: 1.5, marginBottom: 4 }}>
               {stepIndex + 1} / {totalSteps}
             </Text>
             <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-white text-[18px] leading-tight">

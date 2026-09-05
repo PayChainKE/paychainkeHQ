@@ -40,7 +40,7 @@ const FAQItem = ({ question, answer }: { question: string, answer: string }) => 
         <Feather 
           name="chevron-down" 
           size={20} 
-          color="#707971" 
+          color="#5b645c" 
           style={{ transform: [{ rotate: expanded ? '180deg' : '0deg' }] }}
         />
       </TouchableOpacity>
@@ -108,8 +108,8 @@ const SupportMessageForm = () => {
         </View>
       ) : (
         <View>
-          <Text className="font-jakarta-bold text-[#707971] text-[13px] mb-6">Prefer to write it down? We'll reply straight to your email.</Text>
-          <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-2">Subject</Text>
+          <Text className="font-jakarta-bold text-[#5b645c] text-[13px] mb-6">Prefer to write it down? We'll reply straight to your email.</Text>
+          <Text className="text-[10px] font-jakarta-bold text-[#5b645c] uppercase tracking-[0.12em] mb-2">Subject</Text>
           <TextInput
             value={subject}
             onChangeText={setSubject}
@@ -118,7 +118,7 @@ const SupportMessageForm = () => {
             editable={!sending}
             className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl px-4 py-3.5 text-[#0c2010] font-jakarta-bold text-[14px] mb-4"
           />
-          <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-2">Message</Text>
+          <Text className="text-[10px] font-jakarta-bold text-[#5b645c] uppercase tracking-[0.12em] mb-2">Message</Text>
           <TextInput
             value={messageBody}
             onChangeText={setMessageBody}
@@ -222,7 +222,7 @@ export default function SupportPage({ navigation }: any) {
           <View className="mb-12">
             <View className="flex-row items-center justify-between mb-8">
               <Text className="font-jakarta-bold text-[22px] tracking-tight text-[#00351d]">Quick Answers</Text>
-              <Text className="font-jakarta-bold text-[12px] uppercase tracking-[0.2em] text-[#707971]">FAQ</Text>
+              <Text className="font-jakarta-bold text-[12px] uppercase tracking-[0.2em] text-[#5b645c]">FAQ</Text>
             </View>
             
             <View className="gap-4">
@@ -264,11 +264,11 @@ export default function SupportPage({ navigation }: any) {
           {/* Growth Ribbon */}
           <View className="mb-4 p-8 bg-[#5efeb3] rounded-[40px] overflow-hidden flex-row items-center justify-between shadow-sm">
             <View className="z-10 flex-1 pr-8">
-              <Text style={{ fontFamily: 'DMSerifDisplay_400Regular_Italic' }} className="text-[26px] text-[#00351d] mb-2 leading-tight">Expert help, just a tap away.</Text>
+              <Text style={{ fontFamily: 'DMSerifDisplay_400Regular_Italic' }} className="text-[24px] text-[#00351d] mb-2 leading-tight">Expert help, just a tap away.</Text>
               <Text className="font-jakarta-bold text-[10px] uppercase tracking-[0.15em] text-[#006c4e] mt-1">{SUPPORT_HOURS}</Text>
             </View>
-            <View className="absolute -right-8 -bottom-6 opacity-20">
-              <MaterialIcons name="support-agent" size={140} color="#006c4e" />
+            <View className="absolute right-4 bottom-4 opacity-20">
+              <MaterialIcons name="support-agent" size={90} color="#006c4e" />
             </View>
           </View>
         </View>

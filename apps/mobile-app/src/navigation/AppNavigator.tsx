@@ -64,6 +64,7 @@ function MainTabs() {
         name="Collections"
         component={Collections}
         options={{
+          tabBarLabel: 'Transactions',
           tabBarIcon: ({ color }) => (
             <TourTarget id="tab-collections"><Feather name="arrow-down-circle" size={22} color={color} /></TourTarget>
           )

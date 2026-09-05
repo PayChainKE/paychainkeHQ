@@ -14,9 +14,9 @@ export default function SupportTab() {
 
   const solutions = [
     { title: 'Payments failing', icon: 'error-outline', desc: 'Common issues with M-Pesa', color: '#e6f4ea', iconColor: '#006c4e' },
-    { title: 'Cash Advance', icon: 'payments', desc: 'Eligibility and repayment', color: '#fef3c7', iconColor: '#d97706' },
-    { title: 'KYC Verification', icon: 'verified-user', desc: 'Status and requirements', color: '#dbeafe', iconColor: '#2563eb' },
-    { title: 'Settlement delay', icon: 'schedule', desc: 'Bank processing times', color: '#e0e7ff', iconColor: '#4f46e5' },
+    { title: 'Cash Advance', icon: 'payments', desc: 'Eligibility and repayment', color: '#f0fdf4', iconColor: '#1d9e75' },
+    { title: 'KYC Verification', icon: 'verified-user', desc: 'Status and requirements', color: '#dcf5da', iconColor: '#00351d' },
+    { title: 'Settlement delay', icon: 'schedule', desc: 'Bank processing times', color: '#e7f8ef', iconColor: '#0b4d2e' },
   ];
 
   const faqs = [
@@ -43,8 +43,8 @@ export default function SupportTab() {
             <MaterialIcons name="verified-user" size={14} color="#006c4e" />
             <Text className="text-[#006c4e] text-[10px] font-jakarta-extrabold uppercase tracking-widest">Concierge Support</Text>
           </View>
-          <Text className="font-jakarta-extrabold text-[36px] text-[#00351d] tracking-tight mb-4 text-center leading-[42px]">How can we help?</Text>
-          <Text className="text-[#707971] text-[14px] font-jakarta-bold mb-8 text-center leading-relaxed opacity-90 px-4">
+          <Text className="font-jakarta-extrabold text-[32px] text-[#00351d] tracking-tight mb-4 text-center leading-[42px]">How can we help?</Text>
+          <Text className="text-[#5b645c] text-[14px] font-jakarta-bold mb-8 text-center leading-relaxed opacity-90 px-4">
             Search our automated knowledge base or navigate the solution grid for instant resolution.
           </Text>
           
@@ -101,7 +101,7 @@ export default function SupportTab() {
                 </View>
                 {expandedFaq === i && (
                   <View className="px-5 pb-5 pt-0">
-                    <Text className="text-[13px] text-[#707971] leading-relaxed font-jakarta-bold">{f.a}</Text>
+                    <Text className="text-[13px] text-[#5b645c] leading-relaxed font-jakarta-bold">{f.a}</Text>
                   </View>
                 )}
               </TouchableOpacity>
@@ -118,29 +118,29 @@ export default function SupportTab() {
 
             <View className="gap-4 relative z-10">
               <TouchableOpacity onPress={() => Linking.openURL(SUPPORT_WHATSAPP_URL)} className="w-full bg-white/10 p-4 rounded-2xl flex-row items-center justify-between border border-white/5 active:bg-white/20">
-                <View className="flex-row items-center gap-4">
-                  <View className="w-12 h-12 rounded-xl bg-[#006c4e] flex items-center justify-center shadow-lg shadow-[#006c4e]/50">
+                <View className="flex-row items-center gap-4 flex-1 min-w-0 pr-3">
+                  <View className="w-12 h-12 rounded-xl bg-[#006c4e] flex items-center justify-center shadow-lg shadow-[#006c4e]/50 flex-shrink-0">
                     <MaterialIcons name="chat" size={24} color="white" />
                   </View>
-                  <View>
-                    <Text className="text-[15px] font-jakarta-extrabold text-white tracking-tight mb-0.5">WhatsApp Support</Text>
-                    <Text className="text-[11px] text-[#5efeb3] font-jakarta-bold">Instant response (2 mins)</Text>
+                  <View className="flex-1 min-w-0">
+                    <Text className="text-[15px] font-jakarta-extrabold text-white tracking-tight mb-0.5" numberOfLines={1} ellipsizeMode="tail">WhatsApp Support</Text>
+                    <Text className="text-[11px] text-[#5efeb3] font-jakarta-bold" numberOfLines={1} ellipsizeMode="tail">Instant response (2 mins)</Text>
                   </View>
                 </View>
-                <Feather name="arrow-right" size={20} color="rgba(255,255,255,0.3)" />
+                <Feather name="arrow-right" size={20} color="rgba(255,255,255,0.3)" style={{ flexShrink: 0 }} />
               </TouchableOpacity>
 
               <TouchableOpacity onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}`)} className="w-full bg-white/10 p-4 rounded-2xl flex-row items-center justify-between border border-white/5 active:bg-white/20">
-                <View className="flex-row items-center gap-4">
-                  <View className="w-12 h-12 rounded-xl bg-blue-500/30 flex items-center justify-center shadow-lg shadow-blue-500/20">
-                    <MaterialIcons name="mail" size={24} color="#93c5fd" />
+                <View className="flex-row items-center gap-4 flex-1 min-w-0 pr-3">
+                  <View className="w-12 h-12 rounded-xl bg-[#006c4e] flex items-center justify-center shadow-lg shadow-[#006c4e]/50 flex-shrink-0">
+                    <MaterialIcons name="mail" size={24} color="white" />
                   </View>
-                  <View>
-                    <Text className="text-[15px] font-jakarta-extrabold text-white tracking-tight mb-0.5">Email Support</Text>
-                    <Text className="text-[11px] text-white/50 font-jakarta-bold">{SUPPORT_EMAIL}</Text>
+                  <View className="flex-1 min-w-0">
+                    <Text className="text-[15px] font-jakarta-extrabold text-white tracking-tight mb-0.5" numberOfLines={1} ellipsizeMode="tail">Email Support</Text>
+                    <Text className="text-[11px] text-white/50 font-jakarta-bold" numberOfLines={1} ellipsizeMode="tail">{SUPPORT_EMAIL}</Text>
                   </View>
                 </View>
-                <Feather name="arrow-right" size={20} color="rgba(255,255,255,0.3)" />
+                <Feather name="arrow-right" size={20} color="rgba(255,255,255,0.3)" style={{ flexShrink: 0 }} />
               </TouchableOpacity>
             </View>
           </LinearGradient>

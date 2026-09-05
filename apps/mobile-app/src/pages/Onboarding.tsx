@@ -61,7 +61,7 @@ export default function Onboarding({ navigation }: any) {
           ))}
         </View>
         <TouchableOpacity onPress={handleSkip}>
-          <Text className="text-[#707971] font-jakarta-bold text-[14px]">Skip</Text>
+          <Text className="text-[#5b645c] font-jakarta-bold text-[14px]">Skip</Text>
         </TouchableOpacity>
       </View>
 
@@ -70,7 +70,7 @@ export default function Onboarding({ navigation }: any) {
           <Text className="text-[#0c2010] text-[32px] font-jakarta-bold text-center mb-4 tracking-tight">
             {currentSlide.title}
           </Text>
-          <Text className="text-[#707971] text-[16px] font-jakarta-bold text-center leading-relaxed px-4">
+          <Text className="text-[#5b645c] text-[16px] font-jakarta-bold text-center leading-relaxed px-4">
             {currentSlide.description}
           </Text>
         </View>

@@ -480,18 +480,18 @@ export default function SendMoney({ navigation }: any) {
                       className={`flex-row items-center gap-3 p-4 rounded-2xl border-2 ${comingSoon ? 'border-[#eff4ef] bg-white opacity-60' : active ? 'border-[#00351d] bg-[#f0fdf4]' : 'border-[#eff4ef] bg-white'}`}
                     >
                       <View className={`w-10 h-10 rounded-xl items-center justify-center ${comingSoon ? 'bg-[#f7faf7]' : active ? 'bg-[#00351d]' : 'bg-[#f7faf7]'}`}>
-                        <MaterialIcons name={d.icon} size={18} color={comingSoon ? '#a3aca5' : active ? '#5efeb3' : '#707971'} />
+                        <MaterialIcons name={d.icon} size={18} color={comingSoon ? '#a3aca5' : active ? '#5efeb3' : '#5b645c'} />
                       </View>
                       <View className="flex-1">
                         <View className="flex-row items-center gap-2 flex-wrap">
                           <Text className={`text-[14px] font-jakarta-bold ${comingSoon ? 'text-[#a3aca5]' : active ? 'text-[#00351d]' : 'text-[#0c2010]'}`}>{d.label}</Text>
                           {comingSoon && (
                             <View className="px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200">
-                              <Text className="text-[9px] font-jakarta-extrabold uppercase tracking-widest text-amber-700">Coming Soon</Text>
+                              <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-amber-700">Coming Soon</Text>
                             </View>
                           )}
                         </View>
-                        <Text className="text-[10px] text-[#707971] font-jakarta-bold mt-0.5">{d.hint}</Text>
+                        <Text className="text-[10px] text-[#5b645c] font-jakarta-bold mt-0.5">{d.hint}</Text>
                       </View>
                       {!comingSoon && active && <Feather name="check-circle" size={18} color="#00351d" />}
                     </TouchableOpacity>
@@ -530,7 +530,7 @@ export default function SendMoney({ navigation }: any) {
                           className={`flex-1 p-3 rounded-2xl border-2 ${active ? 'border-[#00351d] bg-[#f0fdf4]' : 'border-[#eff4ef] bg-white'}`}
                         >
                           <Text className={`text-[12px] font-jakarta-bold ${active ? 'text-[#00351d]' : 'text-[#0c2010]'}`}>{opt.title}</Text>
-                          <Text className="text-[9px] text-[#707971] font-jakarta-bold mt-0.5">{opt.hint}</Text>
+                          <Text className="text-[10px] text-[#5b645c] font-jakarta-bold mt-0.5">{opt.hint}</Text>
                         </TouchableOpacity>
                       );
                     })}
@@ -543,7 +543,7 @@ export default function SendMoney({ navigation }: any) {
                   <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#00351d]/60 mb-2 ml-1">Bank</Text>
                   <View className="flex-row flex-wrap gap-1.5">
                     {bankCodes.length === 0 && (
-                      <Text className="text-[#707971] font-jakarta-bold text-[11px] py-2">Loading banks…</Text>
+                      <Text className="text-[#5b645c] font-jakarta-bold text-[11px] py-2">Loading banks…</Text>
                     )}
                     {bankCodes.map((b) => (
                       <TouchableOpacity
@@ -560,7 +560,7 @@ export default function SendMoney({ navigation }: any) {
 
               {destination === 'bank' && bankRail === 'rtgs' && (
                 <View className="mb-5 p-4 rounded-2xl bg-[#f7faf7] border border-[#eff4ef]">
-                  <Text className="text-[11px] text-[#707971] font-jakarta-bold leading-relaxed mb-3">
+                  <Text className="text-[11px] text-[#5b645c] font-jakarta-bold leading-relaxed mb-3">
                     RTGS sends to banks outside PesaLink's network, including other East African countries. Settles same business day, ~3 hours. KES only for now.
                   </Text>
                   <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#00351d]/60 mb-2">Beneficiary Bank SWIFT Code</Text>
@@ -608,7 +608,7 @@ export default function SendMoney({ navigation }: any) {
                     placeholderTextColor="#a1a1aa"
                     className="bg-white border border-[#eff4ef] rounded-2xl px-4 py-3.5 text-[#00351d] font-jakarta-bold text-[14px]"
                   />
-                  <Text className="text-[10px] text-[#707971] font-jakarta-bold mt-2">
+                  <Text className="text-[10px] text-[#5b645c] font-jakarta-bold mt-2">
                     "MSC" (Miscellaneous) works for most transfers. If your receiving bank asks for a specific purpose code, enter it here.
                   </Text>
                 </View>
@@ -619,7 +619,7 @@ export default function SendMoney({ navigation }: any) {
               </Text>
               {destination === 'mpesa-primary' ? (
                 <View className="flex-row items-center bg-[#eff4ef] border border-[#e7ece7] rounded-2xl px-5 py-4 mb-5">
-                  <Feather name="lock" size={14} color="#707971" style={{ marginRight: 8 }} />
+                  <Feather name="lock" size={14} color="#5b645c" style={{ marginRight: 8 }} />
                   <Text className="text-[15px] font-jakarta-bold text-[#00351d]">{formatPhoneDisplay(recipientAccount || merchant?.phone) || 'Not on file'}</Text>
                 </View>
               ) : (
@@ -673,7 +673,7 @@ export default function SendMoney({ navigation }: any) {
                 </Text>
               )}
               {Number(amount) > 0 && fee > 0 && (
-                <Text className="text-[11px] font-jakarta-bold mt-2 text-[#707971]">
+                <Text className="text-[11px] font-jakarta-bold mt-2 text-[#5b645c]">
                   Transaction cost: {formatKES(fee)}
                 </Text>
               )}
@@ -704,12 +704,12 @@ export default function SendMoney({ navigation }: any) {
                   <Feather name="lock" size={26} color="#5efeb3" />
                 </View>
                 <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#00351d] mb-2">Set Payment PIN</Text>
-                <Text className="text-[13px] text-[#707971] font-jakarta-bold text-center leading-relaxed px-4">
+                <Text className="text-[13px] text-[#5b645c] font-jakarta-bold text-center leading-relaxed px-4">
                   Create a 4-digit PIN to authorise all money movements. This PIN is shared with every part of PayChain — web dashboard included.
                 </Text>
               </View>
 
-              <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-2 text-center">New PIN</Text>
+              <Text className="text-[10px] font-jakarta-bold text-[#5b645c] uppercase tracking-[0.12em] mb-2 text-center">New PIN</Text>
               <TextInput
                 value={newPin}
                 onChangeText={(t) => setNewPin(t.replace(/\D/g, '').slice(0, 4))}
@@ -721,7 +721,7 @@ export default function SendMoney({ navigation }: any) {
                 placeholder="••••"
                 placeholderTextColor="#a1a1aa"
               />
-              <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-2 text-center">Confirm PIN</Text>
+              <Text className="text-[10px] font-jakarta-bold text-[#5b645c] uppercase tracking-[0.12em] mb-2 text-center">Confirm PIN</Text>
               <TextInput
                 value={confirmPin}
                 onChangeText={(t) => setConfirmPin(t.replace(/\D/g, '').slice(0, 4))}
@@ -761,13 +761,13 @@ export default function SendMoney({ navigation }: any) {
                   ...(reference ? [['Reference', reference]] : []),
                 ] as [string, string][]).map(([k, v]) => (
                   <View key={k} className="flex-row justify-between items-start gap-4 px-5 py-3 border-b border-[#eff4ef]">
-                    <Text className="text-[11px] text-[#707971] font-jakarta-bold uppercase tracking-wider shrink-0">{k}</Text>
+                    <Text className="text-[11px] text-[#5b645c] font-jakarta-bold uppercase tracking-wider shrink-0">{k}</Text>
                     <Text className="text-[13px] font-jakarta-bold text-[#0c2010] text-right flex-shrink flex-1" numberOfLines={0}>{v}</Text>
                   </View>
                 ))}
                 <View className="flex-row justify-between items-center px-5 py-4 bg-[#e7f8ef]">
-                  <Text className="text-[11px] font-jakarta-extrabold text-[#006c4e] uppercase tracking-wider">Total Deducted</Text>
-                  <Text className="text-[19px] font-jakarta-extrabold text-[#00351d]">{formatKES(totalAmount)}</Text>
+                  <Text className="text-[11px] font-jakarta-extrabold text-[#006c4e] uppercase tracking-wider flex-shrink-0">Total Deducted</Text>
+                  <Text className="text-[20px] font-jakarta-extrabold text-[#00351d] flex-1 min-w-0 text-right pl-2" numberOfLines={1} ellipsizeMode="tail">{formatKES(totalAmount)}</Text>
                 </View>
               </View>
 

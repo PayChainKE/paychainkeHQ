@@ -125,8 +125,8 @@ export default function ForgotPin({ navigation }: any) {
     return (
       <SafeAreaView className="flex-1 bg-[#0b2114]" edges={['top', 'left', 'right', 'bottom']}>
         <View className="flex-1 px-8 pt-12">
-          <TouchableOpacity onPress={() => navigation.goBack()} className="mb-8 w-10 h-10 justify-center">
-            <Feather name="arrow-left" size={22} color="white" />
+          <TouchableOpacity onPress={() => navigation.goBack()} className="mb-8 w-9 h-9 items-center justify-center">
+            <Feather name="arrow-left" size={18} color="white" />
           </TouchableOpacity>
 
           <View className="w-16 h-16 bg-[#006c4e] rounded-full justify-center items-center mb-6">

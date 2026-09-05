@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, Image, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { View, Text, Image, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Dimensions, NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,6 +9,7 @@ import api from '../api/config';
 import PrivateValue from '../components/PrivateValue';
 import FundAccountModal from '../components/FundAccountModal';
 import TourTarget from '../components/TourTarget';
+import MerchantWalkthrough from '../components/MerchantWalkthrough';
 import { isCreditTransaction, isDebitTransaction, netBalanceImpact, excludeReversedDuplicates } from '../utils/transactionDirection';
 import { formatAccountNumber } from '../utils/formatAccountNumber';
 import { formatName } from '../utils/formatName';
@@ -17,6 +18,18 @@ type Timeframe = '7D' | '30D' | '6M';
 
 const DAY_NAMES = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const MONTH_NAMES = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+
+// Promo carousel cards are full-bleed (visible content width minus the
+// page's own 24px side padding) so exactly one card is in view per swipe,
+// like a slideshow ad unit rather than a peek-next-card carousel. Sized
+// off the container's own measured layout width, not Dimensions.get
+// ('window') — on web the page content is capped at max-w-lg and centered,
+// so the browser window is much wider than what's actually visible here;
+// Dimensions would size each card to the full window and make the
+// carousel look stuck on one (mostly off-screen) card.
+const PROMO_SLIDE_COUNT = 3;
+const PROMO_AUTOPLAY_MS = 4000;
+const PROMO_CARD_GAP = 16;
 
 // Same bucketing convention as the merchant dashboard's Overview chart
 // (apps/merchant-dashboard/src/pages/Overview.jsx generateChartData), ported to RN.
@@ -94,6 +107,10 @@ export default function Dashboard({ navigation }: any) {
   const [showAmounts, setShowAmounts] = useState(true);
   const [activeTimeframe, setActiveTimeframe] = useState<Timeframe>('7D');
   const [showFundAccount, setShowFundAccount] = useState(false);
+  const [activePromoSlide, setActivePromoSlide] = useState(0);
+  const [promoContainerWidth, setPromoContainerWidth] = useState(0);
+  const promoScrollRef = useRef<ScrollView>(null);
+  const promoCardWidth = Math.max(0, promoContainerWidth - 48);
 
   useFocusEffect(
     useCallback(() => {
@@ -160,6 +177,26 @@ export default function Dashboard({ navigation }: any) {
     fetchDashboardData();
   };
 
+  const handlePromoScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const slide = Math.round(e.nativeEvent.contentOffset.x / (promoCardWidth + PROMO_CARD_GAP));
+    setActivePromoSlide(slide);
+  };
+
+  // Auto-advance the promo carousel like an ad slideshow, looping back to
+  // the first card after the last. Re-armed on every activePromoSlide
+  // change (including a manual swipe) so a manual swipe resets the timer
+  // instead of fighting it. Waits for a real measured width so it doesn't
+  // scroll by 0px before the container has laid out.
+  useEffect(() => {
+    if (promoCardWidth <= 0) return;
+    const timer = setTimeout(() => {
+      const next = (activePromoSlide + 1) % PROMO_SLIDE_COUNT;
+      promoScrollRef.current?.scrollTo({ x: next * (promoCardWidth + PROMO_CARD_GAP), animated: true });
+      setActivePromoSlide(next);
+    }, PROMO_AUTOPLAY_MS);
+    return () => clearTimeout(timer);
+  }, [activePromoSlide, promoCardWidth]);
+
   const initials = merchant?.businessName
     ? merchant.businessName.substring(0, 2).toUpperCase()
     : '??';
@@ -173,11 +210,9 @@ export default function Dashboard({ navigation }: any) {
 
   const isSameDay = (a: Date, b: Date) =>
     a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-  const isSameMonth = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
 
   const inboundTransactions = transactions.filter((tx) => isCreditTransaction(tx.type));
   const todayInbound = inboundTransactions.filter((tx) => isSameDay(new Date(tx.createdAt), now));
-  const monthInbound = inboundTransactions.filter((tx) => isSameMonth(new Date(tx.createdAt), now));
   // netBalanceImpact (not the raw amount field) — inboundTransactions is
   // already type-filtered to credits, so Math.abs just corrects the
   // magnitude for unsettled rows and the NCBA gross/fee mismatch (see its
@@ -185,7 +220,6 @@ export default function Dashboard({ navigation }: any) {
   // failed/pending row as real revenue and overstated ncba_inbound rows by
   // the fee that never actually reached the merchant's balance.
   const todayTotal = todayInbound.reduce((sum, tx) => sum + Math.abs(netBalanceImpact(tx)), 0);
-  const monthTotal = monthInbound.reduce((sum, tx) => sum + Math.abs(netBalanceImpact(tx)), 0);
 
   const chartData = computeChartData(transactions);
   const activeChart = chartData[activeTimeframe];
@@ -195,6 +229,7 @@ export default function Dashboard({ navigation }: any) {
 
   return (
     <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
+      <MerchantWalkthrough />
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ paddingBottom: 100 }}
@@ -224,31 +259,37 @@ export default function Dashboard({ navigation }: any) {
               shadowRadius: 16,
               elevation: 6,
             }}
-            className="px-6 pt-12 pb-11 rounded-b-[32px]"
+            className="px-8 pt-12 pb-11 rounded-b-[32px]"
           >
             {/* ~0.3cm (11px) gap above and below the row, so the avatar/
                 greeting text doesn't sit flush against the header's own
                 top/bottom edges regardless of the outer padding. */}
             <View className="flex-row justify-between items-center" style={{ marginTop: 11, marginBottom: 11 }}>
-              <View className="flex-row items-center gap-3.5">
+              <View className="flex-row items-center gap-3.5 flex-1 min-w-0 pr-3">
                 <TouchableOpacity
                   onPress={() => navigation?.navigate('More')}
-                  className="w-10 h-10 rounded-2xl bg-[#5efeb3] items-center justify-center shadow-md shadow-black/20"
+                  className="w-10 h-10 rounded-2xl bg-[#5efeb3] items-center justify-center shadow-md shadow-black/20 flex-shrink-0"
+                  style={{ marginLeft: 11 }}
                 >
                   <Text className="text-[#00351d] font-jakarta-extrabold text-sm">{initials}</Text>
                 </TouchableOpacity>
-                <View>
-                  <Text className="text-white/70 text-[12px] font-jakarta-bold uppercase tracking-wider mb-1">{greeting} 👋</Text>
-                  <Text className="text-white text-lg font-jakarta-bold tracking-tight">{merchant?.businessName || 'Merchant'}</Text>
+                <View className="flex-1 min-w-0">
+                  <Text className="text-white/70 text-[12px] font-jakarta-bold uppercase tracking-wider mb-1" numberOfLines={1} ellipsizeMode="tail">{greeting} 👋</Text>
+                  <Text className="text-white text-lg font-jakarta-bold tracking-tight" numberOfLines={1} ellipsizeMode="tail">{merchant?.businessName || 'Merchant'}</Text>
                 </View>
               </View>
               <TouchableOpacity
                 onPress={() => navigation?.navigate('Notifications')}
-                className="w-11 h-11 rounded-full bg-white/10 items-center justify-center border border-white/10"
+                className="w-11 h-11 items-center justify-center flex-shrink-0"
+                style={{ marginRight: 19 }}
               >
-                <MaterialIcons name="notifications" size={21} color="white" />
+                <Feather name="bell" size={20} color="white" />
                 {unreadCount > 0 && (
-                  <View className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#ff5a5f] border border-[#0b4d2e]" />
+                  <View className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#ff5a5f] border border-[#0b4d2e] items-center justify-center">
+                    <Text className="text-white text-[10px] font-jakarta-extrabold leading-none">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </Text>
+                  </View>
                 )}
               </TouchableOpacity>
             </View>
@@ -329,7 +370,11 @@ export default function Dashboard({ navigation }: any) {
                 <View pointerEvents="none" style={{ position: 'absolute', top: -70, right: -50, width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(94,254,179,0.14)' }} />
                 <View pointerEvents="none" style={{ position: 'absolute', bottom: -60, left: -60, width: 180, height: 180, borderRadius: 90, backgroundColor: 'rgba(255,255,255,0.04)' }} />
 
-                <View className="flex-row items-center gap-2">
+                {/* 1cm (38px) top offset — with the card's justify-between
+                    layout, this pushes the balance block down from the
+                    top edge without moving the bottom row, so the card
+                    doesn't read as an empty box with text stuck at the top. */}
+                <View className="flex-row items-center gap-2" style={{ marginTop: 38 }}>
                   <Text className="text-white/60 text-[10px] font-jakarta-bold uppercase tracking-[0.15em]">Available Balance</Text>
                   <TouchableOpacity
                     onPress={() => setShowAmounts((v) => !v)}
@@ -347,7 +392,7 @@ export default function Dashboard({ navigation }: any) {
                   hidden={!showAmounts}
                   tint="dark"
                   style={{ fontFamily: 'PlusJakartaSans_700Bold', letterSpacing: -1 }}
-                  className="text-[34px] text-white leading-none mt-2"
+                  className="text-[32px] text-white leading-none mt-2"
                 >
                   {formatCurrency(merchant?.kesBalance || 0)}
                 </PrivateValue>
@@ -477,7 +522,7 @@ export default function Dashboard({ navigation }: any) {
                   <View className="w-9 h-9 rounded-xl bg-white/10 items-center justify-center">
                     <Feather name="zap" size={16} color="#5efeb3" />
                   </View>
-                  <Feather name="arrow-up-right" size={16} color="rgba(255,255,255,0.3)" />
+                  <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.3)" />
                 </View>
                 <Text className="text-white text-[12px] font-jakarta-bold uppercase tracking-wide mb-1">Send STK Push</Text>
                 <Text className="text-white/40 text-[10px] font-jakarta-bold leading-snug">Prompt a customer to pay instantly</Text>
@@ -492,36 +537,11 @@ export default function Dashboard({ navigation }: any) {
                   <View className="w-9 h-9 rounded-xl bg-white/10 items-center justify-center">
                     <Feather name="link" size={16} color="#5efeb3" />
                   </View>
-                  <Feather name="arrow-up-right" size={16} color="rgba(255,255,255,0.3)" />
+                  <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.3)" />
                 </View>
                 <Text className="text-white text-[12px] font-jakarta-bold uppercase tracking-wide mb-1">Get Payment Link</Text>
                 <Text className="text-white/40 text-[10px] font-jakarta-bold leading-snug">Share a link for any amount</Text>
               </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* This Month Performance */}
-          <View className="px-6 mb-8">
-            <View className="bg-white rounded-[32px] p-6 shadow-sm border border-[#bfc9bf]/10">
-              <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-[0.15em] mb-6">This Month Performance</Text>
-              <View className="flex-row justify-between">
-                <View>
-                  <Text className="text-[#0c2010] text-[10px] font-jakarta-bold uppercase tracking-wider mb-1">Revenue</Text>
-                  <PrivateValue hidden={!showAmounts} tint="light" className="text-[#006c4e] text-[16px] font-jakarta-extrabold">
-                    {formatCurrency(monthTotal)}
-                  </PrivateValue>
-                </View>
-                <View className="w-[1px] h-full bg-[#eff4ef]" />
-                <View>
-                  <Text className="text-[#0c2010] text-[10px] font-jakarta-bold uppercase tracking-wider mb-1">Payments</Text>
-                  <Text className="text-[#0c2010] text-[16px] font-jakarta-extrabold">{monthInbound.length}</Text>
-                </View>
-                <View className="w-[1px] h-full bg-[#eff4ef]" />
-                <View>
-                  <Text className="text-[#0c2010] text-[10px] font-jakarta-bold uppercase tracking-wider mb-1">All-Time</Text>
-                  <Text className="text-[#0c2010] text-[16px] font-jakarta-extrabold">{transactions.length}</Text>
-                </View>
-              </View>
             </View>
           </View>
 
@@ -532,7 +552,7 @@ export default function Dashboard({ navigation }: any) {
                 <MaterialIcons name="lightbulb" size={18} color="#059669" />
               </View>
               <View className="flex-1">
-                <Text className="text-[9px] font-jakarta-extrabold text-emerald-800 uppercase tracking-[0.2em] mb-1">Growth Tip</Text>
+                <Text className="text-[10px] font-jakarta-extrabold text-emerald-800 uppercase tracking-[0.2em] mb-1">Growth Tip</Text>
                 <Text className="text-[11px] text-emerald-900 font-jakarta-bold leading-relaxed opacity-80">
                   Instruct your customers to pay via M-Pesa Paybill 880100, Account Number {formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || '...')}, to increase your daily volume.
                 </Text>
@@ -546,7 +566,7 @@ export default function Dashboard({ navigation }: any) {
               <View className="flex-row items-center justify-between mb-1">
                 <View>
                   <Text className="text-lg font-jakarta-bold text-[#0c2010]">Revenue Overview</Text>
-                  <Text className="text-[#707971] text-[11px] font-jakarta-bold mt-0.5">Money moving in and out</Text>
+                  <Text className="text-[#5b645c] text-[11px] font-jakarta-bold mt-0.5">Money moving in and out</Text>
                 </View>
                 <View className="flex-row bg-[#f0fdf4] p-0.5 rounded-lg border border-[#e7ece7]">
                   {(['7D', '30D', '6M'] as Timeframe[]).map((period) => (
@@ -555,7 +575,7 @@ export default function Dashboard({ navigation }: any) {
                       onPress={() => setActiveTimeframe(period)}
                       className={`px-2.5 py-1.5 rounded-md ${activeTimeframe === period ? 'bg-white shadow-sm' : ''}`}
                     >
-                      <Text className={`text-[9px] font-jakarta-extrabold uppercase tracking-wider ${activeTimeframe === period ? 'text-[#006c4e]' : 'text-[#006c4e]/40'}`}>
+                      <Text className={`text-[10px] font-jakarta-extrabold uppercase tracking-wider ${activeTimeframe === period ? 'text-[#006c4e]' : 'text-[#006c4e]/40'}`}>
                         {period}
                       </Text>
                     </TouchableOpacity>
@@ -566,14 +586,14 @@ export default function Dashboard({ navigation }: any) {
               <View className="flex-row items-center gap-5 mt-5 mb-5">
                 <View className="flex-row items-center gap-1.5">
                   <View className="w-2.5 h-2.5 rounded-full bg-[#00855D]" />
-                  <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider">In</Text>
+                  <Text className="text-[10px] font-jakarta-bold text-[#5b645c] uppercase tracking-wider">In</Text>
                   <PrivateValue hidden={!showAmounts} tint="light" className="text-[12px] font-jakarta-extrabold text-[#0c2010]">
                     {formatCurrency(periodInboundTotal)}
                   </PrivateValue>
                 </View>
                 <View className="flex-row items-center gap-1.5">
                   <View className="w-2.5 h-2.5 rounded-full bg-[#D97706]" />
-                  <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider">Out</Text>
+                  <Text className="text-[10px] font-jakarta-bold text-[#5b645c] uppercase tracking-wider">Out</Text>
                   <PrivateValue hidden={!showAmounts} tint="light" className="text-[12px] font-jakarta-extrabold text-[#0c2010]">
                     {formatCurrency(periodOutboundTotal)}
                   </PrivateValue>
@@ -582,7 +602,7 @@ export default function Dashboard({ navigation }: any) {
 
               {periodInboundTotal === 0 && periodOutboundTotal === 0 ? (
                 <View className="h-[120px] items-center justify-center">
-                  <Text className="text-[#707971] font-jakarta-bold text-[12px]">No activity in this period</Text>
+                  <Text className="text-[#5b645c] font-jakarta-bold text-[12px]">No activity in this period</Text>
                 </View>
               ) : (
                 <View className="flex-row items-end justify-between h-[120px]">
@@ -595,7 +615,7 @@ export default function Dashboard({ navigation }: any) {
                           <View style={{ width: 6, height: inH, backgroundColor: '#00855D', borderRadius: 3 }} />
                           <View style={{ width: 6, height: outH, backgroundColor: '#D97706', borderRadius: 3 }} />
                         </View>
-                        <Text className="text-[7px] font-jakarta-bold text-[#707971] uppercase tracking-wider mt-2" numberOfLines={1}>
+                        <Text className="text-[10px] font-jakarta-bold text-[#5b645c] uppercase tracking-wider mt-2" numberOfLines={1}>
                           {label}
                         </Text>
                       </View>
@@ -630,12 +650,11 @@ export default function Dashboard({ navigation }: any) {
                 </View>
               ) : transactions.length === 0 ? (
                 <View className="py-10 items-center justify-center">
-                  <Text className="text-[#707971] font-jakarta-bold">No recent activity</Text>
+                  <Text className="text-[#5b645c] font-jakarta-bold">No recent activity</Text>
                 </View>
               ) : (
                 transactions.slice(0, 10).map((tx, index) => {
                   const isInbound = isCreditTransaction(tx.type);
-                  const isSwap = tx.type === 'fx_swap';
                   const name = isInbound ? (formatName(tx.sender?.name) || 'Unknown') : (formatName(tx.recipient?.name) || formatName(tx.sender?.name) || 'Treasury');
                   const verified = tx.status === 'completed' || tx.status === 'verified';
                   // A failed payout is always refunded in full — without this,
@@ -661,7 +680,7 @@ export default function Dashboard({ navigation }: any) {
                         {isFailed ? (
                           <Text className="text-[#b91c1c] text-[10px] font-jakarta-bold mt-0.5 uppercase tracking-wider">Failed & Refunded</Text>
                         ) : (
-                          <Text className="text-[#707971] text-[10px] font-jakarta-bold mt-0.5" numberOfLines={1} ellipsizeMode="tail">
+                          <Text className="text-[#5b645c] text-[10px] font-jakarta-bold mt-0.5" numberOfLines={1} ellipsizeMode="tail">
                             {new Date(tx.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} · {refText}
                           </Text>
                         )}
@@ -669,11 +688,11 @@ export default function Dashboard({ navigation }: any) {
                       <PrivateValue
                         hidden={!showAmounts}
                         tint="light"
-                        className={`font-jakarta-bold text-[13px] ${isFailed ? 'text-[#707971] line-through' : isSwap ? 'text-[#1D4ED8]' : isInbound ? 'text-[#006c4e]' : 'text-[#0c2010]'}`}
+                        className={`font-jakarta-bold text-[13px] ${isFailed ? 'text-[#5b645c] line-through' : isInbound ? 'text-[#006c4e]' : 'text-[#0c2010]'}`}
                         numberOfLines={1}
                         style={{ flexShrink: 0 }}
                       >
-                        {isSwap ? `${(tx.usdcAmount || 0).toLocaleString()} USDC` : `${isInbound ? '+' : '-'} ${formatCurrency(kes)}`}
+                        {`${isInbound ? '+' : '-'} ${formatCurrency(kes)}`}
                       </PrivateValue>
                     </View>
                   );
@@ -682,34 +701,117 @@ export default function Dashboard({ navigation }: any) {
             </View>
           </View>
 
-          {/* Bulk Payouts shortcut */}
-          <View className="px-6 mb-8">
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={() => navigation?.navigate('Pay')}
-              className="bg-white rounded-[40px] p-6 shadow-sm border-2 border-[#eff4ef]"
+          {/* Promo carousel — Bulk Payouts, Business Advance, Payment Links,
+              swiped horizontally like a slideshow ad unit. Snaps one card
+              per swipe (snapToInterval = card width + gap) rather than
+              react-native's pagingEnabled, since pagingEnabled snaps to the
+              full ScrollView width, not each card's width. */}
+          <View className="mb-8" onLayout={(e) => setPromoContainerWidth(e.nativeEvent.layout.width)}>
+            {promoCardWidth > 0 && (
+            <ScrollView
+              ref={promoScrollRef}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              decelerationRate="fast"
+              snapToInterval={promoCardWidth + PROMO_CARD_GAP}
+              snapToAlignment="start"
+              contentContainerStyle={{ paddingHorizontal: 24, gap: PROMO_CARD_GAP }}
+              onMomentumScrollEnd={handlePromoScroll}
             >
-              <View className="flex-row items-start justify-between mb-5">
-                <View className="w-14 h-14 rounded-full bg-[#f0fdf4] items-center justify-center">
-                  <Feather name="users" size={22} color="#006c4e" />
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => navigation?.navigate('Pay')}
+                style={{ width: promoCardWidth }}
+                className="bg-white rounded-[40px] p-6 shadow-sm border-2 border-[#eff4ef]"
+              >
+                <View className="flex-row items-start justify-between mb-5">
+                  <View className="w-14 h-14 rounded-full bg-[#f0fdf4] items-center justify-center">
+                    <Feather name="users" size={22} color="#006c4e" />
+                  </View>
+                  <View className="w-9 h-9 rounded-full bg-[#eff4ef] items-center justify-center">
+                    <Feather name="chevron-right" size={16} color="#0c2010" />
+                  </View>
                 </View>
-                <View className="w-9 h-9 rounded-full bg-[#eff4ef] items-center justify-center">
-                  <Feather name="arrow-up-right" size={16} color="#0c2010" />
+
+                <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-[0.1em] mb-1">Bulk Payouts</Text>
+                <Text className="text-2xl font-jakarta-bold tracking-tight text-[#0c2010] mb-2">
+                  Pay suppliers & staff at once
+                </Text>
+                <Text className="text-[#5b645c] text-[13px] font-jakarta-bold leading-[18px] mb-6">
+                  Upload a list or pick recipients, then settle an entire batch of payouts in a single click.
+                </Text>
+
+                <View className="self-start bg-[#002110] px-5 py-2.5 rounded-full">
+                  <Text className="text-white text-[11px] font-jakarta-bold uppercase tracking-wider">Start a Bulk Payout</Text>
                 </View>
-              </View>
+              </TouchableOpacity>
 
-              <Text className="text-[#707971] text-[11px] font-jakarta-bold uppercase tracking-[0.1em] mb-1">Bulk Payouts</Text>
-              <Text className="text-2xl font-jakarta-bold tracking-tight text-[#0c2010] mb-2">
-                Pay suppliers & staff at once
-              </Text>
-              <Text className="text-[#707971] text-[13px] font-jakarta-bold leading-[18px] mb-6">
-                Upload a list or pick recipients, then settle an entire batch of payouts in a single click.
-              </Text>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => navigation?.navigate('Advance')}
+                style={{ width: promoCardWidth }}
+                className="bg-white rounded-[40px] p-6 shadow-sm border-2 border-[#eff4ef]"
+              >
+                <View className="flex-row items-start justify-between mb-5">
+                  <View className="w-14 h-14 rounded-full bg-[#f0fdf4] items-center justify-center">
+                    <Feather name="trending-up" size={22} color="#006c4e" />
+                  </View>
+                  <View className="w-9 h-9 rounded-full bg-[#eff4ef] items-center justify-center">
+                    <Feather name="chevron-right" size={16} color="#0c2010" />
+                  </View>
+                </View>
 
-              <View className="self-start bg-[#002110] px-5 py-2.5 rounded-full">
-                <Text className="text-white text-[11px] font-jakarta-bold uppercase tracking-wider">Start a Bulk Payout</Text>
-              </View>
-            </TouchableOpacity>
+                <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-[0.1em] mb-1">Business Advance</Text>
+                <Text className="text-2xl font-jakarta-bold tracking-tight text-[#0c2010] mb-2">
+                  Unlock cash flow instantly
+                </Text>
+                <Text className="text-[#5b645c] text-[13px] font-jakarta-bold leading-[18px] mb-6">
+                  Get an advance against your revenue and repay it automatically as you get paid.
+                </Text>
+
+                <View className="self-start bg-[#002110] px-5 py-2.5 rounded-full">
+                  <Text className="text-white text-[11px] font-jakarta-bold uppercase tracking-wider">Check Eligibility</Text>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => navigation?.navigate('RequestMoney', { preset: 'link' })}
+                style={{ width: promoCardWidth }}
+                className="bg-white rounded-[40px] p-6 shadow-sm border-2 border-[#eff4ef]"
+              >
+                <View className="flex-row items-start justify-between mb-5">
+                  <View className="w-14 h-14 rounded-full bg-[#f0fdf4] items-center justify-center">
+                    <Feather name="link" size={22} color="#006c4e" />
+                  </View>
+                  <View className="w-9 h-9 rounded-full bg-[#eff4ef] items-center justify-center">
+                    <Feather name="chevron-right" size={16} color="#0c2010" />
+                  </View>
+                </View>
+
+                <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-[0.1em] mb-1">Payment Links</Text>
+                <Text className="text-2xl font-jakarta-bold tracking-tight text-[#0c2010] mb-2">
+                  Get paid without an invoice
+                </Text>
+                <Text className="text-[#5b645c] text-[13px] font-jakarta-bold leading-[18px] mb-6">
+                  Share a link for any amount and get paid instantly from anywhere — no paperwork.
+                </Text>
+
+                <View className="self-start bg-[#002110] px-5 py-2.5 rounded-full">
+                  <Text className="text-white text-[11px] font-jakarta-bold uppercase tracking-wider">Create a Link</Text>
+                </View>
+              </TouchableOpacity>
+            </ScrollView>
+            )}
+
+            <View className="flex-row justify-center gap-1.5 mt-4">
+              {[0, 1, 2].map((i) => (
+                <View
+                  key={i}
+                  className={`h-1.5 rounded-full ${activePromoSlide === i ? 'w-5 bg-[#006c4e]' : 'w-1.5 bg-[#d8e4dd]'}`}
+                />
+              ))}
+            </View>
           </View>
 
         </View>

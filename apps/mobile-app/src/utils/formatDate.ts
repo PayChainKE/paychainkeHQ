@@ -8,9 +8,9 @@ const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'S
 // apps/merchant-dashboard/src/utils/formatDate.js so both apps read the
 // same transaction the same way.
 export function formatTxDate(s?: string | number | Date | null): string {
-  if (!s) return '—'
+  if (!s) return ''
   const d = new Date(s)
-  if (isNaN(d.getTime())) return '—'
+  if (isNaN(d.getTime())) return ''
   return `${String(d.getDate()).padStart(2, '0')} ${MONTHS_SHORT[d.getMonth()]} ${d.getFullYear()}`
 }
 

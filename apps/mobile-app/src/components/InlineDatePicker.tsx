@@ -65,7 +65,7 @@ export function InlineDatePicker({ label, value, onChange, placeholder = 'Select
 
   return (
     <View>
-      <Text className="text-[9px] font-jakarta-bold uppercase tracking-widest text-[#707971] mb-1.5 ml-1">{label}</Text>
+      <Text className="text-[10px] font-jakarta-bold uppercase tracking-widest text-[#5b645c] mb-1.5 ml-1">{label}</Text>
       <TouchableOpacity
         onPress={openPicker}
         className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl px-4 py-3 flex-row items-center justify-between"
@@ -73,7 +73,7 @@ export function InlineDatePicker({ label, value, onChange, placeholder = 'Select
         <Text className={`text-[13px] font-jakarta-bold ${selected ? 'text-[#0c2010]' : 'text-[#a1a1aa]'}`}>
           {selected ? formatIsoDateDisplay(value) : placeholder}
         </Text>
-        <Feather name="calendar" size={14} color="#707971" />
+        <Feather name="calendar" size={14} color="#5b645c" />
       </TouchableOpacity>
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
@@ -92,7 +92,7 @@ export function InlineDatePicker({ label, value, onChange, placeholder = 'Select
             <View className="flex-row mb-2">
               {WEEKDAYS.map((w, i) => (
                 <View key={i} style={{ width: '14.28%' }} className="items-center">
-                  <Text className="text-[9px] font-jakarta-extrabold uppercase text-[#a1a1aa]">{w}</Text>
+                  <Text className="text-[10px] font-jakarta-extrabold uppercase text-[#a1a1aa]">{w}</Text>
                 </View>
               ))}
             </View>
@@ -130,7 +130,7 @@ export function InlineDatePicker({ label, value, onChange, placeholder = 'Select
                   onPress={() => { onChange(''); setOpen(false); }}
                   className="flex-1 py-2.5 rounded-xl border border-[#e7ece7] items-center"
                 >
-                  <Text className="text-[11px] font-jakarta-bold text-[#707971]">Clear</Text>
+                  <Text className="text-[11px] font-jakarta-bold text-[#5b645c]">Clear</Text>
                 </TouchableOpacity>
               )}
             </View>

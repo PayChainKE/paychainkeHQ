@@ -16,6 +16,7 @@ import { formatName } from '../utils/formatName';
 import { buildStatementHtml } from '../utils/statementHtml';
 import { InlineDatePicker } from '../components/InlineDatePicker';
 import TourTarget from '../components/TourTarget';
+import TransactionsWalkthrough from '../components/TransactionsWalkthrough';
 
 const EXPORT_PRESETS = [
   { key: '7d', label: 'Last 7 Days' },
@@ -28,7 +29,7 @@ const EXPORT_PRESETS = [
 type ExportPreset = typeof EXPORT_PRESETS[number]['key'];
 
 const ITEMS_PER_PAGE = 20;
-const FILTER_TABS = ['All', 'Inbound', 'Outbound', 'FX Swaps'] as const;
+const FILTER_TABS = ['All', 'Inbound', 'Outbound'] as const;
 type FilterTab = typeof FILTER_TABS[number];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -173,7 +174,6 @@ export default function Transactions({ navigation }: any) {
     if (activeFilter === 'All') return true;
     if (activeFilter === 'Inbound') return isCreditTransaction(t.type);
     if (activeFilter === 'Outbound') return isDebitTransaction(t.type);
-    if (activeFilter === 'FX Swaps') return t.type === 'fx_swap';
     return true;
   });
 
@@ -309,6 +309,7 @@ export default function Transactions({ navigation }: any) {
   // ─── Render ────────────────────────────────────────────────────────────────
   return (
     <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
+      <TransactionsWalkthrough />
       <TopBar title="Transactions" subtitle="Full payment history" />
 
       <ScrollView
@@ -340,7 +341,7 @@ export default function Transactions({ navigation }: any) {
                     </Text>
                   </View>
                   <Text
-                    className="font-jakarta-extrabold text-[34px] tracking-tight leading-none"
+                    className="font-jakarta-extrabold text-[32px] tracking-tight leading-none"
                     style={{ color: statCards[0].style.valueColor }}
                     adjustsFontSizeToFit
                     numberOfLines={1}
@@ -352,8 +353,8 @@ export default function Transactions({ navigation }: any) {
                   </Text>
                 </View>
                 {/* Decorative icon */}
-                <View className="opacity-10 -mr-2 -mt-2">
-                  <MaterialIcons name="today" size={72} color="#ffffff" />
+                <View className="opacity-10">
+                  <MaterialIcons name="today" size={56} color="#ffffff" />
                 </View>
               </View>
             </View>
@@ -429,7 +430,7 @@ export default function Transactions({ navigation }: any) {
                   onPress={() => setActiveFilter(tab)}
                   className={`px-4 py-2 rounded-full border ${activeFilter === tab ? 'bg-[#00351d] border-[#00351d]' : 'bg-white border-[#eff4ef]'}`}
                 >
-                  <Text className={`text-[11px] font-jakarta-bold ${activeFilter === tab ? 'text-white' : 'text-[#707971]'}`}>{tab}</Text>
+                  <Text className={`text-[11px] font-jakarta-bold ${activeFilter === tab ? 'text-white' : 'text-[#5b645c]'}`}>{tab}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -439,17 +440,17 @@ export default function Transactions({ navigation }: any) {
             {isLoading ? (
               <View className="py-20 items-center justify-center">
                 <ActivityIndicator color="#00351d" size="large" />
-                <Text className="text-[#707971] font-jakarta-bold text-[13px] mt-3">Loading…</Text>
+                <Text className="text-[#5b645c] font-jakarta-bold text-[13px] mt-3">Loading…</Text>
               </View>
             ) : currentTransactions.length === 0 ? (
               <View className="py-20 items-center justify-center px-8">
                 <View className="w-16 h-16 rounded-full bg-[#eff4ef] items-center justify-center mb-4">
-                  <MaterialIcons name="receipt-long" size={28} color="#707971" />
+                  <MaterialIcons name="receipt-long" size={28} color="#5b645c" />
                 </View>
                 <Text className="text-[#0c2010] font-jakarta-bold text-[16px] mb-1">
                   {searchQuery || activeFilter !== 'All' ? 'No matching transactions' : 'No transactions yet'}
                 </Text>
-                <Text className="text-[#707971] font-jakarta-bold text-[13px] text-center leading-relaxed">
+                <Text className="text-[#5b645c] font-jakarta-bold text-[13px] text-center leading-relaxed">
                   {searchQuery || activeFilter !== 'All'
                     ? 'Try a different search term or filter.'
                     : 'Inbound payments to your account will appear here.'}
@@ -458,7 +459,6 @@ export default function Transactions({ navigation }: any) {
             ) : (
               currentTransactions.map((tx, index) => {
                 const isInbound = isCreditTransaction(tx.type);
-                const isSwap = tx.type === 'fx_swap';
                 const name = isInbound
                   ? (formatName(tx.sender?.name) || 'Unknown')
                   : (formatName(tx.recipient?.name) || formatName(tx.sender?.name) || 'Treasury');
@@ -491,27 +491,25 @@ export default function Transactions({ navigation }: any) {
                         <Text className="font-jakarta-bold text-[14px] text-[#0c2010] flex-shrink" numberOfLines={1} ellipsizeMode="tail">{name}</Text>
                         {verified && <MaterialIcons name="verified" size={12} color="#006c4e" style={{ marginLeft: 4 }} />}
                       </View>
-                      <Text className="text-[#707971] text-[11px] font-jakarta-bold mt-0.5" numberOfLines={1} ellipsizeMode="tail">
+                      <Text className="text-[#5b645c] text-[11px] font-jakarta-bold mt-0.5" numberOfLines={1} ellipsizeMode="tail">
                         {dateStr}, {timeStr} · {typeLabel}
                       </Text>
                       {isFailed ? (
                         <Text className="text-[#b91c1c] text-[10px] font-jakarta-bold mt-0.5 uppercase tracking-wider">Failed & Refunded</Text>
                       ) : !!phoneStr && (
-                        <Text className="text-[#707971]/70 text-[10px] font-jakarta-bold mt-0.5" numberOfLines={1} ellipsizeMode="tail">
+                        <Text className="text-[#5b645c]/70 text-[10px] font-jakarta-bold mt-0.5" numberOfLines={1} ellipsizeMode="tail">
                           {phoneStr}
                         </Text>
                       )}
                     </View>
                     <Text
                       className={`font-jakarta-bold text-[14px] ${
-                        isFailed ? 'text-[#707971] line-through' : isSwap ? 'text-[#1D4ED8]' : isInbound ? 'text-[#006c4e]' : 'text-[#0c2010]'
+                        isFailed ? 'text-[#5b645c] line-through' : isInbound ? 'text-[#006c4e]' : 'text-[#0c2010]'
                       }`}
                       numberOfLines={1}
                       style={{ flexShrink: 0 }}
                     >
-                      {isSwap
-                        ? `${(tx.usdcAmount || 0).toLocaleString()} USDC`
-                        : `${isInbound ? '+' : '-'} ${formatKES(tx.kesAmount || tx.amount || 0)}`}
+                      {`${isInbound ? '+' : '-'} ${formatKES(tx.kesAmount || tx.amount || 0)}`}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -531,7 +529,7 @@ export default function Transactions({ navigation }: any) {
                 <Text className={`font-jakarta-bold text-[12px] ${currentPage === 1 ? 'text-[#a1a1aa]' : 'text-[#006c4e]'}`}>Prev</Text>
               </TouchableOpacity>
 
-              <Text className="text-[#707971] text-[12px] font-jakarta-bold">
+              <Text className="text-[#5b645c] text-[12px] font-jakarta-bold">
                 Page {currentPage} of {totalPages}
               </Text>
 
@@ -555,16 +553,13 @@ export default function Transactions({ navigation }: any) {
           <TouchableOpacity className="absolute inset-0" activeOpacity={1} onPress={() => setSelectedTx(null)} />
           {selectedTx && (() => {
             const isInbound = isCreditTransaction(selectedTx.type);
-            const isSwap = selectedTx.type === 'fx_swap';
             // A failed payout is always refunded in full — without this, it
             // showed with the exact same solid debit color and a green
             // "Network Status" pill as a real completed one, making it look
             // like money had actually left when net balance impact was zero.
             const isFailedTx = selectedTx.status === 'failed';
-            const amountColor = isFailedTx ? '#9aa39c' : isSwap ? '#1D4ED8' : isInbound ? '#006c4e' : '#0c2010';
-            const amountStr = isSwap
-              ? `${(selectedTx.usdcAmount || 0).toLocaleString()} USDC`
-              : `${isInbound ? '+' : '-'} ${formatKES(selectedTx.kesAmount || selectedTx.amount || 0)}`;
+            const amountColor = isFailedTx ? '#9aa39c' : isInbound ? '#006c4e' : '#0c2010';
+            const amountStr = `${isInbound ? '+' : '-'} ${formatKES(selectedTx.kesAmount || selectedTx.amount || 0)}`;
             const statusPillColor = isFailedTx ? '#f87171' : (selectedTx.status === 'completed' || selectedTx.status === 'verified') ? '#5efeb3' : '#fbbf24';
             const counterpartyName = isInbound
               ? (formatName(selectedTx.sender?.name) || 'Unknown')
@@ -585,7 +580,7 @@ export default function Transactions({ navigation }: any) {
                   <View className="mb-6">
                     <Text className="text-white/40 text-[10px] font-jakarta-bold uppercase tracking-[0.15em] mb-2">Settlement</Text>
                     <Text
-                      className="text-[30px] font-jakarta-extrabold tracking-tight"
+                      className="text-[28px] font-jakarta-extrabold tracking-tight"
                       style={{
                         color: amountColor === '#0c2010' ? '#ffffff' : amountColor,
                         textDecorationLine: isFailedTx ? 'line-through' : 'none',
@@ -662,7 +657,7 @@ export default function Transactions({ navigation }: any) {
             <View className="items-center mb-4"><View className="w-12 h-1.5 bg-[#e7ece7] rounded-full" /></View>
             <ScrollView showsVerticalScrollIndicator={false}>
               <Text className="font-jakarta-extrabold text-[20px] text-[#0c2010] mb-1">Download Statement</Text>
-              <Text className="text-[#707971] font-jakarta-bold text-[13px] mb-6">Choose a period — we'll also email you a copy.</Text>
+              <Text className="text-[#5b645c] font-jakarta-bold text-[13px] mb-6">Choose a period — we'll also email you a copy.</Text>
 
               <View className="gap-2 mb-2">
                 {EXPORT_PRESETS.map((p) => (

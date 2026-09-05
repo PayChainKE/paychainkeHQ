@@ -18,10 +18,10 @@ type NotificationItem = {
 
 const KIND_META: Record<NotificationKind, { icon: keyof typeof MaterialIcons.glyphMap; color: string; bg: string }> = {
   payment: { icon: 'payments', color: '#006c4e', bg: '#e7f8ef' },
-  advance: { icon: 'trending-up', color: '#3f51b5', bg: '#e8eaf6' },
+  advance: { icon: 'trending-up', color: '#1d9e75', bg: '#dcf5da' },
   security: { icon: 'shield', color: '#ba1a1a', bg: '#fff1f1' },
-  wallet: { icon: 'account-balance-wallet', color: '#1d4ed8', bg: '#eef2ff' },
-  system: { icon: 'info-outline', color: '#707971', bg: '#f7faf7' },
+  wallet: { icon: 'account-balance-wallet', color: '#00351d', bg: '#f0fdf4' },
+  system: { icon: 'info-outline', color: '#5b645c', bg: '#f7faf7' },
 };
 
 const isToday = (date: Date) => date.toDateString() === new Date().toDateString();
@@ -39,6 +39,7 @@ export default function Notifications({ navigation }: any) {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [filter, setFilter] = useState<FilterTab>('all');
 
   const fetchNotifications = async () => {
@@ -46,9 +47,13 @@ export default function Notifications({ navigation }: any) {
       const res = await api.get('/api/notifications');
       if (res.data?.success) {
         setNotifications(res.data.notifications || []);
+        setLoadError(false);
+      } else {
+        setLoadError(true);
       }
     } catch (err) {
       console.error('Failed to load notifications', err);
+      setLoadError(true);
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -129,7 +134,7 @@ export default function Notifications({ navigation }: any) {
               onPress={() => setFilter(tab.key)}
               className={`px-3.5 py-1.5 rounded-full border ${filter === tab.key ? 'bg-[#00351d] border-[#00351d]' : 'bg-white border-[#eff4ef]'}`}
             >
-              <Text className={`text-[10px] font-jakarta-extrabold uppercase tracking-wider ${filter === tab.key ? 'text-white' : 'text-[#707971]'}`}>{tab.label}</Text>
+              <Text className={`text-[10px] font-jakarta-extrabold uppercase tracking-wider ${filter === tab.key ? 'text-white' : 'text-[#5b645c]'}`}>{tab.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -151,12 +156,23 @@ export default function Notifications({ navigation }: any) {
             <View className="py-24 items-center justify-center">
               <ActivityIndicator color="#00351d" />
             </View>
+          ) : loadError ? (
+            <View className="items-center justify-center py-24">
+              <View className="w-16 h-16 rounded-full bg-white border border-[#eff4ef] items-center justify-center mb-4">
+                <Feather name="wifi-off" size={24} color="#ba1a1a" />
+              </View>
+              <Text className="text-[14px] text-[#0c2010] font-jakarta-extrabold mb-1">Couldn't load notifications</Text>
+              <Text className="text-[12px] text-[#5b645c] font-jakarta-bold mb-4 text-center max-w-[240px]">Check your connection and try again.</Text>
+              <TouchableOpacity onPress={fetchNotifications} className="bg-[#00351d] px-5 py-2.5 rounded-full">
+                <Text className="text-white text-[11px] font-jakarta-extrabold uppercase tracking-widest">Retry</Text>
+              </TouchableOpacity>
+            </View>
           ) : visible.length === 0 ? (
             <View className="items-center justify-center py-24">
               <View className="w-16 h-16 rounded-full bg-white border border-[#eff4ef] items-center justify-center mb-4">
                 <Feather name="bell-off" size={24} color="#b3b9b4" />
               </View>
-              <Text className="text-[14px] text-[#707971] font-jakarta-bold">
+              <Text className="text-[14px] text-[#5b645c] font-jakarta-bold">
                 {filter === 'unread' ? "You're all caught up" : 'No notifications yet'}
               </Text>
             </View>
@@ -165,7 +181,7 @@ export default function Notifications({ navigation }: any) {
               if (group.items.length === 0) return null;
               return (
                 <View key={group.label} className="mb-8">
-                  <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.2em] mb-3">{group.label}</Text>
+                  <Text className="text-[10px] font-jakarta-bold text-[#5b645c] uppercase tracking-[0.2em] mb-3">{group.label}</Text>
                   <View className="bg-white rounded-[28px] border border-[#eff4ef] shadow-sm shadow-[#00351d]/5 overflow-hidden">
                     {group.items.map((item, index) => {
                       const meta = KIND_META[item.kind] || KIND_META.system;
@@ -186,7 +202,7 @@ export default function Notifications({ navigation }: any) {
                               </Text>
                               {!item.read && <View className="w-2 h-2 rounded-full bg-[#006c4e]" />}
                             </View>
-                            <Text className="text-[12.5px] text-[#707971] font-jakarta-bold leading-relaxed mb-1.5">
+                            <Text className="text-[12.5px] text-[#5b645c] font-jakarta-bold leading-relaxed mb-1.5">
                               {item.message}
                             </Text>
                             <View className="flex-row items-center justify-between">

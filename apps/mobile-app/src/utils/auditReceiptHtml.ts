@@ -1,6 +1,6 @@
 import { isCreditTransaction as isInboundType } from './transactionDirection';
 import { formatName } from './formatName';
-import { formatPhoneOrDash } from './formatPhoneDisplay';
+import { formatPhoneOrBlank } from './formatPhoneDisplay';
 import { barcodeSvg } from './barcode';
 
 // Single source of truth for the printable "Official Audit Receipt" PDF —
@@ -42,13 +42,11 @@ const esc = (s: any) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&l
 // flow) pass it explicitly; otherwise it's derived from sender/recipient.id,
 // the same field Collections.tsx/Transactions.tsx already read for a phone.
 export function buildAuditReceiptHtml(tx: ReceiptTx, phoneNumber?: string): string {
-  const amountStr = tx.type === 'fx_swap'
-    ? `${(tx.usdcAmount || 0).toLocaleString()} USDC`
-    : formatCurrency(tx.kesAmount || tx.amount || 0);
+  const amountStr = formatCurrency(tx.kesAmount || tx.amount || 0);
   const timestamp = new Date(tx.createdAt).toLocaleString('en-KE', {
     day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
   });
-  const phoneStr = formatPhoneOrDash(phoneNumber ?? counterpartyId(tx));
+  const phoneStr = formatPhoneOrBlank(phoneNumber ?? counterpartyId(tx));
 
   return `<!doctype html>
 <html>
@@ -62,19 +60,19 @@ export function buildAuditReceiptHtml(tx: ReceiptTx, phoneNumber?: string): stri
   .band { background: #162723; padding: 18px 16px; text-align: center; }
   .band .title { color: #fff; font-size: 15px; font-weight: 700; letter-spacing: 1.5px; margin-top: 8px; }
   .content { padding: 20px 18px; }
-  .ref-label { font-size: 9px; color: #707971; text-transform: uppercase; letter-spacing: 1.5px; }
+  .ref-label { font-size: 9px; color: #5b645c; text-transform: uppercase; letter-spacing: 1.5px; }
   .ref-value { font-size: 14px; font-weight: 700; margin-top: 3px; }
   .divider { border-top: 1px solid #e6e6e6; margin: 14px 0; }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  .grid .item .label { font-size: 8px; color: #707971; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 3px; }
+  .grid .item .label { font-size: 8px; color: #5b645c; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 3px; }
   .grid .item .value { font-size: 11px; font-weight: 700; }
   .amount-box { margin-top: 16px; }
-  .amount-box .label { font-size: 8px; color: #707971; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 4px; }
+  .amount-box .label { font-size: 8px; color: #5b645c; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 4px; }
   .amount-box .value { font-size: 22px; font-weight: 700; }
   .verify { margin-top: 20px; background: #f5f7f9; padding: 10px 12px; text-align: center; font-size: 9px; font-weight: 700; letter-spacing: 1px; }
   .barcode { margin-top: 16px; text-align: center; }
   .barcode svg { width: 200px; height: 36px; }
-  .barcode .ref { margin-top: 4px; font-family: 'Courier New', monospace; font-size: 8px; color: #707971; letter-spacing: 0.5px; }
+  .barcode .ref { margin-top: 4px; font-family: 'Courier New', monospace; font-size: 8px; color: #5b645c; letter-spacing: 0.5px; }
   .footer { margin-top: 18px; text-align: center; font-size: 8px; color: #969696; line-height: 1.7; }
   .footer .brand { color: #162723; font-weight: 700; }
   .footer .slogan { font-size: 7.5px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: #2f6b52; margin-top: 2px; }
@@ -86,7 +84,7 @@ export function buildAuditReceiptHtml(tx: ReceiptTx, phoneNumber?: string): stri
   </div>
   <div class="content">
     <div class="ref-label">Reference ID</div>
-    <div class="ref-value">${esc(tx.reference || '—')}</div>
+    <div class="ref-value">${esc(tx.reference || '')}</div>
     <div class="divider"></div>
     <div class="grid">
       <div class="item">
@@ -117,7 +115,7 @@ export function buildAuditReceiptHtml(tx: ReceiptTx, phoneNumber?: string): stri
     <div class="verify">OFFICIAL PAYCHAIN TRANSACTION RECORD</div>
     <div class="barcode">
       ${barcodeSvg(tx.reference || '')}
-      <div class="ref">${esc(tx.reference || '—')}</div>
+      <div class="ref">${esc(tx.reference || '')}</div>
     </div>
     <div class="footer">
       This receipt reflects PayChain's record of the transaction identified by the reference above.<br/>

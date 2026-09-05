@@ -78,8 +78,8 @@ export default function SettlementQrCard({ qrCodeDataUri, businessName, accountN
         {/* "Scan me" sticker + curved arrow — points the eye down at the QR */}
         <View className="items-center mb-1">
           <Animated.View style={{ transform: [{ rotate: wiggleRotate }] }}>
-            <View className="bg-[#5EFEB3] px-3 py-1.5 rounded-full rounded-bl-sm" style={{ shadowColor: '#5EFEB3', shadowOpacity: 0.35, shadowRadius: 10, shadowOffset: { width: 0, height: 6 } }}>
-              <Text className="text-[#00351D] text-[10px] font-jakarta-extrabold uppercase tracking-wide" numberOfLines={1}>
+            <View className="bg-[#5EFEB3] px-3 py-1.5 rounded-full rounded-bl-sm" style={{ maxWidth: size + 8, shadowColor: '#5EFEB3', shadowOpacity: 0.35, shadowRadius: 10, shadowOffset: { width: 0, height: 6 } }}>
+              <Text className="text-[#00351D] text-[10px] font-jakarta-extrabold uppercase tracking-wide" numberOfLines={1} ellipsizeMode="tail">
                 Scan me to pay {businessName || formatAccountNumber(accountNumber || undefined) || 'this account'}
               </Text>
             </View>
@@ -119,10 +119,10 @@ export default function SettlementQrCard({ qrCodeDataUri, businessName, accountN
         {/* Footer */}
         <View className="items-center">
           <View className="bg-[#2775CA]/10 border border-[#2775CA]/20 rounded-md px-2.5 py-1 mb-2.5">
-            <Text className="text-[#2775CA] text-[9px] font-jakarta-extrabold uppercase tracking-[0.2em]">Settlement QR</Text>
+            <Text className="text-[#2775CA] text-[10px] font-jakarta-extrabold uppercase tracking-[0.2em]">Settlement QR</Text>
           </View>
           <Text className="text-white text-[15px] font-jakarta-bold tracking-widest">ACC: {formatAccountNumber(accountNumber || undefined) || 'Pending'}</Text>
-          <Text className="text-[#8B98A9] text-[8px] font-jakarta-bold uppercase tracking-widest mt-1.5 text-center" numberOfLines={1}>
+          <Text className="text-[#8B98A9] text-[10px] font-jakarta-bold uppercase tracking-widest mt-1.5 text-center" numberOfLines={1}>
             MERCHANT: {businessName || 'Merchant'}
           </Text>
         </View>

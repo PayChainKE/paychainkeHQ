@@ -1,8 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Share } from 'react-native';
 import { MaterialIcons, Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
 import { useAuth } from '../context/AuthContext';
 import { formatAccountNumber } from '../utils/formatAccountNumber';
@@ -16,6 +15,7 @@ import SupportTab from '../components/tabs/SupportTab';
 import SettingsTab from '../components/tabs/SettingsTab';
 import SecurityTab from '../components/tabs/SecurityTab';
 import TourTarget from '../components/TourTarget';
+import ProfileWalkthrough from '../components/ProfileWalkthrough';
 
 type SectionKey = 'my-accounts' | 'support' | 'settings' | 'security' | 'payment-link' | 'statement' | 'business-profile';
 
@@ -24,13 +24,13 @@ const MENU_ITEMS: Array<{
   label: string;
   icon: keyof typeof MaterialIcons.glyphMap;
 }> = [
-  { key: 'my-accounts', label: 'My Accounts', icon: 'point-of-sale' },
-  { key: 'support', label: 'Help & Support', icon: 'help-outline' },
-  { key: 'settings', label: 'Settings', icon: 'tune' },
-  { key: 'security', label: 'Security', icon: 'security' },
   { key: 'payment-link', label: 'Payment Link', icon: 'link' },
   { key: 'statement', label: 'Account Statement', icon: 'description' },
+  { key: 'my-accounts', label: 'My Accounts', icon: 'point-of-sale' },
   { key: 'business-profile', label: 'Business Profile', icon: 'business' },
+  { key: 'security', label: 'Security', icon: 'security' },
+  { key: 'settings', label: 'Settings', icon: 'tune' },
+  { key: 'support', label: 'Help & Support', icon: 'help-outline' },
 ];
 
 function MenuButton({
@@ -51,7 +51,7 @@ function MenuButton({
       </View>
       <Text
         numberOfLines={2}
-        className={`text-center text-[8px] font-jakarta-bold leading-[10px] ${active ? 'text-[#00351d]' : 'text-[#707971]'}`}
+        className={`text-center text-[10px] font-jakarta-bold leading-[12px] ${active ? 'text-[#00351d]' : 'text-[#5b645c]'}`}
       >
         {label}
       </Text>
@@ -141,7 +141,7 @@ function PaymentLinkPanel() {
   const statusMeta: Record<string, { label: string; color: string; bg: string }> = {
     active: { label: 'Active', color: '#006c4e', bg: '#e7f8ef' },
     paid: { label: 'Paid', color: '#1d4ed8', bg: '#eef2ff' },
-    expired: { label: 'Expired', color: '#707971', bg: '#f7faf7' },
+    expired: { label: 'Expired', color: '#5b645c', bg: '#f7faf7' },
   };
 
   return (
@@ -149,13 +149,13 @@ function PaymentLinkPanel() {
       <View className="w-full max-w-lg mx-auto px-6 pt-2 pb-12">
         <View className="mb-6">
           <Text className="font-jakarta-extrabold text-[28px] text-[#00351d] tracking-tight leading-tight mb-2">Payment Link</Text>
-          <Text className="text-[#707971] text-[14px] font-jakarta-bold leading-relaxed opacity-80">Generate a secure, one-time link for a specific amount and share it with your customer.</Text>
+          <Text className="text-[#5b645c] text-[14px] font-jakarta-bold leading-relaxed opacity-80">Generate a secure, one-time link for a specific amount and share it with your customer.</Text>
         </View>
 
         <View className="bg-white rounded-[32px] border border-[#eff4ef] shadow-sm shadow-[#00351d]/5 p-6 mb-6">
-          <Text className="text-[10px] text-[#707971] font-jakarta-bold uppercase tracking-[0.2em] mb-3">Amount to request</Text>
+          <Text className="text-[10px] text-[#5b645c] font-jakarta-bold uppercase tracking-[0.2em] mb-3">Amount to request</Text>
           <View className="flex-row items-center bg-[#f0fdf4] rounded-2xl border border-[#eff4ef] px-4">
-            <Text className="text-[#707971] text-[13px] font-jakarta-bold mr-2">KES</Text>
+            <Text className="text-[#5b645c] text-[13px] font-jakarta-bold mr-2">KES</Text>
             <ValidatedTextInput
               kind="amount"
               value={amount}
@@ -217,7 +217,7 @@ function PaymentLinkPanel() {
         )}
 
         <View className="mb-6">
-          <Text className="text-[10px] text-[#707971] font-jakarta-bold uppercase tracking-[0.2em] mb-3">Link History</Text>
+          <Text className="text-[10px] text-[#5b645c] font-jakarta-bold uppercase tracking-[0.2em] mb-3">Link History</Text>
 
           {isLoadingHistory ? (
             <View className="bg-white rounded-[32px] border border-[#eff4ef] py-10 items-center justify-center">
@@ -225,7 +225,7 @@ function PaymentLinkPanel() {
             </View>
           ) : history.length === 0 ? (
             <View className="bg-white rounded-[32px] border border-[#eff4ef] p-6 items-center">
-              <Text className="text-[13px] text-[#707971] font-jakarta-bold text-center">No payment links yet. Generate one above to see it here.</Text>
+              <Text className="text-[13px] text-[#5b645c] font-jakarta-bold text-center">No payment links yet. Generate one above to see it here.</Text>
             </View>
           ) : (
             <View className="bg-white rounded-[32px] border border-[#eff4ef] shadow-sm shadow-[#00351d]/5 overflow-hidden">
@@ -238,16 +238,16 @@ function PaymentLinkPanel() {
                     className={`p-5 ${index !== history.length - 1 ? 'border-b border-[#eff4ef]' : ''}`}
                   >
                     <View className="flex-row items-center justify-between mb-1">
-                      <Text className="text-[17px] font-jakarta-extrabold text-[#00351d] tracking-tight">
+                      <Text className="text-[16px] font-jakarta-extrabold text-[#00351d] tracking-tight flex-1 min-w-0 pr-2" numberOfLines={1} ellipsizeMode="tail">
                         {item.currency === 'KES'
                           ? `Ksh ${Number(item.amount || 0).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                           : `${item.currency} ${item.amount.toLocaleString()}`}
                       </Text>
-                      <View style={{ backgroundColor: meta.bg }} className="px-2.5 py-1 rounded-full">
-                        <Text style={{ color: meta.color }} className="text-[9px] font-jakarta-bold uppercase tracking-widest">{meta.label}</Text>
+                      <View style={{ backgroundColor: meta.bg }} className="px-2.5 py-1 rounded-full flex-shrink-0">
+                        <Text style={{ color: meta.color }} className="text-[10px] font-jakarta-bold uppercase tracking-widest">{meta.label}</Text>
                       </View>
                     </View>
-                    <Text className="text-[11px] text-[#707971] font-jakarta-bold mb-3">
+                    <Text className="text-[11px] text-[#5b645c] font-jakarta-bold mb-3">
                       {created.toLocaleDateString('en-KE', { day: '2-digit', month: 'short' })} · {created.toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })}
                     </Text>
                     <View className="flex-row gap-2">
@@ -276,8 +276,8 @@ function PaymentLinkPanel() {
         </View>
 
         <View className="bg-[#f7faf7] rounded-[28px] border border-[#bfc9bf]/20 p-5 flex-row items-start gap-3">
-          <MaterialIcons name="info-outline" size={18} color="#707971" />
-          <Text className="flex-1 text-[12px] text-[#707971] font-jakarta-bold leading-relaxed">
+          <MaterialIcons name="info-outline" size={18} color="#5b645c" />
+          <Text className="flex-1 text-[12px] text-[#5b645c] font-jakarta-bold leading-relaxed">
             Each link is tied to the amount you enter and can only be paid once. Share it in invoices, WhatsApp, or on your website.
           </Text>
         </View>
@@ -292,18 +292,18 @@ function AccountStatementPanel({ navigation, merchant }: { navigation: any; merc
       <View className="w-full max-w-lg mx-auto px-6 pt-2 pb-12">
         <View className="mb-6">
           <Text className="font-jakarta-extrabold text-[28px] text-[#00351d] tracking-tight leading-tight mb-2">Account Statement</Text>
-          <Text className="text-[#707971] text-[14px] font-jakarta-bold leading-relaxed opacity-80">Review recent activity and open the statement export screen.</Text>
+          <Text className="text-[#5b645c] text-[14px] font-jakarta-bold leading-relaxed opacity-80">Review recent activity and open the statement export screen.</Text>
         </View>
 
         <View className="bg-white rounded-[32px] border border-[#eff4ef] shadow-sm shadow-[#00351d]/5 p-6 mb-6">
-          <Text className="text-[10px] text-[#707971] font-jakarta-bold uppercase tracking-[0.2em] mb-2">Statement summary</Text>
+          <Text className="text-[10px] text-[#5b645c] font-jakarta-bold uppercase tracking-[0.2em] mb-2">Statement summary</Text>
           <Text className="text-[18px] font-jakarta-extrabold text-[#00351d] tracking-tight mb-2">{merchant?.businessName || 'Merchant'} account</Text>
-          <Text className="text-[13px] text-[#707971] font-jakarta-bold leading-relaxed">Open Collections to download a PDF statement for today, the last 7 days, this month, or any custom range.</Text>
+          <Text className="text-[13px] text-[#5b645c] font-jakarta-bold leading-relaxed">Open Transaction Summary to download a PDF statement for today, the last 7 days, this month, or any custom range.</Text>
         </View>
 
         <View className="gap-3">
           <TouchableOpacity onPress={() => navigation?.navigate('Collections')} className="bg-[#00351d] py-4 rounded-2xl items-center justify-center shadow-lg shadow-[#00351d]/25">
-            <Text className="text-white font-jakarta-extrabold text-[12px] uppercase tracking-widest">Open Collections</Text>
+            <Text className="text-white font-jakarta-extrabold text-[12px] uppercase tracking-widest">Open Transaction Summary</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => navigation?.navigate('Transactions')} className="bg-white py-4 rounded-2xl items-center justify-center border border-[#eff4ef] shadow-sm">
             <Text className="text-[#00351d] font-jakarta-extrabold text-[12px] uppercase tracking-widest">View Transactions</Text>
@@ -315,12 +315,47 @@ function AccountStatementPanel({ navigation, merchant }: { navigation: any; merc
 }
 
 function BusinessProfilePanel({ merchant }: { merchant: any }) {
+  const { refreshSession } = useAuth();
+  const [kraPin, setKraPin] = useState(merchant?.kraPin || '');
+  const [businessNumber, setBusinessNumber] = useState(merchant?.businessNumber || '');
+  const [isSavingKraPin, setIsSavingKraPin] = useState(false);
+  const [isSavingBusinessNumber, setIsSavingBusinessNumber] = useState(false);
+  // Locked by default once a value exists — Edit re-opens it for a
+  // correction (e.g. a typo'd KRA PIN), it's not a one-time-only field.
+  const [kraPinEditing, setKraPinEditing] = useState(!merchant?.kraPin);
+  const [businessNumberEditing, setBusinessNumberEditing] = useState(!merchant?.businessNumber);
+
+  const kraPinSet = !!merchant?.kraPin;
+  const businessNumberSet = !!merchant?.businessNumber;
+
+  const saveField = async (
+    field: 'kraPin' | 'businessNumber',
+    value: string,
+    setSaving: (v: boolean) => void,
+    setEditing: (v: boolean) => void
+  ) => {
+    if (!value.trim()) return;
+    setSaving(true);
+    try {
+      const res = await api.put('/api/auth/merchant/profile', { [field]: value.trim() });
+      if (res.data.success) {
+        await refreshSession();
+        setEditing(false);
+      }
+    } catch (err: any) {
+      Alert.alert('Failed to save', err.response?.data?.error || 'Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+      <ProfileWalkthrough />
       <View className="w-full max-w-lg mx-auto px-6 pt-2 pb-12">
         <View className="mb-6">
           <Text className="font-jakarta-extrabold text-[28px] text-[#00351d] tracking-tight leading-tight mb-2">Business Profile</Text>
-          <Text className="text-[#707971] text-[14px] font-jakarta-bold leading-relaxed opacity-80">Your registered business identity and key merchant details.</Text>
+          <Text className="text-[#5b645c] text-[14px] font-jakarta-bold leading-relaxed opacity-80">Your registered business identity and key merchant details.</Text>
         </View>
 
         <TourTarget id="profile-identity-card" className="bg-white rounded-[32px] border border-[#eff4ef] shadow-sm shadow-[#00351d]/5 p-6 gap-5">
@@ -328,10 +363,87 @@ function BusinessProfilePanel({ merchant }: { merchant: any }) {
           <ProfileRow label="Email" value={merchant?.email || 'N/A'} />
           <ProfileRow label="Phone" value={merchant?.phone || 'N/A'} />
           <ProfileRow label="PayChain Account" value={formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending')} />
+
+          {/* KRA PIN — locked by default once set (feeds KRA eTIMS invoice
+              filing, so it shouldn't change casually), but Edit re-opens it
+              in case a merchant typed it wrong the first time. */}
           <TourTarget id="kra-pin-field">
-            <ProfileRow label="KRA PIN" value={merchant?.kraPin || 'Not set'} />
+            {kraPinSet && !kraPinEditing ? (
+              <View className="flex-row items-start justify-between gap-4">
+                <View className="flex-1">
+                  <Text className="text-[10px] text-[#5b645c] font-jakarta-bold uppercase tracking-[0.2em] mb-1">KRA PIN</Text>
+                  <Text className="text-[15px] font-jakarta-extrabold text-[#00351d] tracking-tight leading-snug">{merchant.kraPin}</Text>
+                </View>
+                <TouchableOpacity onPress={() => { setKraPin(merchant.kraPin); setKraPinEditing(true); }} className="flex-row items-center gap-1 bg-[#006c4e]/5 px-3 py-1 rounded-full flex-shrink-0">
+                  <Feather name="edit-2" size={12} color="#006c4e" />
+                  <Text className="text-[#006c4e] text-[10px] font-jakarta-extrabold uppercase tracking-widest">Edit</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View>
+                <Text className="text-[10px] text-[#5b645c] font-jakarta-bold uppercase tracking-[0.2em] mb-2">KRA PIN</Text>
+                <View className="flex-row gap-2">
+                  <ValidatedTextInput
+                    kind="kraPin"
+                    value={kraPin}
+                    onChangeText={setKraPin}
+                    placeholder="e.g. P051892647A"
+                    placeholderTextColor="#b3b9b4"
+                    className="flex-1 bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-4 py-3.5 text-[#0c2010] font-jakarta-extrabold text-[14px]"
+                  />
+                  <TouchableOpacity
+                    onPress={() => saveField('kraPin', kraPin, setIsSavingKraPin, setKraPinEditing)}
+                    disabled={isSavingKraPin || !kraPin.trim()}
+                    className="bg-[#00351d] px-5 rounded-2xl items-center justify-center"
+                    style={{ opacity: isSavingKraPin || !kraPin.trim() ? 0.5 : 1 }}
+                  >
+                    {isSavingKraPin ? <ActivityIndicator size="small" color="white" /> : (
+                      <Text className="text-white font-jakarta-extrabold text-[11px] uppercase tracking-widest">Save</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
           </TourTarget>
-          <ProfileRow label="Business Reg Number" value={merchant?.businessNumber || 'Not set'} />
+
+          {/* Business Reg Number — same edit-to-correct pattern as KRA PIN. */}
+          {businessNumberSet && !businessNumberEditing ? (
+            <View className="flex-row items-start justify-between gap-4">
+              <View className="flex-1">
+                <Text className="text-[10px] text-[#5b645c] font-jakarta-bold uppercase tracking-[0.2em] mb-1">Business Reg Number</Text>
+                <Text className="text-[15px] font-jakarta-extrabold text-[#00351d] tracking-tight leading-snug">{merchant.businessNumber}</Text>
+              </View>
+              <TouchableOpacity onPress={() => { setBusinessNumber(merchant.businessNumber); setBusinessNumberEditing(true); }} className="flex-row items-center gap-1 bg-[#006c4e]/5 px-3 py-1 rounded-full flex-shrink-0">
+                <Feather name="edit-2" size={12} color="#006c4e" />
+                <Text className="text-[#006c4e] text-[10px] font-jakarta-extrabold uppercase tracking-widest">Edit</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View>
+              <Text className="text-[10px] text-[#5b645c] font-jakarta-bold uppercase tracking-[0.2em] mb-2">Business Reg Number</Text>
+              <View className="flex-row gap-2">
+                <ValidatedTextInput
+                  kind="businessReg"
+                  optional
+                  value={businessNumber}
+                  onChangeText={setBusinessNumber}
+                  placeholder="e.g. PVT-XXXXXX"
+                  placeholderTextColor="#b3b9b4"
+                  className="flex-1 bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-4 py-3.5 text-[#0c2010] font-jakarta-extrabold text-[14px]"
+                />
+                <TouchableOpacity
+                  onPress={() => saveField('businessNumber', businessNumber, setIsSavingBusinessNumber, setBusinessNumberEditing)}
+                  disabled={isSavingBusinessNumber || !businessNumber.trim()}
+                  className="bg-[#00351d] px-5 rounded-2xl items-center justify-center"
+                  style={{ opacity: isSavingBusinessNumber || !businessNumber.trim() ? 0.5 : 1 }}
+                >
+                  {isSavingBusinessNumber ? <ActivityIndicator size="small" color="white" /> : (
+                    <Text className="text-white font-jakarta-extrabold text-[11px] uppercase tracking-widest">Save</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
         </TourTarget>
       </View>
     </ScrollView>
@@ -342,7 +454,7 @@ function ProfileRow({ label, value }: { label: string; value: string }) {
   return (
     <View className="flex-row items-start justify-between gap-4">
       <View className="flex-1">
-        <Text className="text-[10px] text-[#707971] font-jakarta-bold uppercase tracking-[0.2em] mb-1">{label}</Text>
+        <Text className="text-[10px] text-[#5b645c] font-jakarta-bold uppercase tracking-[0.2em] mb-1">{label}</Text>
         <Text className="text-[15px] font-jakarta-extrabold text-[#00351d] tracking-tight leading-snug">{value}</Text>
       </View>
     </View>
@@ -352,11 +464,6 @@ function ProfileRow({ label, value }: { label: string; value: string }) {
 export default function Profile({ navigation }: any) {
   const { merchant, logout } = useAuth();
   const [activeSection, setActiveSection] = useState<SectionKey>('my-accounts');
-
-  const activeItem = useMemo(
-    () => MENU_ITEMS.find((item) => item.key === activeSection) || MENU_ITEMS[0],
-    [activeSection]
-  );
 
   const renderContent = () => {
     switch (activeSection) {
@@ -384,15 +491,7 @@ export default function Profile({ navigation }: any) {
       <TopBar title="Profile" showBack={false} titleAvatar />
       <View className="flex-1 flex-row bg-[#f0fdf4]">
         <View className="w-[88px] bg-white border-r border-[#eff4ef] shadow-sm shadow-[#00351d]/5">
-          <View className="items-center pt-6 pb-5 border-b border-[#eff4ef]">
-            <LinearGradient colors={['#006c4e', '#00351d']} className="w-10 h-10 rounded-2xl items-center justify-center shadow-lg shadow-[#006c4e]/20">
-              <Text className="text-white font-jakarta-bold text-[11px]">
-                {merchant?.businessName ? merchant.businessName.substring(0, 2).toUpperCase() : 'PC'}
-              </Text>
-            </LinearGradient>
-          </View>
-
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 10, paddingTop: 12, paddingBottom: 24 }}>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 10, paddingTop: 16, paddingBottom: 24 }}>
             {MENU_ITEMS.map((item) => (
               <MenuButton
                 key={item.key}
@@ -409,19 +508,13 @@ export default function Profile({ navigation }: any) {
               <View className="w-10 h-10 rounded-xl items-center justify-center bg-[#fff5f5] mb-1">
                 <Feather name="log-out" size={16} color="#ba1a1a" />
               </View>
-              <Text className="text-center text-[8px] font-jakarta-bold leading-[10px] text-[#ba1a1a]">Log Out</Text>
+              <Text className="text-center text-[10px] font-jakarta-bold leading-[12px] text-[#ba1a1a]">Log Out</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
 
         <View className="flex-1">
-          <View className="px-5 pt-5 pb-3 border-b border-[#eff4ef] bg-[#f0fdf4]">
-            <Text className="text-[#707971] text-[10px] font-jakarta-bold uppercase tracking-[0.2em] mb-1">Selected</Text>
-            <Text className="font-jakarta-extrabold text-[22px] text-[#00351d] tracking-tight">{activeItem.label}</Text>
-          </View>
-          <View className="flex-1">
-            {renderContent()}
-          </View>
+          {renderContent()}
         </View>
       </View>
     </SafeAreaView>

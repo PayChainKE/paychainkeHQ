@@ -6,7 +6,7 @@ module.exports = {
     extend: {
       colors: {
         "tertiary-fixed": "#d3e7e0",
-        "outline": "#707971",
+        "outline": "#5b645c",
         "on-tertiary-container": "#a0b4ad",
         "on-secondary-container": "#007151",
         "primary-container": "#0b4d2e",
@@ -67,6 +67,8 @@ module.exports = {
         body: ["PlusJakartaSans_400Regular"],
         label: ["PlusJakartaSans_600SemiBold"],
         serif: ["DMSerifDisplay_400Regular_Italic"],
+        "jakarta-bold": ["PlusJakartaSans_700Bold"],
+        "jakarta-extrabold": ["PlusJakartaSans_800ExtraBold"],
       },
     },
   },
