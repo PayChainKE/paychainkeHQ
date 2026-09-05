@@ -29,10 +29,19 @@ const TOKEN_KEY          = 'paychain_merchant_token';   // JWT in OS secure encl
 const PIN_KEY            = 'paychain_app_pin';          // app-unlock PIN in OS secure enclave
 const BIOMETRIC_DONE_KEY = 'paychain_biometrics_setup'; // 'true' once setup screen is shown
 
+// iOS-only: without this, SecureStore's default Keychain accessibility
+// (WHEN_UNLOCKED) still lets an item ride along in an encrypted iCloud/
+// iTunes backup — restoring that backup to a different physical device
+// would hand over a live session JWT (or the app-unlock PIN) to whoever
+// controls that device. THIS_DEVICE_ONLY keeps both pinned to the device
+// that created them; Android's equivalent gap is already closed by
+// android.allowBackup: false in app.json.
+const SECURE_STORE_OPTS = { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY };
+
 // ── SecureStore helpers ──────────────────────────────────────────────────────
 async function storeToken(jwt: string) {
   if (Platform.OS === 'web') return;
-  await SecureStore.setItemAsync(TOKEN_KEY, jwt);
+  await SecureStore.setItemAsync(TOKEN_KEY, jwt, SECURE_STORE_OPTS);
 }
 async function loadToken(): Promise<string | null> {
   if (Platform.OS === 'web') return null;
@@ -48,7 +57,7 @@ async function clearToken() {
 // moved to the same OS-encrypted keystore as the JWT.
 async function storeAppPin(pin: string) {
   if (Platform.OS === 'web') return;
-  await SecureStore.setItemAsync(PIN_KEY, pin);
+  await SecureStore.setItemAsync(PIN_KEY, pin, SECURE_STORE_OPTS);
 }
 async function loadAppPin(): Promise<string | null> {
   if (Platform.OS === 'web') return null;
