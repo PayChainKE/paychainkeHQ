@@ -1,8 +1,8 @@
 import './global.css';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
-import { PlusJakartaSans_400Regular, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakarta-sans';
-import { DMSerifDisplay_400Regular_Italic } from '@expo-google-fonts/dm-serif-display';
+import { PlusJakartaSans_400Regular, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold, PlusJakartaSans_800ExtraBold } from '@expo-google-fonts/plus-jakarta-sans';
+import { DMSerifDisplay_400Regular, DMSerifDisplay_400Regular_Italic } from '@expo-google-fonts/dm-serif-display';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Text, TextInput } from 'react-native';
 import MobileLayout from './src/components/layout/MobileLayout';
@@ -29,7 +29,9 @@ function App() {
     PlusJakartaSans_400Regular,
     PlusJakartaSans_600SemiBold,
     PlusJakartaSans_700Bold,
+    PlusJakartaSans_800ExtraBold,
     DMSerifDisplay_400Regular_Italic,
+    DMSerifDisplay_400Regular,
   });
 
   if (!fontsLoaded) {

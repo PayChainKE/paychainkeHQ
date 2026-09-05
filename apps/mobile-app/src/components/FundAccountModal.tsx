@@ -139,7 +139,7 @@ export default function FundAccountModal({ visible, onClose }: { visible: boolea
 
   const CopyRow = ({ label, value, disabled }: { label: string; value: string; disabled?: boolean }) => (
     <View className="mb-3">
-      <Text className="text-[10px] font-jakarta-extrabold text-[#707971] uppercase tracking-widest mb-1.5">{label}</Text>
+      <Text className="text-[10px] font-jakarta-extrabold text-[#5b645c] uppercase tracking-widest mb-1.5">{label}</Text>
       <View className="flex-row items-center justify-between bg-[#f7faf7] border border-[#eff4ef] rounded-2xl px-4 py-3.5">
         <Text className="font-jakarta-bold text-[#0c2010] text-[14px] flex-1 mr-2">{formatAccountNumber(value)}</Text>
         <TouchableOpacity
@@ -162,17 +162,17 @@ export default function FundAccountModal({ visible, onClose }: { visible: boolea
           <View className="items-center mb-4"><View className="w-12 h-1.5 bg-[#e7ece7] rounded-full" /></View>
 
           <View className="flex-row justify-between items-center mb-6">
-            <View>
+            <View className="flex-1 min-w-0 pr-3">
               <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[22px] text-[#0c2010]">
                 {method ? METHOD_TITLE[method] : 'Fund Your Account'}
               </Text>
-              <Text className="text-[9px] text-[#707971] font-jakarta-bold uppercase tracking-[0.2em] mt-1 opacity-70">
+              <Text className="text-[10px] text-[#5b645c] font-jakarta-bold uppercase tracking-[0.2em] mt-1 opacity-70" numberOfLines={1} ellipsizeMode="tail">
                 {method ? `Account: ${ncbaAccountDisplay}` : 'Choose how to top up your balance'}
               </Text>
             </View>
             <TouchableOpacity
               onPress={() => (method ? setMethod(null) : handleClose())}
-              className="w-10 h-10 rounded-full bg-[#f7faf7] items-center justify-center"
+              className="w-10 h-10 rounded-full bg-[#f7faf7] items-center justify-center flex-shrink-0"
             >
               <Feather name={method ? 'arrow-left' : 'x'} size={18} color="#00351d" />
             </TouchableOpacity>
@@ -192,16 +192,16 @@ export default function FundAccountModal({ visible, onClose }: { visible: boolea
                     activeOpacity={0.85}
                     className="flex-row items-center justify-between p-5 rounded-2xl border border-[#eff4ef]"
                   >
-                    <View className="flex-row items-center gap-4">
-                      <View className="w-12 h-12 rounded-2xl items-center justify-center bg-[#e7f8ef]">
+                    <View className="flex-row items-center gap-4 flex-1 min-w-0 pr-3">
+                      <View className="w-12 h-12 rounded-2xl items-center justify-center bg-[#e7f8ef] flex-shrink-0">
                         <Feather name={m.icon} size={20} color="#059669" />
                       </View>
-                      <View>
-                        <Text className="font-jakarta-bold text-[15px] text-[#0c2010]">{m.name}</Text>
-                        <Text className="text-[11px] text-[#707971] font-jakarta-bold">{m.desc}</Text>
+                      <View className="flex-1 min-w-0">
+                        <Text className="font-jakarta-bold text-[15px] text-[#0c2010]" numberOfLines={1} ellipsizeMode="tail">{m.name}</Text>
+                        <Text className="text-[11px] text-[#5b645c] font-jakarta-bold" numberOfLines={1} ellipsizeMode="tail">{m.desc}</Text>
                       </View>
                     </View>
-                    <Feather name="chevron-right" size={18} color="#b3b9b4" />
+                    <Feather name="chevron-right" size={18} color="#b3b9b4" style={{ flexShrink: 0 }} />
                   </TouchableOpacity>
                 ))}
               </View>
@@ -212,7 +212,7 @@ export default function FundAccountModal({ visible, onClose }: { visible: boolea
                     <Feather name="send" size={32} color="#059669" />
                   </View>
                   <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[22px] text-[#0c2010] mb-1">Check Your Phone</Text>
-                  <Text className="text-[13px] text-[#707971] font-jakarta-bold text-center mb-4">
+                  <Text className="text-[13px] text-[#5b645c] font-jakarta-bold text-center mb-4">
                     An M-PESA prompt has been sent to <Text className="font-jakarta-extrabold text-[#0c2010]">{phone}</Text>.{'\n'}Enter your PIN to complete the top-up.
                   </Text>
                   <View className="flex-row items-center gap-2 mb-4">
@@ -221,7 +221,7 @@ export default function FundAccountModal({ visible, onClose }: { visible: boolea
                   </View>
                   <Text className="text-[10px] text-[#a1a1aa] mb-3">Top-up: {formatKES(amount)}</Text>
                   <TouchableOpacity onPress={() => { stopPolling(); setPhase('idle'); setIsLoading(false); }}>
-                    <Text className="text-[11px] text-[#707971] underline">Didn't receive it? Try again</Text>
+                    <Text className="text-[11px] text-[#5b645c] underline">Didn't receive it? Try again</Text>
                   </TouchableOpacity>
                 </View>
               ) : phase === 'success' ? (
@@ -230,7 +230,7 @@ export default function FundAccountModal({ visible, onClose }: { visible: boolea
                     <Feather name="check-circle" size={40} color="#059669" />
                   </View>
                   <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[22px] text-[#0c2010] mb-1">Top-Up Received!</Text>
-                  <Text className="text-[13px] text-[#707971] font-jakarta-bold">{formatKES(amount)} added to your account.</Text>
+                  <Text className="text-[13px] text-[#5b645c] font-jakarta-bold">{formatKES(amount)} added to your account.</Text>
                 </View>
               ) : (
                 <View className="gap-5">
@@ -314,7 +314,7 @@ export default function FundAccountModal({ visible, onClose }: { visible: boolea
                   </Text>
                 </View>
                 <View className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl p-5 mb-5">
-                  <Text className="text-[10px] font-jakarta-extrabold text-[#707971] uppercase tracking-widest mb-4">Instructions for you and your customers</Text>
+                  <Text className="text-[10px] font-jakarta-extrabold text-[#5b645c] uppercase tracking-widest mb-4">Instructions for you and your customers</Text>
                   {PAYBILL_STEPS.map((step, i) => (
                     <View key={i} className="flex-row items-start gap-3 mb-3">
                       <View className="w-6 h-6 rounded-full bg-[#00351d] items-center justify-center mt-0.5">

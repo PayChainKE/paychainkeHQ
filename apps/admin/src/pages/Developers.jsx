@@ -12,6 +12,90 @@ const STATUS_META = {
   suspended:            { label: 'Suspended',  pill: 'bg-red-50 text-red-700 border-red-200' },
 };
 
+// Friendly label + icon for each developer-side audit action. Falls back to
+// the raw action string for anything not listed (matches AuditLog.jsx's
+// ACTION_META fallback behaviour), so a new backend action never breaks
+// this drawer.
+const DEV_ACTION_META = {
+  'developer.registered':                     { label: 'Account created',        icon: 'person_add' },
+  'developer.verified':                       { label: 'Email verified',         icon: 'verified' },
+  'developer.login.success':                  { label: 'Signed in',              icon: 'login' },
+  'developer.login.failed':                   { label: 'Failed sign-in',         icon: 'warning' },
+  'developer.login.blocked':                  { label: 'Sign-in blocked',        icon: 'block' },
+  'developer.password.reset_requested':       { label: 'Password reset requested', icon: 'lock_reset' },
+  'developer.password.reset_attempt_unknown': { label: 'Reset attempt · unknown', icon: 'help' },
+  'developer.password.reset_verified':        { label: 'Reset OTP verified',     icon: 'verified' },
+  'developer.password.reset_completed':       { label: 'Password reset',         icon: 'key' },
+  'developer.api_key.created':                { label: 'API key created',        icon: 'vpn_key' },
+  'developer.api_key.revoked':                { label: 'API key revoked',        icon: 'key_off' },
+  'developer.webhook.created':                { label: 'Webhook registered',     icon: 'webhook' },
+  'developer.merchant_link.verified':         { label: 'Linked merchant account', icon: 'link' },
+  'developer.live_access.requested':          { label: 'Requested live access',  icon: 'rocket_launch' },
+  'developer.payment.payout_executed':        { label: 'Payout executed (API)',  icon: 'call_made' },
+  'admin.developer.live_access_approved':     { label: 'Admin · live access approved', icon: 'check_circle' },
+  'admin.developer.live_access_rejected':     { label: 'Admin · live access rejected/revoked', icon: 'cancel' },
+  'admin.developer.integration_test_run':     { label: 'Admin · ran integration test', icon: 'science' },
+};
+
+const DEV_SEVERITY_TONE = {
+  info:     'bg-blue-50    text-blue-700   border-blue-200',
+  success:  'bg-emerald-50 text-emerald-700 border-emerald-200',
+  warning:  'bg-amber-50   text-amber-700  border-amber-200',
+  critical: 'bg-red-50     text-red-700    border-red-200',
+};
+
+const DEV_ACTOR_TONE = {
+  self:  'text-emerald-700',
+  admin: 'text-amber-700',
+};
+
+function relTime(iso) {
+  if (!iso) return '—';
+  const sec = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (sec < 60)    return 'Just now';
+  if (sec < 3600)  return `${Math.floor(sec / 60)}m ago`;
+  if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`;
+  const days = Math.floor(sec / 86400);
+  if (days < 30)   return `${days}d ago`;
+  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+// Canned email templates so the admin doesn't have to draft a new message
+// every time for the same handful of recurring situations. `subject`/`body`
+// are functions of the developer doc so they can drop in the company name;
+// the admin can still edit both before sending. "Custom" is just a blank
+// slate for anything else.
+const EMAIL_TEMPLATES = [
+  {
+    id: 'live_access_approved',
+    label: 'Live Access Approved',
+    icon: 'check_circle',
+    subject: () => 'Your PayChain live API access has been approved',
+    body: (d) => `Hi ${d.name || 'there'},\n\nGood news — your live API access request for ${d.companyName} has been approved. You can now generate live API keys from your developer dashboard and start accepting real payments through PayChain.\n\nIf anything comes up while you're integrating, just reply to this email and we'll help you out.\n\nWelcome aboard.\n\n— The PayChain Team`,
+  },
+  {
+    id: 'live_access_rejected',
+    label: 'Live Access Rejected',
+    icon: 'cancel',
+    subject: () => 'Update on your PayChain live access request',
+    body: (d) => `Hi ${d.name || 'there'},\n\nThanks for requesting live API access for ${d.companyName}. After review, we're not able to approve it at this time.\n\nReason: [add the specific reason here]\n\nYou're welcome to address this and submit a new request once it's resolved — your sandbox/test access is unaffected in the meantime. Let us know if you have any questions.\n\n— The PayChain Team`,
+  },
+  {
+    id: 'link_merchant_reminder',
+    label: 'Link Merchant Account Reminder',
+    icon: 'link',
+    subject: () => 'Action needed: link your PayChain merchant account',
+    body: (d) => `Hi ${d.name || 'there'},\n\nWe noticed ${d.companyName} hasn't linked a PayChain merchant account yet. Your API keys need a linked merchant account to actually move money — until this is done, live payments can't be processed.\n\nYou can link one from your developer dashboard under "Link Merchant Account." It only takes a minute.\n\nLet us know if you need a hand.\n\n— The PayChain Team`,
+  },
+  {
+    id: 'custom',
+    label: 'Custom Message',
+    icon: 'edit_note',
+    subject: () => '',
+    body: () => '',
+  },
+];
+
 const liveAccessMeta = (d) => {
   if (d.liveAccess?.approved) return { label: 'Live Approved', pill: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
   if (d.liveAccess?.requestedAt) return { label: 'Pending Review', pill: 'bg-amber-50 text-amber-700 border-amber-200' };
@@ -71,6 +155,19 @@ const Developers = () => {
   const [testResult, setTestResult] = useState(null);
   const [testRunning, setTestRunning] = useState(false);
   const [testError, setTestError] = useState('');
+  const [activityDeveloper, setActivityDeveloper] = useState(null);
+  const [activityData, setActivityData] = useState(null);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [activityError, setActivityError] = useState('');
+  const [messagesDeveloper, setMessagesDeveloper] = useState(null);
+  const [messagesThread, setMessagesThread] = useState(null);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [messagesError, setMessagesError] = useState('');
+  const [composeSubject, setComposeSubject] = useState('');
+  const [composeBody, setComposeBody] = useState('');
+  const [composeTemplateId, setComposeTemplateId] = useState('custom');
+  const [sendBusy, setSendBusy] = useState(false);
+  const [sendError, setSendError] = useState('');
 
   const fetchDevelopers = useCallback(async () => {
     setLoading(true);
@@ -168,6 +265,67 @@ const Developers = () => {
     } finally { setWebhooksLoading(false); }
   }
 
+  async function openActivity(developer) {
+    setActivityDeveloper(developer);
+    setActivityData(null);
+    setActivityError('');
+    setActivityLoading(true);
+    try {
+      const res = await api.get(`/api/admin/developers/${developer._id}/audit-log`, { params: { limit: 100 } });
+      if (res.data?.success) setActivityData(res.data.data || []);
+      else setActivityError(res.data?.error || 'Could not load activity.');
+    } catch (e) {
+      setActivityError(e?.response?.data?.error || 'Could not load activity.');
+    } finally { setActivityLoading(false); }
+  }
+
+  async function openMessages(developer) {
+    setMessagesDeveloper(developer);
+    setMessagesThread(null);
+    setMessagesError('');
+    setMessagesLoading(true);
+    setSendError('');
+    applyTemplate('custom', developer);
+    try {
+      const res = await api.get(`/api/admin/developers/${developer._id}/messages`);
+      if (res.data?.success) setMessagesThread(res.data.data || null);
+      else setMessagesError(res.data?.error || 'Could not load messages.');
+    } catch (e) {
+      setMessagesError(e?.response?.data?.error || 'Could not load messages.');
+    } finally { setMessagesLoading(false); }
+  }
+
+  function applyTemplate(templateId, developer) {
+    const template = EMAIL_TEMPLATES.find((t) => t.id === templateId) || EMAIL_TEMPLATES[EMAIL_TEMPLATES.length - 1];
+    const d = developer || messagesDeveloper;
+    setComposeTemplateId(templateId);
+    setComposeSubject(template.subject(d || {}));
+    setComposeBody(template.body(d || {}));
+  }
+
+  async function sendDeveloperEmail() {
+    if (!messagesDeveloper) return;
+    if (!composeSubject.trim()) { setSendError('Subject is required.'); return; }
+    if (composeBody.trim().length < 2) { setSendError('Message cannot be empty.'); return; }
+    setSendBusy(true);
+    setSendError('');
+    try {
+      const res = await api.post(`/api/admin/developers/${messagesDeveloper._id}/messages`, {
+        subject: composeSubject.trim(),
+        body: composeBody.trim(),
+      });
+      if (res.data?.success) {
+        setMessagesThread(res.data.data);
+        applyTemplate('custom', messagesDeveloper);
+        showToast(`Email sent to ${messagesDeveloper.companyName}.`);
+      } else {
+        setSendError(res.data?.error || 'Could not send the email.');
+      }
+    } catch (e) {
+      setSendError(e?.response?.data?.error || 'Could not send the email.');
+    } finally { setSendBusy(false); }
+  }
+
   return (
     <Layout>
       <div className="space-y-6 pb-12">
@@ -227,7 +385,7 @@ const Developers = () => {
                   <Th>Status</Th>
                   <Th>Live Access</Th>
                   <Th>Joined</Th>
-                  <Th>Webhooks</Th>
+                  <Th>Integration</Th>
                   <Th></Th>
                 </tr>
               </thead>
@@ -239,7 +397,7 @@ const Developers = () => {
                 ) : filtered.length === 0 ? (
                   <tr><td colSpan={6} className="px-4 py-10 text-center text-on-surface-variant/40 text-sm">{error || 'No developer accounts yet.'}</td></tr>
                 ) : pagedDevelopers.map((d) => (
-                  <DeveloperRow key={d._id} developer={d} canManage={canManage} busy={busyId === d._id} onApprove={() => handleApprove(d)} onReject={() => handleReject(d)} onViewWebhooks={() => openWebhooks(d)} onTestIntegration={() => openIntegrationTest(d)} />
+                  <DeveloperRow key={d._id} developer={d} canManage={canManage} busy={busyId === d._id} onApprove={() => handleApprove(d)} onReject={() => handleReject(d)} onViewWebhooks={() => openWebhooks(d)} onTestIntegration={() => openIntegrationTest(d)} onViewActivity={() => openActivity(d)} onEmail={() => openMessages(d)} />
                 ))}
               </tbody>
             </table>
@@ -251,7 +409,7 @@ const Developers = () => {
           {loading ? <div className="p-8 text-center text-on-surface-variant/40 text-sm">Loading developers…</div> :
             filtered.length === 0 ? <div className="p-8 text-center text-on-surface-variant/40 text-sm">{error || 'No developer accounts yet.'}</div> :
             pagedDevelopers.map((d) => (
-              <DeveloperCard key={d._id} developer={d} canManage={canManage} busy={busyId === d._id} onApprove={() => handleApprove(d)} onReject={() => handleReject(d)} onViewWebhooks={() => openWebhooks(d)} onTestIntegration={() => openIntegrationTest(d)} />
+              <DeveloperCard key={d._id} developer={d} canManage={canManage} busy={busyId === d._id} onApprove={() => handleApprove(d)} onReject={() => handleReject(d)} onViewWebhooks={() => openWebhooks(d)} onTestIntegration={() => openIntegrationTest(d)} onViewActivity={() => openActivity(d)} onEmail={() => openMessages(d)} />
             ))}
           {!loading && filtered.length > 0 && (
             <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/20 shadow-editorial overflow-hidden">
@@ -282,6 +440,35 @@ const Developers = () => {
             error={testError}
             onRun={runIntegrationTest}
             onClose={() => setTestDeveloper(null)}
+          />
+        )}
+
+        {activityDeveloper && (
+          <ActivityDrawer
+            developer={activityDeveloper}
+            data={activityData}
+            loading={activityLoading}
+            error={activityError}
+            onClose={() => setActivityDeveloper(null)}
+          />
+        )}
+
+        {messagesDeveloper && (
+          <MessagesDrawer
+            developer={messagesDeveloper}
+            thread={messagesThread}
+            loading={messagesLoading}
+            error={messagesError}
+            templateId={composeTemplateId}
+            onTemplate={(id) => applyTemplate(id, messagesDeveloper)}
+            subject={composeSubject}
+            onSubject={setComposeSubject}
+            body={composeBody}
+            onBody={setComposeBody}
+            sendBusy={sendBusy}
+            sendError={sendError}
+            onSend={sendDeveloperEmail}
+            onClose={() => setMessagesDeveloper(null)}
           />
         )}
       </div>
@@ -340,7 +527,7 @@ const DeveloperActions = ({ developer, canManage, busy, onApprove, onReject }) =
   return <span className="text-2xs text-on-surface-variant/40">No action needed</span>;
 };
 
-const DeveloperRow = ({ developer, canManage, busy, onApprove, onReject, onViewWebhooks, onTestIntegration }) => {
+const DeveloperRow = ({ developer, canManage, busy, onApprove, onReject, onViewWebhooks, onTestIntegration, onViewActivity, onEmail }) => {
   const statusStyle = STATUS_META[developer.status] || STATUS_META.active;
   const liveStyle = liveAccessMeta(developer);
   const initials = (developer.companyName || developer.email).split(/\s+/).map((s) => s[0]).slice(0, 2).join('').toUpperCase();
@@ -374,13 +561,23 @@ const DeveloperRow = ({ developer, canManage, busy, onApprove, onReject, onViewW
         {developer.createdAt ? new Date(developer.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
       </td>
       <td className="px-3 py-2 border-b border-outline-variant/5">
-        <button onClick={onViewWebhooks} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-outline-variant/30 text-2xs font-bold uppercase tracking-widest text-on-surface-variant/70 hover:bg-surface-container-low hover:text-on-surface transition-colors">
-          <span className="material-symbols-outlined text-sm">webhook</span>
-          View
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button onClick={onViewWebhooks} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-outline-variant/30 text-2xs font-bold uppercase tracking-widest text-on-surface-variant/70 hover:bg-surface-container-low hover:text-on-surface transition-colors">
+            <span className="material-symbols-outlined text-sm">webhook</span>
+            View
+          </button>
+          <button onClick={onViewActivity} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-outline-variant/30 text-2xs font-bold uppercase tracking-widest text-on-surface-variant/70 hover:bg-surface-container-low hover:text-on-surface transition-colors">
+            <span className="material-symbols-outlined text-sm">manage_history</span>
+            Activity
+          </button>
+        </div>
       </td>
       <td className="px-3 py-2 border-b border-outline-variant/5 text-right">
         <div className="flex items-center justify-end gap-2">
+          <button onClick={onEmail} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-2xs font-bold uppercase tracking-widest transition-colors">
+            <span className="material-symbols-outlined text-sm">mail</span>
+            Email
+          </button>
           {canManage && (
             <button onClick={onTestIntegration} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-2xs font-bold uppercase tracking-widest transition-colors">
               <span className="material-symbols-outlined text-sm">science</span>
@@ -394,7 +591,7 @@ const DeveloperRow = ({ developer, canManage, busy, onApprove, onReject, onViewW
   );
 };
 
-const DeveloperCard = ({ developer, canManage, busy, onApprove, onReject, onViewWebhooks, onTestIntegration }) => {
+const DeveloperCard = ({ developer, canManage, busy, onApprove, onReject, onViewWebhooks, onTestIntegration, onViewActivity, onEmail }) => {
   const statusStyle = STATUS_META[developer.status] || STATUS_META.active;
   const liveStyle = liveAccessMeta(developer);
   const initials = (developer.companyName || developer.email).split(/\s+/).map((s) => s[0]).slice(0, 2).join('').toUpperCase();
@@ -414,9 +611,17 @@ const DeveloperCard = ({ developer, canManage, busy, onApprove, onReject, onView
           </div>
           <div className="mt-3 flex items-center gap-2 flex-wrap">
             <DeveloperActions developer={developer} canManage={canManage} busy={busy} onApprove={onApprove} onReject={onReject} />
+            <button onClick={onEmail} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 text-2xs font-bold uppercase tracking-widest">
+              <span className="material-symbols-outlined text-sm">mail</span>
+              Email
+            </button>
             <button onClick={onViewWebhooks} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-outline-variant/30 text-2xs font-bold uppercase tracking-widest text-on-surface-variant/70">
               <span className="material-symbols-outlined text-sm">webhook</span>
               Webhooks
+            </button>
+            <button onClick={onViewActivity} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-outline-variant/30 text-2xs font-bold uppercase tracking-widest text-on-surface-variant/70">
+              <span className="material-symbols-outlined text-sm">manage_history</span>
+              Activity
             </button>
             {canManage && (
               <button onClick={onTestIntegration} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 text-2xs font-bold uppercase tracking-widest">
@@ -511,6 +716,184 @@ const WebhooksDrawer = ({ developer, data, loading, error, onClose }) => {
               </div>
             ))
           )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Slide-over panel showing everything a developer has done on their
+// account — logins, API key/webhook changes, live-access requests — plus
+// the admin-side decisions made on that account (approve/reject live
+// access, integration test runs). Backed by GET
+// /api/admin/developers/:id/audit-log, which reads the same AuditLog
+// collection the merchant-facing Audit Log page does (see
+// getDeveloperAuditLog in auditLogController.js).
+const ActivityDrawer = ({ developer, data, loading, error, onClose }) => {
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-lg h-full bg-white shadow-2xl overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-outline-variant/10 px-5 py-4 flex items-start justify-between z-10">
+          <div>
+            <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-0.5">Activity Log</p>
+            <h3 className="text-base font-bold text-on-surface tracking-tight">{developer.companyName}</h3>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-lg flex items-center justify-center text-on-surface-variant/60 hover:bg-surface-container-low">
+            <span className="material-symbols-outlined text-lg">close</span>
+          </button>
+        </div>
+
+        <div className="p-5">
+          {loading ? (
+            <div className="space-y-2">
+              {[...Array(6)].map((_, i) => <div key={i} className="h-12 bg-surface-container-low rounded-xl animate-pulse" />)}
+            </div>
+          ) : error ? (
+            <p className="text-sm text-red-600">{error}</p>
+          ) : !data || data.length === 0 ? (
+            <p className="text-sm text-on-surface-variant/50 text-center py-10">No recorded activity for this developer yet.</p>
+          ) : (
+            <div className="divide-y divide-outline-variant/10">
+              {data.map((row) => {
+                const meta = DEV_ACTION_META[row.action] || { label: row.action, icon: 'radio_button_checked' };
+                const tone = DEV_SEVERITY_TONE[row.severity] || DEV_SEVERITY_TONE.info;
+                const actorTone = DEV_ACTOR_TONE[row.actor?.type] || 'text-on-surface-variant/60';
+                return (
+                  <div key={row._id} className="py-3 flex items-start gap-3">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border ${tone}`}>
+                      <span className="material-symbols-outlined text-sm">{meta.icon}</span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-bold text-on-surface truncate">{meta.label}</p>
+                        <span className="text-2xs text-on-surface-variant/40 shrink-0" title={new Date(row.createdAt).toLocaleString()}>{relTime(row.createdAt)}</span>
+                      </div>
+                      {row.message && <p className="text-2xs text-on-surface-variant/60 mt-0.5 break-words">{row.message}</p>}
+                      <div className="mt-1 flex items-center gap-2 flex-wrap">
+                        <span className={`text-2xs font-bold ${actorTone}`}>{row.actor?.type === 'admin' ? (row.actor?.name || 'Admin') : 'Developer'}</span>
+                        {row.ip && <span className="text-2xs text-on-surface-variant/30">· {row.ip}</span>}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Slide-over panel for emailing a developer directly — pick a canned
+// template (or write a custom message), edit it, send, and see everything
+// PayChain has sent them so far in one running thread. Backed by
+// GET/POST /api/admin/developers/:id/messages (sendDeveloperEmail in
+// developerAdminController.js), which stores each send in a Contact
+// document via the same Resend-backed pipeline the merchant-facing
+// Messages page uses.
+//
+// Important honesty note, shown in the UI too: this only shows what
+// PayChain has SENT. If the developer hits "Reply" in their own email
+// client, that reply currently goes straight to the sending admin's own
+// inbox — there's no inbound-email webhook anywhere in this codebase yet
+// to catch it and thread it back in here.
+const MessagesDrawer = ({ developer, thread, loading, error, templateId, onTemplate, subject, onSubject, body, onBody, sendBusy, sendError, onSend, onClose }) => {
+  const history = thread?.replies || [];
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-xl h-full bg-white shadow-2xl overflow-y-auto flex flex-col">
+        <div className="sticky top-0 bg-white border-b border-outline-variant/10 px-5 py-4 flex items-start justify-between z-10">
+          <div>
+            <p className="text-2xs font-bold uppercase tracking-[0.2em] text-emerald-600 mb-0.5">Email</p>
+            <h3 className="text-base font-bold text-on-surface tracking-tight">{developer.companyName}</h3>
+            <p className="text-2xs text-on-surface-variant/50 mt-0.5">{developer.email}</p>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-lg flex items-center justify-center text-on-surface-variant/60 hover:bg-surface-container-low">
+            <span className="material-symbols-outlined text-lg">close</span>
+          </button>
+        </div>
+
+        <div className="p-5 space-y-5">
+          <div>
+            <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/50 mb-2">Conversation</p>
+            {loading ? (
+              <div className="space-y-2">
+                {[...Array(2)].map((_, i) => <div key={i} className="h-16 bg-surface-container-low rounded-xl animate-pulse" />)}
+              </div>
+            ) : error ? (
+              <p className="text-sm text-red-600">{error}</p>
+            ) : history.length === 0 ? (
+              <p className="text-xs text-on-surface-variant/50 text-center py-6 bg-surface-container-low/40 rounded-xl">Nothing sent to this developer yet.</p>
+            ) : (
+              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                {history.map((r) => (
+                  <div key={r._id || r.sentAt} className="border border-outline-variant/20 rounded-xl p-3 bg-surface-container-low/30">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-bold text-on-surface truncate">{r.subject}</p>
+                      <span className="text-2xs text-on-surface-variant/40 shrink-0">{relTime(r.sentAt)}</span>
+                    </div>
+                    <p className="text-2xs text-on-surface-variant/70 mt-1.5 whitespace-pre-wrap line-clamp-4">{r.body}</p>
+                    <p className="text-2xs text-on-surface-variant/40 mt-1.5">Sent by {r.sentByEmail}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="text-2xs text-on-surface-variant/40 mt-2 flex items-start gap-1.5">
+              <span className="material-symbols-outlined text-xs mt-0.5">info</span>
+              This shows what PayChain has sent. A developer's email reply doesn't appear here automatically yet — it lands in the sending admin's own inbox.
+            </p>
+          </div>
+
+          <div className="border-t border-outline-variant/10 pt-5">
+            <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/50 mb-2">Template</p>
+            <div className="flex flex-wrap gap-1.5 mb-4">
+              {EMAIL_TEMPLATES.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => onTemplate(t.id)}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-2xs font-bold uppercase tracking-widest transition-colors ${templateId === t.id ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-outline-variant/30 text-on-surface-variant/70 hover:bg-surface-container-low'}`}
+                >
+                  <span className="material-symbols-outlined text-sm">{t.icon}</span>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            <label className="block text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 mb-1">Subject</label>
+            <input
+              value={subject}
+              onChange={(e) => onSubject(e.target.value)}
+              placeholder="Subject"
+              className="w-full px-3 py-2 mb-3 bg-surface-container-low border border-outline-variant/20 focus:border-emerald-500 focus:ring-0 rounded-lg text-xs font-semibold"
+            />
+
+            <label className="block text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 mb-1">Message</label>
+            <textarea
+              value={body}
+              onChange={(e) => onBody(e.target.value)}
+              rows={8}
+              placeholder="Write your message…"
+              className="w-full px-3 py-2 bg-surface-container-low border border-outline-variant/20 focus:border-emerald-500 focus:ring-0 rounded-lg text-xs leading-relaxed resize-none"
+            />
+
+            {sendError && <p className="text-2xs text-red-600 mt-2">{sendError}</p>}
+
+            <button
+              onClick={onSend}
+              disabled={sendBusy}
+              className="w-full mt-4 px-4 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold uppercase tracking-widest disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {sendBusy ? (
+                <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              ) : (
+                <span className="material-symbols-outlined text-base">send</span>
+              )}
+              {sendBusy ? 'Sending…' : 'Send Email'}
+            </button>
+          </div>
         </div>
       </div>
     </div>

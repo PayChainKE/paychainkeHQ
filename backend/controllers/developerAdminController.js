@@ -1,8 +1,10 @@
 import Developer from '../models/Developer.js';
 import DeveloperWebhook from '../models/DeveloperWebhook.js';
 import WebhookDelivery from '../models/WebhookDelivery.js';
+import Contact from '../models/Contact.js';
 import { logAudit } from '../utils/auditLog.js';
 import { runIntegrationTestForDeveloper } from '../services/developerIntegrationTestService.js';
+import { sendSupportReply } from '../utils/resend.js';
 
 // @desc    List developer accounts (filterable by live-access review state)
 // @route   GET /api/admin/developers
@@ -181,6 +183,118 @@ export const runIntegrationTest = async (req, res) => {
     res.json({ success: true, data: result });
   } catch (error) {
     console.error('Run Integration Test Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Get the admin↔developer email conversation for one developer.
+//          One running thread per developer (a single Contact document,
+//          re-used across every email sent to them — see sendDeveloperEmail
+//          below), not a fresh thread per message. Returns null when
+//          nothing has ever been sent to this developer yet.
+// @route   GET /api/admin/developers/:id/messages
+// @access  Private (Admin — owner/admin/analyst)
+export const getDeveloperMessages = async (req, res) => {
+  try {
+    const developer = await Developer.findById(req.params.id);
+    if (!developer) return res.status(404).json({ error: 'Developer not found.' });
+
+    const thread = await Contact.findOne({ developerId: developer._id }).lean();
+    res.json({ success: true, data: thread || null });
+  } catch (error) {
+    console.error('Get Developer Messages Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Send a real email to a developer (approval/rejection notice, a
+//          nudge to link their merchant account, or any custom message —
+//          the admin frontend supplies canned templates, this endpoint
+//          just sends whatever subject/body it's given) and record it in
+//          that developer's conversation thread. Reuses the exact same
+//          Resend-backed send + delivery-id tracking the merchant-facing
+//          Contact/Messages feature already uses (sendSupportReply), so
+//          delivery failures are surfaced rather than silently "sent".
+//
+//          Note: unlike a real two-way inbox, a developer hitting "Reply"
+//          in their email client does NOT appear here automatically — this
+//          codebase has no inbound-email webhook anywhere yet (the
+//          Contact/Messages reply_to already points at the sending admin's
+//          own address, not a monitored inbox). This endpoint only records
+//          what PayChain sends, not what comes back.
+// @route   POST /api/admin/developers/:id/messages
+// @access  Private (Admin — owner/admin)
+export const sendDeveloperEmail = async (req, res) => {
+  try {
+    const { subject, body } = req.body || {};
+    if (!subject || !String(subject).trim()) {
+      return res.status(400).json({ error: 'Subject is required.' });
+    }
+    if (!body || String(body).trim().length < 2) {
+      return res.status(400).json({ error: 'Message body cannot be empty.' });
+    }
+    if (String(body).length > 10000) {
+      return res.status(400).json({ error: 'Message body too long.' });
+    }
+
+    const developer = await Developer.findById(req.params.id);
+    if (!developer) return res.status(404).json({ error: 'Developer not found.' });
+
+    let resendId = null;
+    try {
+      const sent = await sendSupportReply(developer.email, developer.name, subject, body, req.admin?.email, []);
+      resendId = sent?.data?.id || sent?.id || null;
+    } catch (mailErr) {
+      return res.status(502).json({ error: 'Failed to send the email. Nothing was recorded.' });
+    }
+
+    const entry = {
+      body: String(body).trim(),
+      subject: String(subject).trim(),
+      attachments: [],
+      sentByEmail: req.admin?.email || 'support@paychain.co.ke',
+      sentBy: req.admin?._id || null,
+      sentAt: new Date(),
+      resendId,
+    };
+
+    let thread = await Contact.findOne({ developerId: developer._id });
+    if (!thread) {
+      // First email ever sent to this developer — the Contact schema
+      // requires a top-level subject/message, but the frontend renders
+      // this thread purely from `replies` (see entry pushed below), so
+      // these top-level fields exist only to satisfy the schema/for
+      // searchability in the general Messages inbox, not for display here.
+      thread = await Contact.create({
+        name: developer.name,
+        email: developer.email,
+        contactType: 'developer',
+        developerId: developer._id,
+        subject: entry.subject,
+        message: entry.body,
+        isRead: true,
+        status: 'in_progress',
+        replies: [entry],
+        lastRepliedAt: entry.sentAt,
+      });
+    } else {
+      thread.replies.push(entry);
+      thread.lastRepliedAt = entry.sentAt;
+      thread.isRead = true;
+      if (thread.status === 'open') thread.status = 'in_progress';
+      await thread.save();
+    }
+
+    logAudit({
+      action: 'admin.developer.email_sent', category: 'admin', severity: 'info',
+      message: `${req.admin?.name || req.admin?.email} emailed ${developer.companyName}: "${entry.subject}"`,
+      req, actor: { type: 'admin', id: req.admin?._id, email: req.admin?.email, name: req.admin?.name },
+      metadata: { developerId: String(developer._id), companyName: developer.companyName, subject: entry.subject },
+    });
+
+    res.json({ success: true, data: thread });
+  } catch (error) {
+    console.error('Send Developer Email Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };

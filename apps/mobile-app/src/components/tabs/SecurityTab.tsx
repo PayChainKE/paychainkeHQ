@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ValidatedTextInput } from '../../components/ValidatedTextInput';
 import TourTarget from '../TourTarget';
+import SecurityWalkthrough from '../SecurityWalkthrough';
 import api from '../../api/config';
 
 // Fixed set — same three questions the merchant-dashboard's Profile.jsx
@@ -291,17 +292,18 @@ export default function SecurityTab() {
 
   return (
     <ScrollView className="flex-1 bg-[#022415]" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+      <SecurityWalkthrough />
       <LinearGradient colors={['#00351d', '#022415']} className="absolute inset-0" />
 
       <View className="w-full max-w-lg mx-auto px-6 pt-2 pb-12 relative z-10">
 
         {/* Header */}
-        <View className="flex-row items-center justify-between mb-8">
-          <View>
+        <View className="flex-row items-center justify-between mb-8 gap-3">
+          <View className="flex-1 min-w-0">
             <Text className="font-jakarta-extrabold text-[28px] text-white tracking-tight leading-tight">Security Vault</Text>
-            <Text className="text-[#5efeb3] text-[11px] font-jakarta-bold uppercase tracking-[0.2em] mt-1 opacity-80">Encryption & Access Rules</Text>
+            <Text className="text-[#5efeb3] text-[11px] font-jakarta-bold uppercase tracking-[0.2em] mt-1 opacity-80" numberOfLines={1} ellipsizeMode="tail">Encryption & Access Rules</Text>
           </View>
-          <View className="w-12 h-12 rounded-[18px] bg-white/5 border border-white/10 flex items-center justify-center shadow-lg">
+          <View className="w-12 h-12 rounded-[18px] bg-white/5 border border-white/10 flex items-center justify-center shadow-lg flex-shrink-0">
             <MaterialIcons name="security" size={24} color="#5efeb3" />
           </View>
         </View>
@@ -311,18 +313,18 @@ export default function SecurityTab() {
           <View className="absolute top-0 right-0 w-32 h-32 bg-[#5efeb3]/10 rounded-full -mr-16 -mt-16 blur-xl" />
 
           <View className="flex-row items-center gap-3 mb-6 relative z-10">
-            <View className="w-10 h-10 rounded-xl bg-[#006c4e] flex items-center justify-center shadow-md shadow-[#006c4e]/50">
+            <View className="w-10 h-10 rounded-xl bg-[#006c4e] flex items-center justify-center shadow-md shadow-[#006c4e]/50 flex-shrink-0">
               <Feather name="lock" size={20} color="white" />
             </View>
-            <View>
-              <Text className="text-[16px] font-jakarta-extrabold text-white tracking-tight">Password</Text>
-              <Text className="text-[10px] text-white/50 font-jakarta-bold mt-0.5">Change your access credentials</Text>
+            <View className="flex-1 min-w-0">
+              <Text className="text-[16px] font-jakarta-extrabold text-white tracking-tight" numberOfLines={1} ellipsizeMode="tail">Password</Text>
+              <Text className="text-[10px] text-white/50 font-jakarta-bold mt-0.5" numberOfLines={1} ellipsizeMode="tail">Change your access credentials</Text>
             </View>
           </View>
 
           <View className="gap-4 relative z-10">
             <View>
-              <Text className="text-[9px] text-white/50 font-jakarta-bold uppercase tracking-widest pl-1 mb-2">Current password</Text>
+              <Text className="text-[10px] text-white/50 font-jakarta-bold uppercase tracking-widest pl-1 mb-2">Current password</Text>
               <TextInput
                 secureTextEntry
                 placeholder="••••••••••••"
@@ -333,7 +335,7 @@ export default function SecurityTab() {
               />
             </View>
             <View>
-              <Text className="text-[9px] text-white/50 font-jakarta-bold uppercase tracking-widest pl-1 mb-2">New password</Text>
+              <Text className="text-[10px] text-white/50 font-jakarta-bold uppercase tracking-widest pl-1 mb-2">New password</Text>
               <TextInput
                 secureTextEntry
                 placeholder="••••••••••••"
@@ -344,7 +346,7 @@ export default function SecurityTab() {
               />
             </View>
             <View>
-              <Text className="text-[9px] text-white/50 font-jakarta-bold uppercase tracking-widest pl-1 mb-2">Confirm new password</Text>
+              <Text className="text-[10px] text-white/50 font-jakarta-bold uppercase tracking-widest pl-1 mb-2">Confirm new password</Text>
               <TextInput
                 secureTextEntry
                 placeholder="••••••••••••"
@@ -359,15 +361,15 @@ export default function SecurityTab() {
 
         {/* Advanced Auth */}
         <View className="bg-white/5 rounded-[32px] p-7 border border-white/10 mb-8 shadow-xl relative overflow-hidden">
-          <View className="absolute bottom-0 left-0 w-40 h-40 bg-[#f59e0b]/10 rounded-full -ml-20 -mb-20 blur-2xl" />
+          <View className="absolute bottom-0 left-0 w-40 h-40 bg-[#5efeb3]/10 rounded-full -ml-20 -mb-20 blur-2xl" />
 
           <View className="flex-row items-center gap-3 mb-6 relative z-10">
-            <View className="w-10 h-10 rounded-xl bg-[#f59e0b]/20 flex items-center justify-center border border-[#f59e0b]/30">
-              <MaterialIcons name="admin-panel-settings" size={22} color="#fcd34d" />
+            <View className="w-10 h-10 rounded-xl bg-[#006c4e] flex items-center justify-center shadow-md shadow-[#006c4e]/50 flex-shrink-0">
+              <MaterialIcons name="admin-panel-settings" size={22} color="#5efeb3" />
             </View>
-            <View>
-              <Text className="text-[16px] font-jakarta-extrabold text-white tracking-tight">Advanced Methods</Text>
-              <Text className="text-[10px] text-white/50 font-jakarta-bold mt-0.5">Biometrics & Bulk Pay authorization</Text>
+            <View className="flex-1 min-w-0">
+              <Text className="text-[16px] font-jakarta-extrabold text-white tracking-tight" numberOfLines={1} ellipsizeMode="tail">Advanced Methods</Text>
+              <Text className="text-[10px] text-white/50 font-jakarta-bold mt-0.5" numberOfLines={1} ellipsizeMode="tail">Biometrics & Bulk Pay authorization</Text>
             </View>
           </View>
 
@@ -395,7 +397,7 @@ export default function SecurityTab() {
                   <TouchableOpacity
                     onPress={handlePinReset}
                     disabled={isSavingPin}
-                    className="w-full py-3.5 rounded-xl bg-[#f59e0b] items-center mt-2 shadow-lg shadow-[#f59e0b]/20 active:bg-[#d97706]"
+                    className="w-full py-3.5 rounded-xl bg-[#006c4e] items-center mt-2 shadow-lg shadow-[#006c4e]/20 active:bg-[#00351d]"
                     style={isSavingPin ? { opacity: 0.6 } : undefined}
                   >
                     {isSavingPin ? (
@@ -418,13 +420,13 @@ export default function SecurityTab() {
               onPress={openQuestionsModal}
               className="w-full flex-row items-center justify-between p-5 bg-black/20 rounded-2xl border border-white/5 active:bg-white/5"
             >
-              <View className="flex-row items-center gap-4">
-                <View className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center">
+              <View className="flex-row items-center gap-4 flex-1 min-w-0 pr-3">
+                <View className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center flex-shrink-0">
                   <MaterialIcons name="help-outline" size={22} color="#9ca3af" />
                 </View>
-                <View>
-                  <Text className="text-[15px] font-jakarta-extrabold text-white">Security Questions</Text>
-                  <Text className="text-[11px] text-white/50 font-jakarta-bold mt-0.5">
+                <View className="flex-1 min-w-0">
+                  <Text className="text-[15px] font-jakarta-extrabold text-white" numberOfLines={1} ellipsizeMode="tail">Security Questions</Text>
+                  <Text className="text-[11px] text-white/50 font-jakarta-bold mt-0.5" numberOfLines={1} ellipsizeMode="tail">
                     {questionsConfigured ? `${questionsCount} questions configured` : 'Not configured yet'}
                   </Text>
                 </View>
@@ -434,25 +436,25 @@ export default function SecurityTab() {
 
             {/* Biometric Login */}
             <TourTarget id="biometrics-register" className="w-full flex-row items-center justify-between p-5 bg-black/20 rounded-2xl border border-white/5">
-              <View className="flex-row items-center gap-4">
-                <View className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center">
+              <View className="flex-row items-center gap-4 flex-1 min-w-0 pr-3">
+                <View className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center flex-shrink-0">
                   <MaterialIcons name="fingerprint" size={22} color={merchant?.mobileBiometricUnlockEnabled ? "#5efeb3" : "#9ca3af"} />
                 </View>
-                <View>
-                  <Text className="text-[15px] font-jakarta-extrabold text-white">Biometric Login</Text>
-                  <Text className="text-[11px] text-white/50 font-jakarta-bold mt-0.5">
+                <View className="flex-1 min-w-0">
+                  <Text className="text-[15px] font-jakarta-extrabold text-white" numberOfLines={1} ellipsizeMode="tail">Biometric Login</Text>
+                  <Text className="text-[11px] text-white/50 font-jakarta-bold mt-0.5" numberOfLines={1} ellipsizeMode="tail">
                     {merchant?.mobileBiometricUnlockEnabled ? 'Active on this device' : 'Use Touch ID or Face ID'}
                   </Text>
                 </View>
               </View>
               {merchant?.mobileBiometricUnlockEnabled ? (
-                <View className="bg-[#5efeb3]/20 p-2 rounded-full">
+                <View className="bg-[#5efeb3]/20 p-2 rounded-full flex-shrink-0">
                   <MaterialIcons name="check" size={16} color="#5efeb3" />
                 </View>
               ) : (
                 <TouchableOpacity
                   onPress={() => navigation.navigate('BiometricSetup')}
-                  className="bg-white/10 border border-white/20 px-4 py-2 rounded-xl active:bg-white/20"
+                  className="bg-white/10 border border-white/20 px-4 py-2 rounded-xl active:bg-white/20 flex-shrink-0"
                 >
                   <Text className="text-[10px] text-white font-jakarta-extrabold uppercase tracking-widest">Setup</Text>
                 </TouchableOpacity>
@@ -467,12 +469,12 @@ export default function SecurityTab() {
           <View className="absolute top-0 left-0 w-32 h-32 bg-[#5efeb3]/10 rounded-full -ml-16 -mt-16 blur-xl" />
 
           <View className="flex-row items-center gap-3 mb-6 relative z-10">
-            <View className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center">
+            <View className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center flex-shrink-0">
               <MaterialIcons name="devices" size={22} color="#9ca3af" />
             </View>
-            <View>
-              <Text className="text-[16px] font-jakarta-extrabold text-white tracking-tight">Active Sessions & Devices</Text>
-              <Text className="text-[10px] text-white/50 font-jakarta-bold mt-0.5">Biometric devices with access to your account</Text>
+            <View className="flex-1 min-w-0">
+              <Text className="text-[16px] font-jakarta-extrabold text-white tracking-tight" numberOfLines={1} ellipsizeMode="tail">Active Sessions & Devices</Text>
+              <Text className="text-[10px] text-white/50 font-jakarta-bold mt-0.5" numberOfLines={1} ellipsizeMode="tail">Biometric devices with access to your account</Text>
             </View>
           </View>
 
@@ -599,9 +601,9 @@ export default function SecurityTab() {
       <Modal visible={showQuestionsModal} transparent animationType="slide" onRequestClose={() => setShowQuestionsModal(false)}>
         <View className="flex-1 items-center justify-center bg-black/60 px-6">
           <View className="w-full max-w-lg bg-[#0B2818] rounded-[32px] p-7 border border-white/10 max-h-[85%]">
-            <View className="flex-row items-center justify-between mb-6">
-              <Text className="text-[18px] font-jakarta-extrabold text-white tracking-tight">Security Questions</Text>
-              <TouchableOpacity onPress={() => setShowQuestionsModal(false)} className="w-9 h-9 rounded-full bg-white/10 items-center justify-center">
+            <View className="flex-row items-center justify-between mb-6 gap-3">
+              <Text className="text-[18px] font-jakarta-extrabold text-white tracking-tight flex-1 min-w-0" numberOfLines={1} ellipsizeMode="tail">Security Questions</Text>
+              <TouchableOpacity onPress={() => setShowQuestionsModal(false)} className="w-9 h-9 rounded-full bg-white/10 items-center justify-center flex-shrink-0">
                 <Feather name="x" size={16} color="#fff" />
               </TouchableOpacity>
             </View>
@@ -627,7 +629,7 @@ export default function SecurityTab() {
                   </View>
                 ))}
                 <View>
-                  <Text className="text-[9px] text-white/50 font-jakarta-bold uppercase tracking-widest pl-1 mb-2">Confirm current password</Text>
+                  <Text className="text-[10px] text-white/50 font-jakarta-bold uppercase tracking-widest pl-1 mb-2">Confirm current password</Text>
                   <TextInput
                     secureTextEntry
                     placeholder="••••••••••••"
@@ -744,10 +746,10 @@ function ApiPayoutPanel() {
 
   return (
     <View className="bg-black/20 p-5 rounded-2xl border border-white/5">
-      <View className="flex-row items-center justify-between mb-3">
-        <Text className="text-[14px] font-jakarta-extrabold text-white">Developer API Payouts</Text>
-        <View className={`px-2 py-1 rounded-lg ${status?.apiPayoutEnabled ? 'bg-[#5efeb3]/20' : 'bg-white/10'}`}>
-          <Text className={`text-[9px] font-jakarta-extrabold uppercase tracking-widest ${status?.apiPayoutEnabled ? 'text-[#5efeb3]' : 'text-white/40'}`}>
+      <View className="flex-row items-center justify-between mb-3 gap-2">
+        <Text className="text-[14px] font-jakarta-extrabold text-white flex-1 min-w-0" numberOfLines={1} ellipsizeMode="tail">Developer API Payouts</Text>
+        <View className={`px-2 py-1 rounded-lg flex-shrink-0 ${status?.apiPayoutEnabled ? 'bg-[#5efeb3]/20' : 'bg-white/10'}`}>
+          <Text className={`text-[10px] font-jakarta-extrabold uppercase tracking-widest ${status?.apiPayoutEnabled ? 'text-[#5efeb3]' : 'text-white/40'}`}>
             {status?.apiPayoutEnabled ? 'Enabled' : 'Disabled'}
           </Text>
         </View>

@@ -48,12 +48,12 @@ export default function TopBar({ title, subtitle, showBack = true, onBack, title
             )}
             <View className="flex-1">
               {!titleAvatar && (
-                <Text numberOfLines={1} className="font-jakarta-bold text-[17px] text-[#0c2010] tracking-tight">
+                <Text numberOfLines={1} className="font-jakarta-bold text-[16px] text-[#0c2010] tracking-tight">
                   {title}
                 </Text>
               )}
               {!!subtitle && (
-                <Text numberOfLines={1} className="text-[11px] font-jakarta-bold text-[#707971] mt-0.5">
+                <Text numberOfLines={1} className="text-[11px] font-jakarta-bold text-[#5b645c] mt-0.5">
                   {subtitle}
                 </Text>
               )}
@@ -65,9 +65,10 @@ export default function TopBar({ title, subtitle, showBack = true, onBack, title
           {!isNotifications && (
             <TouchableOpacity
               onPress={() => navigation.navigate('Notifications')}
-              className="w-9 h-9 rounded-full bg-[#f7faf7] items-center justify-center border border-[#eff4ef]"
+              className="w-9 h-9 items-center justify-center"
+              style={{ marginRight: 19 }}
             >
-              <Feather name="bell" size={16} color="#00351d" />
+              <Feather name="bell" size={20} color="#00351d" />
             </TouchableOpacity>
           )}
           {!isMore && (

@@ -24,7 +24,11 @@ export default function PrivateValue({ hidden, children, className, style, tint 
   }
   return (
     <View style={{ alignSelf: 'flex-start', position: 'relative' }}>
-      <Text className={className} style={[style, { opacity: 0 }]} numberOfLines={numberOfLines}>
+      {/* Rendered at full opacity — the BlurView on top blurs this real text
+          (its native/backdrop blur needs actual content behind it to frost;
+          an invisible layer left it with nothing to blur, showing a flat
+          tinted box instead of the number appearing blurry). */}
+      <Text className={className} style={style} numberOfLines={numberOfLines}>
         {children}
       </Text>
       <BlurView

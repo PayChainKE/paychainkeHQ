@@ -26,6 +26,17 @@ const ContactSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  // Set only for admin-initiated conversations with an existing Developer
+  // account (see developerAdminController.js's sendDeveloperEmail) — the
+  // public contact form below never sets this. Lets the admin dashboard's
+  // Developers page find "this developer's" conversation thread directly,
+  // separate from the public form's freeform inbox.
+  developerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Developer',
+    default: null,
+    index: true,
+  },
   contactType: {
     type: String,
     required: [true, 'Contact type is required'],

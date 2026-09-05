@@ -3,7 +3,6 @@ import { View, Text, ScrollView, TouchableOpacity, Modal, TextInput, ActivityInd
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ValidatedTextInput } from '../components/ValidatedTextInput';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { useAuth } from '../context/AuthContext';
@@ -21,7 +20,7 @@ type DateFilter = 'all' | 'today' | 'yesterday' | 'week' | 'last7' | 'month' | '
 // utils/transactionDirection.ts, which both isInboundType/isOutboundType
 // below delegate to). Dashboard groups bulk_pay + settlement + outbound +
 // ncba_outbound under "Outbound".
-type TypeFilter = 'all' | 'inbound' | 'outbound' | 'fx_swap';
+type TypeFilter = 'all' | 'inbound' | 'outbound';
 // Backend status enum: 'pending' | 'completed' | 'failed' | 'verified'
 type StatusFilter = 'all' | 'completed' | 'pending' | 'failed';
 
@@ -112,7 +111,7 @@ export default function Collections() {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Filter state
-  const [activeQuickFilter, setActiveQuickFilter] = useState<'all' | 'today' | 'week' | 'month' | 'inbound' | 'outbound' | 'fx_swap'>('all');
+  const [activeQuickFilter, setActiveQuickFilter] = useState<'all' | 'today' | 'week' | 'month' | 'inbound' | 'outbound'>('all');
   const [showFilterSheet, setShowFilterSheet] = useState(false);
   const [filterDate, setFilterDate] = useState<DateFilter>('all');
   const [filterType, setFilterType] = useState<TypeFilter>('all');
@@ -195,7 +194,6 @@ export default function Collections() {
       month: { date: 'month', type: 'all' },
       inbound: { date: 'all', type: 'inbound' },
       outbound: { date: 'all', type: 'outbound' },
-      fx_swap: { date: 'all', type: 'fx_swap' },
     };
     return map[activeQuickFilter];
   }, [activeQuickFilter]);
@@ -208,7 +206,6 @@ export default function Collections() {
     if (filter === 'all') return true;
     if (filter === 'inbound') return isInboundType(tx.type);
     if (filter === 'outbound') return isOutboundType(tx.type);
-    if (filter === 'fx_swap') return tx.type === 'fx_swap';
     return true;
   };
 
@@ -304,7 +301,6 @@ export default function Collections() {
   const typeFilterLabel = (f: TypeFilter): string => {
     if (f === 'inbound') return 'Inbound';
     if (f === 'outbound') return 'Outbound';
-    if (f === 'fx_swap') return 'FX Swaps';
     return '';
   };
 
@@ -325,13 +321,10 @@ export default function Collections() {
     });
     const inbound = periodTxs.filter((t) => isInboundType(t.type));
     const outbound = periodTxs.filter((t) => isOutboundType(t.type));
-    const swaps = periodTxs.filter((t) => t.type === 'fx_swap');
     // Math.abs(netBalanceImpact(t)) instead of kesValue(t) — see the stats
     // block's identical comment above.
     const inboundTotal = inbound.reduce((a, t) => a + Math.abs(netBalanceImpact(t)), 0);
     const outboundTotal = outbound.reduce((a, t) => a + Math.abs(netBalanceImpact(t)), 0);
-    const swapKesTotal = swaps.reduce((a, t) => a + Math.abs(netBalanceImpact(t)), 0);
-    const swapUsdcTotal = swaps.reduce((a, t) => a + (t.usdcAmount || 0), 0);
     const net = inboundTotal - outboundTotal;
 
     const rangeStr = start && end ? `${formatDate(start)} — ${formatDate(end)}` : 'All time';
@@ -351,10 +344,8 @@ export default function Collections() {
         const inboundRow = isInboundType(tx.type);
         const sign = inboundRow ? '+' : '-';
         const color = inboundRow ? '#006c4e' : '#b3261e';
-        const amtText = tx.type === 'fx_swap'
-          ? `${tx.usdcAmount || 0} USDC`
-          : `${sign} ${formatCurrency(kesValue(tx))}`;
-        const amtColor = tx.type === 'fx_swap' ? '#1D4ED8' : color;
+        const amtText = `${sign} ${formatCurrency(kesValue(tx))}`;
+        const amtColor = color;
         return `
           <tr>
             <td class="num">${idx + 1}</td>
@@ -364,7 +355,7 @@ export default function Collections() {
             </td>
             <td>
               <div class="primary">${esc(counterpartyName(tx))}</div>
-              <div class="muted">${esc(tx.reference || '—')}</div>
+              <div class="muted">${esc(tx.reference || '')}</div>
             </td>
             <td class="type">${esc(txTypeLabel(tx.type))}</td>
             <td class="status">${esc((tx.status || 'completed').toUpperCase())}</td>
@@ -389,12 +380,12 @@ export default function Collections() {
   .brand { display: flex; align-items: center; gap: 12px; }
   .logo { width: 44px; height: 44px; border-radius: 12px; background: linear-gradient(135deg, #00351d, #1D9E75); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px; letter-spacing: 0.5px; }
   .brand-name { font-size: 20px; font-weight: 700; color: #0b4d2e; letter-spacing: -0.2px; }
-  .brand-sub { font-size: 11px; color: #707971; text-transform: uppercase; letter-spacing: 1.5px; margin-top: 2px; }
+  .brand-sub { font-size: 11px; color: #5b645c; text-transform: uppercase; letter-spacing: 1.5px; margin-top: 2px; }
   .doc-title { text-align: right; }
   .doc-title h1 { margin: 0; font-size: 22px; color: #0c2010; font-weight: 600; letter-spacing: -0.4px; }
-  .doc-title .meta { font-size: 11px; color: #707971; margin-top: 4px; }
+  .doc-title .meta { font-size: 11px; color: #5b645c; margin-top: 4px; }
   .meta-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; padding: 16px; background: #f0fdf4; border-radius: 12px; margin-bottom: 24px; }
-  .meta-grid .item .label { font-size: 9px; color: #707971; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 4px; }
+  .meta-grid .item .label { font-size: 9px; color: #5b645c; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 4px; }
   .meta-grid .item .value { font-size: 12px; color: #0c2010; font-weight: 600; }
   .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 28px; }
   .summary .card { padding: 14px; border-radius: 12px; border: 1px solid #e7ece7; }
@@ -402,7 +393,7 @@ export default function Collections() {
   .summary .card .lbl { font-size: 9px; text-transform: uppercase; letter-spacing: 1.2px; opacity: 0.7; margin-bottom: 6px; }
   .summary .card .val { font-size: 16px; font-weight: 700; letter-spacing: -0.3px; }
   .summary .card.primary .lbl { opacity: 0.8; color: #c0e5d3; }
-  .section-title { font-size: 11px; color: #707971; text-transform: uppercase; letter-spacing: 1.6px; font-weight: 700; margin: 0 0 12px 0; }
+  .section-title { font-size: 11px; color: #5b645c; text-transform: uppercase; letter-spacing: 1.6px; font-weight: 700; margin: 0 0 12px 0; }
   table { width: 100%; border-collapse: collapse; font-size: 11px; }
   thead th { text-align: left; padding: 10px 8px; background: #f7faf7; color: #404942; font-weight: 700; font-size: 9px; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #e7ece7; }
   thead th.amount, thead th.num { text-align: right; }
@@ -412,9 +403,9 @@ export default function Collections() {
   tbody td.type { font-size: 10px; color: #404942; }
   tbody td.status { font-size: 10px; color: #006c4e; font-weight: 600; }
   .primary { font-weight: 600; color: #0c2010; font-size: 11px; }
-  .muted { font-size: 9px; color: #707971; margin-top: 2px; }
-  .empty { padding: 40px; text-align: center; color: #707971; font-size: 12px; }
-  .footer { margin-top: 32px; padding-top: 18px; border-top: 1px solid #e7ece7; font-size: 9px; color: #707971; line-height: 1.6; }
+  .muted { font-size: 9px; color: #5b645c; margin-top: 2px; }
+  .empty { padding: 40px; text-align: center; color: #5b645c; font-size: 12px; }
+  .footer { margin-top: 32px; padding-top: 18px; border-top: 1px solid #e7ece7; font-size: 9px; color: #5b645c; line-height: 1.6; }
   .footer .signature { display: flex; justify-content: space-between; margin-top: 18px; font-size: 10px; }
   .footer .signature .col { width: 45%; }
   .footer .signature .col .line { border-top: 1px solid #bfc9bf; margin-top: 28px; padding-top: 4px; color: #404942; font-weight: 600; }
@@ -470,11 +461,10 @@ export default function Collections() {
       <div class="val" style="color:#b3261e">- ${formatCurrency(outboundTotal)}</div>
     </div>
     <div class="card">
-      <div class="lbl">${swaps.length > 0 ? `FX Swaps · ${swaps.length}` : 'Transactions'}</div>
-      <div class="val">${swaps.length > 0 ? `${swapUsdcTotal.toFixed(2)} USDC` : periodTxs.length}</div>
+      <div class="lbl">Transactions</div>
+      <div class="val">${periodTxs.length}</div>
     </div>
   </div>
-  ${swaps.length > 0 ? `<div style="font-size:9px;color:#707971;margin-top:-18px;margin-bottom:24px;text-align:right;">Swap volume in KES: ${formatCurrency(swapKesTotal)}</div>` : ''}
 
   <p class="section-title">Transaction Detail</p>
   ${periodTxs.length === 0
@@ -590,7 +580,7 @@ export default function Collections() {
         active ? 'bg-[#00351d] border-[#00351d]' : 'bg-white border-[#e7ece7]'
       }`}
     >
-      {icon && <Feather name={icon} size={14} color={active ? '#a7f3d0' : '#707971'} />}
+      {icon && <Feather name={icon} size={14} color={active ? '#a7f3d0' : '#5b645c'} />}
       <Text className={`${icon ? 'ml-2' : ''} text-[13px] ${active ? 'text-white font-jakarta-bold' : 'text-[#404942] font-jakarta-bold'}`}>
         {label}
       </Text>
@@ -599,10 +589,10 @@ export default function Collections() {
 
   return (
     <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
-      <TopBar title="Collections" subtitle={`Account ${formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'PENDING')}`} showBack={false} />
+      <TopBar title="Transaction Summary" subtitle={`Account ${formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'PENDING')}`} showBack={false} />
 
       <ScrollView
-        className="flex-1 z-10 mt-6"
+        className="flex-1 z-10"
         contentContainerStyle={{ paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -614,60 +604,39 @@ export default function Collections() {
           />
         }
       >
-        <View className="w-full max-w-lg mx-auto px-4">
-          <TouchableOpacity
-            onPress={() => setShowStatementSheet(true)}
-            activeOpacity={0.85}
-            className="flex-row items-center justify-between bg-white rounded-2xl border border-[#eff4ef] px-4 py-3 mt-4 mb-1 shadow-sm shadow-[#00351d]/5"
-          >
-            <View className="flex-row items-center gap-2.5">
-              <View className="w-9 h-9 rounded-xl bg-[#f7faf7] items-center justify-center border border-[#eff4ef]">
-                <Feather name="file-text" size={15} color="#00351d" />
-              </View>
-              <Text className="text-[13px] font-jakarta-bold text-[#0c2010]">Download Statement</Text>
-            </View>
-            <Feather name="chevron-right" size={16} color="#707971" />
-          </TouchableOpacity>
-
-          {/* Summary Cards — 2x2 Grid */}
-          <View className="flex-row flex-wrap pb-6 pt-2 -mx-1.5">
+        <View className="w-full max-w-lg mx-auto px-4 pt-6">
+          {/* Summary Cards — 2x2 Grid. One consistent card style (white,
+              same radius/shadow/border, same pale-mint icon circle) across
+              all four, differentiated only by icon + a small accent —
+              reads as one deliberate set instead of four different themes. */}
+          <View className="flex-row flex-wrap pb-3 -mx-1.5">
             <View className="w-1/2 px-1.5 mb-3">
-              <LinearGradient
-                colors={['#00351d', '#0b4d2e']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                className="p-5 shadow-lg shadow-[#00351d]/25 border border-white/5"
-                style={{ minHeight: 132, borderRadius: 26, overflow: 'hidden' }}
-              >
+              <View className="bg-white rounded-[26px] p-5 shadow-sm shadow-[#00351d]/5 border border-[#eff4ef]" style={{ minHeight: 132 }}>
                 <View className="flex-row items-center justify-between mb-4">
-                  <View className="w-9 h-9 rounded-xl bg-white/15 items-center justify-center border border-white/20">
-                    <Feather name="sun" size={15} color="#a7f3d0" />
+                  <View className="w-9 h-9 rounded-xl bg-[#f0fdf4] items-center justify-center">
+                    <Feather name="sun" size={15} color="#006c4e" />
                   </View>
-                  <View className="bg-white/15 px-2 py-0.5 rounded-full">
-                    <Text className="text-[8.5px] font-jakarta-bold text-white tracking-[0.15em]">LIVE</Text>
+                  <View className="bg-[#f0fdf4] px-2 py-0.5 rounded-full">
+                    <Text className="text-[8.5px] font-jakarta-bold text-[#006c4e] tracking-[0.15em]">LIVE</Text>
                   </View>
                 </View>
-                <Text className="text-[9.5px] font-jakarta-bold text-white/60 uppercase tracking-[0.15em] mb-1.5">Today</Text>
-                <Text className="text-[21px] font-jakarta-extrabold text-white tracking-tight leading-tight" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                <Text className="text-[9.5px] font-jakarta-bold text-[#5b645c] uppercase tracking-[0.15em] mb-1.5">Today</Text>
+                <Text className="text-[20px] font-jakarta-extrabold text-[#00351d] tracking-tight leading-tight" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
                   {formatCurrency(stats.today.total)}
                 </Text>
-              </LinearGradient>
+              </View>
             </View>
 
-            {/* This Week / This Month / All Time previously used unrelated
-                blue, orange, and navy accents — swapped for the shared
-                brand palette (green tint, gold, deep green) so all four
-                cards read as one deliberate set, matching the dashboard. */}
             <View className="w-1/2 px-1.5 mb-3">
-              <View className="bg-[#dcf5da] rounded-[26px] p-5 shadow-sm shadow-[#00351d]/5 border border-[#c9ecc6]" style={{ minHeight: 132 }}>
+              <View className="bg-white rounded-[26px] p-5 shadow-sm shadow-[#00351d]/5 border border-[#eff4ef]" style={{ minHeight: 132 }}>
                 <View className="flex-row items-center justify-between mb-4">
-                  <View className="w-9 h-9 rounded-xl bg-white items-center justify-center">
+                  <View className="w-9 h-9 rounded-xl bg-[#f0fdf4] items-center justify-center">
                     <Feather name="trending-up" size={15} color="#006c4e" />
                   </View>
                   <Feather name="arrow-up-right" size={14} color="#68dbae" />
                 </View>
-                <Text className="text-[9.5px] font-jakarta-bold text-[#00351d]/60 uppercase tracking-[0.15em] mb-1.5">This Week</Text>
-                <Text className="text-[21px] font-jakarta-extrabold text-[#00351d] tracking-tight leading-tight" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                <Text className="text-[9.5px] font-jakarta-bold text-[#5b645c] uppercase tracking-[0.15em] mb-1.5">This Week</Text>
+                <Text className="text-[20px] font-jakarta-extrabold text-[#00351d] tracking-tight leading-tight" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
                   {formatCurrency(stats.week.total)}
                 </Text>
               </View>
@@ -676,34 +645,28 @@ export default function Collections() {
             <View className="w-1/2 px-1.5">
               <View className="bg-white rounded-[26px] p-5 shadow-sm shadow-[#00351d]/5 border border-[#eff4ef]" style={{ minHeight: 132 }}>
                 <View className="flex-row items-center justify-between mb-4">
-                  <LinearGradient
-                    colors={['#f6e7b4', '#d4af37', '#a8842c']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={{ width: 36, height: 36, borderRadius: 12 }}
-                    className="items-center justify-center"
-                  >
-                    <Feather name="calendar" size={15} color="#3d2e05" />
-                  </LinearGradient>
-                  <Feather name="arrow-up-right" size={14} color="#e7c9a3" />
+                  <View className="w-9 h-9 rounded-xl bg-[#f0fdf4] items-center justify-center">
+                    <Feather name="calendar" size={15} color="#006c4e" />
+                  </View>
+                  <Feather name="arrow-up-right" size={14} color="#68dbae" />
                 </View>
-                <Text className="text-[9.5px] font-jakarta-bold text-[#707971] uppercase tracking-[0.15em] mb-1.5">This Month</Text>
-                <Text className="text-[21px] font-jakarta-extrabold text-[#00351d] tracking-tight leading-tight" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                <Text className="text-[9.5px] font-jakarta-bold text-[#5b645c] uppercase tracking-[0.15em] mb-1.5">This Month</Text>
+                <Text className="text-[20px] font-jakarta-extrabold text-[#00351d] tracking-tight leading-tight" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
                   {formatCurrency(stats.month.total)}
                 </Text>
               </View>
             </View>
 
             <View className="w-1/2 px-1.5">
-              <View className="bg-[#0b4d2e] rounded-[26px] p-5 shadow-lg shadow-[#00351d]/25 border border-white/5" style={{ minHeight: 132 }}>
+              <View className="bg-white rounded-[26px] p-5 shadow-sm shadow-[#00351d]/5 border border-[#eff4ef]" style={{ minHeight: 132 }}>
                 <View className="flex-row items-center justify-between mb-4">
-                  <View className="w-9 h-9 rounded-xl bg-white/10 items-center justify-center border border-white/10">
-                    <Feather name="award" size={15} color="#5efeb3" />
+                  <View className="w-9 h-9 rounded-xl bg-[#f0fdf4] items-center justify-center">
+                    <Feather name="award" size={15} color="#006c4e" />
                   </View>
-                  <Text className="text-[8.5px] font-jakarta-bold text-white/50 uppercase tracking-[0.15em]">Lifetime</Text>
+                  <Feather name="arrow-up-right" size={14} color="#68dbae" />
                 </View>
-                <Text className="text-[9.5px] font-jakarta-bold text-white/60 uppercase tracking-[0.15em] mb-1.5">All Time</Text>
-                <Text className="text-[21px] font-jakarta-extrabold text-white tracking-tight leading-tight" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                <Text className="text-[9.5px] font-jakarta-bold text-[#5b645c] uppercase tracking-[0.15em] mb-1.5">All Time</Text>
+                <Text className="text-[20px] font-jakarta-extrabold text-[#00351d] tracking-tight leading-tight" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
                   {formatCurrency(stats.allTime.total)}
                 </Text>
               </View>
@@ -716,22 +679,22 @@ export default function Collections() {
             activeOpacity={0.85}
             className="flex-row items-center justify-between bg-white rounded-[22px] p-4 mb-5 border border-[#bfc9bf]/20 shadow-sm"
           >
-            <View className="flex-row items-center gap-3">
-              <View className="w-11 h-11 rounded-full bg-[#e7f8ef] items-center justify-center">
+            <View className="flex-row items-center gap-3 flex-1 min-w-0 pr-2">
+              <View className="w-11 h-11 rounded-full bg-[#e7f8ef] items-center justify-center flex-shrink-0">
                 <Feather name="file-text" size={18} color="#006c4e" />
               </View>
-              <View>
-                <Text className="font-jakarta-bold text-[#0c2010] text-[14px]">Download Statement</Text>
-                <Text className="text-[#707971] text-[11px] font-jakarta-bold mt-0.5">Choose a period · PDF export</Text>
+              <View className="flex-1 min-w-0">
+                <Text className="font-jakarta-bold text-[#0c2010] text-[14px]" numberOfLines={1} ellipsizeMode="tail">Download Statement</Text>
+                <Text className="text-[#5b645c] text-[11px] font-jakarta-bold mt-0.5" numberOfLines={1} ellipsizeMode="tail">Choose a period · PDF export</Text>
               </View>
             </View>
-            <Feather name="chevron-right" size={18} color="#707971" />
+            <Feather name="chevron-right" size={18} color="#5b645c" style={{ flexShrink: 0 }} />
           </TouchableOpacity>
 
           {/* Search and Filter Row */}
           <View className="flex-row items-center gap-3 mb-6 px-1">
             <View className="flex-1 flex-row items-center bg-white rounded-full px-4 py-3 shadow-sm border border-[#bfc9bf]/20">
-              <Feather name="search" size={18} color="#707971" />
+              <Feather name="search" size={18} color="#5b645c" />
               <TextInput
                 className="flex-1 ml-2 text-[#0c2010] font-jakarta-bold text-[14px]"
                 placeholder="Search transactions..."
@@ -741,7 +704,7 @@ export default function Collections() {
               />
               {searchQuery.length > 0 && (
                 <TouchableOpacity onPress={() => setSearchQuery('')}>
-                  <Feather name="x-circle" size={18} color="#707971" />
+                  <Feather name="x-circle" size={18} color="#5b645c" />
                 </TouchableOpacity>
               )}
             </View>
@@ -766,15 +729,14 @@ export default function Collections() {
             <QuickPill value="month" label="This Month" />
             <QuickPill value="inbound" label="Inbound" />
             <QuickPill value="outbound" label="Outbound" />
-            <QuickPill value="fx_swap" label="FX Swaps" />
           </ScrollView>
 
           <View className="px-2">
             <View className="flex-row justify-between items-center mb-5">
-              <Text className="text-[11px] font-jakarta-extrabold uppercase tracking-[0.15em] text-[#707971]">
+              <Text className="text-[11px] font-jakarta-extrabold uppercase tracking-[0.15em] text-[#5b645c]">
                 {currentListLabel}
               </Text>
-              <Text className="text-[11px] font-jakarta-bold text-[#707971]">{filteredTransactions.length} Results</Text>
+              <Text className="text-[11px] font-jakarta-bold text-[#5b645c]">{filteredTransactions.length} Results</Text>
             </View>
 
             <View className="bg-white rounded-[32px] p-2 shadow-sm border border-[#bfc9bf]/10 mb-6">
@@ -786,16 +748,9 @@ export default function Collections() {
                 paginatedTransactions.map((tx, index, visible) => {
                   const name = counterpartyName(tx);
                   const inboundRow = isInboundType(tx.type);
-                  const isSwap = tx.type === 'fx_swap';
                   const verified = tx.status === 'completed' || tx.status === 'verified';
-                  const amountText = isSwap
-                    ? `${(tx.usdcAmount || 0).toLocaleString()} USDC`
-                    : `${inboundRow ? '+' : '-'} ${formatCurrency(kesValue(tx))}`;
-                  const amountColor = isSwap
-                    ? 'text-[#1D4ED8]'
-                    : inboundRow
-                    ? 'text-[#006c4e]'
-                    : 'text-[#0c2010]';
+                  const amountText = `${inboundRow ? '+' : '-'} ${formatCurrency(kesValue(tx))}`;
+                  const amountColor = inboundRow ? 'text-[#006c4e]' : 'text-[#0c2010]';
                   const refText = tx.reference ? formatReference(tx.reference) : tx.type.replace('_', ' ');
                   return (
                     <TouchableOpacity
@@ -823,7 +778,7 @@ export default function Collections() {
                           {verified && <MaterialIcons name="verified" size={12} color="#006c4e" style={{ marginLeft: 4 }} />}
                         </View>
                         <Text
-                          className="text-[#707971] text-[10px] font-jakarta-bold mt-0.5"
+                          className="text-[#5b645c] text-[10px] font-jakarta-bold mt-0.5"
                           numberOfLines={1}
                           ellipsizeMode="tail"
                         >
@@ -843,10 +798,10 @@ export default function Collections() {
               ) : (
                 <View className="items-center justify-center py-10">
                   <View className="w-14 h-14 rounded-full bg-[#f0fdf4] items-center justify-center mb-3">
-                    <Feather name="inbox" size={22} color="#707971" />
+                    <Feather name="inbox" size={22} color="#5b645c" />
                   </View>
                   <Text className="text-[#0c2010] font-jakarta-bold text-[14px]">No transactions found</Text>
-                  <Text className="text-[#707971] font-jakarta-bold text-[12px] mt-1">Try adjusting your filters or search</Text>
+                  <Text className="text-[#5b645c] font-jakarta-bold text-[12px] mt-1">Try adjusting your filters or search</Text>
                   {(advancedFiltersActive || activeQuickFilter !== 'all' || searchQuery) && (
                     <TouchableOpacity
                       onPress={() => {
@@ -874,7 +829,7 @@ export default function Collections() {
                   <Text className={`font-jakarta-bold text-[12px] ${currentPage === 1 ? 'text-[#a1a1aa]' : 'text-[#006c4e]'}`}>Prev</Text>
                 </TouchableOpacity>
 
-                <Text className="text-[#707971] text-[12px] font-jakarta-bold">
+                <Text className="text-[#5b645c] text-[12px] font-jakarta-bold">
                   Page {currentPage} of {totalPages}
                 </Text>
 
@@ -909,7 +864,7 @@ export default function Collections() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
-              <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-3">Date Range</Text>
+              <Text className="text-[10px] font-jakarta-bold text-[#5b645c] uppercase tracking-[0.12em] mb-3">Date Range</Text>
               <View className="flex-row flex-wrap mb-5">
                 <Choice active={filterDate === 'all'} label="All Time" onPress={() => setFilterDate('all')} icon="globe" />
                 <Choice active={filterDate === 'today'} label="Today" onPress={() => setFilterDate('today')} icon="sun" />
@@ -921,15 +876,14 @@ export default function Collections() {
                 <Choice active={filterDate === 'year'} label="This Year" onPress={() => setFilterDate('year')} icon="award" />
               </View>
 
-              <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-3">Direction</Text>
+              <Text className="text-[10px] font-jakarta-bold text-[#5b645c] uppercase tracking-[0.12em] mb-3">Direction</Text>
               <View className="flex-row flex-wrap mb-5">
                 <Choice active={filterType === 'all'} label="All" onPress={() => setFilterType('all')} />
                 <Choice active={filterType === 'inbound'} label="Inbound" onPress={() => setFilterType('inbound')} icon="arrow-down-left" />
                 <Choice active={filterType === 'outbound'} label="Outbound" onPress={() => setFilterType('outbound')} icon="arrow-up-right" />
-                <Choice active={filterType === 'fx_swap'} label="FX Swaps" onPress={() => setFilterType('fx_swap')} icon="refresh-cw" />
               </View>
 
-              <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-3">Status</Text>
+              <Text className="text-[10px] font-jakarta-bold text-[#5b645c] uppercase tracking-[0.12em] mb-3">Status</Text>
               <View className="flex-row flex-wrap mb-5">
                 <Choice active={filterStatus === 'all'} label="Any" onPress={() => setFilterStatus('all')} />
                 <Choice active={filterStatus === 'completed'} label="Completed" onPress={() => setFilterStatus('completed')} icon="check-circle" />
@@ -937,16 +891,16 @@ export default function Collections() {
                 <Choice active={filterStatus === 'failed'} label="Failed" onPress={() => setFilterStatus('failed')} icon="x-circle" />
               </View>
 
-              <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-3">Amount Range (KES)</Text>
+              <Text className="text-[10px] font-jakarta-bold text-[#5b645c] uppercase tracking-[0.12em] mb-3">Amount Range (KES)</Text>
               <View className="flex-row gap-3 mb-6">
                 <View className="flex-1 bg-[#f0fdf4] rounded-2xl px-4 py-3 border border-[#e7ece7]">
-                  <Text className="text-[9px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1">Min</Text>
+                  <Text className="text-[10px] font-jakarta-bold text-[#5b645c] uppercase tracking-wider mb-1">Min</Text>
                   <ValidatedTextInput kind="amount" optional placeholder="0" placeholderTextColor="#a1a1aa"
                     value={filterMinAmount} onChangeText={setFilterMinAmount}
                     className="text-[#0c2010] font-jakarta-bold text-[15px]" />
                 </View>
                 <View className="flex-1 bg-[#f0fdf4] rounded-2xl px-4 py-3 border border-[#e7ece7]">
-                  <Text className="text-[9px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1">Max</Text>
+                  <Text className="text-[10px] font-jakarta-bold text-[#5b645c] uppercase tracking-wider mb-1">Max</Text>
                   <ValidatedTextInput kind="amount" optional placeholder="No limit" placeholderTextColor="#a1a1aa"
                     value={filterMaxAmount} onChangeText={setFilterMaxAmount}
                     className="text-[#0c2010] font-jakarta-bold text-[15px]" />
@@ -977,14 +931,14 @@ export default function Collections() {
               <View className="w-14 h-14 rounded-full bg-[#e7f8ef] items-center justify-center mb-3">
                 <Feather name="file-text" size={22} color="#006c4e" />
               </View>
-              <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[26px] text-[#0c2010]">Download Statement</Text>
-              <Text className="text-[13px] font-jakarta-bold text-[#707971] mt-1 text-center">
+              <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#0c2010]">Download Statement</Text>
+              <Text className="text-[13px] font-jakarta-bold text-[#5b645c] mt-1 text-center">
                 Select a period — we'll prepare a premium PDF
               </Text>
             </View>
 
             <View className="mt-6 mb-2">
-              <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-3">Period</Text>
+              <Text className="text-[10px] font-jakarta-bold text-[#5b645c] uppercase tracking-[0.12em] mb-3">Period</Text>
               <View className="flex-row flex-wrap">
                 <Choice active={statementPeriod === 'today'} label="Today" onPress={() => setStatementPeriod('today')} icon="sun" />
                 <Choice active={statementPeriod === 'week'} label="This Week" onPress={() => setStatementPeriod('week')} icon="calendar" />
@@ -998,16 +952,16 @@ export default function Collections() {
 
             <View className="bg-[#f0fdf4] rounded-[20px] p-4 mb-6 mt-2 border border-[#e7ece7]">
               <View className="flex-row justify-between items-center mb-2">
-                <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider">Period</Text>
+                <Text className="text-[10px] font-jakarta-bold text-[#5b645c] uppercase tracking-wider">Period</Text>
                 <Text className="text-[12px] font-jakarta-bold text-[#0c2010]">{getDateRange(statementPeriod).label}</Text>
               </View>
               <View className="flex-row justify-between items-center mb-2">
-                <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider">Format</Text>
+                <Text className="text-[10px] font-jakarta-bold text-[#5b645c] uppercase tracking-wider">Format</Text>
                 <Text className="text-[12px] font-jakarta-bold text-[#0c2010]">PDF · A4</Text>
               </View>
               <View className="flex-row justify-between items-center">
-                <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider">Account</Text>
-                <Text className="text-[12px] font-jakarta-bold text-[#0c2010]" numberOfLines={1}>{merchant?.businessName || '—'}</Text>
+                <Text className="text-[10px] font-jakarta-bold text-[#5b645c] uppercase tracking-wider flex-shrink-0">Account</Text>
+                <Text className="text-[12px] font-jakarta-bold text-[#0c2010] flex-1 text-right ml-3" numberOfLines={1} ellipsizeMode="tail">{merchant?.businessName || ''}</Text>
               </View>
             </View>
 
@@ -1027,7 +981,7 @@ export default function Collections() {
               )}
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setShowStatementSheet(false)} className="items-center py-3 mt-2">
-              <Text className="text-[#707971] font-jakarta-bold text-[13px]">Cancel</Text>
+              <Text className="text-[#5b645c] font-jakarta-bold text-[13px]">Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1045,22 +999,20 @@ export default function Collections() {
             <ScrollView showsVerticalScrollIndicator={false}>
               <View className="items-center mb-8">
                 <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-2xl text-[#0c2010]">Transaction Details</Text>
-                <Text className="text-[#707971] text-[11px] font-jakarta-bold mt-2 tracking-[0.15em] uppercase" numberOfLines={1}>
-                  Reference: {selectedTx?.reference || '—'}
+                <Text className="text-[#5b645c] text-[11px] font-jakarta-bold mt-2 tracking-[0.15em] uppercase" numberOfLines={1}>
+                  Reference: {selectedTx?.reference || ''}
                 </Text>
               </View>
 
               <View className="mb-6">
-                <Text className="text-[10px] text-[#707971]/70 font-jakarta-bold uppercase tracking-[0.2em] mb-2">Settlement</Text>
+                <Text className="text-[10px] text-[#5b645c]/70 font-jakarta-bold uppercase tracking-[0.2em] mb-2">Settlement</Text>
                 <Text className="text-[32px] font-jakarta-extrabold text-[#0c2010] tracking-tight">
-                  {selectedTx?.type === 'fx_swap'
-                    ? `${(selectedTx?.usdcAmount || 0).toLocaleString()} USDC`
-                    : formatCurrency(selectedTx ? kesValue(selectedTx) : 0)}
+                  {formatCurrency(selectedTx ? kesValue(selectedTx) : 0)}
                 </Text>
               </View>
 
               <View className="pt-5 border-t border-[#eff4ef] mb-6">
-                <Text className="text-[10px] text-[#707971]/70 font-jakarta-bold uppercase tracking-[0.2em] mb-2">Network Status</Text>
+                <Text className="text-[10px] text-[#5b645c]/70 font-jakarta-bold uppercase tracking-[0.2em] mb-2">Network Status</Text>
                 <View
                   className="flex-row items-center gap-2 self-start px-3 py-1.5 rounded-full"
                   style={{
@@ -1085,30 +1037,30 @@ export default function Collections() {
                         : selectedTx?.status === 'pending' ? '#b45309' : '#b91c1c',
                     }}
                   >
-                    {selectedTx?.status || '—'}
+                    {selectedTx?.status || ''}
                   </Text>
                 </View>
               </View>
 
               <View className="pt-5 border-t border-[#eff4ef] mb-6">
-                <Text className="text-[10px] text-[#707971]/70 font-jakarta-bold uppercase tracking-[0.2em] mb-2">Counterparty</Text>
+                <Text className="text-[10px] text-[#5b645c]/70 font-jakarta-bold uppercase tracking-[0.2em] mb-2">Counterparty</Text>
                 <Text className="text-[16px] font-jakarta-bold text-[#0c2010]" numberOfLines={1}>
                   {selectedTx ? counterpartyName(selectedTx) : 'Unknown'}
                 </Text>
-                <Text className="text-[10px] text-[#707971] font-jakarta-bold mt-1 uppercase tracking-widest">
+                <Text className="text-[10px] text-[#5b645c] font-jakarta-bold mt-1 uppercase tracking-widest">
                   {formatAccountNumber(selectedTx?.accountNumber || merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'SYSTEM')}
                 </Text>
               </View>
 
               <View className="pt-5 border-t border-[#eff4ef] mb-6">
-                <Text className="text-[10px] text-[#707971]/70 font-jakarta-bold uppercase tracking-[0.2em] mb-2">Timestamp</Text>
+                <Text className="text-[10px] text-[#5b645c]/70 font-jakarta-bold uppercase tracking-[0.2em] mb-2">Timestamp</Text>
                 <Text className="text-[13px] font-jakarta-bold text-[#0c2010]/70 uppercase tracking-widest">
                   {selectedTx ? new Date(selectedTx.createdAt).toLocaleString('en-KE') : ''}
                 </Text>
               </View>
 
               <View className="pt-5 border-t border-b border-[#eff4ef] pb-8 mb-6">
-                <Text className="text-[10px] text-[#707971]/70 font-jakarta-bold uppercase tracking-[0.2em] mb-2">Verification</Text>
+                <Text className="text-[10px] text-[#5b645c]/70 font-jakarta-bold uppercase tracking-[0.2em] mb-2">Verification</Text>
                 <View className="flex-row items-center gap-3 bg-[#f7faf7] border border-[#eff4ef] px-4 py-3 rounded-2xl self-start">
                   <Feather name="shield" size={16} color="#00351d40" />
                   <Text className="text-[10px] font-jakarta-bold text-[#00351d]/60 uppercase tracking-[0.1em]">PayChain Transaction Record</Text>
@@ -1134,7 +1086,7 @@ export default function Collections() {
                 </TouchableOpacity>
 
                 <TouchableOpacity onPress={() => setShowReceipt(false)} className="py-2">
-                  <Text className="text-[#707971] font-jakarta-extrabold text-[11px] uppercase tracking-[0.2em]">Done</Text>
+                  <Text className="text-[#5b645c] font-jakarta-extrabold text-[11px] uppercase tracking-[0.2em]">Done</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>

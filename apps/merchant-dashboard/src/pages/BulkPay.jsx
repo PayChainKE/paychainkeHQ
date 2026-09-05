@@ -12,7 +12,6 @@ import { isValidPhoneKE } from '../utils/validators'
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay'
 import paychainLogo from '../assets/paychain-logo-dark.png'
 import paychainLogoWhite from '../assets/paychain-logo-white.png'
-import paychainMark from '../assets/paychain-mark.png'
 import axios from 'axios'
 
 export default function BulkPay() {
@@ -2803,7 +2802,7 @@ export default function BulkPay() {
                         )}
 
                         <div className="mt-auto pt-6 border-t border-outline-variant/10 flex flex-col items-center gap-2">
-                           <img src={paychainMark} alt="" className="h-4 w-auto object-contain opacity-40" />
+                           <img src={paychainLogo} alt="PayChain" className="h-4 object-contain opacity-40" />
                            <p className="text-[9px] text-center text-on-surface-variant font-bold uppercase tracking-widest opacity-50">Powered by PayChain Finance • Nairobi, Kenya</p>
                         </div>
                         </div>

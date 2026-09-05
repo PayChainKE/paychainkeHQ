@@ -72,7 +72,7 @@ function formatRetryTime(ms: number): string {
 
 export default function PinEntry({ navigation }: any) {
   usePreventScreenCapture(); // no-op on web, same as the SecureStore guards above
-  const { appPin, unlockApp, logout, isBiometricsEnabled } = useAuth();
+  const { appPin, unlockApp, logout, isBiometricsEnabled, merchant } = useAuth();
   const { support, authenticate } = useBiometrics();
   const [pin, setPin] = useState('');
   // idle: nothing attempted yet (or PIN pad only) · prompting: OS sheet is
@@ -176,7 +176,7 @@ export default function PinEntry({ navigation }: any) {
           <Feather name="shield" size={28} color="white" />
         </View>
         <Text className="text-white text-[24px] font-jakarta-bold mb-2">
-          Unlock PayChain
+          {merchant?.businessName ? `Welcome back, ${merchant.businessName}` : 'Welcome back'}
         </Text>
         <Text className={`text-[14px] font-jakarta-bold text-center mb-8 ${isLocked ? 'text-red-400' : 'text-[#68dbae]'}`}>
           {isLocked

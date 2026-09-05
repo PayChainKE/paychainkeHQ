@@ -5,7 +5,7 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import api from '../../api/config';
 import { formatTxDate, formatTxTime } from '../../utils/formatDate';
-import { formatPhoneOrDash } from '../../utils/formatPhoneDisplay';
+import { formatPhoneOrBlank } from '../../utils/formatPhoneDisplay';
 import { barcodePattern } from '../../utils/barcode';
 import { buildAuditReceiptHtml } from '../../utils/auditReceiptHtml';
 
@@ -74,7 +74,7 @@ export default function TransactionSuccessCard({
   const [savedFavourite, setSavedFavourite] = useState(false);
   const [downloadingReceipt, setDownloadingReceipt] = useState(false);
 
-  const reference = transaction?.reference || '—';
+  const reference = transaction?.reference || '';
   const createdAt = transaction?.createdAt || new Date().toISOString();
   const statusKey = (transaction?.status || 'completed').toLowerCase();
   const statusLabel = STATUS_LABEL[statusKey] || (statusKey.charAt(0).toUpperCase() + statusKey.slice(1));
@@ -122,7 +122,7 @@ export default function TransactionSuccessCard({
 
   const DetailRow = ({ label, value, mono }: { label: string; value: string; mono?: boolean }) => (
     <View className="flex-row items-center justify-between gap-3 py-2">
-      <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#707971] shrink-0">{label}</Text>
+      <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#5b645c] shrink-0">{label}</Text>
       <Text
         numberOfLines={1}
         style={mono ? { fontVariant: ['tabular-nums'] } : undefined}
@@ -141,7 +141,7 @@ export default function TransactionSuccessCard({
         }`}>
           <Feather name={isPending ? 'clock' : 'check-circle'} size={40} color={isPending ? '#b45309' : '#006c4e'} />
         </View>
-        <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[26px] text-[#00351d] mb-1 text-center">
+        <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#00351d] mb-1 text-center">
           {isPending ? 'Payment Processing' : 'Transaction Successful'}
         </Text>
         {isPending && (
@@ -169,9 +169,9 @@ export default function TransactionSuccessCard({
       <View className="px-7 py-5">
         <DetailRow label="Date & Time" value={`${formatTxDate(createdAt)} · ${formatTxTime(createdAt)}`} />
         <DetailRow label="Transaction ID" value={reference} mono />
-        <DetailRow label="Paid To" value={recipientDisplay || '—'} />
-        <DetailRow label="Phone Number" value={formatPhoneOrDash(phoneNumber)} mono />
-        <DetailRow label="Payment Type" value={methodLabel || '—'} />
+        <DetailRow label="Paid To" value={recipientDisplay || ''} />
+        <DetailRow label="Phone Number" value={formatPhoneOrBlank(phoneNumber)} mono />
+        <DetailRow label="Payment Type" value={methodLabel || ''} />
       </View>
 
       <View className="mx-7 border-t border-dashed border-[#00351d]/10" />
@@ -185,7 +185,7 @@ export default function TransactionSuccessCard({
             />
           ))}
         </View>
-        <Text className="mt-1.5 text-[9px] font-jakarta-bold text-[#707971]" style={{ fontVariant: ['tabular-nums'] }}>
+        <Text className="mt-1.5 text-[10px] font-jakarta-bold text-[#5b645c]" style={{ fontVariant: ['tabular-nums'] }}>
           {reference}
         </Text>
       </View>
@@ -238,8 +238,8 @@ export default function TransactionSuccessCard({
       </View>
 
       <View className="bg-[#f7faf8] border-t border-[#00351d]/5 py-3 items-center">
-        <Text className="text-[10px] font-jakarta-bold text-[#707971]">PayChain Kenya · {PAYCHAIN_PHONE}</Text>
-        <Text className="text-[9px] font-jakarta-extrabold uppercase tracking-widest text-[#2f6b52] mt-0.5">
+        <Text className="text-[10px] font-jakarta-bold text-[#5b645c]">PayChain Kenya · {PAYCHAIN_PHONE}</Text>
+        <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#2f6b52] mt-0.5">
           {PAYCHAIN_SLOGAN}
         </Text>
       </View>

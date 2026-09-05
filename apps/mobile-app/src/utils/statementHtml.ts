@@ -87,15 +87,13 @@ export function buildStatementHtml({
     if (isSwap) paidOut = fmtNum(tx.kesAmount || 0);
     runBalance += netBalanceImpact(tx);
 
-    const desc = isSwap
-      ? `FX Swap → ${tx.usdcAmount || 0} USDC`
-      : tx.sender?.name !== tx.recipient?.name
-        ? `${formatName(tx.sender?.name) || '—'} → ${formatName(tx.recipient?.name) || '—'}`
-        : formatName(tx.sender?.name) || formatName(tx.recipient?.name) || '—';
+    const desc = tx.sender?.name !== tx.recipient?.name
+      ? `${formatName(tx.sender?.name) || ''} → ${formatName(tx.recipient?.name) || ''}`
+      : formatName(tx.sender?.name) || formatName(tx.recipient?.name) || '';
 
     return `<tr>
       <td class="mono small">${esc(dateStr)}<br/><span class="dim">${esc(timeStr)}</span></td>
-      <td class="mono small">${esc((tx.reference || '—').slice(0, 16))}</td>
+      <td class="mono small">${esc((tx.reference || '').slice(0, 16))}</td>
       <td class="small">${esc(desc.slice(0, 40))}</td>
       <td class="mono small right in">${esc(paidIn)}</td>
       <td class="mono small right out">${esc(paidOut)}</td>
@@ -154,11 +152,11 @@ export function buildStatementHtml({
 
   <h2>Account Details</h2>
   <div class="grid">
-    <div class="k">Account Name: <span class="v">${esc(merchant?.name || '—')}</span></div>
-    <div class="k">Business: <span class="v">${esc(merchant?.businessName || '—')}</span></div>
+    <div class="k">Account Name: <span class="v">${esc(merchant?.name || '')}</span></div>
+    <div class="k">Business: <span class="v">${esc(merchant?.businessName || '')}</span></div>
     <div class="k">Paybill / PayChain Account: <span class="v">880100 / ${esc(formatAccountNumber(accountNumber))}</span></div>
-    <div class="k">Email: <span class="v">${esc(merchant?.email || '—')}</span></div>
-    <div class="k">Phone: <span class="v">${esc(merchant?.phone || '—')}</span></div>
+    <div class="k">Email: <span class="v">${esc(merchant?.email || '')}</span></div>
+    <div class="k">Phone: <span class="v">${esc(merchant?.phone || '')}</span></div>
     <div class="k">Statement Period: <span class="v">${esc(periodLabel)}</span></div>
   </div>
 
