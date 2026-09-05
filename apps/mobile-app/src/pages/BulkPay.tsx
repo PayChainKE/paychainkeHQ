@@ -7,30 +7,18 @@ import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as DocumentPicker from 'expo-document-picker';
 import * as Clipboard from 'expo-clipboard';
 import { ValidatedTextInput } from '../components/ValidatedTextInput';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/config';
 import TopBar from '../components/layout/TopBar';
-import FundAccountModal from '../components/FundAccountModal';
 import { formatAccountNumber } from '../utils/formatAccountNumber';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type PayeeType = 'employee' | 'supplier' | 'utility' | 'contractor';
 type PaymentMethod = 'Mobile Money' | 'Bank';
 type MobileMoneyType = 'Personal Number' | 'Paybill' | 'Buy Goods';
-
-// Lipa na M-Pesa (Till/Paybill) outbound payouts are still being verified
-// end-to-end — restricted to Brantech Solutions (the account used for live
-// testing, matching backend/config/lipaNaMpesaBetaAllowlist.js) until
-// confirmed working, then opened up to every merchant.
-const LIPA_NA_MPESA_BETA_MERCHANT_ID = '6a8f30cb228671cacc4361fe'; // Brantech Solutions
-
-// Paused 2026-08-31, mirrors backend/config/lipaNaMpesaBetaAllowlist.js's
-// LIVE_TESTING_ENABLED — NCBA callbacks unconfirmed, so Till/Paybill is
-// hidden for everyone (including the beta merchant) until Rose confirms
-// they're working. Flip back to true alongside that backend flag.
-const LIPA_NA_MPESA_LIVE_TESTING_ENABLED = false;
 
 interface Payee {
   _id: string;
@@ -62,7 +50,6 @@ interface Receipt {
   reference: string;
   timestamp: string;
   status?: string;
-  failureReason?: string | null;
 }
 
 interface BatchHistory {
@@ -141,7 +128,6 @@ const BATCH_STATUS_META: Record<string, { bg: string; text: string }> = {
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function BulkPay() {
   const { merchant, refreshSession } = useAuth();
-  const isLipaNaMpesaBetaMerchant = LIPA_NA_MPESA_LIVE_TESTING_ENABLED && merchant?._id === LIPA_NA_MPESA_BETA_MERCHANT_ID;
 
   const [activeTab, setActiveTab] = useState<'Payees' | 'Batches' | 'Invoices'>('Payees');
   const [activeFilter, setActiveFilter] = useState<Filter>('All');
@@ -151,11 +137,6 @@ export default function BulkPay() {
 
   const [selectedPayees, setSelectedPayees] = useState<Record<string, boolean>>({});
   const [payoutAmounts, setPayoutAmounts] = useState<Record<string, number>>({});
-  // Read-only estimate of the batch's total transaction cost, shown in the
-  // Authorize Batch review modal so "Total Payout" isn't the only figure a
-  // merchant sees before a PIN-confirmed debit that also includes fees.
-  // Never blocks review/authorization if it fails — purely informational.
-  const [estimatedFee, setEstimatedFee] = useState(0);
 
   // Modals
   const [showPinSetup, setShowPinSetup] = useState(false);
@@ -163,13 +144,10 @@ export default function BulkPay() {
   const [showAmountEditor, setShowAmountEditor] = useState<Payee | null>(null);
   const [showAuthorize, setShowAuthorize] = useState(false);
   const [showReceipts, setShowReceipts] = useState(false);
+  const [showCsvUpload, setShowCsvUpload] = useState(false);
   const [showBatchDetails, setShowBatchDetails] = useState<BatchHistory | null>(null);
   const [showFundingSourceSelect, setShowFundingSourceSelect] = useState(false);
   const [showSecurity, setShowSecurity] = useState(false);
-  // Matches the merchant-dashboard's Liquidity "+" button in BulkPay.jsx —
-  // lets a merchant top up straight from here instead of leaving Bulk Pay
-  // to find the funding flow elsewhere.
-  const [showFundAccount, setShowFundAccount] = useState(false);
 
   // Funding source (virtual account) — mirrors the dashboard's single
   // funding-source selector, derived from the merchant's own profile (no
@@ -182,6 +160,10 @@ export default function BulkPay() {
   // authorizeBatch. Kept here for exact behavioral parity.
   const [securityStep, setSecurityStep] = useState<1 | 2>(1);
   const [securityOtp, setSecurityOtp] = useState('');
+
+  // Which batch is pending authorization — set right before opening the
+  // Funding Source Select -> Security flow, consumed once the PIN is confirmed.
+  const [pendingBatch, setPendingBatch] = useState<{ source: 'manual' | 'csv' } | null>(null);
 
   // Invoices
   const blankInvoice = (): Invoice => ({
@@ -207,6 +189,11 @@ export default function BulkPay() {
   const [confirmDeleteInvoiceId, setConfirmDeleteInvoiceId] = useState<string | null>(null);
   const [showLinkModal, setShowLinkModal] = useState(false);
   const invoicesPerPage = 5;
+
+  // CSV upload
+  const [csvPreview, setCsvPreview] = useState<any[]>([]);
+  const [csvSummary, setCsvSummary] = useState<any>(null);
+  const [csvUploadLoading, setCsvUploadLoading] = useState(false);
 
   // Batch history
   const [batchHistory, setBatchHistory] = useState<BatchHistory[]>([]);
@@ -250,9 +237,6 @@ export default function BulkPay() {
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [lastBatchReference, setLastBatchReference] = useState<string>('');
   const [lastBatchStatus, setLastBatchStatus] = useState<string>('Processed');
-
-  // ── Profile gate ──
-  const isProfileComplete = Boolean(merchant?.kraPin && merchant?.businessNumber);
 
   // ── Fetch payees ──
   const fetchPayees = useCallback(async (refresh = false) => {
@@ -534,55 +518,42 @@ export default function BulkPay() {
     }
   };
 
-  // ── Repeat Last Batch ──
-  // Replaces the old CSV-upload path — same underlying need (build a batch
-  // fast without re-selecting every payee) without requiring the merchant
-  // to produce a spreadsheet. Reloads the most recent batch's payee
-  // selection and amounts, then switches to the Payees tab so they can
-  // review before authorizing — mirrors the dashboard's identical feature.
-  // batchHistory[0] is safe to treat as "most recent" — fetchBatches sorts
-  // by createdAt descending server-side (getBatches, bulkPayController.js).
-  const handleRepeatLastBatch = () => {
-    const lastBatch = batchHistory[0];
-    if (!lastBatch || !lastBatch.transactions?.length) {
-      Alert.alert('No Previous Batch', "You haven't sent a batch yet — select payees on the Payees tab to get started.");
-      return;
+  // ── Upload CSV ──
+  const handleCsvUpload = async () => {
+    try {
+      const doc = await DocumentPicker.getDocumentAsync({
+        type: ['text/csv', 'text/plain'],
+      });
+
+      if (doc.canceled || !doc.assets?.[0]) return;
+
+      setCsvUploadLoading(true);
+      setAuthPin('');
+      const file = doc.assets[0];
+
+      // Send to backend for preview — the server computes real PAYE/NSSF/SHIF
+      // tax withholding for employee rows. There is no safe client-side
+      // fallback: parsing the CSV locally would submit gross-as-net (zero
+      // withholding) for real payouts, so on failure we just surface the
+      // error and let the merchant retry instead of guessing locally.
+      const formData = new FormData();
+      formData.append('file', {
+        uri: file.uri,
+        type: 'text/csv',
+        name: file.name,
+      } as any);
+
+      const previewRes = await api.post('/api/bulkpay/upload-csv', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setCsvPreview(previewRes.data?.rows || []);
+      setCsvSummary(previewRes.data?.summary || {});
+      setShowCsvUpload(true);
+    } catch (err: any) {
+      Alert.alert('CSV Upload Failed', err?.response?.data?.message || err?.message || 'Could not process CSV. Please try again.');
+    } finally {
+      setCsvUploadLoading(false);
     }
-
-    const newSelected: Record<string, boolean> = {};
-    const newAmounts: Record<string, number> = {};
-    let matchedCount = 0;
-    let skippedCount = 0;
-
-    for (const row of lastBatch.transactions) {
-      const payeeId = row.payeeId ? String(row.payeeId) : null;
-      // Only pre-select a payee still on the current list — one could have
-      // been edited/removed since the last batch, with no safe amount or
-      // destination left to reuse.
-      const stillExists = payeeId && payeesList.some((p) => p._id === payeeId);
-      if (stillExists) {
-        newSelected[payeeId] = true;
-        newAmounts[payeeId] = row.amount || 0;
-        matchedCount++;
-      } else {
-        skippedCount++;
-      }
-    }
-
-    if (matchedCount === 0) {
-      Alert.alert('Nothing to Repeat', "None of last batch's payees are still on your list.");
-      return;
-    }
-
-    setSelectedPayees(newSelected);
-    setPayoutAmounts(newAmounts);
-    setActiveTab('Payees');
-    Alert.alert(
-      'Last Batch Loaded',
-      skippedCount > 0
-        ? `${matchedCount} payee${matchedCount === 1 ? '' : 's'} reloaded. ${skippedCount} from your last batch ${skippedCount === 1 ? 'is' : 'are'} no longer on your list and were skipped.`
-        : `${matchedCount} payee${matchedCount === 1 ? '' : 's'} reloaded from your last batch — review the amounts before sending.`
-    );
   };
 
   // ── Trigger PIN setup if needed ──
@@ -603,33 +574,12 @@ export default function BulkPay() {
     [selectedPayees]
   );
 
-  useEffect(() => {
-    if (!selectedIds.length) { setEstimatedFee(0); return; }
-    const timer = setTimeout(async () => {
-      try {
-        const items = selectedIds.map((id) => ({ payeeId: id, amount: payoutAmounts[id] || 0 }));
-        const res = await api.post('/api/bulkpay/preview-fees', { items });
-        setEstimatedFee(res.data?.totalFee || 0);
-      } catch (error) {
-        // Purely informational — a failed estimate shouldn't block review
-        // or authorization, so just leave the last known figure showing.
-        console.error('Error estimating batch fees:', error);
-      }
-    }, 400);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedIds, JSON.stringify(payoutAmounts)]);
-
   const batchTotal = useMemo(
     () => selectedIds.reduce((sum, id) => sum + (payoutAmounts[id] || 0), 0),
     [selectedIds, payoutAmounts]
   );
 
-  // availableBalance excludes anything credited in the last 2 minutes and
-  // still held server-side (backend/utils/availableBalance.js) — the same
-  // figure authorizeBatch's debitAvailableBalance actually enforces, so
-  // this warning can't disagree with what submitting the batch will do.
-  const balance = merchant?.availableBalance ?? merchant?.kesBalance ?? 0;
+  const balance = merchant?.kesBalance ?? 0;
   const isLiquidityLow = batchTotal > balance && batchTotal > 0;
 
   // ── Selection ──
@@ -672,11 +622,12 @@ export default function BulkPay() {
 
   const validateNewPayee = (): string | null => {
     if (!newPayee.name.trim()) return 'Recipient name is required.';
-    // Neither Employees nor Suppliers require KRA PIN/ID Number/eTIMS
-    // Invoice/CU Number — PayChain has no live KRA integration on this
-    // path, so these are optional record-keeping fields only (matches the
-    // dashboard's equivalent form and the backend, which never enforced
-    // this either since bulkPayController.js's addPayee/updatePayee).
+    if (newPayee.type === 'employee' && (!newPayee.kraPin || !newPayee.idNumber)) {
+      return 'KRA PIN and ID Number are required for employees.';
+    }
+    if (newPayee.type === 'supplier' && (!newPayee.kraPin || !newPayee.etimsInvoiceNumber || !newPayee.cuNumber)) {
+      return 'KRA PIN, eTIMS Invoice, and CU Number are required for suppliers.';
+    }
     if (newPayee.paymentMethod === 'Mobile Money') {
       if (newPayee.mobileMoneyType === 'Personal Number' && !validatePhone(newPayee.phone)) {
         return 'Enter a valid Kenyan phone number (07XX or 01XX).';
@@ -813,8 +764,10 @@ export default function BulkPay() {
   const fundingSourceNumber = formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending');
 
   // ── Step 3: confirm funding source, then move to Security (OTP -> PIN) ──
-  const proceedToFundingSourceSelect = () => {
+  const proceedToFundingSourceSelect = (source: 'manual' | 'csv') => {
+    setPendingBatch({ source });
     setShowAuthorize(false);
+    setShowCsvUpload(false);
     setSelectedFundingSource(false);
     setShowFundingSourceSelect(true);
   };
@@ -832,9 +785,10 @@ export default function BulkPay() {
     setSecurityStep(1);
     setSecurityOtp('');
     setAuthPin('');
+    setPendingBatch(null);
   };
 
-  // ── Final authorize (fires after Security PIN step) ──
+  // ── Final authorize (fires after Security PIN step, for either source) ──
   const handleAuthorize = async () => {
     if (authPin.length !== 4) {
       Alert.alert('Invalid PIN', 'Enter your 4-digit Bulk Pay PIN.');
@@ -842,16 +796,25 @@ export default function BulkPay() {
     }
     setIsAuthorizing(true);
     try {
-      const batchRows = payeesList
-        .filter(p => selectedPayees[p._id])
-        .map(p => ({
-          payeeMatch: p._id,
-          name: p.name,
-          type: p.type,
-          phone: p.phone,
-          grossAmount: payoutAmounts[p._id] || 0,
-          netAmount: payoutAmounts[p._id] || 0,
-        }));
+      const batchRows = pendingBatch?.source === 'csv'
+        ? csvPreview.map((row: any) => ({
+            name: row.name,
+            type: row.type || 'employee',
+            phone: row.phone,
+            grossAmount: row.grossAmount || row.amount || 0,
+            netAmount: row.netAmount || row.amount || 0,
+            taxDeductions: row.taxDeductions || { paye: 0, nssf: 0, shif: 0 },
+          }))
+        : payeesList
+            .filter(p => selectedPayees[p._id])
+            .map(p => ({
+              payeeMatch: p._id,
+              name: p.name,
+              type: p.type,
+              phone: p.phone,
+              grossAmount: payoutAmounts[p._id] || 0,
+              netAmount: payoutAmounts[p._id] || 0,
+            }));
 
       const res = await api.post('/api/bulkpay/authorize', {
         batchRows,
@@ -875,7 +838,6 @@ export default function BulkPay() {
           day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
         }),
         status: tx.status || 'pending',
-        failureReason: tx.failureReason || null,
       }));
 
       setReceipts(newReceipts);
@@ -884,26 +846,15 @@ export default function BulkPay() {
       setSecurityOtp('');
       setSecurityStep(1);
       setSelectedPayees({});
+      setCsvPreview([]);
+      setCsvSummary(null);
+      setPendingBatch(null);
       setShowReceipts(true);
       fetchBatches();
       // Balance was just debited server-side — refresh now instead of
       // waiting on the ambient 5s poll in AuthContext, so the balance shown
       // elsewhere in the app reflects this payout immediately.
       refreshSession();
-
-      // Surface why a row failed (e.g. below NCBA's KES 50 Mobile Money
-      // minimum) instead of leaving the merchant with just "N failed" and
-      // no way to tell why — matches the dashboard's equivalent summary.
-      const failedReceipts = newReceipts.filter(r => r.status === 'failed');
-      if (failedReceipts.length > 0) {
-        const distinctReasons = [...new Set(failedReceipts.map(r => r.failureReason).filter(Boolean))];
-        if (distinctReasons.length > 0) {
-          Alert.alert(
-            failedReceipts.length === newReceipts.length ? 'Batch Failed' : 'Batch Partially Processed',
-            `${failedReceipts.length} of ${newReceipts.length} payout${newReceipts.length === 1 ? '' : 's'} failed and ${failedReceipts.length === 1 ? 'was' : 'were'} refunded.\n\n${distinctReasons.join('\n')}`
-          );
-        }
-      }
     } catch (e: any) {
       Alert.alert('Authorization failed', e?.response?.data?.message || 'Could not process batch.');
       // Allow retry for PIN if it fails, matching the dashboard's behavior.
@@ -999,25 +950,7 @@ export default function BulkPay() {
       <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#00351d" />
-          <Text className="text-[#707971] font-jakarta-medium text-[14px] mt-4">Loading payees…</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  // Profile gate
-  if (!isProfileComplete) {
-    return (
-      <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
-        <TopBar title="Bulk Payments" subtitle="Profile required to unlock" showBack={false} />
-        <View className="flex-1 items-center justify-center px-8">
-          <View className="w-20 h-20 rounded-full bg-[#fef3e7] items-center justify-center mb-6">
-            <Feather name="lock" size={32} color="#b87333" />
-          </View>
-          <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[28px] text-[#0c2010] text-center mb-3">Profile Incomplete</Text>
-          <Text className="text-[#707971] font-jakarta-medium text-[14px] text-center leading-relaxed max-w-[320px]">
-            To unlock Bulk Payments and stay KRA-compliant, add your KRA PIN and Business Number to your profile.
-          </Text>
+          <Text className="text-[#707971] font-jakarta-bold text-[14px] mt-4">Loading payees…</Text>
         </View>
       </SafeAreaView>
     );
@@ -1025,22 +958,7 @@ export default function BulkPay() {
 
   return (
     <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
-      <TopBar title="Bulk Payments" showBack={false} />
-
-      {/* Liquidity */}
-      <View className="w-full max-w-lg mx-auto px-6 mt-3 flex-row items-center justify-between">
-        <View>
-          <Text className="text-[9px] font-jakarta-bold text-[#707971] uppercase tracking-[0.15em] mb-0.5">Liquidity</Text>
-          <Text className="font-jakarta-bold text-[16px] text-[#0c2010]">{formatKES(balance)}</Text>
-        </View>
-        <TouchableOpacity
-          onPress={() => setShowFundAccount(true)}
-          className="w-10 h-10 rounded-full bg-[#00351d] items-center justify-center shadow-sm"
-          accessibilityLabel="Fund Account"
-        >
-          <Feather name="plus" size={18} color="#ffffff" />
-        </TouchableOpacity>
-      </View>
+      <TopBar title="Bulk Payments" subtitle={`Balance: ${formatKES(balance)}`} showBack={false} />
 
       {/* Tabs */}
       <View className="w-full max-w-lg mx-auto px-6 mt-4">
@@ -1113,14 +1031,8 @@ export default function BulkPay() {
               <View className="bg-[#fef2f2] border border-[#fecaca] rounded-2xl p-3.5 mb-4 flex-row items-center gap-2">
                 <Feather name="alert-triangle" size={16} color="#b91c1c" />
                 <Text className="text-[#b91c1c] font-jakarta-bold text-[12px] flex-1" numberOfLines={2}>
-                  Batch ({formatKES(batchTotal)}) exceeds balance ({formatKES(balance)}).
+                  Batch ({formatKES(batchTotal)}) exceeds balance ({formatKES(balance)}). Top up to proceed.
                 </Text>
-                <TouchableOpacity
-                  onPress={() => setShowFundAccount(true)}
-                  className="bg-[#b91c1c] px-3 py-1.5 rounded-full"
-                >
-                  <Text className="text-white font-jakarta-bold text-[11px]">Top Up</Text>
-                </TouchableOpacity>
               </View>
             )}
 
@@ -1131,7 +1043,7 @@ export default function BulkPay() {
                   <Feather name="users" size={26} color="#707971" />
                 </View>
                 <Text className="text-[#0c2010] font-jakarta-bold text-[16px] mb-1">No payees yet</Text>
-                <Text className="text-[#707971] font-jakarta-medium text-[13px] text-center max-w-[260px] leading-relaxed">
+                <Text className="text-[#707971] font-jakarta-bold text-[13px] text-center max-w-[260px] leading-relaxed">
                   Tap "Add Payee" above to register your first recipient.
                 </Text>
               </View>
@@ -1161,7 +1073,7 @@ export default function BulkPay() {
                         <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: meta.badgeBg }}>
                           <Text className="text-[8px] font-jakarta-bold uppercase tracking-[0.1em]" style={{ color: meta.badgeText }}>{meta.label}</Text>
                         </View>
-                        <Text className="text-[#707971] font-jakarta-medium text-[10px] ml-2" numberOfLines={1}>
+                        <Text className="text-[#707971] font-jakarta-bold text-[10px] ml-2" numberOfLines={1}>
                           {p.paymentMethod === 'Bank' ? p.bankName : p.phone || p.paybillNumber || p.tillNumber || '—'}
                         </Text>
                       </View>
@@ -1191,9 +1103,9 @@ export default function BulkPay() {
           <View className="w-full max-w-lg mx-auto px-6 pt-5">
             {/* Quick actions */}
             <View className="flex-row gap-2.5 mb-5">
-              <TouchableOpacity onPress={handleRepeatLastBatch} className="flex-1 bg-[#dbeafe] rounded-2xl p-3.5 flex-row items-center justify-center gap-2 border border-[#bfdbfe]">
-                <Feather name="rotate-ccw" size={16} color="#1e40af" />
-                <Text className="text-[#1e40af] font-jakarta-bold text-[12px]">Repeat Last Batch</Text>
+              <TouchableOpacity onPress={handleCsvUpload} className="flex-1 bg-[#dbeafe] rounded-2xl p-3.5 flex-row items-center justify-center gap-2 border border-[#bfdbfe]" disabled={csvUploadLoading}>
+                <Feather name={csvUploadLoading ? 'loader' : 'upload'} size={16} color="#1e40af" />
+                <Text className="text-[#1e40af] font-jakarta-bold text-[12px]">{csvUploadLoading ? 'Uploading' : 'CSV'}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={fetchBatches} className="flex-1 bg-[#e7f8ef] rounded-2xl p-3.5 flex-row items-center justify-center gap-2 border border-[#bbf7d0]">
                 <Feather name="refresh-cw" size={16} color="#006c4e" />
@@ -1210,7 +1122,7 @@ export default function BulkPay() {
                   </View>
                   <View className="flex-1">
                     <Text className="font-jakarta-bold text-[15px] text-[#0c2010]">Last Batch</Text>
-                    <Text className="text-[#707971] font-jakarta-medium text-[11px]" numberOfLines={1}>
+                    <Text className="text-[#707971] font-jakarta-bold text-[11px]" numberOfLines={1}>
                       {receipts.length} recipients · {lastBatchReference}
                     </Text>
                   </View>
@@ -1250,7 +1162,7 @@ export default function BulkPay() {
                     <Feather name="layers" size={22} color="#707971" />
                   </View>
                   <Text className="text-[#0c2010] font-jakarta-bold text-[14px] mb-1">No batches</Text>
-                  <Text className="text-[#707971] font-jakarta-medium text-[12px] text-center">Create your first bulk payment to see history here.</Text>
+                  <Text className="text-[#707971] font-jakarta-bold text-[12px] text-center">Create your first bulk payment to see history here.</Text>
                 </View>
               ) : (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-1">
@@ -1266,7 +1178,7 @@ export default function BulkPay() {
                         <View className="flex-row items-center justify-between mb-3">
                           <View>
                             <Text className="font-jakarta-bold text-[13px] text-[#0c2010]" numberOfLines={1}>{batch.batchReference}</Text>
-                            <Text className="text-[#707971] font-jakarta-medium text-[10px] mt-1">
+                            <Text className="text-[#707971] font-jakarta-bold text-[10px] mt-1">
                               {new Date(batch.createdAt).toLocaleDateString('en-KE')}
                             </Text>
                           </View>
@@ -1277,17 +1189,17 @@ export default function BulkPay() {
                           </View>
                         </View>
                         <View className="bg-[#f0fdf4] rounded-xl p-3 mb-2">
-                          <Text className="text-[9px] font-jakarta-medium text-[#707971] uppercase tracking-wider mb-1">Amount</Text>
+                          <Text className="text-[9px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1">Amount</Text>
                           <Text className="text-[#00351d] font-jakarta-bold text-[16px]">{formatKES(batch.totalNetAmount)}</Text>
                         </View>
                         <View className="flex-row gap-2">
                           <View className="flex-1">
-                            <Text className="text-[9px] font-jakarta-medium text-[#707971] uppercase tracking-wider mb-1">Recipients</Text>
+                            <Text className="text-[9px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1">Recipients</Text>
                             <Text className="text-[#404942] font-jakarta-bold text-[13px]">{batch.payeeCount}</Text>
                           </View>
                           <View className="flex-1">
-                            <Text className="text-[9px] font-jakarta-medium text-[#707971] uppercase tracking-wider mb-1">Source</Text>
-                            <Text className="text-[#404942] font-jakarta-medium text-[11px]" numberOfLines={1}>{batch.fundingSource}</Text>
+                            <Text className="text-[9px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1">Source</Text>
+                            <Text className="text-[#404942] font-jakarta-bold text-[11px]" numberOfLines={1}>{batch.fundingSource}</Text>
                           </View>
                         </View>
                       </TouchableOpacity>
@@ -1305,7 +1217,7 @@ export default function BulkPay() {
                   </View>
                   <View>
                     <Text className="font-jakarta-bold text-[14px] text-[#0c2010]">Bulk Pay PIN</Text>
-                    <Text className="text-[#707971] font-jakarta-medium text-[11px]">{merchant?.hasBulkPayPin === false ? 'Not configured' : 'Configured'}</Text>
+                    <Text className="text-[#707971] font-jakarta-bold text-[11px]">{merchant?.hasBulkPayPin === false ? 'Not configured' : 'Configured'}</Text>
                   </View>
                 </View>
                 <Feather name="chevron-right" size={18} color="#707971" />
@@ -1315,7 +1227,7 @@ export default function BulkPay() {
             <View className="bg-[#5efeb3] rounded-[24px] p-6">
               <Text className="text-[#00351d] font-jakarta-extrabold text-[10px] tracking-[0.2em] uppercase mb-3">Pro Tip</Text>
               <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[#00351d] text-[18px] leading-snug">
-                Use Repeat Last Batch to resend a recurring payout in seconds, or fund your account to increase payment limits.
+                Upload CSV files for bulk imports, or fund your account to increase payment limits.
               </Text>
             </View>
           </View>
@@ -1330,10 +1242,10 @@ export default function BulkPay() {
                 </View>
                 <View>
                   <Text className="font-jakarta-bold text-[15px] text-[#0c2010]">Invoices</Text>
-                  <Text className="text-[#707971] font-jakarta-medium text-[11px]">Billing & Drafts</Text>
+                  <Text className="text-[#707971] font-jakarta-bold text-[11px]">Billing & Drafts</Text>
                 </View>
               </View>
-              <Text className="text-[#707971] font-jakarta-medium text-[12px] leading-relaxed mb-4">
+              <Text className="text-[#707971] font-jakarta-bold text-[12px] leading-relaxed mb-4">
                 Generate, send, and manage professional invoices directly to your clients.
               </Text>
               <TouchableOpacity onPress={handleOpenInvoiceEditor} className="bg-[#00351d] rounded-2xl py-3.5 flex-row items-center justify-center gap-2">
@@ -1366,7 +1278,7 @@ export default function BulkPay() {
                     <Feather name="file-text" size={22} color="#707971" />
                   </View>
                   <Text className="text-[#0c2010] font-jakarta-bold text-[14px] mb-1">No recent invoices</Text>
-                  <Text className="text-[#707971] font-jakarta-medium text-[12px] text-center">Generate your first professional e-invoice to start getting paid.</Text>
+                  <Text className="text-[#707971] font-jakarta-bold text-[12px] text-center">Generate your first professional e-invoice to start getting paid.</Text>
                 </View>
               ) : (
                 <View className="gap-3">
@@ -1388,7 +1300,7 @@ export default function BulkPay() {
                           <View className="flex-1 min-w-0">
                             <Text className="font-jakarta-bold text-[13px] text-[#0c2010]" numberOfLines={1}>{inv.customer?.name || 'Unnamed Customer'}</Text>
                             <View className="flex-row items-center gap-2 mt-0.5">
-                              <Text className="text-[10px] text-[#707971] font-jakarta-medium">
+                              <Text className="text-[10px] text-[#707971] font-jakarta-bold">
                                 #{inv.invoiceNumber} · {inv.createdAt ? new Date(inv.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : ''}
                               </Text>
                               <View style={{ backgroundColor: meta.badgeBg }} className="px-1.5 py-0.5 rounded">
@@ -1414,7 +1326,7 @@ export default function BulkPay() {
                           <View className="flex-row items-center justify-between">
                             <View>
                               <Text className="text-[13px] font-jakarta-bold text-[#00351d]">{inv.currency} {(inv.total || 0).toLocaleString()}</Text>
-                              <Text className="text-[9px] text-[#707971] font-jakarta-medium uppercase tracking-widest">Total value</Text>
+                              <Text className="text-[9px] text-[#707971] font-jakarta-bold uppercase tracking-widest">Total value</Text>
                             </View>
                             <View className="flex-row gap-2">
                               {inv.status !== 'paid' && (
@@ -1505,7 +1417,7 @@ export default function BulkPay() {
                   <Feather name="shield" size={22} color="#006c4e" />
                 </View>
                 <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#0c2010]">Set Bulk Pay PIN</Text>
-                <Text className="text-[#707971] font-jakarta-medium text-[12px] mt-1 text-center">A 4-digit PIN is required to authorize batches.</Text>
+                <Text className="text-[#707971] font-jakarta-bold text-[12px] mt-1 text-center">A 4-digit PIN is required to authorize batches.</Text>
               </View>
               <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-2">New PIN</Text>
               <TextInput
@@ -1545,7 +1457,7 @@ export default function BulkPay() {
             <View className="w-full max-w-lg mx-auto bg-white rounded-t-[36px] px-6 pt-4 pb-8 mt-auto">
               <View className="items-center mb-4"><View className="w-12 h-1.5 bg-[#e7ece7] rounded-full" /></View>
               <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[22px] text-[#0c2010]">Set Payout</Text>
-              <Text className="text-[#707971] font-jakarta-medium text-[12px] mb-5" numberOfLines={1}>For {showAmountEditor?.name}</Text>
+              <Text className="text-[#707971] font-jakarta-bold text-[12px] mb-5" numberOfLines={1}>For {showAmountEditor?.name}</Text>
               <View className="bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-5 py-4 mb-5 flex-row items-center">
                 <Text className="text-[#707971] font-jakarta-bold text-[18px] mr-2">KES</Text>
                 <TextInput
@@ -1577,7 +1489,7 @@ export default function BulkPay() {
                 <Feather name="lock" size={22} color="#b87333" />
               </View>
               <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#0c2010]">Authorize Batch</Text>
-              <Text className="text-[#707971] font-jakarta-medium text-[12px] mt-1 text-center">Review before selecting a funding source.</Text>
+              <Text className="text-[#707971] font-jakarta-bold text-[12px] mt-1 text-center">Review before selecting a funding source.</Text>
             </View>
             <View className="bg-[#f0fdf4] rounded-2xl p-4 mb-6 border border-[#e7ece7]">
               <View className="flex-row justify-between items-center mb-2">
@@ -1588,15 +1500,9 @@ export default function BulkPay() {
                 <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider">Total Payout</Text>
                 <Text className="font-jakarta-bold text-[#00351d] text-[16px]">{formatKES(batchTotal)}</Text>
               </View>
-              {estimatedFee > 0 && (
-                <View className="flex-row justify-between items-center mt-2">
-                  <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider">Est. Transaction Cost</Text>
-                  <Text className="font-jakarta-bold text-[#0c2010] text-[13px]">{formatKES(estimatedFee)}</Text>
-                </View>
-              )}
             </View>
             <TouchableOpacity
-              onPress={() => proceedToFundingSourceSelect()}
+              onPress={() => proceedToFundingSourceSelect('manual')}
               className="w-full bg-[#00351d] h-[56px] rounded-full flex-row items-center justify-center"
             >
               <Feather name="arrow-right" size={16} color="#fff" />
@@ -1604,6 +1510,71 @@ export default function BulkPay() {
             </TouchableOpacity>
           </View>
         </View>
+      </Modal>
+
+      {/* ── CSV Upload Preview Modal ── */}
+      <Modal visible={showCsvUpload} transparent animationType="slide" onRequestClose={() => !isAuthorizing && setShowCsvUpload(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
+          <View className="flex-1 justify-end bg-black/50">
+            <TouchableOpacity className="absolute inset-0" activeOpacity={1} onPress={() => !isAuthorizing && setShowCsvUpload(false)} />
+            <View className="w-full max-w-lg mx-auto bg-white rounded-t-[36px] px-6 pt-4 pb-8 mt-auto" style={{ maxHeight: '90%' }}>
+              <View className="items-center mb-4"><View className="w-12 h-1.5 bg-[#e7ece7] rounded-full" /></View>
+              <View className="items-center mb-4">
+                <View className="w-14 h-14 rounded-full bg-[#dbeafe] items-center justify-center mb-3">
+                  <Feather name="file-text" size={22} color="#1e40af" />
+                </View>
+                <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#0c2010]">Review CSV Batch</Text>
+                <Text className="text-[#707971] font-jakarta-bold text-[12px] mt-1">{csvPreview.length} row{csvPreview.length === 1 ? '' : 's'} detected</Text>
+              </View>
+
+              <View className="bg-[#f0fdf4] rounded-2xl p-4 mb-4 border border-[#e7ece7]">
+                <View className="flex-row justify-between items-center mb-2">
+                  <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider">Gross Total</Text>
+                  <Text className="font-jakarta-bold text-[#0c2010] text-[14px]">{formatKES(csvSummary?.totalGross)}</Text>
+                </View>
+                <View className="flex-row justify-between items-center">
+                  <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider">Net Payout</Text>
+                  <Text className="font-jakarta-bold text-[#00351d] text-[16px]">{formatKES(csvSummary?.totalNet)}</Text>
+                </View>
+              </View>
+
+              <ScrollView className="mb-4" showsVerticalScrollIndicator={false} style={{ maxHeight: 220 }}>
+                {csvPreview.map((row: any, idx: number) => (
+                  <View key={idx} className="bg-white rounded-2xl p-3 mb-2 border border-[#e7ece7] flex-row items-center">
+                    <View className="w-9 h-9 rounded-full bg-[#f0fdf4] items-center justify-center mr-3 border border-[#bfc9bf]/30">
+                      <Text className="font-jakarta-bold text-[10px] text-[#404942]">{initials(row.name)}</Text>
+                    </View>
+                    <View className="flex-1 min-w-0 mr-2">
+                      <Text className="font-jakarta-bold text-[13px] text-[#0c2010]" numberOfLines={1}>{row.name}</Text>
+                      <Text
+                        className={`text-[10px] font-jakarta-bold ${row.status?.startsWith('Warning') ? 'text-[#b87333]' : 'text-[#707971]'}`}
+                        numberOfLines={1}
+                      >
+                        {row.status || 'Valid'}
+                      </Text>
+                    </View>
+                    <Text className="font-jakarta-bold text-[13px] text-[#0c2010]" style={{ flexShrink: 0 }}>
+                      {formatKES(row.netAmount ?? row.amount)}
+                    </Text>
+                  </View>
+                ))}
+              </ScrollView>
+
+              <TouchableOpacity
+                onPress={() => proceedToFundingSourceSelect('csv')}
+                disabled={csvPreview.length === 0}
+                className="w-full bg-[#00351d] h-[56px] rounded-full flex-row items-center justify-center"
+                style={{ opacity: csvPreview.length === 0 ? 0.7 : 1 }}
+              >
+                <Feather name="arrow-right" size={16} color="#fff" />
+                <Text className="text-white font-jakarta-bold text-[15px] ml-2">Continue</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setShowCsvUpload(false)} className="items-center py-3 mt-2">
+                <Text className="text-[#707971] font-jakarta-bold text-[13px]">Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ── Funding Source Select Modal (Step 3: Funding Source) ── */}
@@ -1625,7 +1596,7 @@ export default function BulkPay() {
                   </View>
                   <View>
                     <Text className="font-jakarta-bold text-[14px] text-[#0c2010]">{fundingSourceLabel}</Text>
-                    <Text className="text-[#707971] font-jakarta-medium text-[11px] mt-0.5">PayChain Account No: {fundingSourceNumber}</Text>
+                    <Text className="text-[#707971] font-jakarta-bold text-[11px] mt-0.5">PayChain Account No: {fundingSourceNumber}</Text>
                   </View>
                 </View>
               </View>
@@ -1655,7 +1626,7 @@ export default function BulkPay() {
             <View className="w-full max-w-lg mx-auto bg-white rounded-t-[36px] px-6 pt-4 pb-8 mt-auto">
               <View className="items-center mb-4"><View className="w-12 h-1.5 bg-[#e7ece7] rounded-full" /></View>
               <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[22px] text-[#0c2010] mb-1">Verification</Text>
-              <Text className="text-[#707971] font-jakarta-medium text-[12px] mb-6">Security check required for settlement</Text>
+              <Text className="text-[#707971] font-jakarta-bold text-[12px] mb-6">Security check required for settlement</Text>
 
               {securityStep === 1 ? (
                 <>
@@ -1741,7 +1712,7 @@ export default function BulkPay() {
               <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#0c2010]">
                 {lastBatchStatus === 'Processed' ? 'Batch Settled' : lastBatchStatus === 'Failed' ? 'Batch Failed' : lastBatchStatus === 'Partial' ? 'Batch Partially Settled' : 'Batch Submitted'}
               </Text>
-              <Text className="text-[#707971] font-jakarta-medium text-[12px] mt-1 text-center" numberOfLines={2}>
+              <Text className="text-[#707971] font-jakarta-bold text-[12px] mt-1 text-center" numberOfLines={2}>
                 {lastBatchStatus === 'Processed'
                   ? `Ref: ${lastBatchReference}`
                   : lastBatchStatus === 'Failed'
@@ -1757,25 +1728,18 @@ export default function BulkPay() {
                   ? { color: '#b91c1c', label: 'Failed · Refunded' }
                   : { color: '#b87333', label: 'Pending' };
                 return (
-                  <View key={r.id} className="bg-[#f0fdf4] rounded-2xl p-3 mb-2 border border-[#e7ece7]">
-                    <View className="flex-row items-center">
-                      <View className="w-9 h-9 rounded-full bg-white items-center justify-center mr-3 border border-[#bfc9bf]/30">
-                        <Text className="font-jakarta-bold text-[10px] text-[#404942]">{initials(r.name)}</Text>
-                      </View>
-                      <View className="flex-1 min-w-0 mr-2">
-                        <Text className="font-jakarta-bold text-[13px] text-[#0c2010]" numberOfLines={1}>{r.name}</Text>
-                        <Text className="text-[#707971] font-jakarta-medium text-[10px]" numberOfLines={1}>{r.id}</Text>
-                      </View>
-                      <View className="items-end" style={{ flexShrink: 0 }}>
-                        <Text className="font-jakarta-bold text-[13px] text-[#0c2010]">{formatKES(r.amount)}</Text>
-                        <Text style={{ color: rowMeta.color }} className="text-[9px] font-jakarta-bold uppercase tracking-wider mt-0.5">{rowMeta.label}</Text>
-                      </View>
+                  <View key={r.id} className="bg-[#f0fdf4] rounded-2xl p-3 mb-2 border border-[#e7ece7] flex-row items-center">
+                    <View className="w-9 h-9 rounded-full bg-white items-center justify-center mr-3 border border-[#bfc9bf]/30">
+                      <Text className="font-jakarta-bold text-[10px] text-[#404942]">{initials(r.name)}</Text>
                     </View>
-                    {r.status === 'failed' && r.failureReason && (
-                      <View className="bg-[#fef2f2] rounded-xl px-3 py-2 mt-2 border border-[#fecaca]">
-                        <Text className="text-[10px] font-jakarta-semibold text-[#b91c1c]">{r.failureReason}</Text>
-                      </View>
-                    )}
+                    <View className="flex-1 min-w-0 mr-2">
+                      <Text className="font-jakarta-bold text-[13px] text-[#0c2010]" numberOfLines={1}>{r.name}</Text>
+                      <Text className="text-[#707971] font-jakarta-bold text-[10px]" numberOfLines={1}>{r.id}</Text>
+                    </View>
+                    <View className="items-end" style={{ flexShrink: 0 }}>
+                      <Text className="font-jakarta-bold text-[13px] text-[#0c2010]">{formatKES(r.amount)}</Text>
+                      <Text style={{ color: rowMeta.color }} className="text-[9px] font-jakarta-bold uppercase tracking-wider mt-0.5">{rowMeta.label}</Text>
+                    </View>
                   </View>
                 );
               })}
@@ -1785,7 +1749,7 @@ export default function BulkPay() {
               <Text className="text-white font-jakarta-bold text-[15px] ml-2">Download Report</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setShowReceipts(false)} className="items-center py-3 mt-2">
-              <Text className="text-[#707971] font-jakarta-semibold text-[13px]">Close</Text>
+              <Text className="text-[#707971] font-jakarta-bold text-[13px]">Close</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1802,7 +1766,7 @@ export default function BulkPay() {
                 <View className="flex-row items-center justify-between mb-4">
                   <View>
                     <Text className="font-jakarta-bold text-[16px] text-[#0c2010]">{showBatchDetails.batchReference}</Text>
-                    <Text className="text-[#707971] font-jakarta-medium text-[11px] mt-0.5">
+                    <Text className="text-[#707971] font-jakarta-bold text-[11px] mt-0.5">
                       {new Date(showBatchDetails.createdAt).toLocaleString('en-KE')}
                     </Text>
                   </View>
@@ -1815,15 +1779,15 @@ export default function BulkPay() {
 
                 <View className="flex-row gap-2 mb-4">
                   <View className="flex-1 bg-[#f0fdf4] rounded-2xl p-3">
-                    <Text className="text-[9px] font-jakarta-medium text-[#707971] uppercase tracking-wider mb-1">Net Paid</Text>
+                    <Text className="text-[9px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1">Net Paid</Text>
                     <Text className="text-[#00351d] font-jakarta-bold text-[15px]">{formatKES(showBatchDetails.totalNetAmount)}</Text>
                   </View>
                   <View className="flex-1 bg-[#f0fdf4] rounded-2xl p-3">
-                    <Text className="text-[9px] font-jakarta-medium text-[#707971] uppercase tracking-wider mb-1">Tax Withheld</Text>
+                    <Text className="text-[9px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1">Tax Withheld</Text>
                     <Text className="text-[#00351d] font-jakarta-bold text-[15px]">{formatKES(showBatchDetails.totalTaxDeductions)}</Text>
                   </View>
                   <View className="flex-1 bg-[#f0fdf4] rounded-2xl p-3">
-                    <Text className="text-[9px] font-jakarta-medium text-[#707971] uppercase tracking-wider mb-1">Payees</Text>
+                    <Text className="text-[9px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1">Payees</Text>
                     <Text className="text-[#00351d] font-jakarta-bold text-[15px]">{showBatchDetails.payeeCount}</Text>
                   </View>
                 </View>
@@ -1834,27 +1798,20 @@ export default function BulkPay() {
                     const rowStatus = tx.status || 'pending';
                     const meta = BATCH_STATUS_META[rowStatus === 'completed' ? 'Processed' : rowStatus === 'failed' ? 'Failed' : 'Pending'];
                     return (
-                      <View key={tx.receiptNumber || idx} className="bg-[#f0fdf4] rounded-2xl p-3 mb-2 border border-[#e7ece7]">
-                        <View className="flex-row items-center">
-                          <View className="w-9 h-9 rounded-full bg-white items-center justify-center mr-3 border border-[#bfc9bf]/30">
-                            <Text className="font-jakarta-bold text-[10px] text-[#404942]">{initials(tx.name)}</Text>
-                          </View>
-                          <View className="flex-1 min-w-0 mr-2">
-                            <Text className="font-jakarta-bold text-[13px] text-[#0c2010]" numberOfLines={1}>{tx.name}</Text>
-                            <Text className="text-[#707971] font-jakarta-medium text-[10px]" numberOfLines={1}>{tx.accountReference}</Text>
-                          </View>
-                          <View className="items-end" style={{ flexShrink: 0 }}>
-                            <Text className="font-jakarta-bold text-[13px] text-[#0c2010]">{formatKES(tx.amount)}</Text>
-                            <View style={{ backgroundColor: meta.bg }} className="px-2 py-0.5 rounded-full mt-1">
-                              <Text style={{ color: meta.text }} className="text-[8px] font-jakarta-bold uppercase tracking-wider">{rowStatus}</Text>
-                            </View>
+                      <View key={tx.receiptNumber || idx} className="bg-[#f0fdf4] rounded-2xl p-3 mb-2 border border-[#e7ece7] flex-row items-center">
+                        <View className="w-9 h-9 rounded-full bg-white items-center justify-center mr-3 border border-[#bfc9bf]/30">
+                          <Text className="font-jakarta-bold text-[10px] text-[#404942]">{initials(tx.name)}</Text>
+                        </View>
+                        <View className="flex-1 min-w-0 mr-2">
+                          <Text className="font-jakarta-bold text-[13px] text-[#0c2010]" numberOfLines={1}>{tx.name}</Text>
+                          <Text className="text-[#707971] font-jakarta-bold text-[10px]" numberOfLines={1}>{tx.accountReference}</Text>
+                        </View>
+                        <View className="items-end" style={{ flexShrink: 0 }}>
+                          <Text className="font-jakarta-bold text-[13px] text-[#0c2010]">{formatKES(tx.amount)}</Text>
+                          <View style={{ backgroundColor: meta.bg }} className="px-2 py-0.5 rounded-full mt-1">
+                            <Text style={{ color: meta.text }} className="text-[8px] font-jakarta-bold uppercase tracking-wider">{rowStatus}</Text>
                           </View>
                         </View>
-                        {rowStatus === 'failed' && tx.failureReason && (
-                          <View className="bg-[#fef2f2] rounded-xl px-3 py-2 mt-2 border border-[#fecaca]">
-                            <Text className="text-[10px] font-jakarta-semibold text-[#b91c1c]">{tx.failureReason}</Text>
-                          </View>
-                        )}
                       </View>
                     );
                   })}
@@ -1862,7 +1819,7 @@ export default function BulkPay() {
               </>
             )}
             <TouchableOpacity onPress={() => setShowBatchDetails(null)} className="items-center py-3 mt-1">
-              <Text className="text-[#707971] font-jakarta-semibold text-[13px]">Close</Text>
+              <Text className="text-[#707971] font-jakarta-bold text-[13px]">Close</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1878,7 +1835,7 @@ export default function BulkPay() {
               <View className="flex-row justify-between items-center mb-5">
                 <View>
                   <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[22px] text-[#0c2010]">{editingId ? 'Edit Recipient' : 'New Recipient'}</Text>
-                  <Text className="text-[10px] font-jakarta-medium text-[#707971] uppercase tracking-wider mt-1">
+                  <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mt-1">
                     Step {addStep} of 2 · {addStep === 1 ? 'Category' : 'Details'}
                   </Text>
                 </View>
@@ -1904,7 +1861,7 @@ export default function BulkPay() {
                           </View>
                           <View className="flex-1">
                             <Text className="font-jakarta-bold text-[15px] text-[#0c2010]">{meta.label}</Text>
-                            <Text className="text-[#707971] font-jakarta-medium text-[11px] mt-0.5">{meta.description}</Text>
+                            <Text className="text-[#707971] font-jakarta-bold text-[11px] mt-0.5">{meta.description}</Text>
                           </View>
                           <View className={`w-5 h-5 rounded-full items-center justify-center ${isActive ? 'bg-[#00351d]' : 'border border-[#bfc9bf]'}`}>
                             {isActive && <Feather name="check" size={11} color="#fff" />}
@@ -1924,15 +1881,14 @@ export default function BulkPay() {
                       onChangeText={(t) => setNewPayee({ ...newPayee, name: t })}
                       placeholder={newPayee.type === 'utility' ? 'e.g. Kenya Power' : 'e.g. John Kamau'}
                       placeholderTextColor="#a1a1aa"
-                      className="bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-4 py-3.5 text-[#0c2010] font-jakarta-semibold text-[14px] mb-4"
+                      className="bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-4 py-3.5 text-[#0c2010] font-jakarta-bold text-[14px] mb-4"
                     />
 
                     {/* KRA Employee fields */}
                     {newPayee.type === 'employee' && (
                       <View className="bg-[#f0fdf4] rounded-2xl p-4 mb-4 border border-[#bbf7d0]">
-                        <Text className="text-[10px] font-jakarta-bold text-[#006c4e] uppercase tracking-wider mb-1">KRA Payroll Details (Optional)</Text>
-                        <Text className="text-[10px] font-jakarta-medium text-[#707971] mb-3">For your own business records.</Text>
-                        <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">KRA PIN</Text>
+                        <Text className="text-[10px] font-jakarta-bold text-[#006c4e] uppercase tracking-wider mb-3">KRA Payroll Details</Text>
+                        <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">KRA PIN *</Text>
                         <TextInput
                           value={newPayee.kraPin}
                           onChangeText={(t) => setNewPayee({ ...newPayee, kraPin: t.toUpperCase() })}
@@ -1941,7 +1897,7 @@ export default function BulkPay() {
                           placeholderTextColor="#a1a1aa"
                           className="bg-white border border-[#e7ece7] rounded-xl px-4 py-3 text-[#0c2010] font-jakarta-bold text-[14px] mb-3"
                         />
-                        <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">ID Number</Text>
+                        <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">ID Number *</Text>
                         <TextInput
                           value={newPayee.idNumber}
                           onChangeText={(t) => setNewPayee({ ...newPayee, idNumber: t.replace(/\D/g, '') })}
@@ -1978,9 +1934,8 @@ export default function BulkPay() {
                     {/* KRA Supplier fields */}
                     {newPayee.type === 'supplier' && (
                       <View className="bg-[#eef2ff] rounded-2xl p-4 mb-4 border border-[#c7d2fe]">
-                        <Text className="text-[10px] font-jakarta-bold text-[#3730a3] uppercase tracking-wider mb-1">KRA eTIMS Details (Optional)</Text>
-                        <Text className="text-[10px] font-jakarta-medium text-[#707971] mb-3">For your own business records.</Text>
-                        <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">Supplier KRA PIN</Text>
+                        <Text className="text-[10px] font-jakarta-bold text-[#3730a3] uppercase tracking-wider mb-3">KRA eTIMS Details</Text>
+                        <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">Supplier KRA PIN *</Text>
                         <TextInput
                           value={newPayee.kraPin}
                           onChangeText={(t) => setNewPayee({ ...newPayee, kraPin: t.toUpperCase() })}
@@ -1989,7 +1944,7 @@ export default function BulkPay() {
                           placeholderTextColor="#a1a1aa"
                           className="bg-white border border-[#e7ece7] rounded-xl px-4 py-3 text-[#0c2010] font-jakarta-bold text-[14px] mb-3"
                         />
-                        <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">eTIMS Invoice</Text>
+                        <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">eTIMS Invoice *</Text>
                         <TextInput
                           value={newPayee.etimsInvoiceNumber}
                           onChangeText={(t) => setNewPayee({ ...newPayee, etimsInvoiceNumber: t })}
@@ -1997,7 +1952,7 @@ export default function BulkPay() {
                           placeholderTextColor="#a1a1aa"
                           className="bg-white border border-[#e7ece7] rounded-xl px-4 py-3 text-[#0c2010] font-jakarta-bold text-[14px] mb-3"
                         />
-                        <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">Control Unit (CU)</Text>
+                        <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">Control Unit (CU) *</Text>
                         <TextInput
                           value={newPayee.cuNumber}
                           onChangeText={(t) => setNewPayee({ ...newPayee, cuNumber: t })}
@@ -2037,20 +1992,15 @@ export default function BulkPay() {
                     {newPayee.paymentMethod === 'Mobile Money' && (
                       <View>
                         <View className="flex-row gap-1.5 mb-3">
-                          {(['Personal Number', 'Paybill', 'Buy Goods'] as MobileMoneyType[]).map((mt) => {
-                            const comingSoon = (mt === 'Paybill' || mt === 'Buy Goods') && !isLipaNaMpesaBetaMerchant;
-                            return (
-                              <TouchableOpacity
-                                key={mt}
-                                disabled={comingSoon}
-                                onPress={() => { if (comingSoon) return; setNewPayee({ ...newPayee, mobileMoneyType: mt }); }}
-                                className={`flex-1 py-2.5 rounded-lg items-center border ${comingSoon ? 'bg-white border-[#e7ece7] opacity-60' : newPayee.mobileMoneyType === mt ? 'bg-[#00351d] border-[#00351d]' : 'bg-white border-[#e7ece7]'}`}
-                              >
-                                <Text className={`font-jakarta-bold text-[10px] uppercase tracking-wider ${comingSoon ? 'text-[#a3aca5]' : newPayee.mobileMoneyType === mt ? 'text-white' : 'text-[#707971]'}`}>{mt}</Text>
-                                {comingSoon && <Text className="font-jakarta-extrabold text-[7px] uppercase tracking-wider text-amber-700 mt-0.5">Coming Soon</Text>}
-                              </TouchableOpacity>
-                            );
-                          })}
+                          {(['Personal Number', 'Paybill', 'Buy Goods'] as MobileMoneyType[]).map((mt) => (
+                            <TouchableOpacity
+                              key={mt}
+                              onPress={() => setNewPayee({ ...newPayee, mobileMoneyType: mt })}
+                              className={`flex-1 py-2.5 rounded-lg items-center border ${newPayee.mobileMoneyType === mt ? 'bg-[#00351d] border-[#00351d]' : 'bg-white border-[#e7ece7]'}`}
+                            >
+                              <Text className={`font-jakarta-bold text-[10px] uppercase tracking-wider ${newPayee.mobileMoneyType === mt ? 'text-white' : 'text-[#707971]'}`}>{mt}</Text>
+                            </TouchableOpacity>
+                          ))}
                         </View>
                         {newPayee.mobileMoneyType === 'Personal Number' && (
                           <TextInput
@@ -2233,7 +2183,7 @@ export default function BulkPay() {
                         onChangeText={(t) => handleUpdateInvoiceItem(index, 'description', t)}
                         placeholder="Item description"
                         placeholderTextColor="#a1a1aa"
-                        className="bg-white border border-[#eff4ef] rounded-xl px-3 py-2.5 text-[13px] font-jakarta-medium text-[#0c2010] mb-2.5"
+                        className="bg-white border border-[#eff4ef] rounded-xl px-3 py-2.5 text-[13px] font-jakarta-bold text-[#0c2010] mb-2.5"
                       />
                       <View className="flex-row items-center gap-2.5">
                         <View className="flex-1">
@@ -2285,7 +2235,7 @@ export default function BulkPay() {
                     multiline
                     numberOfLines={3}
                     textAlignVertical="top"
-                    className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl px-4 py-3 text-[13px] font-jakarta-medium text-[#0c2010] min-h-[80px]"
+                    className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl px-4 py-3 text-[13px] font-jakarta-bold text-[#0c2010] min-h-[80px]"
                   />
                 </View>
                 <TouchableOpacity
@@ -2352,7 +2302,7 @@ export default function BulkPay() {
                 <Feather name="x" size={14} color="#0c2010" />
               </TouchableOpacity>
             </View>
-            <Text className="text-[#707971] font-jakarta-medium text-[12px] mb-4 leading-relaxed">
+            <Text className="text-[#707971] font-jakarta-bold text-[12px] mb-4 leading-relaxed">
               Share this link with your customer to allow them to view and pay this invoice online.
             </Text>
             <View className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl p-4 mb-5">
@@ -2364,8 +2314,6 @@ export default function BulkPay() {
           </View>
         </View>
       </Modal>
-
-      <FundAccountModal visible={showFundAccount} onClose={() => setShowFundAccount(false)} />
     </SafeAreaView>
   );
 }

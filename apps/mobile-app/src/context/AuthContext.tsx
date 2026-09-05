@@ -446,6 +446,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
     await AsyncStorage.setItem(BIOMETRIC_DONE_KEY, 'true');
+    // This function only ever runs once the BiometricSetup screen has
+    // actually been completed on this device — enabled, declined, or
+    // auto-skipped because the device has no biometric hardware — so
+    // hasSetBiometrics must flip to true regardless of `enabled`.
+    // applyBiometricsEnabled() below only flips it on the enabled=true
+    // path (it's also called from session-restore/persistSession with the
+    // server's flag, where enabled=false correctly means "hasn't set up
+    // biometrics on this device yet, still show the screen" — a different
+    // meaning than "just declined it right now").
+    setHasSetBiometrics(true);
     applyBiometricsEnabled(enabled);
   }
 
