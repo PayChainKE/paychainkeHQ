@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Analytics } from "@vercel/analytics/react";
 import { lazy, Suspense } from "react";
 import ScrollToTop from "./components/ScrollToTop";
+import GoogleAnalyticsTracker from "./components/GoogleAnalyticsTracker";
 import FloatingWhatsApp from "./components/FloatingWhatsApp";
 
 // Route-level code splitting — every page used to be a static import here,
@@ -44,6 +45,7 @@ const App = () => {
         <Sonner />
         <BrowserRouter>
           <ScrollToTop />
+          <GoogleAnalyticsTracker />
           <Suspense fallback={null}>
           <Routes>
             <Route path="/" element={<Index />} />
