@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import { trackEvent } from '@/lib/analytics';
 
 const BookDemo: React.FC = () => {
   useEffect(() => {
@@ -49,6 +50,15 @@ const BookDemo: React.FC = () => {
       });
 
       Cal.ns["paychain-demo"]("ui", { "hideEventTypeDetails": false, "layout": "month_view", "theme": "dark" });
+
+      // A confirmed booking happens entirely inside Cal.com's embedded
+      // widget — no page navigation or outbound click GA could pick up on
+      // its own, so this is the only way to know a demo was actually
+      // booked rather than just the page being viewed.
+      Cal.ns["paychain-demo"]("on", {
+        action: "bookingSuccessful",
+        callback: () => trackEvent('generate_lead', { form_name: 'book_demo' }),
+      });
     }
     /* eslint-enable @typescript-eslint/no-explicit-any */
   }, []);
