@@ -1,6 +1,18 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-EDF68839GB"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      // send_page_view is off here — this is a client-side-routed SPA, so
+      // every pageview (including the first) is instead sent explicitly by
+      // src/components/GoogleAnalyticsTracker.tsx on each route change.
+      // Without this, only the very first page load would ever be counted.
+      gtag('config', 'G-EDF68839GB', { send_page_view: false });
+    </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- TODO: Set the document title to the name of your application -->
