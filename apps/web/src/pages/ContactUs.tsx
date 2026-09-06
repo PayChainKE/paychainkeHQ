@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { AxiosError } from "axios";
 import api from "@/lib/api";
+import { trackEvent } from "@/lib/analytics";
 import styles from "./ContactUs.module.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -212,6 +213,10 @@ export default function ContactUs() {
       try {
         await api.post('/api/contact', formData);
         setIsSuccess(true);
+        // GA can't see this on its own — the submit button click doesn't
+        // navigate anywhere, so only a successful backend response should
+        // count as a lead, not just the click.
+        trackEvent('generate_lead', { form_name: 'contact', contact_type: formData.contactType || undefined });
       } catch (err) {
         const axiosError = err as AxiosError<{ error?: string }>;
         console.error('Contact error:', axiosError);
