@@ -3,6 +3,7 @@ import Layout from '../components/layout/Layout';
 import api from '../api/api';
 import { formatKES } from '../utils/formatCurrency';
 import ConfirmTariffChangeModal from '../components/modals/ConfirmTariffChangeModal';
+import { useAuth } from '../context/AuthContext';
 
 const Th = ({ children, className = '' }) => (
   <th className={`px-3 py-3 text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 ${className}`}>{children}</th>
@@ -25,6 +26,15 @@ const RAIL_ICONS = {
 // requestTariffUpdate expects in `changes: [{ key, max, newFee }]`.
 const changeId = (tariffKey, max) => `${tariffKey}::${max ?? 'flat'}`;
 
+// Editing 80+ individual fee bands in one sitting is realistic here (see
+// the 2026-09-07 platform-wide repricing), and this used to live only in
+// component state — closing the tab, an accidental reload, or the page
+// getting kicked back to the login screen wiped every unsaved edit with no
+// way back, forcing a full re-entry from scratch. Persisted to
+// localStorage instead, scoped per admin (not global) so a shared machine
+// doesn't mix up two admins' in-progress edits.
+const draftKey = (adminId) => `paychain_admin_tariff_draft:${adminId || 'anon'}`;
+
 // Every fee tariff currently live on the platform — read straight from the
 // backend's own config/cache (see controllers/tariffController.js), so this
 // page can never show a stale or hand-copied number. Grouped exactly like
@@ -33,6 +43,7 @@ const changeId = (tariffKey, max) => `${tariffKey}::${max ?? 'flat'}`;
 // third-party cost columns never are — those are facts about what NCBA/
 // Safaricom actually charges PayChain, not PayChain's own price to set.
 const TransactionTariffs = () => {
+  const { admin } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -40,6 +51,7 @@ const TransactionTariffs = () => {
   const [editMode, setEditMode] = useState(false);
   const [changes, setChanges] = useState({}); // id -> { key, max, label, oldFee, newFee }
   const [showConfirm, setShowConfirm] = useState(false);
+  const [draftRestored, setDraftRestored] = useState(false);
 
   const fetchTariffs = useCallback(async () => {
     setLoading(true);
@@ -56,6 +68,41 @@ const TransactionTariffs = () => {
   }, []);
 
   useEffect(() => { fetchTariffs(); }, [fetchTariffs]);
+
+  // Restore an unsaved draft left from a previous visit — once, on the
+  // first render where we actually know who's logged in.
+  useEffect(() => {
+    if (!admin?._id) return;
+    try {
+      const raw = localStorage.getItem(draftKey(admin._id));
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      if (saved && typeof saved === 'object' && Object.keys(saved).length > 0) {
+        setChanges(saved);
+        setEditMode(true);
+        setDraftRestored(true);
+      }
+    } catch {
+      // Corrupt/unreadable draft — ignore rather than block the page.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [admin?._id]);
+
+  // Keep the draft in sync with every edit. Removes the key entirely once
+  // there's nothing pending, so a clean session never leaves a stray entry.
+  useEffect(() => {
+    if (!admin?._id) return;
+    try {
+      if (Object.keys(changes).length === 0) {
+        localStorage.removeItem(draftKey(admin._id));
+      } else {
+        localStorage.setItem(draftKey(admin._id), JSON.stringify(changes));
+      }
+    } catch {
+      // Storage full/unavailable (private mode, quota) — editing still
+      // works via component state, it just won't survive a reload.
+    }
+  }, [changes, admin?._id]);
 
   const setChange = useCallback((tariffKey, max, label, oldFee, rawValue) => {
     const id = changeId(tariffKey, max);
@@ -76,6 +123,7 @@ const TransactionTariffs = () => {
   function exitEditMode() {
     setEditMode(false);
     setChanges({});
+    setDraftRestored(false);
   }
 
   function handleConfirmed(freshData) {
@@ -116,11 +164,21 @@ const TransactionTariffs = () => {
           </div>
         </div>
 
+        {draftRestored && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
+            <span className="material-symbols-outlined text-blue-600 shrink-0">restore</span>
+            <p className="text-xs text-blue-800 font-medium leading-relaxed flex-1">
+              Restored {changeList.length} unsaved change{changeList.length === 1 ? '' : 's'} from your last visit — nothing was lost when you left.
+            </p>
+            <button onClick={() => setDraftRestored(false)} className="text-2xs font-bold uppercase tracking-widest text-blue-700 hover:text-blue-900 shrink-0">Dismiss</button>
+          </div>
+        )}
+
         {editMode && (
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
             <span className="material-symbols-outlined text-amber-600 shrink-0">edit_note</span>
             <p className="text-xs text-amber-800 font-medium leading-relaxed">
-              Editing PayChain's own margin/service-fee columns only (highlighted in green) — the real third-party cost columns stay fixed. Every change here applies platform-wide, immediately, once confirmed with a 5-minute email code — no code deploy needed.
+              Editing PayChain's own margin/service-fee columns only (highlighted in green) — the real third-party cost columns stay fixed. Every change here applies platform-wide, immediately, once confirmed with a 5-minute email code — no code deploy needed. Your progress is saved automatically as you go, so it's safe to come back to this later.
             </p>
           </div>
         )}
