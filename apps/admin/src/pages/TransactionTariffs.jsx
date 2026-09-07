@@ -9,6 +9,23 @@ const Th = ({ children, className = '' }) => (
   <th className={`px-3 py-3 text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 ${className}`}>{children}</th>
 );
 
+const formatUpdatedAt = (iso) => {
+  if (!iso) return null;
+  return new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+};
+
+// Old-vs-new caption shown under any fee that's actually been edited before
+// (previousFee is null until the first edit — see confirmTariffUpdate in
+// tariffController.js). Silent no-op for a tariff nobody's touched yet.
+const HistoryNote = ({ previousFee, updatedAt }) => {
+  if (previousFee == null) return null;
+  return (
+    <p className="text-[10px] text-on-surface-variant/50 font-medium mt-0.5 whitespace-nowrap">
+      was {formatKES(previousFee)}{updatedAt ? ` · ${formatUpdatedAt(updatedAt)}` : ''}
+    </p>
+  );
+};
+
 const RAIL_ICONS = {
   rtgs: 'account_balance',
   pesalink: 'bolt',
@@ -280,9 +297,13 @@ const TransactionTariffs = () => {
                         value={changes[changeId(data.invoices.merchantFlatFeeKey, null)]?.newFee ?? data.invoices.merchantFlatFee}
                         onChange={(v) => setChange(data.invoices.merchantFlatFeeKey, null, 'Invoice Merchant Fee', data.invoices.merchantFlatFee, v)}
                       />
+                      <HistoryNote previousFee={data.invoices.previousFee} updatedAt={data.invoices.updatedAt} />
                     </span>
                   ) : (
-                    <span className="text-xs font-bold text-violet-800">Merchant fee: flat {formatKES(data.invoices.merchantFlatFee)} on every invoice</span>
+                    <span className="text-xs font-bold text-violet-800">
+                      Merchant fee: flat {formatKES(data.invoices.merchantFlatFee)} on every invoice
+                      <HistoryNote previousFee={data.invoices.previousFee} updatedAt={data.invoices.updatedAt} />
+                    </span>
                   )}
                 </div>
               </div>
@@ -317,9 +338,10 @@ const TransactionTariffs = () => {
                               value={changes[changeId(rail.tariffKey, null)]?.newFee ?? rail.serviceFee}
                               onChange={(v) => setChange(rail.tariffKey, null, rail.label, rail.serviceFee, v)}
                             />
+                            <HistoryNote previousFee={rail.previousFee} updatedAt={rail.updatedAt} />
                           </div>
                         ) : (
-                          <FlatStat label="PayChain" value={rail.serviceFee} accent />
+                          <FlatStat label="PayChain" value={rail.serviceFee} accent previousFee={rail.previousFee} updatedAt={rail.updatedAt} />
                         )}
                         <FlatStat label="Total" value={rail.totalFee} bold />
                       </div>
@@ -352,12 +374,18 @@ const TransactionTariffs = () => {
                   <div key={s.id} className="flex items-center justify-between bg-surface-container-low/60 rounded-lg px-4 py-3">
                     <span className="text-xs font-bold text-on-surface">{s.label}</span>
                     {editMode ? (
-                      <FeeInput
-                        value={changes[changeId(s.tariffKey, null)]?.newFee ?? s.flatFee}
-                        onChange={(v) => setChange(s.tariffKey, null, s.label, s.flatFee, v)}
-                      />
+                      <div className="text-right">
+                        <FeeInput
+                          value={changes[changeId(s.tariffKey, null)]?.newFee ?? s.flatFee}
+                          onChange={(v) => setChange(s.tariffKey, null, s.label, s.flatFee, v)}
+                        />
+                        <HistoryNote previousFee={s.previousFee} updatedAt={s.updatedAt} />
+                      </div>
                     ) : (
-                      <span className="text-sm font-bold text-emerald-700 tabular-nums">{formatKES(s.flatFee)}</span>
+                      <div className="text-right">
+                        <span className="text-sm font-bold text-emerald-700 tabular-nums">{formatKES(s.flatFee)}</span>
+                        <HistoryNote previousFee={s.previousFee} updatedAt={s.updatedAt} />
+                      </div>
                     )}
                   </div>
                 ))}
@@ -468,6 +496,7 @@ const BandTable = ({ rows, columns, dense, editMode, changes, setChange }) => (
                   ) : (
                     formatKES(r[c.key] ?? 0)
                   )}
+                  {c.editable && <HistoryNote previousFee={r.previousFee} updatedAt={r.updatedAt} />}
                 </td>
               );
             })}
@@ -478,10 +507,11 @@ const BandTable = ({ rows, columns, dense, editMode, changes, setChange }) => (
   </div>
 );
 
-const FlatStat = ({ label, value, accent, bold }) => (
+const FlatStat = ({ label, value, accent, bold, previousFee, updatedAt }) => (
   <div>
     <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 mb-1">{label}</p>
     <p className={`text-sm tabular-nums ${accent ? 'font-bold text-emerald-700' : bold ? 'font-bold text-on-surface' : 'text-on-surface-variant/80'}`}>{formatKES(value)}</p>
+    <HistoryNote previousFee={previousFee} updatedAt={updatedAt} />
   </div>
 );
 

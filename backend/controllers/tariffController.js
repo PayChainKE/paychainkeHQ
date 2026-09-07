@@ -31,7 +31,7 @@ import {
 import { sendAdminActionOTP } from '../utils/resend.js';
 import { logAudit } from '../utils/auditLog.js';
 import { adminActor } from './adminController.js';
-import { loadTariffCache } from '../services/tariffCardCache.js';
+import { loadTariffCache, getCachedTariffDoc } from '../services/tariffCardCache.js';
 
 // Timing-safe 6-digit-OTP-hash compare — identical helper to
 // adminController.js's own safeEqual (kept local here rather than exported/
@@ -78,6 +78,28 @@ function labelBands(bands, { free } = {}) {
 // stamps `tariffKey` (flat cards) or `tariffKey`+`max` per row (tiered
 // cards) onto every editable figure, so the frontend never hardcodes a key
 // name — it just echoes back whatever this endpoint already told it.
+// Old-vs-new display data — pulled from TariffCard's own previousFee/
+// previousFlatFee/updatedAt fields (set by confirmTariffUpdate below on
+// every edit), not recomputed here. Returns rows/fields unchanged when
+// nothing's ever been edited (previousFee/previousFlatFee stay null), so a
+// tariff nobody has touched yet shows no history at all.
+function decorateBands(tariffKey, bands) {
+  const doc = getCachedTariffDoc(tariffKey);
+  if (!doc || !Array.isArray(doc.bands)) return bands;
+  const byMax = new Map(doc.bands.map((b) => [b.max, b]));
+  return bands.map((row) => {
+    const cached = byMax.get(row.max);
+    if (!cached || cached.previousFee == null) return row;
+    return { ...row, previousFee: cached.previousFee, updatedAt: cached.updatedAt };
+  });
+}
+
+function decorateFlat(tariffKey) {
+  const doc = getCachedTariffDoc(tariffKey);
+  if (!doc || doc.previousFlatFee == null) return {};
+  return { previousFee: doc.previousFlatFee, updatedAt: doc.updatedAt };
+}
+
 function buildTariffPayload() {
   return {
     moneyIn: {
@@ -90,19 +112,20 @@ function buildTariffPayload() {
       // getCustomerSurchargeBands() has its own, coarser boundary list, so
       // an index-paired zip would silently mismatch amounts and fees a few
       // rows in.
-      bands: labelBands(SAFARICOM_TARIFF.map((s) => ({
+      bands: decorateBands('customer_surcharge', labelBands(SAFARICOM_TARIFF.map((s) => ({
         max: s.max,
         safaricomFee: s.fee,
         paychainFee: calculateCustomerSurcharge(s.max),
-      })), { free: FLAT_FEE_FREE_TIER_MAX_KES }),
+      })), { free: FLAT_FEE_FREE_TIER_MAX_KES })),
     },
     invoices: {
       note: `The one deliberate dual charge: the merchant pays a flat KES ${getInvoiceMerchantFlatFee()} service fee (clamped to the invoice value) alongside the customer's own tiered markup below.`,
       merchantFlatFee: getInvoiceMerchantFlatFee(),
       merchantFlatFeeKey: 'invoice_merchant_flat_fee',
+      ...decorateFlat('invoice_merchant_flat_fee'),
       freeAtOrBelow: FLAT_FEE_FREE_TIER_MAX_KES,
       customerMarkupKey: 'invoice_client_markup',
-      customerMarkupBands: labelBands(getInvoiceClientMarkupBands(), { free: FLAT_FEE_FREE_TIER_MAX_KES }),
+      customerMarkupBands: decorateBands('invoice_client_markup', labelBands(getInvoiceClientMarkupBands(), { free: FLAT_FEE_FREE_TIER_MAX_KES })),
     },
     moneyOut: {
       note: 'Merchant pays both the real third-party (NCBA/Safaricom) cost and PayChain\'s own margin on every rail below.',
@@ -113,6 +136,7 @@ function buildTariffPayload() {
           shape: 'flat',
           tariffKey: 'rtgs_service_fee',
           ...getRtgsTariff(),
+          ...decorateFlat('rtgs_service_fee'),
         },
         {
           id: 'pesalink',
@@ -120,7 +144,7 @@ function buildTariffPayload() {
           shape: 'tiered',
           tariffKey: 'pesalink_service_fee',
           maxAmount: MAX_PESALINK_AMOUNT,
-          bands: labelBands([500, 3500, 7000, 10000, 250000].map((max) => ({ max, ...getPesaLinkTariff(max) }))),
+          bands: decorateBands('pesalink_service_fee', labelBands([500, 3500, 7000, 10000, 250000].map((max) => ({ max, ...getPesaLinkTariff(max) })))),
         },
         {
           id: 'mobile_withdrawal',
@@ -152,7 +176,7 @@ function buildTariffPayload() {
                 editableBoundary: editableMaxes.has(max),
               };
             });
-            return labelBands(rows).map((b) => ({ ...b, totalFee: round2(b.baseCost + b.serviceFee) }));
+            return decorateBands('mobile_withdrawal_service_fee', labelBands(rows).map((b) => ({ ...b, totalFee: round2(b.baseCost + b.serviceFee) })));
           })(),
         },
         {
@@ -161,7 +185,7 @@ function buildTariffPayload() {
           shape: 'tiered',
           tariffKey: 'lipa_na_mpesa_service_fee',
           maxAmount: MAX_LIPA_NA_MPESA_B2B_AMOUNT,
-          bands: labelBands([100, 500, 1000, 2500, 5000, 10000, 20000, 30000, 40000, 50000, 100000, 150000, 200000, 250000].map((max) => ({ max, ...getLipaNaMpesaTariff(max) }))),
+          bands: decorateBands('lipa_na_mpesa_service_fee', labelBands([100, 500, 1000, 2500, 5000, 10000, 20000, 30000, 40000, 50000, 100000, 150000, 200000, 250000].map((max) => ({ max, ...getLipaNaMpesaTariff(max) })))),
         },
         {
           id: 'kplc_postpaid',
@@ -169,13 +193,14 @@ function buildTariffPayload() {
           shape: 'flat',
           tariffKey: 'kplc_postpaid_service_fee',
           ...getKplcPostpaidTariff(),
+          ...decorateFlat('kplc_postpaid_service_fee'),
         },
         {
           id: 'kplc_prepaid',
           label: 'KPLC Prepaid Token',
           shape: 'tiered',
           tariffKey: 'kplc_prepaid_service_fee',
-          bands: labelBands([500, 2000, 4000, 7000, 10000, 25000, 50000, 100000, 250000].map((max) => ({ max, ...getKplcPrepaidTariff(max) }))),
+          bands: decorateBands('kplc_prepaid_service_fee', labelBands([500, 2000, 4000, 7000, 10000, 25000, 50000, 100000, 250000].map((max) => ({ max, ...getKplcPrepaidTariff(max) })))),
         },
         {
           id: 'ncwsc',
@@ -183,6 +208,7 @@ function buildTariffPayload() {
           shape: 'flat',
           tariffKey: 'ncwsc_service_fee',
           ...getNcwscTariff(),
+          ...decorateFlat('ncwsc_service_fee'),
         },
         {
           id: 'internet',
@@ -191,6 +217,7 @@ function buildTariffPayload() {
           dormant: true,
           tariffKey: 'internet_service_fee',
           ...getInternetTariff(),
+          ...decorateFlat('internet_service_fee'),
         },
         {
           id: 'rent',
@@ -198,17 +225,17 @@ function buildTariffPayload() {
           shape: 'tiered',
           dormant: true,
           tariffKey: 'rent_service_fee',
-          bands: labelBands([10000, 20000, 35000, 50000, 250000].map((max) => ({ max, ...getRentTariff(max) }))),
+          bands: decorateBands('rent_service_fee', labelBands([10000, 20000, 35000, 50000, 250000].map((max) => ({ max, ...getRentTariff(max) })))),
         },
       ],
     },
     flatStreams: {
       note: 'Flat PayChain margins on the remaining transaction types, not tied to a tiered NCBA/Safaricom cost sheet.',
       streams: [
-        { id: 'ncba_disbursement', label: 'NCBA Disbursement (generic, e.g. bank/utility bulk payouts routed via NCBA Host-to-Host)', tariffKey: 'ncba_disbursement_flat', flatFee: getNcbaDisbursementFlatFee() },
-        { id: 'stablecoin_payment', label: 'Stablecoin (USDC) outbound payment', tariffKey: 'stablecoin_flat', flatFee: getStablecoinPaymentFlatFee() },
-        { id: 'settlement', label: 'Generic settlement (bank/mobile off-ramp)', tariffKey: 'settlement_flat', flatFee: getSettlementFlatFee() },
-        { id: 'mpesa_b2b_legacy', label: 'M-Pesa B2B (legacy, pre-NCBA — historical transactions only)', tariffKey: 'mpesa_b2b_legacy_flat', flatFee: getMpesaB2bLegacyFlatFee() },
+        { id: 'ncba_disbursement', label: 'NCBA Disbursement (generic, e.g. bank/utility bulk payouts routed via NCBA Host-to-Host)', tariffKey: 'ncba_disbursement_flat', flatFee: getNcbaDisbursementFlatFee(), ...decorateFlat('ncba_disbursement_flat') },
+        { id: 'stablecoin_payment', label: 'Stablecoin (USDC) outbound payment', tariffKey: 'stablecoin_flat', flatFee: getStablecoinPaymentFlatFee(), ...decorateFlat('stablecoin_flat') },
+        { id: 'settlement', label: 'Generic settlement (bank/mobile off-ramp)', tariffKey: 'settlement_flat', flatFee: getSettlementFlatFee(), ...decorateFlat('settlement_flat') },
+        { id: 'mpesa_b2b_legacy', label: 'M-Pesa B2B (legacy, pre-NCBA — historical transactions only)', tariffKey: 'mpesa_b2b_legacy_flat', flatFee: getMpesaB2bLegacyFlatFee(), ...decorateFlat('mpesa_b2b_legacy_flat') },
       ],
     },
   };
@@ -377,14 +404,26 @@ export const confirmTariffUpdate = async (req, res) => {
       if (!doc) continue; // shouldn't happen — key was validated at request time
       if (doc.shape === 'flat') {
         before.push({ key, max: null, oldFee: doc.flatFee, newFee });
-        bulkOps.push({ updateOne: { filter: { key }, update: { $set: { flatFee: newFee, updatedBy: req.admin._id } } } });
+        bulkOps.push({
+          updateOne: {
+            filter: { key },
+            update: { $set: { flatFee: newFee, previousFlatFee: doc.flatFee, updatedBy: req.admin._id } },
+          },
+        });
       } else {
         const band = doc.bands.find((b) => b.max === max);
         before.push({ key, max, oldFee: band?.fee ?? null, newFee });
         bulkOps.push({
           updateOne: {
             filter: { key, 'bands.max': max },
-            update: { $set: { 'bands.$.fee': newFee, updatedBy: req.admin._id } },
+            update: {
+              $set: {
+                'bands.$.fee': newFee,
+                'bands.$.previousFee': band?.fee ?? null,
+                'bands.$.updatedAt': new Date(),
+                updatedBy: req.admin._id,
+              },
+            },
           },
         });
       }

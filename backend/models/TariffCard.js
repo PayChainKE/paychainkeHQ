@@ -20,10 +20,21 @@ const tariffCardSchema = new mongoose.Schema({
   label: { type: String, required: true },
   shape: { type: String, enum: ['flat', 'tiered'], required: true },
   flatFee: { type: Number, default: null },
+  // What flatFee was immediately before the most recent confirmed edit —
+  // null until the first edit ever happens. Paired with the document's own
+  // `updatedAt` (timestamps: true below) for a flat card, since there's
+  // only ever one value to change at a time.
+  previousFlatFee: { type: Number, default: null },
   bands: [{
     _id: false,
     max: { type: Number, required: true },
     fee: { type: Number, required: true },
+    // Same previous-value pairing as previousFlatFee above, but per band —
+    // a tiered card's document-level `updatedAt` bumps on every edit to
+    // ANY of its ~20 bands, so it can't tell you when band X specifically
+    // last changed. This does.
+    previousFee: { type: Number, default: null },
+    updatedAt: { type: Date, default: null },
   }],
   updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null },
 }, { timestamps: true });

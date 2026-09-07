@@ -24,6 +24,15 @@ export async function loadTariffCache() {
   cache = next;
 }
 
+// Raw cached document for a key, history fields (previousFee/previousFlatFee/
+// per-band updatedAt) and all — for tariffController.js#buildTariffPayload's
+// old-vs-new display, which needs more than the {max,fee} shape the pricing
+// getters below deliberately narrow down to. Read-only; never mutate what
+// this returns.
+export function getCachedTariffDoc(key) {
+  return cache.get(key) || null;
+}
+
 export function startTariffCacheRefreshInterval() {
   setInterval(() => {
     loadTariffCache().catch((e) => console.error('Tariff cache refresh failed:', e));
