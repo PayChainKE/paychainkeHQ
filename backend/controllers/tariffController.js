@@ -128,15 +128,32 @@ function buildTariffPayload() {
           shape: 'tiered',
           tariffKey: 'mobile_withdrawal_service_fee',
           maxAmount: MAX_B2C_AMOUNT,
-          // Same reasoning as moneyIn above — the PayChain-margin bands have
-          // their own, coarser boundary list than B2C_REGISTERED_USER_BANDS
-          // (14 rows vs 20), so this evaluates calculateB2cServiceFee at
-          // each real Safaricom-cost boundary instead of an index zip.
-          bands: labelBands(B2C_REGISTERED_USER_BANDS.map((s) => ({
-            max: s.max,
-            baseCost: s.safaricomFee,
-            serviceFee: calculateB2cServiceFee(s.max),
-          }))).map((b) => ({ ...b, totalFee: round2(b.baseCost + b.serviceFee) })),
+          // The PayChain-margin bands have their own, coarser boundary list
+          // than B2C_REGISTERED_USER_BANDS (14 vs 20) — this used to just
+          // show one row per Safaricom boundary, which meant 7 of those 20
+          // rows (15k/25k/30k/35k/40k/45k/70k) rendered as editable in the
+          // admin UI but always got rejected by requestTariffUpdate's shape
+          // check below, since they aren't real PayChain fee boundaries —
+          // and the one real boundary Safaricom's list doesn't have
+          // (100k) had no row to edit at all. Merging both boundary lists
+          // (deduped, sorted) and stamping `editableBoundary` per row fixes
+          // both: every real boundary gets a row, and the frontend can tell
+          // which rows are actually safe to edit vs. informational-only.
+          bands: (() => {
+            const editableMaxes = new Set(TARIFF_SHAPES.mobile_withdrawal_service_fee.maxes);
+            const allMaxes = [...new Set([...B2C_REGISTERED_USER_BANDS.map((s) => s.max), ...editableMaxes])].sort((a, b) => a - b);
+            const rows = allMaxes.map((max) => {
+              const safaricomBand = B2C_REGISTERED_USER_BANDS.find((s) => max <= s.max) || B2C_REGISTERED_USER_BANDS[B2C_REGISTERED_USER_BANDS.length - 1];
+              const serviceFee = calculateB2cServiceFee(max);
+              return {
+                max,
+                baseCost: safaricomBand.safaricomFee,
+                serviceFee,
+                editableBoundary: editableMaxes.has(max),
+              };
+            });
+            return labelBands(rows).map((b) => ({ ...b, totalFee: round2(b.baseCost + b.serviceFee) }));
+          })(),
         },
         {
           id: 'lipa_na_mpesa',

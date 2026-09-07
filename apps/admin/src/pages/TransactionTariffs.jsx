@@ -330,7 +330,13 @@ const BandTable = ({ rows, columns, dense, editMode, changes, setChange }) => (
           <tr key={i} className={i % 2 === 1 ? 'bg-surface-container-low/20' : ''}>
             <td className={`px-3 ${dense ? 'py-1.5' : 'py-2'} border-b border-outline-variant/5 font-mono text-on-surface-variant/80 whitespace-nowrap`}>{r.label}</td>
             {columns.map((c) => {
-              const isEditing = editMode && c.editable;
+              // Some rails (Mobile Withdrawal) show more rows than boundaries
+              // that can actually be changed — the extra rows exist purely to
+              // surface the real Safaricom cost at a finer granularity than
+              // PayChain's own fee bands use. `editableBoundary === false`
+              // marks those; editing one would always be rejected on confirm.
+              const rowEditable = r.editableBoundary !== false;
+              const isEditing = editMode && c.editable && rowEditable;
               const id = isEditing ? changeId(c.tariffKey, r.max) : null;
               return (
                 <td key={c.key} className={`px-3 ${dense ? 'py-1.5' : 'py-2'} border-b border-outline-variant/5 text-right tabular-nums ${c.accent ? 'font-bold text-emerald-700' : c.bold ? 'font-bold text-on-surface' : 'text-on-surface-variant/80'}`}>
@@ -339,6 +345,10 @@ const BandTable = ({ rows, columns, dense, editMode, changes, setChange }) => (
                       value={changes[id]?.newFee ?? r[c.key] ?? 0}
                       onChange={(v) => setChange(c.tariffKey, r.max, `${r.label}`, r[c.key] ?? 0, v)}
                     />
+                  ) : editMode && c.editable && !rowEditable ? (
+                    <span title="Not a real fee boundary for this tariff — shown for reference only, at the rate the surrounding band already charges.">
+                      {formatKES(r[c.key] ?? 0)}
+                    </span>
                   ) : (
                     formatKES(r[c.key] ?? 0)
                   )}

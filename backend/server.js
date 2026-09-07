@@ -69,7 +69,6 @@ import { loadTariffCache, startTariffCacheRefreshInterval } from './services/tar
 import { backfillNcbaMerchantCodes } from './migrations/backfillNcbaMerchantCodes.js';
 import { checkAndSendDormancyReminders } from './services/dormancyReminderService.js';
 import { checkAndSendTaxDeadlineReminders } from './services/taxDeadlineReminderService.js';
-import { runWeeklyRevenueSweepIfDue } from './services/revenueSweepService.js';
 import { reconcileStuckOpenBankingPayouts } from './services/ncbaOpenBankingReconciliationService.js';
 import { reconcileMissedNcbaCollections } from './services/ncbaCollectionReconciliationService.js';
 import { reconcileUnrecordedBankCharges } from './services/bankChargeReconciliationService.js';
@@ -399,14 +398,14 @@ async function bootstrap() {
   checkAndSendTaxDeadlineReminders();
   setInterval(checkAndSendTaxDeadlineReminders, 24 * 60 * 60 * 1000);
 
-  // Weekly PayChain revenue sweep — checks daily, only actually attempts a
-  // transfer on the configured weekday (PAYCHAIN_REVENUE_SWEEP_DAY, default
-  // Monday), always to the single hardcoded destination account in
-  // revenueSweepService.js's REVENUE_SWEEP_DESTINATION.
-  runWeeklyRevenueSweepIfDue().catch((e) => console.error('Revenue sweep check failed:', e));
-  setInterval(() => {
-    runWeeklyRevenueSweepIfDue().catch((e) => console.error('Revenue sweep check failed:', e));
-  }, 24 * 60 * 60 * 1000);
+  // Weekly PayChain revenue sweep now runs as a standalone Render Cron Job
+  // (scripts/run-revenue-sweep-cron.js) on a fixed clock schedule, instead
+  // of an in-process setInterval here. That old approach only ever checked
+  // in at whatever time-of-day this web service last happened to boot —
+  // a deploy, a crash, any Render restart re-anchored the 24h timer to the
+  // new boot time, so "Monday morning" was never actually guaranteed and
+  // could drift to miss Monday's window entirely some weeks. See that
+  // script's header comment for the cron schedule and setup notes.
 
   // NCBA Open Banking async-rail reconciliation — Mobile B2W/Lipa na Mpesa/
   // KPLC/NCWSC payouts whose settlement callback never arrives would
