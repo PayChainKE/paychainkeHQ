@@ -35,6 +35,33 @@ const changeId = (tariffKey, max) => `${tariffKey}::${max ?? 'flat'}`;
 // doesn't mix up two admins' in-progress edits.
 const draftKey = (adminId) => `paychain_admin_tariff_draft:${adminId || 'anon'}`;
 
+// Every id a restored (or otherwise stale) draft is allowed to still
+// reference, derived from the payload actually just fetched — not a
+// hardcoded list, so this can never itself drift out of sync with the
+// backend the way the Mobile Withdrawal display once did. A row with
+// `editableBoundary === false` (informational-only, see tariffController.js)
+// is deliberately excluded.
+function collectEditableIds(data) {
+  const ids = new Set();
+  if (!data) return ids;
+  const addBands = (tariffKey, bands) => {
+    if (!tariffKey || !bands) return;
+    for (const b of bands) {
+      if (b.editableBoundary === false) continue;
+      ids.add(changeId(tariffKey, b.max));
+    }
+  };
+  addBands(data.moneyIn?.tariffKey, data.moneyIn?.bands);
+  if (data.invoices?.merchantFlatFeeKey) ids.add(changeId(data.invoices.merchantFlatFeeKey, null));
+  addBands(data.invoices?.customerMarkupKey, data.invoices?.customerMarkupBands);
+  for (const rail of data.moneyOut?.rails || []) {
+    if (rail.shape === 'flat') ids.add(changeId(rail.tariffKey, null));
+    else addBands(rail.tariffKey, rail.bands);
+  }
+  for (const s of data.flatStreams?.streams || []) ids.add(changeId(s.tariffKey, null));
+  return ids;
+}
+
 // Every fee tariff currently live on the platform — read straight from the
 // backend's own config/cache (see controllers/tariffController.js), so this
 // page can never show a stale or hand-copied number. Grouped exactly like
@@ -52,6 +79,7 @@ const TransactionTariffs = () => {
   const [changes, setChanges] = useState({}); // id -> { key, max, label, oldFee, newFee }
   const [showConfirm, setShowConfirm] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
+  const [prunedCount, setPrunedCount] = useState(0);
 
   const fetchTariffs = useCallback(async () => {
     setLoading(true);
@@ -104,6 +132,25 @@ const TransactionTariffs = () => {
     }
   }, [changes, admin?._id]);
 
+  // Guards against a stale draft (saved before a tariff's real boundaries
+  // changed, e.g. the Mobile Withdrawal fix) silently resurrecting an edit
+  // that can no longer be submitted — cross-checks whatever's pending
+  // against the payload just fetched and drops anything that no longer
+  // matches a real, editable boundary, rather than letting it ride along
+  // until confirm rejects the whole batch again.
+  useEffect(() => {
+    if (!data) return;
+    const validIds = collectEditableIds(data);
+    setChanges((prev) => {
+      const staleIds = Object.keys(prev).filter((id) => !validIds.has(id));
+      if (staleIds.length === 0) return prev;
+      const next = { ...prev };
+      for (const id of staleIds) delete next[id];
+      setPrunedCount(staleIds.length);
+      return next;
+    });
+  }, [data]);
+
   const setChange = useCallback((tariffKey, max, label, oldFee, rawValue) => {
     const id = changeId(tariffKey, max);
     setChanges((prev) => {
@@ -124,6 +171,7 @@ const TransactionTariffs = () => {
     setEditMode(false);
     setChanges({});
     setDraftRestored(false);
+    setPrunedCount(0);
   }
 
   function handleConfirmed(freshData) {
@@ -171,6 +219,16 @@ const TransactionTariffs = () => {
               Restored {changeList.length} unsaved change{changeList.length === 1 ? '' : 's'} from your last visit — nothing was lost when you left.
             </p>
             <button onClick={() => setDraftRestored(false)} className="text-2xs font-bold uppercase tracking-widest text-blue-700 hover:text-blue-900 shrink-0">Dismiss</button>
+          </div>
+        )}
+
+        {prunedCount > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+            <span className="material-symbols-outlined text-amber-600 shrink-0">warning</span>
+            <p className="text-xs text-amber-800 font-medium leading-relaxed flex-1">
+              Dropped {prunedCount} restored edit{prunedCount === 1 ? '' : 's'} that no longer target a real fee boundary — the tariff's boundaries changed since that draft was saved. Your other changes are unaffected.
+            </p>
+            <button onClick={() => setPrunedCount(0)} className="text-2xs font-bold uppercase tracking-widest text-amber-700 hover:text-amber-900 shrink-0">Dismiss</button>
           </div>
         )}
 
