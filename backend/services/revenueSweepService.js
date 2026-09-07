@@ -99,10 +99,13 @@ function logEvent(level, event, fields) {
 //   - `netUnswept`: `grossUnswept` minus real bank/tax charges
 //     (BankAccountCharge — Excise Duty, Withholding Tax, etc.) plus any
 //     deliberate write-off (RevenueWriteOff — see that model's doc
-//     comment). THIS is the figure actually safe to physically transfer
-//     (runRevenueSweep) or use to compute the pooled account's expected
-//     balance (computeExpectedPoolBalance) — it must stay charge-aware, or
-//     both of those would be wrong again.
+//     comment). Used by computeExpectedPoolBalance for Pool Reconciliation
+//     — it must stay charge-aware there, or that cross-check against the
+//     real NCBA balance would be wrong. runRevenueSweep itself now sweeps
+//     `grossUnswept` (Brandon, 2026-09-07 — charges were outpacing revenue
+//     and pinning this at KES 0 for weeks, holding back real earned
+//     revenue); its own live-balance safety gate is what actually protects
+//     merchant funds, independent of this figure.
 // Callers that want the admin-facing "how much has PayChain earned" KPI
 // should read `grossUnswept` + `totalCharges` (shown as its own line) side
 // by side, never blended into one silently-netted number.
@@ -274,21 +277,28 @@ export async function runRevenueSweep() {
     throw e;
   }
 
-  // Physically transferring must always use the charge-aware net figure —
-  // never the gross admin-facing one (see computeUnsweptRevenue's doc
-  // comment) — real bank/tax charges have already left the account for
-  // real, so only the net remainder is actually safe to move out.
-  const { netUnswept, transactionCount } = await computeUnsweptRevenue();
-  let attemptedAmount = Math.min(netUnswept, MAX_TRANSFER_AMOUNT);
+  // Sweeps the gross accrued figure — real bank/tax charges (Excise Duty,
+  // withholding tax, etc.) no longer net against what's swept (Brandon,
+  // 2026-09-07: those charges were piling up faster than fee revenue and
+  // leaving netUnswept pinned at KES 0 for weeks at a time, holding real
+  // earned revenue back in the pooled account indefinitely). The hard
+  // safety gate right below this — cross-checking against NCBA's actual
+  // live balance minus what's owed to merchants — is what actually
+  // prevents over-sweeping merchant funds, and stays fully in force
+  // regardless of this figure; charges are still tracked and still shown
+  // separately (computeExpectedPoolBalance/Pool Reconciliation), just no
+  // longer allowed to block a real transfer of money PayChain has earned.
+  const { grossUnswept, transactionCount } = await computeUnsweptRevenue();
+  let attemptedAmount = Math.min(grossUnswept, MAX_TRANSFER_AMOUNT);
 
   if (attemptedAmount < MIN_TRANSFER_AMOUNT) {
-    logEvent('info', 'revenue_sweep_skipped_below_minimum', { netUnswept });
+    logEvent('info', 'revenue_sweep_skipped_below_minimum', { grossUnswept });
     return recordSweep({
       periodStart, periodEnd, attemptedAmount, transactionCount, status: 'skipped',
       ...destinationAudit,
-      failureReason: netUnswept <= 0
+      failureReason: grossUnswept <= 0
         ? 'No revenue accrued since the last sweep.'
-        : `Accrued revenue (KES ${netUnswept}) is below NCBA's KES ${MIN_TRANSFER_AMOUNT} minimum transfer.`,
+        : `Accrued revenue (KES ${grossUnswept}) is below NCBA's KES ${MIN_TRANSFER_AMOUNT} minimum transfer.`,
     });
   }
 
