@@ -64,6 +64,16 @@ const TEMPLATES = [
   },
   {
     category: 'tips',
+    label: 'STK Push',
+    body: `Want an easier way to get paid? With PayChain STK Push, just enter your customer's phone number and the amount — they get a prompt to enter their M-PESA PIN, and the money lands in your account instantly. Try it today!`,
+  },
+  {
+    category: 'tips',
+    label: 'Payment Link',
+    body: `Have a customer who isn't near your shop? Create a PayChain Payment Link and send it via WhatsApp or SMS. They tap it, pay instantly, and you get notified — no Paybill number needed!`,
+  },
+  {
+    category: 'tips',
     label: 'Invoices (Credit Sales)',
     body: `Selling on credit? Send your customer a PayChain Invoice on their phone and get paid on time, every time — no more forgotten debts. Try it in your PayChain app today.`,
   },
