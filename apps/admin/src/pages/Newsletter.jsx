@@ -31,6 +31,7 @@ export default function Newsletter() {
   const [error, setError] = useState('');
 
   // Add-subscriber inline form
+  const [addName, setAddName] = useState('');
   const [addEmail, setAddEmail] = useState('');
   const [addBusy, setAddBusy] = useState(false);
   const [addError, setAddError] = useState('');
@@ -139,7 +140,7 @@ export default function Newsletter() {
     return subscribers.filter((s) => {
       if (statusFilter === 'active' && !s.active) return false;
       if (statusFilter === 'inactive' && s.active) return false;
-      if (q && !s.email.toLowerCase().includes(q)) return false;
+      if (q && !s.email.toLowerCase().includes(q) && !(s.name || '').toLowerCase().includes(q)) return false;
       return true;
     });
   }, [subscribers, search, statusFilter]);
@@ -158,8 +159,9 @@ export default function Newsletter() {
     if (!EMAIL_RE.test(email)) { setAddError('Enter a valid email.'); return; }
     setAddBusy(true);
     try {
-      await api.post('/api/newsletter/admin', { email });
+      await api.post('/api/newsletter/admin', { email, name: addName.trim() || undefined });
       setAddEmail('');
+      setAddName('');
       setAddOk(true);
       setTimeout(() => setAddOk(false), 2200);
       fetchAll();
@@ -297,6 +299,7 @@ export default function Newsletter() {
 
   function downloadCsv() {
     const rows = filtered.map((s) => ({
+      Name: s.name || '',
       Email: s.email,
       Status: s.active ? 'Active' : 'Inactive',
       Source: s.source || 'public',
@@ -354,6 +357,15 @@ export default function Newsletter() {
               <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/60 mb-2">Add subscriber manually</p>
               <form onSubmit={handleAdd} className="flex gap-2">
                 <input
+                  type="text"
+                  value={addName}
+                  onChange={(e) => setAddName(e.target.value)}
+                  placeholder="Name (optional)"
+                  maxLength={100}
+                  disabled={addBusy}
+                  className="w-40 px-3 py-2.5 border border-outline-variant/40 rounded-lg text-sm focus:border-primary focus:ring-2 focus:ring-primary/10 outline-none disabled:opacity-50"
+                />
+                <input
                   type="email"
                   value={addEmail}
                   onChange={(e) => { setAddEmail(e.target.value); setAddError(''); }}
@@ -373,7 +385,7 @@ export default function Newsletter() {
               <div className="h-5 mt-1.5">
                 {addError && <p className="text-xs text-red-600 font-medium">{addError}</p>}
                 {addOk && <p className="text-xs text-emerald-600 font-medium">✓ Subscriber added.</p>}
-                {!addError && !addOk && <p className="text-2xs text-on-surface-variant/50">Duplicates are automatically rejected.</p>}
+                {!addError && !addOk && <p className="text-2xs text-on-surface-variant/50">Duplicates are automatically rejected. Add a name to personalize their campaigns.</p>}
               </div>
             </div>
             {/* Search */}
@@ -385,7 +397,7 @@ export default function Newsletter() {
                   <input
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search by email..."
+                    placeholder="Search by name or email..."
                     className="w-full pl-9 pr-3 py-2.5 border border-outline-variant/40 rounded-lg text-sm focus:border-primary focus:ring-2 focus:ring-primary/10 outline-none"
                   />
                 </div>
@@ -453,7 +465,8 @@ export default function Newsletter() {
                       </td>
                       <td className="px-3 py-2 text-on-surface-variant/40 border-b border-outline-variant/5 text-2xs tabular-nums">{String((page - 1) * PAGE_SIZE + i + 1).padStart(3, '0')}</td>
                       <td className="px-3 py-2 border-b border-outline-variant/5">
-                        <p className="font-bold text-on-surface tracking-tight">{s.email}</p>
+                        {s.name && <p className="font-bold text-on-surface tracking-tight">{s.name}</p>}
+                        <p className={s.name ? 'text-2xs text-on-surface-variant/60' : 'font-bold text-on-surface tracking-tight'}>{s.email}</p>
                         {s.addedBy?.email && <p className="text-2xs text-on-surface-variant/50">added by {s.addedBy.email}</p>}
                       </td>
                       <td className="px-3 py-2 border-b border-outline-variant/5">

@@ -5,7 +5,7 @@ import { sendSMS } from '../utils/sms.js';
 import { logAudit } from '../utils/auditLog.js';
 import { adminActor } from './adminController.js';
 
-const CATEGORIES = ['maintenance', 'holiday', 'security', 'general'];
+const CATEGORIES = ['maintenance', 'holiday', 'security', 'general', 'tips'];
 // ~6 concatenated SMS segments (153 chars/part once concatenated) — a
 // generous ceiling for what's meant to stay a short notification, not an
 // admin accidentally pasting in a full newsletter body.

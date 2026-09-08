@@ -10,13 +10,42 @@ import { v2 as cloudinary } from 'cloudinary';
 // DoS. Reachable here from the public, unauthenticated POST /newsletter/subscribe.
 const EMAIL_RE = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 
+// Escapes for interpolating a subscriber-supplied name into email HTML —
+// this is public, unauthenticated input (the landing-page form), so it must
+// never be trusted verbatim inside a <div>.
+function escapeHtml(str) {
+  return String(str ?? '').replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+
+// Merge-tag personalization for sendCampaign below — an admin writes
+// "Hi {{name}}," once in the composer and every recipient gets their own
+// name substituted in at send time (falling back to "there" when a
+// subscriber has none on file), instead of every inbox getting an
+// identical, generic greeting. Case-insensitive / whitespace-tolerant match
+// ({{Name}}, {{ name }}) so a typo'd tag doesn't silently fail to resolve.
+// Two variants: the subject line is plain text (HTML-escaping it would show
+// literal "&amp;" etc. in the inbox), while the body is real HTML.
+const NAME_TAG_RE = /\{\{\s*name\s*\}\}/gi;
+function personalizeSubject(subject, name) {
+  return String(subject).replace(NAME_TAG_RE, (name || '').trim() || 'there');
+}
+function personalizeHtml(html, name) {
+  return String(html).replace(NAME_TAG_RE, escapeHtml((name || '').trim() || 'there'));
+}
+
+function cleanName(name) {
+  return typeof name === 'string' ? name.trim().slice(0, 100) : '';
+}
+
 // ── Public ────────────────────────────────────────────────────────────
 
 // @desc    Subscribe via the public landing page form.
 // @route   POST /api/newsletter
 // @access  Public
 export const subscribe = async (req, res) => {
-  const { email } = req.body;
+  const { email, name } = req.body;
   try {
     if (!email || !EMAIL_RE.test(email)) {
       return res.status(400).json({ error: 'A valid email is required.' });
@@ -26,12 +55,13 @@ export const subscribe = async (req, res) => {
     if (subscriber) {
       if (!subscriber.active) {
         subscriber.active = true;
+        if (!subscriber.name && name) subscriber.name = cleanName(name);
         await subscriber.save();
         return res.json({ message: 'Subscription reactivated!' });
       }
       return res.status(400).json({ error: 'Email already subscribed' });
     }
-    subscriber = await Subscription.create({ email: lower, source: 'public' });
+    subscriber = await Subscription.create({ email: lower, source: 'public', name: cleanName(name) });
     sendNewsletterConfirmation(lower).catch((err) =>
       console.error('Newsletter confirmation email failed:', err)
     );
@@ -72,7 +102,7 @@ export const getSubscribers = async (req, res) => {
 // @access  Private (Admin)
 export const adminAddSubscriber = async (req, res) => {
   try {
-    const { email } = req.body || {};
+    const { email, name } = req.body || {};
     if (!email || !EMAIL_RE.test(email)) {
       return res.status(400).json({ error: 'A valid email is required.' });
     }
@@ -83,6 +113,7 @@ export const adminAddSubscriber = async (req, res) => {
     }
     const subscriber = await Subscription.create({
       email: lower,
+      name: cleanName(name),
       source: 'admin',
       addedBy: req.admin?._id || null,
       active: true,
@@ -157,12 +188,15 @@ export const sendCampaign = async (req, res) => {
       : [];
     const hasSelection = validRecipientIds.length > 0;
     const query = hasSelection ? { _id: { $in: validRecipientIds }, active: true } : { active: true };
-    const subscribers = await Subscription.find(query).select('email').lean();
+    const subscribers = await Subscription.find(query).select('email name').lean();
     if (subscribers.length === 0) {
       return res.status(400).json({ error: hasSelection ? 'None of the selected subscribers are active.' : 'No active subscribers to send to.' });
     }
 
     // Plain text → paragraphs. HTML mode trusts the admin (it's our own UI).
+    // This is the {{name}}-bearing template shared by every recipient —
+    // personalizeSubject/personalizeHtml resolve the actual per-recipient
+    // greeting just before each send below, so this stays the raw template.
     const htmlBody = htmlMode
       ? String(body)
       : String(body)
@@ -176,7 +210,11 @@ export const sendCampaign = async (req, res) => {
     for (let i = 0; i < subscribers.length; i += BATCH) {
       const slice = subscribers.slice(i, i + BATCH);
       const results = await Promise.allSettled(
-        slice.map((s) => sendNewsletterEmail(s.email, subject, htmlBody))
+        slice.map((s) => sendNewsletterEmail(
+          s.email,
+          personalizeSubject(subject, s.name),
+          personalizeHtml(htmlBody, s.name)
+        ))
       );
       results.forEach((r) => { r.status === 'fulfilled' ? success++ : failure++; });
     }

@@ -69,3 +69,23 @@ export function buildInstallReminderSms({ businessName, loginUrl }) {
     }
   );
 }
+
+/**
+ * Admin-triggered re-engagement SMS (Dormant Accounts page) for a merchant
+ * with no recent login/transaction activity — a manual, discretionary
+ * companion to services/dormancyReminderService.js's automated 60-day email
+ * cycle, not a replacement for it. Personalized with the merchant's own
+ * business name so it reads as addressed to them, not a generic blast.
+ *
+ * @param {{ businessName?: string|null }} params
+ * @returns {{ message: string, truncated: boolean, length: number }}
+ */
+export function buildDormantAccountReminderSms({ businessName }) {
+  return buildStrictSms(
+    ({ name }) =>
+      `Hi ${name}, we miss you at PayChain! Sign in or take a payment anytime to keep your account active and earning. We're here if you need anything.`,
+    {
+      truncatable: [{ key: 'name', value: businessName || 'there' }],
+    }
+  );
+}

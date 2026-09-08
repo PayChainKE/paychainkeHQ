@@ -79,6 +79,7 @@ import {
 import { runWalletAudit } from '../controllers/walletAuditController.js';
 import { adminListInvoices } from '../controllers/invoiceController.js';
 import { sendSmsBroadcast, getSmsBroadcasts, deleteSmsBroadcast, clearSmsBroadcasts } from '../controllers/smsBroadcastController.js';
+import { getDormantMerchants, sendDormantReminders } from '../controllers/dormantAccountsController.js';
 import { getRevenue, getRevenueSweeps, archiveRevenueSweep, unarchiveRevenueSweep, exportRevenueSweeps, triggerRevenueSweep, getReconciliations, submitReconciliation, archiveReconciliation, unarchiveReconciliation, bulkArchiveReconciliations, getExpectedPoolBalance, getLivePoolBalance, getPoolAccountStatement, getBankCharges, recordBankCharge, updateBankCharge, archiveBankCharge, writeOffRevenueDeficit, getRevenueTransactions } from '../controllers/revenueController.js';
 import { getApiTransactions, getApiTransactionsSummary } from '../controllers/apiTransactionsController.js';
 import { getTariffs, requestTariffUpdate, confirmTariffUpdate } from '../controllers/tariffController.js';
@@ -329,6 +330,14 @@ router.get('/sms-broadcasts',        protect, excludeOfficer, getSmsBroadcasts);
 router.post('/sms-broadcasts',       protect, requireMutator, sensitiveActionLimiter, sendSmsBroadcast);
 router.delete('/sms-broadcasts/:id', protect, requireMutator, sensitiveActionLimiter, deleteSmsBroadcast);
 router.post('/sms-broadcasts/clear', protect, requireMutator, sensitiveActionLimiter, clearSmsBroadcasts);
+
+// Dormant-account re-engagement — admin-triggered email/SMS reminder to
+// merchants with no recent login/transaction activity, personalized with
+// their business name. Manual companion to the automated 60-day dormancy
+// email cycle (services/dormancyReminderService.js) — see
+// dormantAccountsController.js's doc comment for how the two relate.
+router.get('/dormant-accounts',         protect, excludeOfficer, getDormantMerchants);
+router.post('/dormant-accounts/remind', protect, requireMutator, sensitiveActionLimiter, sendDormantReminders);
 
 // Live dashboard updates (Server-Sent Events) — the admin frontend opens
 // one long-lived connection per session (see AuthContext.jsx) and gets a

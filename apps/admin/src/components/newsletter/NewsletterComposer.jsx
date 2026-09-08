@@ -250,6 +250,51 @@ const IMAGE_SIZES = [
   { value: '100%', label: 'Full' },
 ];
 
+// Starter campaigns — plain, benefit-first language a small shop or kiosk
+// owner reads once and understands, not marketing jargon. Every body uses
+// the {{name}} merge tag (see personalizeHtml in newsletterController.js)
+// so "Hi {{name}}," resolves to the real subscriber's name at send time.
+// Picking one overwrites the current subject/body — same "no confirmation,
+// just apply it" convention as SmsBroadcast.jsx's own quick templates.
+const NEWSLETTER_TEMPLATES = [
+  {
+    icon: 'insights',
+    label: 'Automatic Sales Tracking',
+    subject: 'See your daily sales automatically with PayChain',
+    body: `<p>Hi {{name}},</p><p>Did you know PayChain automatically counts every payment you receive and shows you your daily sales — no notebook, no calculator needed?</p><p>Every time a customer pays your Paybill, you get an instant SMS and it's added to your sales for the day. Just open your dashboard anytime to see how your business is doing.</p><p><a href="https://paychain.co.ke">Check your sales now →</a></p><p>Asante for growing with PayChain!<br>Team PayChain</p>`,
+  },
+  {
+    icon: 'payments',
+    label: 'Cash Advance',
+    subject: 'Need money to restock? PayChain Cash Advance can help',
+    body: `<p>Hi {{name}},</p><p>Running low on stock but your customers haven't paid you back yet? PayChain Cash Advance gives trusted merchants quick access to extra money — based on your own sales history, with no paperwork and no long queues at the bank.</p><p>Open your PayChain dashboard to see if you qualify.</p><p>We're here to help your business grow.<br>Team PayChain</p>`,
+  },
+  {
+    icon: 'diversity_3',
+    label: 'Referral / Grow Together',
+    subject: "Know a shop owner still using a notebook? Tell them about PayChain",
+    body: `<p>Hi {{name}},</p><p>You already know how easy it is to collect payments and track sales with PayChain. Do you know another shop owner, kiosk, or business friend who's still writing sales in a notebook or losing track of M-PESA payments?</p><p>Tell them about PayChain — it's free to sign up and takes just a few minutes to get started.</p><p>Thank you for trusting us with your business.<br>Team PayChain</p>`,
+  },
+  {
+    icon: 'shield_lock',
+    label: 'Account Security',
+    subject: 'Keep your PayChain account safe',
+    body: `<p>Hi {{name}},</p><p>Your money's safety matters to us. Here are 3 quick reminders to keep your PayChain account secure:</p><ul><li>Never share your PIN or OTP with anyone — not even someone claiming to be from PayChain.</li><li>Always check who sent a link before you click it.</li><li>Call us right away if you notice anything suspicious on your account.</li></ul><p>Stay safe out there.<br>Team PayChain</p>`,
+  },
+  {
+    icon: 'volunteer_activism',
+    label: 'Thank You / Loyalty',
+    subject: 'Asante for trusting PayChain with your business',
+    body: `<p>Hi {{name}},</p><p>We just want to say thank you. Every day, business owners like you trust PayChain to collect payments, track sales, and grow — and that means everything to us.</p><p>We're always working to make things easier for you. If there's anything you'd like PayChain to do better, just reply to this email — we read every message.</p><p>Tuko pamoja,<br>Team PayChain</p>`,
+  },
+  {
+    icon: 'celebration',
+    label: 'Holiday Greeting',
+    subject: 'Happy Holidays from PayChain!',
+    body: `<p>Hi {{name}},</p><p>Wishing you and your business a joyful festive season! Thank you for trusting PayChain to collect, pay, protect, and grow with you all year round.</p><p>Season's greetings from all of us at PayChain Kenya.<br>Team PayChain</p>`,
+  },
+];
+
 // ── Main composer ─────────────────────────────────────────────────────
 // `initialContent` seeds the editor once at mount — used when continuing a
 // saved draft. Fine as mount-only: Newsletter.jsx conditionally renders
@@ -261,6 +306,7 @@ export default function NewsletterComposer({
   initialContent, draftStatus, onSaveDraft,
 }) {
   const [showPreview, setShowPreview] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
   const [linkDialog, setLinkDialog] = useState(false);
   const [imageDialog, setImageDialog] = useState(false);
 
@@ -303,6 +349,26 @@ export default function NewsletterComposer({
     setImageDialog(false);
   }, [editor]);
 
+  // {{name}} is resolved per-recipient at send time (see
+  // newsletterController.js#sendCampaign's personalizeHtml) — a subscriber
+  // with no name on file falls back to "there" rather than the tag itself.
+  const insertNameTag = useCallback(() => {
+    if (!editor) return;
+    editor.chain().focus().insertContent('{{name}}').run();
+  }, [editor]);
+
+  const applyTemplate = useCallback((tpl) => {
+    onSubject(tpl.subject);
+    editor?.commands.setContent(tpl.body);
+    setShowTemplates(false);
+  }, [editor, onSubject]);
+
+  // Preview-only substitution so the live preview pane shows what a real
+  // recipient would actually see, instead of a literal "{{name}}" — mirrors
+  // the same fallback ("there") the backend uses when a subscriber has no
+  // name on file, sampled here with a placeholder first name.
+  const previewHtml = html.replace(/\{\{\s*name\s*\}\}/gi, 'Alex');
+
   if (done) {
     return (
       <ModalShell onClose={onClose} wide>
@@ -338,6 +404,11 @@ export default function NewsletterComposer({
               </span>
             )}
             <div className="flex items-center gap-1">
+              <button type="button" onClick={() => setShowTemplates((v) => !v)}
+                className={`px-3 py-1 rounded-lg text-2xs font-bold uppercase tracking-widest transition-all flex items-center gap-1.5 ${showTemplates ? 'bg-white/20 text-white' : 'text-white/60 hover:bg-white/10 hover:text-white'}`}>
+                <span className="material-symbols-outlined text-sm">auto_awesome</span>
+                Templates
+              </button>
               <button type="button" onClick={() => onSaveDraft?.(html)} disabled={busy || draftStatus === 'saving'}
                 className="px-3 py-1 rounded-lg text-2xs font-bold uppercase tracking-widest text-white/60 hover:bg-white/10 hover:text-white transition-all disabled:opacity-40 flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-sm">save</span>
@@ -358,6 +429,26 @@ export default function NewsletterComposer({
         <div className="flex flex-col lg:flex-row flex-1 overflow-hidden min-h-0">
           {/* ── Left: compose pane ── */}
           <div className={`flex flex-col flex-1 min-h-0 ${showPreview ? 'hidden lg:flex lg:w-1/2' : 'flex'}`}>
+
+            {/* Quick templates — overwrites subject + body on click */}
+            {showTemplates && (
+              <div className="px-5 py-3.5 border-b border-outline-variant/15 bg-surface-container-lowest/60 shrink-0">
+                <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 mb-2">Quick Templates — click to fill Subject &amp; Body</p>
+                <div className="flex flex-wrap gap-2">
+                  {NEWSLETTER_TEMPLATES.map((tpl) => (
+                    <button
+                      key={tpl.label}
+                      type="button"
+                      onClick={() => applyTemplate(tpl)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-2xs font-bold transition-colors bg-emerald-50 text-emerald-700 border-emerald-200 hover:opacity-80"
+                    >
+                      <span className="material-symbols-outlined text-sm">{tpl.icon}</span>
+                      {tpl.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* To (read-only) */}
             <div className="flex items-center gap-3 px-5 py-2.5 border-b border-outline-variant/15 bg-surface-container-lowest/30 shrink-0">
@@ -455,6 +546,12 @@ export default function NewsletterComposer({
                 <span className="material-symbols-outlined text-base">image</span>
               </ToolBtn>
 
+              <Divider />
+
+              <ToolBtn onClick={insertNameTag} title="Insert recipient's name — personalizes each email, e.g. 'Hi Brandon,' instead of a generic greeting">
+                <span className="material-symbols-outlined text-base">badge</span>
+              </ToolBtn>
+
               {/* Image size — only shows when the cursor is on an image */}
               {editor?.isActive('image') && (
                 <>
@@ -485,6 +582,14 @@ export default function NewsletterComposer({
               <div className="ml-auto text-2xs text-on-surface-variant/30 tabular-nums">{textLen} chars</div>
             </div>
 
+            {/* Merge-tag hint */}
+            <div className="px-5 py-1.5 border-b border-outline-variant/10 bg-primary/5 shrink-0">
+              <p className="text-2xs text-primary/80">
+                <span className="material-symbols-outlined text-xs align-text-bottom mr-1">badge</span>
+                Tip: use the <button type="button" onClick={insertNameTag} className="font-bold underline hover:text-primary">name tag</button> button (or type <code className="font-mono bg-primary/10 px-1 rounded">{'{{name}}'}</code>) to greet each subscriber by name — e.g. "Hi {'{{name}}'}," becomes "Hi Brandon," per recipient. Falls back to "there" if a subscriber has no name on file.
+              </p>
+            </div>
+
             {/* Editor body */}
             <div className="flex-1 overflow-y-auto">
               <EditorContent editor={editor} />
@@ -511,7 +616,7 @@ export default function NewsletterComposer({
                   </div>
                   <div
                     className="p-6 rich-text-content text-gray-800 leading-relaxed"
-                    dangerouslySetInnerHTML={{ __html: html || '<p class="text-gray-400 italic">(empty — start writing in the editor)</p>' }}
+                    dangerouslySetInnerHTML={{ __html: previewHtml || '<p class="text-gray-400 italic">(empty — start writing in the editor)</p>' }}
                   />
                   <div className="border-t border-gray-100 px-6 py-4 text-center">
                     <p className="text-2xs text-gray-400">You received this email because you subscribed to PayChain updates.</p>
