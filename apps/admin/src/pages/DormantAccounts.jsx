@@ -1,25 +1,54 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import Layout from '../components/layout/Layout';
 import api from '../api/api';
 
-function relativeTime(iso) {
-  if (!iso) return 'Never active';
-  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (s < 3600) return `${Math.max(1, Math.floor(s / 60))}m ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  const days = Math.floor(s / 86400);
-  return `${days}d ago`;
+const MIN_LEN = 5;
+const MAX_LEN = 918;
+// Mirrors dormantAccountsController.js's own DEFAULT_SUBJECT/DEFAULT_MESSAGE
+// exactly — this is just the pre-filled starting point in the editor, the
+// backend applies its own defaults independently if a request ever omits
+// them, so the two never need to be kept in sync at runtime, only in intent.
+const DEFAULT_SUBJECT = 'We miss you at PayChain!';
+const DEFAULT_MESSAGE = "Hi {{business}}, we miss you at PayChain! It's been {{days}} since we last saw you — sign in or take a payment anytime to keep your account active and earning. We're here if you need anything.";
+
+// SMS segment estimate — same math as SmsBroadcast.jsx's own smsSegments.
+function smsSegments(len) {
+  if (len === 0) return 0;
+  if (len <= 160) return 1;
+  return Math.ceil(len / 153);
 }
+
+// Client-side mirror of dormantAccountsController.js's personalizeText —
+// used only to render the Preview panel before sending; the real,
+// authoritative substitution happens server-side per recipient at send time.
+function personalizeText(text, businessName, daysDormant) {
+  const biz = (businessName || '').trim() || 'there';
+  const days = Number.isFinite(daysDormant) ? `${daysDormant} day${daysDormant === 1 ? '' : 's'}` : 'a while';
+  return String(text).replace(/\{\{\s*business\s*\}\}/gi, biz).replace(/\{\{\s*days\s*\}\}/gi, days);
+}
+
+const SAMPLE_MERCHANT = { businessName: "Jane's Duka", daysDormant: 12 };
 
 export default function DormantAccounts() {
   const [merchants, setMerchants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  const [tierFilter, setTierFilter] = useState('all'); // 'all' | 'idle' | 'dormant'
 
+  // 'all' here means "everyone currently visible after the tier/search
+  // filters below" (not literally every idle+dormant merchant in the DB) —
+  // so narrowing the list with tierFilter always narrows who gets messaged
+  // too. confirmSend always resolves this to an explicit id list before
+  // sending, which the backend re-verifies as still idle/dormant anyway.
   const [audience, setAudience] = useState('all'); // 'all' | 'selected'
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [channels, setChannels] = useState({ email: true, sms: false });
+
+  const [subject, setSubject] = useState(DEFAULT_SUBJECT);
+  const [message, setMessage] = useState(DEFAULT_MESSAGE);
+  const [showPreview, setShowPreview] = useState(false);
+  const messageRef = useRef(null);
 
   const [pendingSend, setPendingSend] = useState(false);
   const [sending, setSending] = useState(false);
@@ -42,19 +71,41 @@ export default function DormantAccounts() {
 
   useEffect(() => { fetchDormant(); }, [fetchDormant]);
 
+  const tierCounts = useMemo(() => ({
+    idle: merchants.filter((m) => m.tier === 'idle').length,
+    dormant: merchants.filter((m) => m.tier === 'dormant').length,
+  }), [merchants]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return merchants;
-    return merchants.filter((m) =>
-      (m.businessName || '').toLowerCase().includes(q) ||
-      (m.name || '').toLowerCase().includes(q) ||
-      (m.email || '').toLowerCase().includes(q) ||
-      (m.phone || '').toLowerCase().includes(q)
-    );
-  }, [merchants, search]);
+    return merchants.filter((m) => {
+      if (tierFilter !== 'all' && m.tier !== tierFilter) return false;
+      if (!q) return true;
+      return (
+        (m.businessName || '').toLowerCase().includes(q) ||
+        (m.name || '').toLowerCase().includes(q) ||
+        (m.email || '').toLowerCase().includes(q) ||
+        (m.phone || '').toLowerCase().includes(q)
+      );
+    });
+  }, [merchants, search, tierFilter]);
 
-  const recipientCount = audience === 'all' ? merchants.length : selectedIds.size;
+  const recipientCount = audience === 'all' ? filtered.length : selectedIds.size;
   const anyChannel = channels.email || channels.sms;
+  const trimmedMessage = message.trim();
+
+  // Whoever would actually receive this first — used purely so the Preview
+  // panel shows a real target's business name/days-dormant instead of a
+  // placeholder, whenever one is available. Falls back to a made-up sample
+  // when the current filter/selection is empty so Preview never blanks out.
+  const sampleTarget = useMemo(() => {
+    if (audience === 'all') return filtered[0] || SAMPLE_MERCHANT;
+    const firstSelected = merchants.find((m) => selectedIds.has(m._id));
+    return firstSelected || SAMPLE_MERCHANT;
+  }, [audience, filtered, merchants, selectedIds]);
+
+  const previewSubject = personalizeText(subject.trim() || DEFAULT_SUBJECT, sampleTarget.businessName, sampleTarget.daysDormant);
+  const previewMessage = personalizeText(trimmedMessage || DEFAULT_MESSAGE, sampleTarget.businessName, sampleTarget.daysDormant);
 
   const toggleMerchant = (id) => {
     setSelectedIds((prev) => {
@@ -64,8 +115,24 @@ export default function DormantAccounts() {
     });
   };
 
+  const insertTag = (tag) => {
+    const el = messageRef.current;
+    if (!el) { setMessage((m) => `${m}${tag}`); return; }
+    const start = el.selectionStart ?? message.length;
+    const end = el.selectionEnd ?? message.length;
+    const next = `${message.slice(0, start)}${tag}${message.slice(end)}`;
+    setMessage(next);
+    requestAnimationFrame(() => {
+      el.focus();
+      const pos = start + tag.length;
+      el.setSelectionRange(pos, pos);
+    });
+  };
+
   const openConfirm = () => {
     if (!anyChannel) { showToast('Pick at least one channel.'); return; }
+    if (trimmedMessage.length < MIN_LEN) { showToast(`Message is too short (min ${MIN_LEN} characters).`); return; }
+    if (audience === 'all' && filtered.length === 0) { showToast('No merchants match the current filter.'); return; }
     if (audience === 'selected' && selectedIds.size === 0) { showToast('Select at least one merchant.'); return; }
     setResult(null);
     setPendingSend(true);
@@ -74,10 +141,17 @@ export default function DormantAccounts() {
   const confirmSend = async () => {
     setSending(true);
     try {
+      // Always resolved to an explicit id list — "All" means "everyone
+      // currently visible after the tier/search filters", not literally
+      // every idle+dormant merchant on file, so narrowing the list on
+      // screen always narrows who actually gets messaged.
+      const targetIds = audience === 'all' ? filtered.map((m) => m._id) : Array.from(selectedIds);
       const payload = {
-        audience,
-        merchantIds: audience === 'selected' ? Array.from(selectedIds) : undefined,
+        audience: 'selected',
+        merchantIds: targetIds,
         channels: [channels.email && 'email', channels.sms && 'sms'].filter(Boolean),
+        subject: subject.trim() || DEFAULT_SUBJECT,
+        message: trimmedMessage || DEFAULT_MESSAGE,
       };
       const res = await api.post('/api/admin/dormant-accounts/remind', payload);
       if (res.data?.success) {
@@ -106,7 +180,7 @@ export default function DormantAccounts() {
             </div>
             <h2 className="text-3xl md:text-4xl font-bold text-on-surface tracking-tighter font-headline">Dormant Accounts</h2>
             <p className="text-on-surface-variant/60 mt-1 text-xs md:text-sm font-body">
-              Merchants with no sign-in or transaction in 30+ days. Send a personalized reminder to bring them back.
+              Merchants who've gone quiet — idle (8–30 days) and dormant (30+ days, or never active) both included. Send a personalized reminder to bring them back.
             </p>
           </div>
         </div>
@@ -122,7 +196,7 @@ export default function DormantAccounts() {
           <div className="lg:col-span-3 bg-surface-container-lowest border border-outline-variant/10 rounded-2xl overflow-hidden flex flex-col">
             <div className="px-5 py-4 border-b border-outline-variant/10 flex items-center justify-between gap-3">
               <p className="text-sm font-bold text-on-surface">
-                {loading ? 'Loading…' : `${merchants.length} dormant merchant${merchants.length === 1 ? '' : 's'}`}
+                {loading ? 'Loading…' : `${merchants.length} merchant${merchants.length === 1 ? '' : 's'} (${tierCounts.idle} idle · ${tierCounts.dormant} dormant)`}
               </p>
               <div className="flex gap-2">
                 <button
@@ -131,7 +205,7 @@ export default function DormantAccounts() {
                     audience === 'all' ? 'bg-primary text-white border-primary' : 'bg-white text-on-surface-variant border-outline-variant/20 hover:bg-surface-container-low'
                   }`}
                 >
-                  All ({merchants.length})
+                  All ({filtered.length})
                 </button>
                 <button
                   onClick={() => setAudience('selected')}
@@ -142,6 +216,25 @@ export default function DormantAccounts() {
                   Select ({selectedIds.size})
                 </button>
               </div>
+            </div>
+
+            <div className="px-5 py-3 border-b border-outline-variant/10 flex items-center gap-2">
+              <span className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/40 shrink-0">Show:</span>
+              {[
+                { key: 'all', label: `All (${merchants.length})` },
+                { key: 'idle', label: `Idle (${tierCounts.idle})` },
+                { key: 'dormant', label: `Dormant (${tierCounts.dormant})` },
+              ].map((t) => (
+                <button
+                  key={t.key}
+                  onClick={() => setTierFilter(t.key)}
+                  className={`px-2.5 py-1 rounded-full border text-2xs font-bold transition-colors ${
+                    tierFilter === t.key ? 'bg-on-surface text-white border-on-surface' : 'bg-white text-on-surface-variant border-outline-variant/20 hover:bg-surface-container-low'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
             </div>
 
             <div className="px-5 py-3 border-b border-outline-variant/10">
@@ -163,29 +256,34 @@ export default function DormantAccounts() {
                 <p className="text-xs text-red-600 px-5 py-8 text-center">{error}</p>
               ) : filtered.length === 0 ? (
                 <p className="text-2xs text-on-surface-variant/40 px-5 py-10 text-center">
-                  {merchants.length === 0 ? 'No dormant merchants right now — everyone has been active in the last 30 days.' : 'No merchants match your search.'}
+                  {merchants.length === 0 ? 'No idle or dormant merchants right now — everyone has been active in the last 7 days.' : 'No merchants match this filter.'}
                 </p>
               ) : (
-                filtered.map((m) => (
-                  <label key={m._id} className={`flex items-center gap-3 px-5 py-3 hover:bg-surface-container-low cursor-pointer ${audience !== 'selected' ? 'opacity-60' : ''}`}>
-                    <input
-                      type="checkbox"
-                      disabled={audience !== 'selected'}
-                      checked={audience === 'selected' ? selectedIds.has(m._id) : true}
-                      onChange={() => toggleMerchant(m._id)}
-                      className="w-4 h-4 accent-primary shrink-0"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-bold text-on-surface truncate">{m.businessName || m.name || 'Unnamed merchant'}</p>
-                      <p className="text-2xs text-on-surface-variant/50 truncate">
-                        {m.email || 'no email'}{m.phone ? ` · ${m.phone}` : ' · no phone'}
-                      </p>
-                    </div>
-                    <span className="text-2xs font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 shrink-0">
-                      {m.daysDormant == null ? 'Never active' : `${m.daysDormant}d dormant`}
-                    </span>
-                  </label>
-                ))
+                filtered.map((m) => {
+                  const isDormant = m.tier === 'dormant';
+                  const badgeCls = isDormant ? 'text-red-700 bg-red-50 border-red-200' : 'text-amber-700 bg-amber-50 border-amber-200';
+                  const badgeLabel = m.daysDormant == null ? 'Never active' : `${m.daysDormant}d ${isDormant ? 'dormant' : 'idle'}`;
+                  return (
+                    <label key={m._id} className={`flex items-center gap-3 px-5 py-3 hover:bg-surface-container-low cursor-pointer ${audience !== 'selected' ? 'opacity-60' : ''}`}>
+                      <input
+                        type="checkbox"
+                        disabled={audience !== 'selected'}
+                        checked={audience === 'selected' ? selectedIds.has(m._id) : true}
+                        onChange={() => toggleMerchant(m._id)}
+                        className="w-4 h-4 accent-primary shrink-0"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold text-on-surface truncate">{m.businessName || m.name || 'Unnamed merchant'}</p>
+                        <p className="text-2xs text-on-surface-variant/50 truncate">
+                          {m.email || 'no email'}{m.phone ? ` · ${m.phone}` : ' · no phone'}
+                        </p>
+                      </div>
+                      <span className={`text-2xs font-bold rounded-full px-2 py-0.5 shrink-0 border ${badgeCls}`}>
+                        {badgeLabel}
+                      </span>
+                    </label>
+                  );
+                })
               )}
             </div>
           </div>
@@ -216,16 +314,78 @@ export default function DormantAccounts() {
               </div>
             </div>
 
-            <div className="bg-surface-container-low/60 border border-outline-variant/10 rounded-xl p-4">
-              <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 mb-2">Message preview</p>
-              <p className="text-xs text-on-surface-variant leading-relaxed">
-                Each merchant gets a message addressed to <strong>their own business</strong> — e.g. "Hi {'{'}Business Name{'}'}, we miss you at PayChain!" — not one generic blast. The exact copy is fixed (not editable here) so it always stays on-brand; only the audience and channel change.
-              </p>
+            {channels.email && (
+              <div>
+                <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 mb-2">Email Subject</p>
+                <input
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  maxLength={200}
+                  placeholder={DEFAULT_SUBJECT}
+                  className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-2.5 text-sm font-medium text-on-surface focus:ring-2 focus:ring-primary/30 focus:border-primary/40 outline-none"
+                />
+              </div>
+            )}
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50">Message</p>
+                <p className={`text-2xs font-bold tabular-nums ${message.length > MAX_LEN ? 'text-red-600' : 'text-on-surface-variant/40'}`}>
+                  {message.length} / {MAX_LEN}{channels.sms ? ` · ${smsSegments(trimmedMessage.length)} SMS` : ''}
+                </p>
+              </div>
+              <textarea
+                ref={messageRef}
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                rows={5}
+                maxLength={MAX_LEN}
+                placeholder={DEFAULT_MESSAGE}
+                className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-medium text-on-surface focus:ring-2 focus:ring-primary/30 focus:border-primary/40 outline-none resize-none"
+              />
+              <div className="flex items-center flex-wrap gap-2 mt-2">
+                <span className="text-2xs text-on-surface-variant/40 font-bold">Insert:</span>
+                <button type="button" onClick={() => insertTag('{{business}}')} className="px-2 py-1 rounded-md bg-primary/10 text-primary text-2xs font-bold font-mono hover:bg-primary/20 transition-colors">{'{{business}}'}</button>
+                <button type="button" onClick={() => insertTag('{{days}}')} className="px-2 py-1 rounded-md bg-primary/10 text-primary text-2xs font-bold font-mono hover:bg-primary/20 transition-colors">{'{{days}}'}</button>
+                <span className="text-2xs text-on-surface-variant/40">— resolved per merchant at send time.</span>
+              </div>
             </div>
 
             <button
+              type="button"
+              onClick={() => setShowPreview((v) => !v)}
+              className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-outline-variant/20 text-on-surface-variant text-2xs font-bold uppercase tracking-widest hover:bg-surface-container-low transition-colors"
+            >
+              <span className="material-symbols-outlined text-sm">{showPreview ? 'visibility_off' : 'visibility'}</span>
+              {showPreview ? 'Hide preview' : 'Preview before sending'}
+            </button>
+
+            {showPreview && (
+              <div className="space-y-3">
+                <p className="text-2xs text-on-surface-variant/50">
+                  Previewing as <strong className="text-on-surface">{sampleTarget.businessName || 'this merchant'}</strong>{sampleTarget === SAMPLE_MERCHANT ? ' (sample — no merchant selected yet)' : ''}.
+                </p>
+                {channels.email && (
+                  <div className="border border-outline-variant/15 rounded-xl overflow-hidden">
+                    <div className="bg-[#06201B] px-4 py-3">
+                      <p className="text-2xs font-bold uppercase tracking-widest text-emerald-300/80 mb-0.5">Email preview</p>
+                      <p className="text-white font-bold text-sm">{previewSubject}</p>
+                    </div>
+                    <div className="bg-white p-4 text-xs text-on-surface-variant leading-relaxed whitespace-pre-wrap">{previewMessage}</div>
+                  </div>
+                )}
+                {channels.sms && (
+                  <div className="border border-outline-variant/15 rounded-xl p-4">
+                    <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 mb-2">SMS preview</p>
+                    <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-xs text-emerald-900 whitespace-pre-wrap">{previewMessage}</div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <button
               onClick={openConfirm}
-              disabled={!anyChannel || recipientCount === 0 || sending}
+              disabled={!anyChannel || recipientCount === 0 || sending || trimmedMessage.length > MAX_LEN}
               className="w-full py-3.5 rounded-xl bg-primary text-white font-bold text-sm uppercase tracking-widest shadow-md hover:shadow-lg disabled:opacity-40 transition-all flex items-center justify-center gap-2"
             >
               <span className="material-symbols-outlined text-lg">send</span>
@@ -257,6 +417,11 @@ export default function DormantAccounts() {
                   {channels.sms ? ' — real SMS cost applies.' : '.'}
                 </p>
               </div>
+            </div>
+            <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-xl p-3 mb-5 max-h-40 overflow-y-auto">
+              <p className="text-2xs font-bold text-on-surface-variant/40 uppercase tracking-widest mb-1.5">Preview — as {sampleTarget.businessName || 'this merchant'}</p>
+              {channels.email && <p className="text-xs font-bold text-on-surface mb-1">{previewSubject}</p>}
+              <p className="text-xs text-on-surface-variant whitespace-pre-wrap">{previewMessage}</p>
             </div>
             <div className="flex gap-2">
               <button

@@ -17,11 +17,10 @@ const CATEGORY_META = {
 
 // "Tips & Features" copy is deliberately plain, benefit-first language — a
 // kiosk or village-shop owner reading this on a basic phone should
-// understand it on the first read, no banking/tech jargon. Mirrors the
-// {{name}}-free, one-size-fits-all style of the other broadcast templates
-// (SMS Broadcast has no per-recipient merge tag like Newsletter does — see
-// buildDormantAccountReminderSms in accountSmsTemplates.js for the one
-// personalized SMS surface in the app).
+// understand it on the first read, no banking/tech jargon. Fixed,
+// {{merge-tag}}-free copy sent identically to every recipient — for a
+// per-recipient personalized/editable SMS blast, see the Dormant Accounts
+// page (dormantAccountsController.js's {{business}}/{{days}} tags).
 const TEMPLATES = [
   {
     category: 'maintenance',
