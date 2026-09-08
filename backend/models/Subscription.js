@@ -11,6 +11,16 @@ const SubscriptionSchema = new mongoose.Schema({
     // for why the old pattern was a catastrophic-backtracking DoS.
     match: [/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/, 'Please add a valid email']
   },
+  // Optional — lets campaigns greet a subscriber by name (see
+  // newsletterController.js#sendCampaign's {{name}} merge tag) instead of a
+  // generic "Dear Customer". Blank for older/public subscribers who signed
+  // up before this field existed; those just fall back to "there".
+  name: {
+    type: String,
+    trim: true,
+    default: '',
+    maxlength: 100,
+  },
   active: {
     type: Boolean,
     default: true,

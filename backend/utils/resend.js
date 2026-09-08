@@ -1634,6 +1634,66 @@ export const sendDormancyFinalWarningEmail = async (email, name, businessName) =
   }
 };
 
+// @desc  Admin-triggered re-engagement email (Dormant Accounts page,
+// controllers/dormantAccountsController.js) — a manual companion to the
+// automated sendDormancyReminderEmail/sendDormancyFinalWarningEmail pair
+// above, for an admin who wants to nudge dormant merchants right now rather
+// than wait for the scheduled 53/60-day cycle. Personalized with both the
+// contact's name (greeting) and the business name (body copy), same as the
+// automated notices, so it never reads as a generic mass blast.
+export const sendDormantAccountReminderEmail = async (email, name, businessName, daysDormant) => {
+  try {
+    const safeName = (name || 'there').toString().replace(/</g, '&lt;');
+    const safeBiz  = (businessName || 'your business').toString().replace(/</g, '&lt;');
+    const sinceLine = Number.isFinite(daysDormant) && daysDormant > 0
+      ? `It's been ${daysDormant} day${daysDormant === 1 ? '' : 's'} since we last saw any activity on <strong>${safeBiz}</strong>'s account.`
+      : `We haven't seen any recent activity on <strong>${safeBiz}</strong>'s account.`;
+
+    const data = await resend.emails.send({
+      from: 'PayChain <info@paychain.co.ke>',
+      to: [email],
+      subject: `We miss you at PayChain, ${safeName}!`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 560px; margin: auto; background: #ffffff; border: 1px solid #eef0ee; border-radius: 18px; overflow: hidden;">
+          <div style="background: linear-gradient(135deg, #06201B 0%, #0a3029 100%); padding: 32px 32px 36px;">
+            <div style="margin-bottom: 20px;">${logoImgWhite(108, 'left')}</div>
+            <div style="display: inline-flex; align-items: center; gap: 10px;">
+              <span style="display: inline-block; width: 36px; height: 36px; border-radius: 999px; background: rgba(94, 254, 179, 0.18); text-align: center; line-height: 36px; color: #5EFEB3; font-size: 18px; font-weight: 800;">♥</span>
+              <div>
+                <p style="margin: 0; color: #5EFEB3; font-size: 11px; font-weight: 800; letter-spacing: 2.5px; text-transform: uppercase;">Keep Growing With Us</p>
+                <h1 style="margin: 4px 0 0; color: #fff; font-size: 22px; font-weight: 800; letter-spacing: -0.3px;">We miss you!</h1>
+              </div>
+            </div>
+          </div>
+
+          <div style="padding: 36px 32px;">
+            <p style="margin: 0 0 16px; color: #111; font-size: 15px;">Hi ${safeName},</p>
+            <p style="margin: 0 0 22px; color: #4b5563; font-size: 15px; line-height: 1.6;">${sinceLine}</p>
+
+            <div style="background: #f0fdf9; border-left: 4px solid #06201B; border-radius: 8px; padding: 16px 18px; margin: 0 0 26px;">
+              <p style="margin: 0; color: #0a3029; font-size: 13px; line-height: 1.5;">
+                Sign in or take a payment anytime to keep your account active — collect, pay, and grow with PayChain whenever you're ready. We're here if you need anything.
+              </p>
+            </div>
+
+            <a href="${FRONTEND_URL}/login" style="display: inline-block; background: #06201B; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 12px; font-weight: 800; font-size: 14px; letter-spacing: 0.4px;">Sign in to your dashboard →</a>
+          </div>
+
+          <div style="padding: 22px 30px; background: #fafafa; border-top: 1px solid #eef0ee; text-align: center;">
+            <p style="margin: 0; color: #9ca3af; font-size: 11px;">Questions? Contact <a href="mailto:support@paychain.co.ke" style="color: #6b7280;">support@paychain.co.ke</a>.</p>
+            <p style="margin: 8px 0 0; color: #bbb; font-size: 11px;">&copy; ${new Date().getFullYear()} PayChainKE · Nairobi, Kenya</p>
+          </div>
+        </div>
+      `,
+    });
+    console.log(`📧 Dormant account reminder (manual) → ${email}`);
+    return data;
+  } catch (error) {
+    console.error('❌ Resend Dormant Account Reminder Error:', error);
+    throw error;
+  }
+};
+
 // @desc  Sent to every active owner-role admin after each weekly revenue
 // sweep attempt (services/revenueSweepService.js) — completed, failed, or
 // skipped. The sweep itself has no human approval step (it's not tied to

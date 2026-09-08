@@ -12,8 +12,16 @@ const CATEGORY_META = {
   holiday:     { label: 'Holiday',     icon: 'celebration', color: 'bg-pink-50 text-pink-700 border-pink-200' },
   security:    { label: 'Security',    icon: 'shield', color: 'bg-red-50 text-red-700 border-red-200' },
   general:     { label: 'General',     icon: 'campaign', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+  tips:        { label: 'Tips & Features', icon: 'insights', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
 };
 
+// "Tips & Features" copy is deliberately plain, benefit-first language — a
+// kiosk or village-shop owner reading this on a basic phone should
+// understand it on the first read, no banking/tech jargon. Mirrors the
+// {{name}}-free, one-size-fits-all style of the other broadcast templates
+// (SMS Broadcast has no per-recipient merge tag like Newsletter does — see
+// buildDormantAccountReminderSms in accountSmsTemplates.js for the one
+// personalized SMS surface in the app).
 const TEMPLATES = [
   {
     category: 'maintenance',
@@ -29,6 +37,36 @@ const TEMPLATES = [
     category: 'security',
     label: 'Security Reminder',
     body: `Dear Merchant, protect your PayChain PIN and OTP — never share them with anyone, even someone claiming to call from PayChain. We will never ask for your PIN over a call or SMS. Noticed suspicious activity on your account? Call ${PAYCHAIN_PHONE} immediately. – Team PayChain`,
+  },
+  {
+    category: 'tips',
+    label: 'Automatic Sales Tracking',
+    body: `Collect payments on your PayChain Paybill without worry! PayChain confirms every customer payment and counts your daily sales automatically so you never lose track of money. Check sales: https://paychain.co.ke`,
+  },
+  {
+    category: 'tips',
+    label: 'Cash Advance',
+    body: `Need extra money to restock your shop? PayChain gives trusted merchants a Cash Advance based on your own sales — no paperwork, no long queues at the bank. Open your PayChain app to see if you qualify.`,
+  },
+  {
+    category: 'tips',
+    label: 'Your Money Is Safe',
+    body: `Your money is safe with PayChain. Every coin your customers pay goes straight to your account, and you can move it to M-PESA anytime you need it. Karibu PayChain — collect with confidence!`,
+  },
+  {
+    category: 'tips',
+    label: 'Referral / Grow Together',
+    body: `Do you know another shop owner who still writes sales in a notebook? Tell them about PayChain! Free to join, instant payment alerts, and automatic sales records. Asante for growing with us.`,
+  },
+  {
+    category: 'tips',
+    label: 'Bulk Pay (Suppliers & Staff)',
+    body: `Paying many suppliers or workers at once? Use PayChain Bulk Pay to send money to everyone in one go, straight from your phone — no more standing in line at the bank.`,
+  },
+  {
+    category: 'tips',
+    label: 'Invoices (Credit Sales)',
+    body: `Selling on credit? Send your customer a PayChain Invoice on their phone and get paid on time, every time — no more forgotten debts. Try it in your PayChain app today.`,
   },
   {
     category: 'general',

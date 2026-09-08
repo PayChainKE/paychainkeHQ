@@ -52,6 +52,7 @@ const NAV_SECTIONS = [
       { icon: 'mail',          label: 'Messages',       path: '/messages'       },
       { icon: 'newspaper',     label: 'Newsletter',     path: '/newsletter'     },
       { icon: 'sms',           label: 'SMS Broadcast',  path: '/sms-broadcast'  },
+      { icon: 'person_alert',  label: 'Dormant Accounts', path: '/dormant-accounts' },
     ],
   },
   {
