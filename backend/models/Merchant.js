@@ -731,6 +731,16 @@ const merchantSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  // Cooldown marker for the MANUAL Dormant Accounts admin feature (see
+  // controllers/dormantAccountsController.js) — separate from the two
+  // automated fields above. Claimed atomically (findOneAndUpdate against
+  // this field) immediately before a reminder actually goes out, so a
+  // double-click on "Confirm & Send" or two overlapping requests can never
+  // both win the race and message the same merchant twice.
+  dormantManualReminderSentAt: {
+    type: Date,
+    default: null,
+  },
 }, {
   timestamps: true
 });

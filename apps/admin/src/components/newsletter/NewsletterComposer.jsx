@@ -293,6 +293,18 @@ const NEWSLETTER_TEMPLATES = [
     subject: 'Happy Holidays from PayChain!',
     body: `<p>Hi {{name}},</p><p>Wishing you and your business a joyful festive season! Thank you for trusting PayChain to collect, pay, protect, and grow with you all year round.</p><p>Season's greetings from all of us at PayChain Kenya.<br>Team PayChain</p>`,
   },
+  {
+    icon: 'phone_iphone',
+    label: 'STK Push',
+    subject: 'Get paid faster with PayChain STK Push',
+    body: `<p>Hi {{name}},</p><p>Tired of customers mistyping your Paybill number or sending money to the wrong account? With PayChain STK Push, you don't need to give out any numbers at all.</p><p>Just enter your customer's phone number and the amount on your PayChain dashboard. They'll get a prompt on their phone — they enter their M-PESA PIN, and the money lands in your account instantly.</p><p><a href="https://paychain.co.ke">Try STK Push today →</a></p><p>Faster payments, fewer mistakes.<br>Team PayChain</p>`,
+  },
+  {
+    icon: 'link',
+    label: 'Payment Link',
+    subject: 'Sell to any customer, anywhere, with a PayChain Payment Link',
+    body: `<p>Hi {{name}},</p><p>Have a customer who isn't standing in front of you — maybe they called in an order, or found you online? Create a PayChain Payment Link and send it to them on WhatsApp, SMS, or Facebook.</p><p>They just tap the link and pay — no Paybill number to remember, no mistakes. You get notified the moment they pay.</p><p><a href="https://paychain.co.ke">Create your first Payment Link →</a></p><p>Sell more, anywhere.<br>Team PayChain</p>`,
+  },
 ];
 
 // ── Main composer ─────────────────────────────────────────────────────

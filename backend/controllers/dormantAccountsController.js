@@ -59,6 +59,15 @@ const IDLE_WITHIN_DAYS = 30;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const BATCH = 10;
 
+// Same cooldown convention as adminController.js's sendInstallReminder. The
+// real purpose here isn't rate-limiting per se — it's correctness: claiming
+// a merchant via an atomic findOneAndUpdate (below) before actually sending
+// anything means a double-click on "Confirm & Send", or two requests that
+// overlap for any other reason, can never both win the race and message the
+// same merchant twice. Only one concurrent request can flip
+// dormantManualReminderSentAt from stale/null to "now" for a given _id.
+const REMINDER_COOLDOWN_MS = 5 * 60 * 1000;
+
 function tierFor(daysSinceActivity) {
   if (daysSinceActivity == null) return 'dormant';
   if (daysSinceActivity <= ACTIVE_WITHIN_DAYS) return 'active';
@@ -164,11 +173,29 @@ export const sendDormantReminders = async (req, res) => {
       return res.status(400).json({ error: 'None of the selected merchants are currently idle or dormant.' });
     }
 
-    let emailSuccess = 0, emailFailure = 0, smsSuccess = 0, smsFailure = 0;
+    let emailSuccess = 0, emailFailure = 0, smsSuccess = 0, smsFailure = 0, skipped = 0;
 
     for (let i = 0; i < targets.length; i += BATCH) {
       const slice = targets.slice(i, i + BATCH);
       await Promise.allSettled(slice.map(async (m) => {
+        // Atomically claim this merchant before sending anything — see
+        // REMINDER_COOLDOWN_MS's comment above for why this is the actual
+        // fix for double-sends, not just a rate limit.
+        const claimed = await Merchant.findOneAndUpdate(
+          {
+            _id: m._id,
+            $or: [
+              { dormantManualReminderSentAt: null },
+              { dormantManualReminderSentAt: { $lt: new Date(Date.now() - REMINDER_COOLDOWN_MS) } },
+            ],
+          },
+          { $set: { dormantManualReminderSentAt: new Date() } }
+        );
+        if (!claimed) {
+          skipped++;
+          return;
+        }
+
         const personalizedPlain = personalizeText(finalMessage, m.businessName, m.daysDormant);
         if (wantEmail) {
           if (!m.email) {
@@ -196,19 +223,20 @@ export const sendDormantReminders = async (req, res) => {
 
     logAudit({
       action: 'admin.dormant_reminder.sent', category: 'admin', severity: 'info',
-      message: `Sent dormant-account reminder to ${targets.length} merchant(s) via ${[wantEmail && 'email', wantSms && 'SMS'].filter(Boolean).join(' + ')}`,
+      message: `Sent dormant-account reminder to ${targets.length - skipped} merchant(s) via ${[wantEmail && 'email', wantSms && 'SMS'].filter(Boolean).join(' + ')}${skipped ? ` (${skipped} skipped — reminded moments ago)` : ''}`,
       actor: adminActor(req.admin), req,
-      metadata: { targetCount: targets.length, emailSuccess, emailFailure, smsSuccess, smsFailure, audience },
+      metadata: { targetCount: targets.length, emailSuccess, emailFailure, smsSuccess, smsFailure, skipped, audience },
     });
 
     const parts = [];
     if (wantEmail) parts.push(`${emailSuccess}/${emailSuccess + emailFailure} emails`);
     if (wantSms) parts.push(`${smsSuccess}/${smsSuccess + smsFailure} SMS`);
+    const skippedNote = skipped ? ` (${skipped} skipped — already reminded in the last few minutes)` : '';
 
     res.json({
       success: true,
-      message: `Sent to ${targets.length} merchant${targets.length === 1 ? '' : 's'} — ${parts.join(', ')}.`,
-      data: { targetCount: targets.length, emailSuccess, emailFailure, smsSuccess, smsFailure },
+      message: `Sent to ${targets.length - skipped} merchant${(targets.length - skipped) === 1 ? '' : 's'} — ${parts.join(', ')}.${skippedNote}`,
+      data: { targetCount: targets.length, emailSuccess, emailFailure, smsSuccess, smsFailure, skipped },
     });
   } catch (error) {
     console.error('Send Dormant Reminders Error:', error);
