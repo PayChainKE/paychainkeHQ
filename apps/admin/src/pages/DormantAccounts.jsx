@@ -52,6 +52,7 @@ export default function DormantAccounts() {
 
   const [pendingSend, setPendingSend] = useState(false);
   const [sending, setSending] = useState(false);
+  const sendingRef = useRef(false);
   const [result, setResult] = useState(null); // { message } | null
   const [toast, setToast] = useState('');
   const showToast = useCallback((msg) => { setToast(msg); setTimeout(() => setToast(''), 3500); }, []);
@@ -139,6 +140,13 @@ export default function DormantAccounts() {
   };
 
   const confirmSend = async () => {
+    // Synchronous ref guard, not just the `sending` state — a state update
+    // isn't guaranteed to have committed to the DOM (disabling the button)
+    // before a near-simultaneous second click/Enter-key fires this again.
+    // The backend's own atomic per-merchant claim is the real fix for a
+    // duplicate send; this just avoids firing a redundant request at all.
+    if (sendingRef.current) return;
+    sendingRef.current = true;
     setSending(true);
     try {
       // Always resolved to an explicit id list — "All" means "everyone
@@ -164,6 +172,7 @@ export default function DormantAccounts() {
     } catch (e) {
       showToast(e?.response?.data?.error || 'Send failed.');
     } finally {
+      sendingRef.current = false;
       setSending(false);
     }
   };
