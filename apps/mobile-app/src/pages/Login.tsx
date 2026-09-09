@@ -2,11 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator, Modal, FlatList, Image, Linking } from 'react-native';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as DocumentPicker from 'expo-document-picker';
 import { useAuth } from '../context/AuthContext';
 import { useBiometrics } from '../hooks/useBiometrics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ValidatedTextInput } from '../components/ValidatedTextInput';
 import { validators } from '../utils/validators';
+
+// Mirrors the backend's canonical list (merchantAuthController.js's
+// CERTIFICATE_DOCUMENT_TYPES) and apps/merchant-dashboard/src/pages/Login.jsx's
+// picker — keep all three in sync if this ever changes.
+const CERTIFICATE_DOCUMENT_TYPES = [
+  { value: 'certificate_of_registration', label: 'Certificate of Registration' },
+  { value: 'business_permit', label: 'Business Permit' },
+  { value: 'license', label: 'License' },
+  { value: 'other', label: 'Other Business Document' },
+];
 
 const KENYAN_COUNTIES = [
   "Baringo", "Bomet", "Bungoma", "Busia", "Elgeyo-Marakwet", "Embu", "Garissa", 
@@ -35,7 +46,7 @@ export default function Login({ route }: any) {
   // way biometricLogin's own "Session expired" message already renders.
   useEffect(() => {
     const REASON_MESSAGES: Record<string, string> = {
-      'session-invalid': 'Your session is no longer valid. Please sign in again.',
+      'session-invalid': 'Your session is no longer valid. Please log in again.',
     };
     if (logoutReason && REASON_MESSAGES[logoutReason]) {
       setErr(REASON_MESSAGES[logoutReason]);
@@ -55,6 +66,10 @@ export default function Login({ route }: any) {
   const [area, setArea] = useState('');
   const [employees, setEmployees] = useState('');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [certDocType, setCertDocType] = useState('');
+  const [certFile, setCertFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
+  const [certError, setCertError] = useState('');
+  const [showDocTypeModal, setShowDocTypeModal] = useState(false);
   // Flipped true the first time Continue is pressed with an invalid field —
   // forces every ValidatedTextInput on this step to show its own inline
   // error immediately (via forceTouched), not just the ones the user
@@ -143,7 +158,7 @@ export default function Login({ route }: any) {
   const handleBiometricSignIn = async () => {
     setErr('');
     // Step 1: verify identity locally on the device
-    const auth = await authenticateBiometric('Sign in to PayChain');
+    const auth = await authenticateBiometric('Log in to PayChain');
     if (!auth.success) {
       if (!auth.cancelled) setErr(auth.error);
       return;
@@ -152,7 +167,7 @@ export default function Login({ route }: any) {
     setLoading(true);
     const res = await biometricLogin();
     setLoading(false);
-    if (!res.success) setErr(res.error || 'Session expired. Please sign in with your password.');
+    if (!res.success) setErr(res.error || 'Session expired. Please log in with your password.');
   };
 
   const handleVerifyOTP = async () => {
@@ -224,6 +239,25 @@ export default function Login({ route }: any) {
     }
   };
 
+  const pickCertificate = async () => {
+    setCertError('');
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['image/*', 'application/pdf'],
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+      const asset = result.assets[0];
+      if (asset.size && asset.size > 10 * 1024 * 1024) {
+        setCertError('File is too large — the limit is 10MB.');
+        return;
+      }
+      setCertFile(asset);
+    } catch {
+      setCertError('Could not open the file picker. Please try again.');
+    }
+  };
+
   const handleSignupContinue = () => {
     // Real validators, not the previous name/phone presence-or-length-only
     // checks — those were weaker than what ValidatedTextInput itself uses to
@@ -271,6 +305,14 @@ export default function Login({ route }: any) {
       setErr('Please let us know whether this is an eCommerce business.');
       return;
     }
+    if (!certDocType) {
+      setErr('Select which registration document you are uploading.');
+      return;
+    }
+    if (!certFile) {
+      setErr(certError || 'Upload your Certificate of Registration, Business Permit, or License to continue.');
+      return;
+    }
     setErr('');
     setSignupStepTouched(false);
     setIsSignupPasswordStep(true);
@@ -286,19 +328,26 @@ export default function Login({ route }: any) {
       return;
     }
 
-    const payload = {
-      name: signupName,
-      email: signupEmail,
-      phone: signupPhone,
-      businessName: signupBusinessName,
-      password: newPassword,
-      ecommerce: signupEcommerce,
-      businessType,
-      county: signupCounty,
-      area,
-      employees,
-      agreedToTerms,
-    };
+    const payload = new FormData();
+    payload.append('name', signupName);
+    payload.append('email', signupEmail);
+    payload.append('phone', signupPhone);
+    payload.append('businessName', signupBusinessName);
+    payload.append('password', newPassword);
+    payload.append('ecommerce', signupEcommerce);
+    payload.append('businessType', businessType);
+    payload.append('county', signupCounty);
+    payload.append('area', area);
+    payload.append('employees', employees);
+    payload.append('agreedToTerms', String(agreedToTerms));
+    payload.append('documentType', certDocType);
+    if (certFile) {
+      payload.append('certificate', {
+        uri: certFile.uri,
+        name: certFile.name || 'certificate.jpg',
+        type: certFile.mimeType || 'image/jpeg',
+      } as any);
+    }
 
     setLoading(true);
     const res = await signup(payload);
@@ -339,7 +388,7 @@ export default function Login({ route }: any) {
           <Text className={`text-[11px] font-jakarta-bold uppercase tracking-widest ${
             activeTab === tab ? 'text-[#06201b]' : 'text-[#5b645c]'
           }`}>
-            {tab === 'signup' ? 'Sign Up' : tab === 'login' ? 'Login' : 'Reset'}
+            {tab === 'signup' ? 'Register' : tab === 'login' ? 'Log In' : 'Reset'}
           </Text>
         </TouchableOpacity>
       ))}
@@ -379,13 +428,13 @@ export default function Login({ route }: any) {
 
             {activeTab === 'login' && !isOTPMode && !isResetMode && (
               <View>
-                <Text className="text-[#0c2010] text-[24px] font-jakarta-bold mb-2">Sign in</Text>
+                <Text className="text-[#0c2010] text-[24px] font-jakarta-bold mb-2">Log in</Text>
                 <Text className="text-[#5b645c] text-[14px] font-jakarta-bold mb-6">Enter credentials provided during onboarding.</Text>
 
                 {showBiometricButton && (
                   <TouchableOpacity onPress={handleBiometricSignIn} className="bg-[#ecfdf5] border border-[#a7f3d0] py-4 rounded-2xl flex-row justify-center items-center mb-6">
                     <Feather name="target" size={20} color="#047857" />
-                    <Text className="text-[#047857] font-jakarta-bold text-[14px] ml-3">Sign in with Passkey / Biometrics</Text>
+                    <Text className="text-[#047857] font-jakarta-bold text-[14px] ml-3">Log in with Passkey / Biometrics</Text>
                   </TouchableOpacity>
                 )}
 
@@ -425,7 +474,7 @@ export default function Login({ route }: any) {
                   onPress={handleLogin} disabled={loading}
                   className="w-full bg-[#06201b] py-4 rounded-2xl flex-row justify-center items-center mb-8"
                 >
-                  {loading ? <ActivityIndicator color="white" /> : <Text className="text-white font-jakarta-bold text-[16px]">Sign In</Text>}
+                  {loading ? <ActivityIndicator color="white" /> : <Text className="text-white font-jakarta-bold text-[16px]">Log In</Text>}
                 </TouchableOpacity>
 
                 <View className="flex-row items-center justify-center opacity-50 pt-4 gap-2">
@@ -589,6 +638,41 @@ export default function Login({ route }: any) {
                       </TouchableOpacity>
                     </View>
                   </View>
+                  <View className="pt-2 border-t border-[#e5e7eb] mt-2">
+                    <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Business Verification Document *</Text>
+                    <Text className="text-[#5b645c] text-[11px] font-jakarta-bold mb-3 opacity-70">
+                      Upload your Certificate of Registration, Business Permit, or License. Required to create an account.
+                    </Text>
+                    <TouchableOpacity onPress={() => setShowDocTypeModal(true)} className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 flex-row justify-between items-center mb-3">
+                      <Text className={`text-[14px] font-jakarta-bold flex-1 min-w-0 pr-2 ${certDocType ? 'text-[#0c2010]' : 'text-[#9ca3af]'}`} numberOfLines={1} ellipsizeMode="tail">
+                        {CERTIFICATE_DOCUMENT_TYPES.find(t => t.value === certDocType)?.label || '—Which document is this?—'}
+                      </Text>
+                      <Feather name="chevron-down" size={16} color="#9ca3af" style={{ flexShrink: 0 }} />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={pickCertificate}
+                      className={`w-full border-2 border-dashed rounded-2xl px-4 py-4 flex-row items-center ${
+                        certError ? 'border-red-300 bg-red-50' : certFile ? 'border-emerald-400 bg-[#ecfdf5]' : 'border-[#d1d5db] bg-[#f9fafb]'
+                      }`}
+                    >
+                      {certFile && certFile.mimeType?.startsWith('image/') ? (
+                        <Image source={{ uri: certFile.uri }} style={{ width: 48, height: 48, borderRadius: 10 }} />
+                      ) : (
+                        <Feather name={certFile ? 'file-text' : 'upload'} size={22} color={certFile ? '#047857' : '#9ca3af'} />
+                      )}
+                      <View className="ml-3 flex-1 min-w-0">
+                        <Text className="text-[13px] font-jakarta-bold text-[#0c2010]" numberOfLines={1} ellipsizeMode="middle">
+                          {certFile ? (certFile.name || 'Document selected') : 'Take a photo or choose a file'}
+                        </Text>
+                        <Text className="text-[10px] font-jakarta-bold text-[#9ca3af] mt-0.5">JPG, PNG or PDF, up to 10MB. Must be clear and in focus.</Text>
+                      </View>
+                    </TouchableOpacity>
+                    {certError ? (
+                      <Text className="text-red-500 text-[11px] font-jakarta-bold mt-1.5">{certError}</Text>
+                    ) : null}
+                  </View>
+
                   <TouchableOpacity onPress={handleSignupContinue} className="w-full bg-[#06201b] py-4 rounded-2xl flex-row justify-center items-center mt-4">
                     <Text className="text-white font-jakarta-bold text-[16px]">Submit Application</Text>
                   </TouchableOpacity>
@@ -693,6 +777,22 @@ export default function Login({ route }: any) {
             {['Sole Proprietorship', 'Partnership', 'Limited Liability Company (LLC)', 'Public Limited Company (PLC)', 'SACCO', 'NGO/Non-Profit', 'Cooperative Society', 'Other'].map(type => (
               <TouchableOpacity key={type} className="py-4 border-b border-[#e5e7eb]" onPress={() => { setBusinessType(type); setShowBusinessModal(false); }}>
                 <Text className="text-[16px] font-jakarta-bold text-[#0c2010]">{type}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showDocTypeModal} animationType="slide" transparent={true}>
+        <View className="flex-1 justify-end bg-black/50">
+          <View className="bg-white rounded-t-3xl p-6">
+            <View className="flex-row justify-between items-center mb-6">
+              <Text className="text-[#0c2010] text-[18px] font-jakarta-bold">Document Type</Text>
+              <TouchableOpacity onPress={() => setShowDocTypeModal(false)}><Feather name="x" size={24} color="#0c2010" /></TouchableOpacity>
+            </View>
+            {CERTIFICATE_DOCUMENT_TYPES.map(t => (
+              <TouchableOpacity key={t.value} className="py-4 border-b border-[#e5e7eb]" onPress={() => { setCertDocType(t.value); setShowDocTypeModal(false); }}>
+                <Text className="text-[16px] font-jakarta-bold text-[#0c2010]">{t.label}</Text>
               </TouchableOpacity>
             ))}
           </View>

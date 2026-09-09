@@ -42,7 +42,7 @@ import {
 } from '../controllers/merchantAuthController.js';
 import { protectMerchant, protectMerchantSSE, protectDeveloper } from '../middleware/authMiddleware.js';
 import { registerMerchantEventClient } from '../utils/merchantEventStream.js';
-import { upload } from '../utils/cloudinary.js';
+import { uploadMemory } from '../utils/cloudinary.js';
 import {
   registerDeveloper,
   verifyDeveloperOtp,
@@ -193,7 +193,7 @@ router.post('/setup-password', adminOtpLimiter, setupPasswordWithToken);
 // Registration is public and accepts a file upload — same abuse surface as
 // login, so it gets the same per-IP throttle (merchantLoginLimiter was
 // previously only applied to login itself, leaving this endpoint unlimited).
-router.post('/merchant/register', merchantLoginLimiter, upload.single('certificate'), registerMerchant);
+router.post('/merchant/register', merchantLoginLimiter, uploadMemory.single('certificate'), registerMerchant);
 router.post('/merchant/verify-otp', merchantOtpLimiter, verifyMerchantOTP);
 router.post('/merchant/login', merchantLoginLimiter, loginMerchant);
 router.post('/merchant/resend-otp', merchantOtpLimiter, resendMerchantOTP);

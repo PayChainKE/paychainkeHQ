@@ -20,6 +20,8 @@ import { timingSafeStringEqual } from '../utils/timingSafeCompare.js';
 import { normalizeKraPin, isValidKraPin, KRA_PIN_FORMAT_HINT } from '../utils/kraPinValidator.js';
 import { getOrCreatePlatformSettings } from '../models/PlatformSettings.js';
 import { getAvailableBalance } from '../utils/availableBalance.js';
+import { checkImageSharpness } from '../utils/imageBlurCheck.js';
+import { uploadBufferToCloudinary } from '../utils/cloudinary.js';
 
 // Canonical option sets for self-serve signup's business-details step —
 // kept here (not just in the frontend) so a request bypassing the UI can't
@@ -37,6 +39,18 @@ const BUSINESS_TYPES = [
   'Other',
 ];
 const EMPLOYEE_BANDS = ['1-10', '11-50', '51-200', '201-500', '501+'];
+
+// Mirrored in Login.jsx (web) and Login.tsx (mobile) — keep in sync.
+const CERTIFICATE_DOCUMENT_TYPES = ['certificate_of_registration', 'business_permit', 'license', 'other'];
+
+// A single, narrowly-scoped exception to "every login requires OTP" — the
+// Google Play (and, if ever needed, App Store) reviewer account. Reviewers
+// can't receive an OTP by email/SMS, and Google explicitly disallows asking
+// them to use their own inbox — see loginMerchant below for where this is
+// applied. Deliberately env-driven, not hardcoded, so it can be rotated
+// without a deploy and is never accidentally left pointed at a real
+// merchant's email.
+const APP_REVIEW_BYPASS_EMAIL = (process.env.APP_REVIEW_BYPASS_EMAIL || '').trim().toLowerCase();
 
 // Mask a phone number for safe display in the UI, e.g. +254712345678 →
 // +254•••••••78. Falls back to the raw digits if the number can't be
@@ -86,7 +100,7 @@ export const registerMerchant = async (req, res) => {
   try {
     let {
       name, email, phone, businessName, password, registrationSource, kraPin, businessNumber,
-      businessType, county, area, employees, ecommerce, agreedToTerms,
+      businessType, county, area, employees, ecommerce, agreedToTerms, documentType,
     } = req.body || {};
     const certificateFile = req.file;
 
@@ -152,6 +166,31 @@ export const registerMerchant = async (req, res) => {
       return res.status(400).json({ error: 'You must agree to the Privacy Policy and Terms of Service to create an account.' });
     }
 
+    // Certificate of Registration / Business Permit / License — mandatory
+    // proof the business is real, same spirit as the officer-led KYB
+    // checklist but lightweight enough for an unattended self-serve signup.
+    if (!certificateFile) {
+      return res.status(400).json({ error: 'Upload your Certificate of Registration, Business Permit, or License to continue.' });
+    }
+    if (!documentType || !CERTIFICATE_DOCUMENT_TYPES.includes(documentType)) {
+      return res.status(400).json({ error: 'Select which document you uploaded.' });
+    }
+    // Only a photo can be "blurry" — a PDF's own text/vector content is
+    // already exactly as clear as it will ever be, and sharp isn't
+    // guaranteed to have PDF rasterization support in every environment.
+    if (certificateFile.mimetype !== 'application/pdf') {
+      let sharpness;
+      try {
+        sharpness = await checkImageSharpness(certificateFile.buffer);
+      } catch (e) {
+        console.error('Certificate sharpness check failed:', e);
+        return res.status(400).json({ error: 'We could not read that image. Please upload a different photo of your document.' });
+      }
+      if (sharpness.blurry) {
+        return res.status(400).json({ error: sharpness.reason });
+      }
+    }
+
     // Build phone variations (handles 0790…, 254790…, +254790…, 790…) to
     // catch duplicates regardless of stored format.
     const phoneBase = (() => {
@@ -187,7 +226,17 @@ export const registerMerchant = async (req, res) => {
       return res.status(400).json({ error: 'A merchant with that business registration number already exists.' });
     }
 
-    const certificateUrl = certificateFile ? certificateFile.path : null;
+    // Upload last, only once every other check has passed — avoids
+    // spending a Cloudinary write on a signup that was going to fail anyway
+    // (duplicate email/phone/KRA PIN, bad business details, etc).
+    let certificateUrl;
+    try {
+      const uploaded = await uploadBufferToCloudinary(certificateFile.buffer, 'paychain_certificates');
+      certificateUrl = uploaded.secure_url;
+    } catch (e) {
+      console.error('Certificate upload to Cloudinary failed:', e);
+      return res.status(500).json({ error: 'We could not upload your document right now. Please try again.' });
+    }
     const otp = crypto.randomInt(100000, 1000000).toString();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
 
@@ -200,6 +249,7 @@ export const registerMerchant = async (req, res) => {
       businessNumber: businessNumber || null,
       password,
       certificateUrl,
+      certificateDocumentType: documentType,
       otp,
       otpExpires,
       kesBalance: 0,
@@ -283,6 +333,72 @@ export const registerMerchant = async (req, res) => {
   }
 };
 
+// Builds the full { merchant, token } payload the frontend expects once a
+// login is fully complete (password + OTP, or the Play Store reviewer
+// bypass below) — shared so both paths stay in sync as fields get added
+// here over time instead of drifting apart across two copies.
+async function buildMerchantSessionPayload(merchant) {
+  const platformSettings = await getOrCreatePlatformSettings();
+  const { availableBalance, heldAmount } = await getAvailableBalance(merchant._id, merchant.kesBalance);
+  return {
+    merchant: {
+      _id: merchant._id,
+      name: merchant.name,
+      email: merchant.email,
+      phone: merchant.phone,
+      businessName: merchant.businessName,
+      // NCBA virtual account — ncbaVirtualAccountNumber is null until
+      // NCBA_INSTITUTION_PREFIX is configured (i.e. until NCBA actually
+      // assigns PayChain's 4-digit code); render that as "pending bank
+      // assignment" rather than an error.
+      ncbaMerchantCode: merchant.ncbaMerchantCode,
+      ncbaVirtualAccountNumber: getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode),
+      kesBalance: merchant.kesBalance,
+      // What debitAvailableBalance will actually let this merchant send
+      // right now — kesBalance minus anything credited in the last 2
+      // minutes and still held (utils/availableBalance.js). Previously
+      // absent here, so Send Money/Bulk Pay showed the full kesBalance as
+      // "available" and a merchant who'd just been paid could pass the
+      // UI's own balance check, enter their PIN, and only then be
+      // rejected server-side.
+      availableBalance,
+      heldAmount,
+      usdcBalance: merchant.usdcBalance,
+      stellarPublicKey: merchant.stellarPublicKey,
+      status: merchant.status,
+      isVerified: merchant.isVerified,
+      createdAt: merchant.createdAt,
+      lastLogin: merchant.lastLogin,
+      loginCount: merchant.loginCount,
+      kraPin: merchant.kraPin,
+      businessNumber: merchant.businessNumber,
+      isKRAVerified: merchant.isKRAVerified,
+      settlementMobile: merchant.settlementMobile,
+      settlementBankName: merchant.settlementBankName,
+      settlementBankAccount: merchant.settlementBankAccount,
+      settlementBankCode: merchant.settlementBankCode,
+      hasAppPin: !!merchant.appPin,
+      biometricsEnabled: merchant.biometricsEnabled,
+      mobileBiometricUnlockEnabled: merchant.mobileBiometricUnlockEnabled,
+      features: merchant.features,
+      // Global admin kill switch (Merchants page) — distinct from
+      // features.cashAdvanceForm, which is per-merchant. Either one being
+      // off means the merchant can't apply.
+      platformCashAdvanceEnabled: platformSettings.cashAdvanceEnabled,
+      hasSeenOnboardingWalkthrough: merchant.hasSeenOnboardingWalkthrough,
+      hasSeenAccountsWalkthrough: merchant.hasSeenAccountsWalkthrough,
+      hasSeenSecurityWalkthrough: merchant.hasSeenSecurityWalkthrough,
+      hasSeenProfileWalkthrough: merchant.hasSeenProfileWalkthrough,
+      hasSeenTransactionsWalkthrough: merchant.hasSeenTransactionsWalkthrough,
+      // Lets the frontend hide specific screens/promos (Cash Advance, etc.)
+      // from the one designated app-store reviewer account without
+      // affecting any real merchant. See APP_REVIEW_BYPASS_EMAIL above.
+      isAppReviewAccount: !!APP_REVIEW_BYPASS_EMAIL && merchant.email === APP_REVIEW_BYPASS_EMAIL,
+    },
+    token: generateToken(merchant._id, '30d', { tokenVersion: merchant.tokenVersion || 0 })
+  };
+}
+
 // @desc    Verify Merchant OTP
 // @route   POST /api/auth/merchant/verify-otp
 // @access  Public
@@ -338,63 +454,8 @@ export const verifyMerchantOTP = async (req, res) => {
       message: 'Your account was just accessed with a verified sign-in code.',
     });
 
-    const platformSettings = await getOrCreatePlatformSettings();
-    const { availableBalance, heldAmount } = await getAvailableBalance(merchant._id, merchant.kesBalance);
-
-    res.json({
-      success: true,
-      merchant: {
-        _id: merchant._id,
-        name: merchant.name,
-        email: merchant.email,
-        phone: merchant.phone,
-        businessName: merchant.businessName,
-        // NCBA virtual account — ncbaVirtualAccountNumber is null until
-        // NCBA_INSTITUTION_PREFIX is configured (i.e. until NCBA actually
-        // assigns PayChain's 4-digit code); render that as "pending bank
-        // assignment" rather than an error.
-        ncbaMerchantCode: merchant.ncbaMerchantCode,
-        ncbaVirtualAccountNumber: getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode),
-        kesBalance: merchant.kesBalance,
-        // What debitAvailableBalance will actually let this merchant send
-        // right now — kesBalance minus anything credited in the last 2
-        // minutes and still held (utils/availableBalance.js). Previously
-        // absent here, so Send Money/Bulk Pay showed the full kesBalance as
-        // "available" and a merchant who'd just been paid could pass the
-        // UI's own balance check, enter their PIN, and only then be
-        // rejected server-side.
-        availableBalance,
-        heldAmount,
-        usdcBalance: merchant.usdcBalance,
-        stellarPublicKey: merchant.stellarPublicKey,
-        status: merchant.status,
-        isVerified: merchant.isVerified,
-        createdAt: merchant.createdAt,
-        lastLogin: merchant.lastLogin,
-        loginCount: merchant.loginCount,
-        kraPin: merchant.kraPin,
-        businessNumber: merchant.businessNumber,
-        isKRAVerified: merchant.isKRAVerified,
-        settlementMobile: merchant.settlementMobile,
-        settlementBankName: merchant.settlementBankName,
-        settlementBankAccount: merchant.settlementBankAccount,
-        settlementBankCode: merchant.settlementBankCode,
-        hasAppPin: !!merchant.appPin,
-        biometricsEnabled: merchant.biometricsEnabled,
-        mobileBiometricUnlockEnabled: merchant.mobileBiometricUnlockEnabled,
-        features: merchant.features,
-        // Global admin kill switch (Merchants page) — distinct from
-        // features.cashAdvanceForm, which is per-merchant. Either one being
-        // off means the merchant can't apply.
-        platformCashAdvanceEnabled: platformSettings.cashAdvanceEnabled,
-        hasSeenOnboardingWalkthrough: merchant.hasSeenOnboardingWalkthrough,
-        hasSeenAccountsWalkthrough: merchant.hasSeenAccountsWalkthrough,
-        hasSeenSecurityWalkthrough: merchant.hasSeenSecurityWalkthrough,
-        hasSeenProfileWalkthrough: merchant.hasSeenProfileWalkthrough,
-        hasSeenTransactionsWalkthrough: merchant.hasSeenTransactionsWalkthrough
-      },
-      token: generateToken(merchant._id, '30d', { tokenVersion: merchant.tokenVersion || 0 })
-    });
+    const payload = await buildMerchantSessionPayload(merchant);
+    res.json({ success: true, ...payload });
   } catch (error) {
     serverError(res, 500, 'Server Error', error, 'Verify Merchant OTP Error:');
   }
@@ -459,6 +520,28 @@ export const loginMerchant = async (req, res) => {
         merchant, req,
       });
       return res.status(403).json({ error: 'This account has been locked. Please contact PayChain support.' });
+    }
+
+    // App-store-reviewer exception — see APP_REVIEW_BYPASS_EMAIL above.
+    // Skips OTP entirely and returns a completed session in the exact same
+    // shape verifyMerchantOTP would, which both frontends already know how
+    // to handle (mfaRequired: false was the shape the old "remembered
+    // device" 3-day bypass used, before it was removed).
+    if (APP_REVIEW_BYPASS_EMAIL && merchant.email === APP_REVIEW_BYPASS_EMAIL) {
+      merchant.isVerified = true;
+      merchant.loginCount = (merchant.loginCount || 0) + 1;
+      merchant.lastLogin = new Date();
+      await merchant.save();
+
+      logAudit({
+        action: 'merchant.login.success', category: 'auth', severity: 'success',
+        message: 'Signed in successfully — app store review account (OTP bypassed)',
+        merchant, req,
+        metadata: { loginCount: merchant.loginCount, method: 'password+review_bypass' },
+      });
+
+      const payload = await buildMerchantSessionPayload(merchant);
+      return res.json({ success: true, mfaRequired: false, ...payload });
     }
 
     // Always require OTP verification for every login (removed 3-day bypass).
@@ -1040,7 +1123,9 @@ export const getMerchantMe = async (req, res) => {
         hasSeenAccountsWalkthrough: merchant.hasSeenAccountsWalkthrough,
         hasSeenSecurityWalkthrough: merchant.hasSeenSecurityWalkthrough,
         hasSeenProfileWalkthrough: merchant.hasSeenProfileWalkthrough,
-        hasSeenTransactionsWalkthrough: merchant.hasSeenTransactionsWalkthrough
+        hasSeenTransactionsWalkthrough: merchant.hasSeenTransactionsWalkthrough,
+        // See buildMerchantSessionPayload's comment above.
+        isAppReviewAccount: !!APP_REVIEW_BYPASS_EMAIL && merchant.email === APP_REVIEW_BYPASS_EMAIL,
       }
     });
   } catch (error) {

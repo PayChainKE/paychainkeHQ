@@ -14,7 +14,7 @@
       }
     },
     "android": {
-      "package": "co.ke.paychain.mobile",
+      "package": "ke.co.paychain.app",
       "allowBackup": false,
       "adaptiveIcon": {
         "backgroundColor": "#faf9f6",

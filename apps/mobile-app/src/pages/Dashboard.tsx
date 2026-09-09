@@ -457,14 +457,16 @@ export default function Dashboard({ navigation }: any) {
               <Text className="text-[11px] font-jakarta-bold text-[#0c2010] uppercase tracking-widest">Pay</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity className="items-center" activeOpacity={0.8} onPress={() => navigation?.navigate('Advance')}>
-              <View className="w-16 h-16 rounded-full bg-white shadow-lg shadow-black/15 items-center justify-center mb-2.5">
-                <View className="w-11 h-11 rounded-full bg-[#0b4d2e] items-center justify-center">
-                  <Feather name="trending-up" size={21} color="#5efeb3" />
+            {!merchant?.isAppReviewAccount && (
+              <TouchableOpacity className="items-center" activeOpacity={0.8} onPress={() => navigation?.navigate('Advance')}>
+                <View className="w-16 h-16 rounded-full bg-white shadow-lg shadow-black/15 items-center justify-center mb-2.5">
+                  <View className="w-11 h-11 rounded-full bg-[#0b4d2e] items-center justify-center">
+                    <Feather name="trending-up" size={21} color="#5efeb3" />
+                  </View>
                 </View>
-              </View>
-              <Text className="text-[11px] font-jakarta-bold text-[#0c2010] uppercase tracking-widest">Advance</Text>
-            </TouchableOpacity>
+                <Text className="text-[11px] font-jakarta-bold text-[#0c2010] uppercase tracking-widest">Advance</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Growth Ribbon */}
@@ -746,33 +748,67 @@ export default function Dashboard({ navigation }: any) {
                 </View>
               </TouchableOpacity>
 
-              <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={() => navigation?.navigate('Advance')}
-                style={{ width: promoCardWidth }}
-                className="bg-white rounded-[40px] p-6 shadow-sm border-2 border-[#eff4ef]"
-              >
-                <View className="flex-row items-start justify-between mb-5">
-                  <View className="w-14 h-14 rounded-full bg-[#f0fdf4] items-center justify-center">
-                    <Feather name="trending-up" size={22} color="#006c4e" />
+              {merchant?.isAppReviewAccount ? (
+                // Swapped in place of the Business Advance card for the
+                // app-store reviewer account — keeps the carousel's card
+                // count/dot indices (PROMO_SLIDE_COUNT, [0,1,2] below)
+                // unchanged rather than removing a slide outright.
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => navigation?.navigate('Collections')}
+                  style={{ width: promoCardWidth }}
+                  className="bg-white rounded-[40px] p-6 shadow-sm border-2 border-[#eff4ef]"
+                >
+                  <View className="flex-row items-start justify-between mb-5">
+                    <View className="w-14 h-14 rounded-full bg-[#f0fdf4] items-center justify-center">
+                      <Feather name="bar-chart-2" size={22} color="#006c4e" />
+                    </View>
+                    <View className="w-9 h-9 rounded-full bg-[#eff4ef] items-center justify-center">
+                      <Feather name="chevron-right" size={16} color="#0c2010" />
+                    </View>
                   </View>
-                  <View className="w-9 h-9 rounded-full bg-[#eff4ef] items-center justify-center">
-                    <Feather name="chevron-right" size={16} color="#0c2010" />
+
+                  <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-[0.1em] mb-1">Sales Tracking</Text>
+                  <Text className="text-2xl font-jakarta-bold tracking-tight text-[#0c2010] mb-2">
+                    Every sale, tracked automatically
+                  </Text>
+                  <Text className="text-[#5b645c] text-[13px] font-jakarta-bold leading-[18px] mb-6">
+                    PayChain confirms every customer payment and counts your daily sales for you.
+                  </Text>
+
+                  <View className="self-start bg-[#002110] px-5 py-2.5 rounded-full">
+                    <Text className="text-white text-[11px] font-jakarta-bold uppercase tracking-wider">View Transactions</Text>
                   </View>
-                </View>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => navigation?.navigate('Advance')}
+                  style={{ width: promoCardWidth }}
+                  className="bg-white rounded-[40px] p-6 shadow-sm border-2 border-[#eff4ef]"
+                >
+                  <View className="flex-row items-start justify-between mb-5">
+                    <View className="w-14 h-14 rounded-full bg-[#f0fdf4] items-center justify-center">
+                      <Feather name="trending-up" size={22} color="#006c4e" />
+                    </View>
+                    <View className="w-9 h-9 rounded-full bg-[#eff4ef] items-center justify-center">
+                      <Feather name="chevron-right" size={16} color="#0c2010" />
+                    </View>
+                  </View>
 
-                <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-[0.1em] mb-1">Business Advance</Text>
-                <Text className="text-2xl font-jakarta-bold tracking-tight text-[#0c2010] mb-2">
-                  Unlock cash flow instantly
-                </Text>
-                <Text className="text-[#5b645c] text-[13px] font-jakarta-bold leading-[18px] mb-6">
-                  Get an advance against your revenue and repay it automatically as you get paid.
-                </Text>
+                  <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-[0.1em] mb-1">Business Advance</Text>
+                  <Text className="text-2xl font-jakarta-bold tracking-tight text-[#0c2010] mb-2">
+                    Unlock cash flow instantly
+                  </Text>
+                  <Text className="text-[#5b645c] text-[13px] font-jakarta-bold leading-[18px] mb-6">
+                    Get an advance against your revenue and repay it automatically as you get paid.
+                  </Text>
 
-                <View className="self-start bg-[#002110] px-5 py-2.5 rounded-full">
-                  <Text className="text-white text-[11px] font-jakarta-bold uppercase tracking-wider">Check Eligibility</Text>
-                </View>
-              </TouchableOpacity>
+                  <View className="self-start bg-[#002110] px-5 py-2.5 rounded-full">
+                    <Text className="text-white text-[11px] font-jakarta-bold uppercase tracking-wider">Check Eligibility</Text>
+                  </View>
+                </TouchableOpacity>
+              )}
 
               <TouchableOpacity
                 activeOpacity={0.85}

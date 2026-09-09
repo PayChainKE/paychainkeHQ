@@ -8,6 +8,17 @@ import poweredByLogo from '../assets/poweredby-logo.png'
 import { ValidatedInput } from '../components/ValidatedInput'
 import { validators } from '../utils/validators'
 import { BiometricLoginButton } from '../components/BiometricButton'
+import { estimateImageSharpness, isImageFile } from '../utils/imageBlurCheck'
+
+// Mirrors the backend's canonical list (merchantAuthController.js's
+// CERTIFICATE_DOCUMENT_TYPES) and apps/mobile-app/src/pages/Login.tsx's
+// picker — keep all three in sync if this ever changes.
+const CERTIFICATE_DOCUMENT_TYPES = [
+  { value: 'certificate_of_registration', label: 'Certificate of Registration' },
+  { value: 'business_permit', label: 'Business Permit' },
+  { value: 'license', label: 'License' },
+  { value: 'other', label: 'Other Business Document' },
+]
 
 const KENYAN_COUNTIES = [
   "Baringo", "Bomet", "Bungoma", "Busia", "Elgeyo-Marakwet", "Embu", "Garissa",
@@ -79,9 +90,9 @@ export default function Login() {
   useEffect(() => {
     const reason = new URLSearchParams(location.search).get('reason')
     const REASON_MESSAGES = {
-      'idle-timeout': 'You were signed out after 15 minutes of inactivity. Please sign in again.',
-      'session-expired': 'Your session has expired. Please sign in again.',
-      'session-revoked': 'This session was signed out remotely. Please sign in again.',
+      'idle-timeout': 'You were signed out after 15 minutes of inactivity. Please log in again.',
+      'session-expired': 'Your session has expired. Please log in again.',
+      'session-revoked': 'This session was signed out remotely. Please log in again.',
       'account-unavailable': 'This account is no longer available. Please contact support if you believe this is a mistake.',
     }
     if (REASON_MESSAGES[reason]) {
@@ -102,6 +113,11 @@ export default function Login() {
   const [signupEmployees, setSignupEmployees] = useState('')
   const [signupEcommerce, setSignupEcommerce] = useState('')
   const [agreedToTerms, setAgreedToTerms] = useState(false)
+  const [signupDocType, setSignupDocType] = useState('')
+  const [signupCertFile, setSignupCertFile] = useState(null)
+  const [signupCertPreview, setSignupCertPreview] = useState('')
+  const [certChecking, setCertChecking] = useState(false)
+  const [certError, setCertError] = useState('')
   // Flipped true the first time Continue is pressed with an invalid field —
   // forces every ValidatedInput on this step to show its own inline error
   // immediately (via forceTouched), not just the ones the user happened to
@@ -127,6 +143,7 @@ export default function Login() {
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
 
   const signupSubmittingRef = useRef(false)
+  const certInputRef = useRef(null)
 
   // Navigation Tabs — a brand-new visitor (no remembered identifier, same
   // signal quickLogin above uses) lands on Signup instead of Login, so
@@ -357,6 +374,43 @@ export default function Login() {
     otpRefs.current[nextEmpty === -1 ? 5 : nextEmpty]?.focus()
   }
 
+  async function handleCertFileChange(e) {
+    const file = e.target.files?.[0] || null
+    setCertError('')
+    setSignupCertFile(file)
+    setSignupCertPreview('')
+    if (!file) return
+
+    if (!isImageFile(file) && file.type !== 'application/pdf') {
+      setCertError('Upload a JPG, PNG or PDF file.')
+      setSignupCertFile(null)
+      if (certInputRef.current) certInputRef.current.value = ''
+      return
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setCertError('File is too large — the limit is 10MB.')
+      setSignupCertFile(null)
+      if (certInputRef.current) certInputRef.current.value = ''
+      return
+    }
+    if (!isImageFile(file)) return // PDF — nothing to preview/blur-check client-side
+
+    setCertChecking(true)
+    try {
+      const result = await estimateImageSharpness(file)
+      setSignupCertPreview(result.dataUrl || '')
+      if (result.blurry) {
+        setCertError(result.reason)
+        setSignupCertFile(null)
+        if (certInputRef.current) certInputRef.current.value = ''
+      }
+    } catch {
+      // Couldn't read the image client-side — let the server's own check decide.
+    } finally {
+      setCertChecking(false)
+    }
+  }
+
   async function handleSignup(e) {
     e.preventDefault()
     // Real validators, not the previous name/phone presence-or-length-only
@@ -405,6 +459,14 @@ export default function Login() {
       setErr('Please let us know whether this is an eCommerce business.')
       return
     }
+    if (!signupDocType) {
+      setErr('Select which registration document you are uploading.')
+      return
+    }
+    if (!signupCertFile) {
+      setErr(certError || 'Upload your Certificate of Registration, Business Permit, or License to continue.')
+      return
+    }
     setErr('')
     setSignupStepTouched(false)
     setIsSignupPasswordStep(true)
@@ -421,19 +483,20 @@ export default function Login() {
       setErr('Passwords do not match.')
       return
     }
-    const payload = {
-      name: signupName.trim(),
-      email: signupEmail.trim(),
-      phone: signupPhone.trim(),
-      businessName: signupBusinessName.trim(),
-      password: newPassword,
-      businessType: signupBusinessType,
-      county: signupCounty,
-      area: signupArea.trim(),
-      employees: signupEmployees,
-      ecommerce: signupEcommerce,
-      agreedToTerms,
-    }
+    const payload = new FormData()
+    payload.append('name', signupName.trim())
+    payload.append('email', signupEmail.trim())
+    payload.append('phone', signupPhone.trim())
+    payload.append('businessName', signupBusinessName.trim())
+    payload.append('password', newPassword)
+    payload.append('businessType', signupBusinessType)
+    payload.append('county', signupCounty)
+    payload.append('area', signupArea.trim())
+    payload.append('employees', signupEmployees)
+    payload.append('ecommerce', signupEcommerce)
+    payload.append('agreedToTerms', agreedToTerms)
+    payload.append('documentType', signupDocType)
+    payload.append('certificate', signupCertFile)
 
     signupSubmittingRef.current = true
     setLoading(true)
@@ -453,9 +516,13 @@ export default function Login() {
     setActiveTab('login')
     setPassword('')
     setAgreedToTerms(false)
+    setSignupDocType('')
+    setSignupCertFile(null)
+    setSignupCertPreview('')
+    setCertError('')
     addNotification({
       title: 'Account Created',
-      message: 'Sign in with your new credentials to access your dashboard.',
+      message: 'Log in with your new credentials to access your dashboard.',
       type: 'success',
     })
   }
@@ -541,7 +608,7 @@ export default function Login() {
                     : 'text-primary/40 hover:text-primary/70 hover:bg-white/50'
                 }`}
               >
-                {tab === 'signup' ? 'Sign Up' : tab === 'login' ? 'Login' : 'Reset Password'}
+                {tab === 'signup' ? 'Register' : tab === 'login' ? 'Log In' : 'Reset Password'}
               </button>
             ))}
           </div>
@@ -826,8 +893,68 @@ export default function Login() {
                   </div>
                 </div>
 
+                <div className="space-y-3 pt-2 border-t border-outline-variant/10 mt-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1 flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-sm">verified_user</span>
+                    Business Verification Document *
+                  </label>
+                  <p className="text-2xs text-on-surface-variant/60 pl-1 -mt-1">
+                    Upload your Certificate of Registration, Business Permit, or License. Required to create an account.
+                  </p>
+                  <div className="relative">
+                    <select
+                      required
+                      value={signupDocType}
+                      onChange={e => setSignupDocType(e.target.value)}
+                      className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 pl-4 pr-10 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all appearance-none cursor-pointer"
+                    >
+                      <option value="">—Which document is this?—</option>
+                      {CERTIFICATE_DOCUMENT_TYPES.map(t => (
+                        <option key={t.value} value={t.value}>{t.label}</option>
+                      ))}
+                    </select>
+                    <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-primary/40 pointer-events-none">expand_more</span>
+                  </div>
+
+                  <label
+                    htmlFor="certificateUpload"
+                    className={`flex items-center gap-3 w-full border-2 border-dashed rounded-xl px-4 py-4 cursor-pointer transition-all ${
+                      certError ? 'border-red-300 bg-red-50/50' : signupCertFile ? 'border-emerald-400 bg-emerald-50/40' : 'border-outline-variant/25 bg-slate-50 hover:border-primary/40'
+                    }`}
+                  >
+                    {signupCertPreview ? (
+                      <img src={signupCertPreview} alt="Document preview" className="w-14 h-14 object-cover rounded-lg border border-outline-variant/20 shrink-0" />
+                    ) : (
+                      <span className={`material-symbols-outlined text-2xl shrink-0 ${signupCertFile ? 'text-emerald-600' : 'text-primary/30'}`}>
+                        {signupCertFile ? 'description' : 'upload_file'}
+                      </span>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-bold text-primary truncate">
+                        {certChecking ? 'Checking image quality…' : signupCertFile ? signupCertFile.name : 'Take a photo or choose a file'}
+                      </p>
+                      <p className="text-2xs text-on-surface-variant/50">JPG, PNG or PDF, up to 10MB. Must be clear and in focus.</p>
+                    </div>
+                    <input
+                      id="certificateUpload"
+                      ref={certInputRef}
+                      type="file"
+                      accept="image/*,application/pdf"
+                      capture="environment"
+                      onChange={handleCertFileChange}
+                      className="hidden"
+                    />
+                  </label>
+                  {certError && (
+                    <p className="text-2xs font-bold text-red-600 pl-1 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-sm">error</span>
+                      {certError}
+                    </p>
+                  )}
+                </div>
+
                 <div className="sticky bottom-0 bg-white pt-2 pb-1 z-10">
-                  <button disabled={loading} className="w-full bg-[#06201B] text-white py-4 rounded-xl font-black text-sm shadow-xl hover:bg-[#0a3029] active:scale-[0.98] transition-all flex items-center justify-center gap-2 group border border-white/5 disabled:opacity-50">
+                  <button disabled={loading || certChecking} className="w-full bg-[#06201B] text-white py-4 rounded-xl font-black text-sm shadow-xl hover:bg-[#0a3029] active:scale-[0.98] transition-all flex items-center justify-center gap-2 group border border-white/5 disabled:opacity-50">
                     {loading ? (
                       <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                     ) : (
@@ -879,7 +1006,7 @@ export default function Login() {
             <>
               <div className="mb-8 lg:mb-10">
                  <h3 className="font-headline text-3xl lg:text-5xl text-primary tracking-tight font-black">
-                   {quickLogin ? 'Welcome back' : 'Sign in'}
+                   {quickLogin ? 'Welcome back' : 'Log in'}
                  </h3>
                  <p className="text-on-surface-variant font-medium mt-2 opacity-70">
                    {quickLogin ? 'Use your fingerprint or Face ID to continue instantly.' : 'Enter credentials provided during onboarding.'}
@@ -989,7 +1116,7 @@ export default function Login() {
                     <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
                   ) : (
                     <>
-                      Sign In
+                      Log In
                       <span className="material-symbols-outlined group-hover:translate-x-1 transition-transform">arrow_forward</span>
                     </>
                   )}
@@ -1102,7 +1229,7 @@ export default function Login() {
                   ) : (
                     <>
                       <span className="material-symbols-outlined text-emerald-400 text-lg">verified</span>
-                      Verify &amp; Sign In
+                      Verify &amp; Log In
                     </>
                   )}
                 </button>
@@ -1138,7 +1265,7 @@ export default function Login() {
                     onClick={() => exitResetFlow('login')}
                     className="w-full bg-[#06201B] text-white py-4 rounded-2xl font-black text-base shadow-2xl hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-3 border border-white/5"
                   >
-                    Continue to sign in
+                    Continue to log in
                     <span className="material-symbols-outlined">arrow_forward</span>
                   </button>
                   <p className="text-[10px] uppercase tracking-[0.2em] font-black text-on-surface-variant/40">
