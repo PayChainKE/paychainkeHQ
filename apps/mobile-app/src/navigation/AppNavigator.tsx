@@ -26,6 +26,14 @@ const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
 function MainTabs() {
+  // App-store reviewer account (see backend's APP_REVIEW_BYPASS_EMAIL) —
+  // Cash Advance may fall under credit-licensing rules that aren't
+  // confirmed yet, so it's kept out of what the reviewer sees. The route
+  // stays registered (just hidden from the tab bar) so it can't ever be a
+  // broken navigation target if something still links to it.
+  const { merchant } = useAuth();
+  const isReviewAccount = !!merchant?.isAppReviewAccount;
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -82,11 +90,15 @@ function MainTabs() {
       <Tab.Screen
         name="Advance"
         component={CashAdvance}
-        options={{
-          tabBarIcon: ({ color }) => (
-            <TourTarget id="tab-advance"><Feather name="trending-up" size={22} color={color} /></TourTarget>
-          )
-        }}
+        options={
+          isReviewAccount
+            ? { tabBarButton: () => null, tabBarItemStyle: { flex: 0, width: 0, padding: 0 } }
+            : {
+                tabBarIcon: ({ color }) => (
+                  <TourTarget id="tab-advance"><Feather name="trending-up" size={22} color={color} /></TourTarget>
+                )
+              }
+        }
       />
       <Tab.Screen
         name="More"
