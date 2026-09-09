@@ -35,7 +35,7 @@ export default function Login({ route }: any) {
   // way biometricLogin's own "Session expired" message already renders.
   useEffect(() => {
     const REASON_MESSAGES: Record<string, string> = {
-      'session-invalid': 'Your session is no longer valid. Please sign in again.',
+      'session-invalid': 'Your session is no longer valid. Please log in again.',
     };
     if (logoutReason && REASON_MESSAGES[logoutReason]) {
       setErr(REASON_MESSAGES[logoutReason]);
@@ -143,7 +143,7 @@ export default function Login({ route }: any) {
   const handleBiometricSignIn = async () => {
     setErr('');
     // Step 1: verify identity locally on the device
-    const auth = await authenticateBiometric('Sign in to PayChain');
+    const auth = await authenticateBiometric('Log in to PayChain');
     if (!auth.success) {
       if (!auth.cancelled) setErr(auth.error);
       return;
@@ -152,7 +152,7 @@ export default function Login({ route }: any) {
     setLoading(true);
     const res = await biometricLogin();
     setLoading(false);
-    if (!res.success) setErr(res.error || 'Session expired. Please sign in with your password.');
+    if (!res.success) setErr(res.error || 'Session expired. Please log in with your password.');
   };
 
   const handleVerifyOTP = async () => {
@@ -339,7 +339,7 @@ export default function Login({ route }: any) {
           <Text className={`text-[11px] font-jakarta-bold uppercase tracking-widest ${
             activeTab === tab ? 'text-[#06201b]' : 'text-[#5b645c]'
           }`}>
-            {tab === 'signup' ? 'Sign Up' : tab === 'login' ? 'Login' : 'Reset'}
+            {tab === 'signup' ? 'Register' : tab === 'login' ? 'Log In' : 'Reset'}
           </Text>
         </TouchableOpacity>
       ))}
@@ -379,13 +379,13 @@ export default function Login({ route }: any) {
 
             {activeTab === 'login' && !isOTPMode && !isResetMode && (
               <View>
-                <Text className="text-[#0c2010] text-[24px] font-jakarta-bold mb-2">Sign in</Text>
+                <Text className="text-[#0c2010] text-[24px] font-jakarta-bold mb-2">Log in</Text>
                 <Text className="text-[#5b645c] text-[14px] font-jakarta-bold mb-6">Enter credentials provided during onboarding.</Text>
 
                 {showBiometricButton && (
                   <TouchableOpacity onPress={handleBiometricSignIn} className="bg-[#ecfdf5] border border-[#a7f3d0] py-4 rounded-2xl flex-row justify-center items-center mb-6">
                     <Feather name="target" size={20} color="#047857" />
-                    <Text className="text-[#047857] font-jakarta-bold text-[14px] ml-3">Sign in with Passkey / Biometrics</Text>
+                    <Text className="text-[#047857] font-jakarta-bold text-[14px] ml-3">Log in with Passkey / Biometrics</Text>
                   </TouchableOpacity>
                 )}
 
@@ -425,7 +425,7 @@ export default function Login({ route }: any) {
                   onPress={handleLogin} disabled={loading}
                   className="w-full bg-[#06201b] py-4 rounded-2xl flex-row justify-center items-center mb-8"
                 >
-                  {loading ? <ActivityIndicator color="white" /> : <Text className="text-white font-jakarta-bold text-[16px]">Sign In</Text>}
+                  {loading ? <ActivityIndicator color="white" /> : <Text className="text-white font-jakarta-bold text-[16px]">Log In</Text>}
                 </TouchableOpacity>
 
                 <View className="flex-row items-center justify-center opacity-50 pt-4 gap-2">

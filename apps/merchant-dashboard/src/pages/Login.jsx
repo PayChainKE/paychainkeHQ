@@ -79,9 +79,9 @@ export default function Login() {
   useEffect(() => {
     const reason = new URLSearchParams(location.search).get('reason')
     const REASON_MESSAGES = {
-      'idle-timeout': 'You were signed out after 15 minutes of inactivity. Please sign in again.',
-      'session-expired': 'Your session has expired. Please sign in again.',
-      'session-revoked': 'This session was signed out remotely. Please sign in again.',
+      'idle-timeout': 'You were signed out after 15 minutes of inactivity. Please log in again.',
+      'session-expired': 'Your session has expired. Please log in again.',
+      'session-revoked': 'This session was signed out remotely. Please log in again.',
       'account-unavailable': 'This account is no longer available. Please contact support if you believe this is a mistake.',
     }
     if (REASON_MESSAGES[reason]) {
@@ -455,7 +455,7 @@ export default function Login() {
     setAgreedToTerms(false)
     addNotification({
       title: 'Account Created',
-      message: 'Sign in with your new credentials to access your dashboard.',
+      message: 'Log in with your new credentials to access your dashboard.',
       type: 'success',
     })
   }
@@ -541,7 +541,7 @@ export default function Login() {
                     : 'text-primary/40 hover:text-primary/70 hover:bg-white/50'
                 }`}
               >
-                {tab === 'signup' ? 'Sign Up' : tab === 'login' ? 'Login' : 'Reset Password'}
+                {tab === 'signup' ? 'Register' : tab === 'login' ? 'Log In' : 'Reset Password'}
               </button>
             ))}
           </div>
@@ -879,7 +879,7 @@ export default function Login() {
             <>
               <div className="mb-8 lg:mb-10">
                  <h3 className="font-headline text-3xl lg:text-5xl text-primary tracking-tight font-black">
-                   {quickLogin ? 'Welcome back' : 'Sign in'}
+                   {quickLogin ? 'Welcome back' : 'Log in'}
                  </h3>
                  <p className="text-on-surface-variant font-medium mt-2 opacity-70">
                    {quickLogin ? 'Use your fingerprint or Face ID to continue instantly.' : 'Enter credentials provided during onboarding.'}
@@ -989,7 +989,7 @@ export default function Login() {
                     <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
                   ) : (
                     <>
-                      Sign In
+                      Log In
                       <span className="material-symbols-outlined group-hover:translate-x-1 transition-transform">arrow_forward</span>
                     </>
                   )}
@@ -1102,7 +1102,7 @@ export default function Login() {
                   ) : (
                     <>
                       <span className="material-symbols-outlined text-emerald-400 text-lg">verified</span>
-                      Verify &amp; Sign In
+                      Verify &amp; Log In
                     </>
                   )}
                 </button>
@@ -1138,7 +1138,7 @@ export default function Login() {
                     onClick={() => exitResetFlow('login')}
                     className="w-full bg-[#06201B] text-white py-4 rounded-2xl font-black text-base shadow-2xl hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-3 border border-white/5"
                   >
-                    Continue to sign in
+                    Continue to log in
                     <span className="material-symbols-outlined">arrow_forward</span>
                   </button>
                   <p className="text-[10px] uppercase tracking-[0.2em] font-black text-on-surface-variant/40">
