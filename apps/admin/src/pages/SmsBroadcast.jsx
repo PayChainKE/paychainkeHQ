@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import Layout from '../components/layout/Layout';
 import api from '../api/api';
 import TablePagination from '../components/ui/TablePagination';
@@ -124,6 +124,7 @@ export default function SmsBroadcast() {
 
   const [pendingSend, setPendingSend] = useState(false);
   const [sending, setSending] = useState(false);
+  const sendingRef = useRef(false);
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
   const showToast = useCallback((msg) => { setToast(msg); setTimeout(() => setToast(''), 3000); }, []);
@@ -220,6 +221,13 @@ export default function SmsBroadcast() {
   };
 
   const confirmSend = async () => {
+    // Synchronous ref guard, not just the `sending` state — a state update
+    // isn't guaranteed to have committed to the DOM (disabling the button)
+    // before a near-simultaneous second click/Enter-key fires this again.
+    // Same fix as DormantAccounts.jsx's confirmSend, after a broadcast bug
+    // there turned out to need a real per-recipient send guard.
+    if (sendingRef.current) return;
+    sendingRef.current = true;
     setSending(true);
     setError('');
     try {
@@ -241,6 +249,7 @@ export default function SmsBroadcast() {
     } catch (e) {
       setError(e?.response?.data?.error || 'Send failed.');
     } finally {
+      sendingRef.current = false;
       setSending(false);
       setPendingSend(false);
     }
