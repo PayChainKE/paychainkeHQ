@@ -50,3 +50,30 @@ export const uploadReceipt = multer({
     cb(null, ok.includes(file.mimetype));
   },
 });
+
+// Buffers the file in memory instead of streaming straight to Cloudinary —
+// used only where the file must be inspected (e.g. a blur check) before
+// deciding whether to keep it. `upload` above can't support that: its
+// CloudinaryStorage engine uploads while the request body is still being
+// read, so by the time a controller sees `req.file` the (possibly rejected)
+// file is already persisted.
+export const uploadMemory = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  fileFilter: (_req, file, cb) => {
+    const ok = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+    cb(null, ok.includes(file.mimetype));
+  },
+});
+
+// Manual counterpart to CloudinaryStorage — uploads a buffer that's already
+// in memory (post fileFilter/blur-check) rather than a multipart stream.
+export function uploadBufferToCloudinary(buffer, folder) {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder, resource_type: 'image', transformation: [{ width: 1000, height: 1000, crop: 'limit' }] },
+      (err, result) => (err ? reject(err) : resolve(result)),
+    );
+    stream.end(buffer);
+  });
+}

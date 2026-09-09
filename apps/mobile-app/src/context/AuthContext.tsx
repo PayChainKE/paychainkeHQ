@@ -338,11 +338,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  async function signup(formData: any) {
+  async function signup(formData: FormData) {
     try {
-      const res = await api.post('/api/auth/merchant/register', {
-        ...formData,
-        registrationSource: 'mobile',
+      formData.append('registrationSource', 'mobile');
+      const res = await api.post('/api/auth/merchant/register', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
       return { success: true, email: res.data.email, message: res.data.message };
     } catch (err: any) {

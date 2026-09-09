@@ -20,6 +20,8 @@ import { timingSafeStringEqual } from '../utils/timingSafeCompare.js';
 import { normalizeKraPin, isValidKraPin, KRA_PIN_FORMAT_HINT } from '../utils/kraPinValidator.js';
 import { getOrCreatePlatformSettings } from '../models/PlatformSettings.js';
 import { getAvailableBalance } from '../utils/availableBalance.js';
+import { checkImageSharpness } from '../utils/imageBlurCheck.js';
+import { uploadBufferToCloudinary } from '../utils/cloudinary.js';
 
 // Canonical option sets for self-serve signup's business-details step —
 // kept here (not just in the frontend) so a request bypassing the UI can't
@@ -37,6 +39,9 @@ const BUSINESS_TYPES = [
   'Other',
 ];
 const EMPLOYEE_BANDS = ['1-10', '11-50', '51-200', '201-500', '501+'];
+
+// Mirrored in Login.jsx (web) and Login.tsx (mobile) — keep in sync.
+const CERTIFICATE_DOCUMENT_TYPES = ['certificate_of_registration', 'business_permit', 'license', 'other'];
 
 // Mask a phone number for safe display in the UI, e.g. +254712345678 →
 // +254•••••••78. Falls back to the raw digits if the number can't be
@@ -86,7 +91,7 @@ export const registerMerchant = async (req, res) => {
   try {
     let {
       name, email, phone, businessName, password, registrationSource, kraPin, businessNumber,
-      businessType, county, area, employees, ecommerce, agreedToTerms,
+      businessType, county, area, employees, ecommerce, agreedToTerms, documentType,
     } = req.body || {};
     const certificateFile = req.file;
 
@@ -152,6 +157,31 @@ export const registerMerchant = async (req, res) => {
       return res.status(400).json({ error: 'You must agree to the Privacy Policy and Terms of Service to create an account.' });
     }
 
+    // Certificate of Registration / Business Permit / License — mandatory
+    // proof the business is real, same spirit as the officer-led KYB
+    // checklist but lightweight enough for an unattended self-serve signup.
+    if (!certificateFile) {
+      return res.status(400).json({ error: 'Upload your Certificate of Registration, Business Permit, or License to continue.' });
+    }
+    if (!documentType || !CERTIFICATE_DOCUMENT_TYPES.includes(documentType)) {
+      return res.status(400).json({ error: 'Select which document you uploaded.' });
+    }
+    // Only a photo can be "blurry" — a PDF's own text/vector content is
+    // already exactly as clear as it will ever be, and sharp isn't
+    // guaranteed to have PDF rasterization support in every environment.
+    if (certificateFile.mimetype !== 'application/pdf') {
+      let sharpness;
+      try {
+        sharpness = await checkImageSharpness(certificateFile.buffer);
+      } catch (e) {
+        console.error('Certificate sharpness check failed:', e);
+        return res.status(400).json({ error: 'We could not read that image. Please upload a different photo of your document.' });
+      }
+      if (sharpness.blurry) {
+        return res.status(400).json({ error: sharpness.reason });
+      }
+    }
+
     // Build phone variations (handles 0790…, 254790…, +254790…, 790…) to
     // catch duplicates regardless of stored format.
     const phoneBase = (() => {
@@ -187,7 +217,17 @@ export const registerMerchant = async (req, res) => {
       return res.status(400).json({ error: 'A merchant with that business registration number already exists.' });
     }
 
-    const certificateUrl = certificateFile ? certificateFile.path : null;
+    // Upload last, only once every other check has passed — avoids
+    // spending a Cloudinary write on a signup that was going to fail anyway
+    // (duplicate email/phone/KRA PIN, bad business details, etc).
+    let certificateUrl;
+    try {
+      const uploaded = await uploadBufferToCloudinary(certificateFile.buffer, 'paychain_certificates');
+      certificateUrl = uploaded.secure_url;
+    } catch (e) {
+      console.error('Certificate upload to Cloudinary failed:', e);
+      return res.status(500).json({ error: 'We could not upload your document right now. Please try again.' });
+    }
     const otp = crypto.randomInt(100000, 1000000).toString();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
 
@@ -200,6 +240,7 @@ export const registerMerchant = async (req, res) => {
       businessNumber: businessNumber || null,
       password,
       certificateUrl,
+      certificateDocumentType: documentType,
       otp,
       otpExpires,
       kesBalance: 0,

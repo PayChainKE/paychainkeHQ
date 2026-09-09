@@ -178,7 +178,19 @@ const merchantSchema = new mongoose.Schema({
   },
   certificateUrl: {
     type: String,
+    // Enforced as mandatory in registerMerchant's controller logic (with a
+    // tailored error message), not here — this field stays optional at the
+    // schema level because other Merchant.create() call sites (officer
+    // invite, waitlist conversion, admin-created accounts) legitimately
+    // create merchants without a self-serve upload, via their own KYB flow.
     required: [false, 'Certificate URL is not mandatory yet'],
+  },
+  // What certificateUrl actually is — set by self-serve signup only (see
+  // registerMerchant). Null for merchants created any other way.
+  certificateDocumentType: {
+    type: String,
+    enum: ['certificate_of_registration', 'business_permit', 'license', 'other'],
+    default: null,
   },
   isVerified: {
     type: Boolean,
