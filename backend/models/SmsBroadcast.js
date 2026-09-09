@@ -9,7 +9,7 @@ const SmsBroadcastSchema = new mongoose.Schema({
   message: { type: String, required: true, trim: true, maxlength: 918 },
   category: {
     type: String,
-    enum: ['maintenance', 'holiday', 'security', 'general'],
+    enum: ['maintenance', 'holiday', 'security', 'general', 'tips'],
     default: 'general',
   },
   audience: { type: String, enum: ['all', 'selected'], required: true },
