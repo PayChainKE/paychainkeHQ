@@ -4,6 +4,7 @@ import { formatAccountNumberDisplay } from './ncbaValidators.js';
 import { generateMerchantStickerPdf, generateMerchantQrFlyerPdf } from './stickerGenerator.js';
 import { generateBrandedQrDataUri } from './qrCode.js';
 import { kraLogoDataUri } from './kraLogo.js';
+import { logEmail } from './emailLog.js';
 
 dotenv.config();
 
@@ -146,7 +147,7 @@ export const sendWalletActivationEmail = async (email, name, stellarPublicKey) =
       ? `${stellarPublicKey.slice(0, 8)}...${stellarPublicKey.slice(-6)}`
       : 'N/A';
 
-    const data = await resend.emails.send({
+    const emailPayload = {
       from: 'PayChain Digital Wallet <info@paychain.co.ke>',
       to: [email],
       subject: 'Welcome to your Digital Wallet: Your PayChain Wallet is Ready',
@@ -274,8 +275,10 @@ export const sendWalletActivationEmail = async (email, name, stellarPublicKey) =
         </body>
         </html>
       `
-    });
+    };
+    const data = await resend.emails.send(emailPayload);
     console.log(`📧 Wallet Activation Email sent to ${email}`);
+    logEmail({ to: email, type: 'wallet_activation', subject: emailPayload.subject, bodyHtml: emailPayload.html, resendId: data?.data?.id || data?.id || null }).catch(() => {});
     return data;
   } catch (error) {
     console.error('❌ Resend Wallet Activation Email Error:', error);
@@ -350,7 +353,7 @@ export const sendWelcomeEmail = async (email, name, password, phone, ncbaVirtual
   const emailAttachments = [stickerAttachment, qrAttachment].filter(Boolean);
 
   try {
-    const data = await resend.emails.send({
+    const emailPayload = {
       from: 'PayChain <info@paychain.co.ke>',
       to: [email],
       subject: `Welcome to PayChain, ${firstName} — Your Merchant Account is Active`,
@@ -515,8 +518,19 @@ export const sendWelcomeEmail = async (email, name, password, phone, ncbaVirtual
 </body>
 </html>
       `
-    });
+    };
+    const data = await resend.emails.send(emailPayload);
     console.log(`📧 Welcome email sent to ${email}`);
+    // Redact the plaintext password before persisting — this log is meant
+    // for "what did we tell the merchant", not a durable, browsable copy of
+    // their initial credentials.
+    logEmail({
+      to: email,
+      type: 'welcome',
+      subject: emailPayload.subject,
+      bodyHtml: emailPayload.html.replaceAll(password, '••••••••'),
+      resendId: data?.data?.id || data?.id || null,
+    }).catch(() => {});
     return data;
   } catch (error) {
     console.error('❌ Resend Welcome Email Error:', error);
@@ -643,7 +657,7 @@ export const sendAdminActionOTP = async (email, otp, actionLabel, target) => {
 // (which asks the admin to confirm something); this just informs them.
 export const sendSecurityAlertEmail = async (email, subject, heading, details) => {
   try {
-    const data = await resend.emails.send({
+    const emailPayload = {
       from: 'PayChain Security <info@paychain.co.ke>',
       to: [email],
       subject: `[PayChain Alert] ${subject}`,
@@ -665,7 +679,9 @@ export const sendSecurityAlertEmail = async (email, subject, heading, details) =
           </div>
         </div>
       `
-    });
+    };
+    const data = await resend.emails.send(emailPayload);
+    logEmail({ to: email, type: 'security_alert', subject: emailPayload.subject, bodyHtml: emailPayload.html, resendId: data?.data?.id || data?.id || null }).catch(() => {});
     return data;
   } catch (error) {
     console.error('❌ Resend Security Alert Error:', error);
@@ -696,7 +712,7 @@ export const sendMerchantInvite = async (email, name, businessName, setupLink, n
   }
 
   try {
-    const data = await resend.emails.send({
+    const emailPayload = {
       from: 'PayChain Onboarding <info@paychain.co.ke>',
       to: [email],
       subject: 'You have been invited to PayChain — Set up your account',
@@ -746,8 +762,10 @@ export const sendMerchantInvite = async (email, name, businessName, setupLink, n
           </div>
         </div>
       `
-    });
+    };
+    const data = await resend.emails.send(emailPayload);
     console.log(`📧 Merchant Invite sent to ${email}`);
+    logEmail({ to: email, type: 'merchant_invite', subject: emailPayload.subject, bodyHtml: emailPayload.html, resendId: data?.data?.id || data?.id || null }).catch(() => {});
     return data;
   } catch (error) {
     console.error('❌ Resend Merchant Invite Error:', error);
@@ -859,7 +877,7 @@ const KYB_DOC_LABELS = {
 export const sendKybRevisionRequest = async (email, name, businessName, docTypes, message, resubmitLink) => {
   const docList = (docTypes || []).map((t) => KYB_DOC_LABELS[t] || t).join(', ');
   try {
-    const data = await resend.emails.send({
+    const emailPayload = {
       from: 'PayChain Onboarding <info@paychain.co.ke>',
       to: [email],
       subject: `Action needed: your PayChain application for ${businessName}`,
@@ -889,8 +907,10 @@ export const sendKybRevisionRequest = async (email, name, businessName, docTypes
           </div>
         </div>
       `,
-    });
+    };
+    const data = await resend.emails.send(emailPayload);
     console.log(`📧 KYB revision request sent to ${email} (${docList})`);
+    logEmail({ to: email, type: 'kyb_revision_request', subject: emailPayload.subject, bodyHtml: emailPayload.html, resendId: data?.data?.id || data?.id || null }).catch(() => {});
     return data;
   } catch (error) {
     console.error('❌ Resend KYB Revision Request Error:', error);
@@ -902,7 +922,7 @@ export const sendKybRevisionRequest = async (email, name, businessName, docTypes
 // internal rejection note is never included, it's for internal audit only.
 export const sendKybRejection = async (email, name, businessName) => {
   try {
-    const data = await resend.emails.send({
+    const emailPayload = {
       from: 'PayChain Onboarding <info@paychain.co.ke>',
       to: [email],
       subject: `Update on your PayChain application for ${businessName}`,
@@ -922,8 +942,10 @@ export const sendKybRejection = async (email, name, businessName) => {
           </div>
         </div>
       `,
-    });
+    };
+    const data = await resend.emails.send(emailPayload);
     console.log(`📧 KYB rejection notice sent to ${email}`);
+    logEmail({ to: email, type: 'kyb_rejection', subject: emailPayload.subject, bodyHtml: emailPayload.html, resendId: data?.data?.id || data?.id || null }).catch(() => {});
     return data;
   } catch (error) {
     console.error('❌ Resend KYB Rejection Error:', error);
@@ -943,7 +965,7 @@ export const sendPasswordResetConfirmation = async (email, name, when, ip, ua) =
     const safeIp   = String(ip   || 'unknown').replace(/</g, '&lt;');
     const safeUa   = String(ua   || 'unknown device').replace(/</g, '&lt;').slice(0, 200);
 
-    const data = await resend.emails.send({
+    const emailPayload = {
       from: 'PayChain Security <info@paychain.co.ke>',
       to: [email],
       subject: 'Your PayChain password was changed',
@@ -991,8 +1013,10 @@ export const sendPasswordResetConfirmation = async (email, name, when, ip, ua) =
           </div>
         </div>
       `,
-    });
+    };
+    const data = await resend.emails.send(emailPayload);
     console.log(`📧 Reset confirmation → ${email}`);
+    logEmail({ to: email, type: 'password_reset_confirmation', subject: emailPayload.subject, bodyHtml: emailPayload.html, resendId: data?.data?.id || data?.id || null }).catch(() => {});
     return data;
   } catch (error) {
     console.error('❌ Resend Reset Confirmation Error:', error);
@@ -1018,7 +1042,7 @@ export const sendContactDetailsChangedEmail = async (email, name, changes) => {
       changes?.phoneChanged ? `<tr><td style="padding: 4px 0; color: #6b7280;">Phone</td><td style="padding: 4px 0; font-weight: 600;">${esc(changes.phoneChanged.from)} &rarr; ${esc(changes.phoneChanged.to)}</td></tr>` : '',
     ].join('');
 
-    const data = await resend.emails.send({
+    const emailPayload = {
       from: 'PayChain Security <info@paychain.co.ke>',
       to: [email],
       subject: 'Your PayChain account contact details were changed',
@@ -1062,8 +1086,10 @@ export const sendContactDetailsChangedEmail = async (email, name, changes) => {
           </div>
         </div>
       `,
-    });
+    };
+    const data = await resend.emails.send(emailPayload);
     console.log(`📧 Contact-changed notification → ${email}`);
+    logEmail({ to: email, type: 'contact_details_changed', subject: emailPayload.subject, bodyHtml: emailPayload.html, resendId: data?.data?.id || data?.id || null }).catch(() => {});
     return data;
   } catch (error) {
     console.error('❌ Resend Contact-Changed Notification Error:', error);
@@ -1085,7 +1111,7 @@ export const sendBatchReceiptEmail = async (email, businessName, batchRows, tota
 
     const auditHash = Math.random().toString(36).substring(2, 18).toUpperCase();
 
-    const data = await resend.emails.send({
+    const emailPayload = {
       from: 'PayChain Settlement <info@paychain.co.ke>',
       to: [email],
       subject: `Batch Payment Receipt - ${businessName}`,
@@ -1169,8 +1195,10 @@ export const sendBatchReceiptEmail = async (email, businessName, batchRows, tota
           </div>
         </div>
       `
-    });
+    };
+    const data = await resend.emails.send(emailPayload);
     console.log(`📧 Batch Receipt Email sent to ${email}`);
+    logEmail({ to: email, type: 'batch_receipt', subject: emailPayload.subject, bodyHtml: emailPayload.html, resendId: data?.data?.id || data?.id || null }).catch(() => {});
     return data;
   } catch (error) {
     console.error('❌ Resend Batch Receipt Error:', error);
@@ -1485,7 +1513,7 @@ export const sendInvoicePaidReceiptEmail = async ({
 // not a separately regenerated one.
 export const sendStatementEmail = async ({ to, businessName, periodLabel, pdfBase64, filename }) => {
   try {
-    const data = await resend.emails.send({
+    const emailPayload = {
       from: 'PayChain Statements <info@paychain.co.ke>',
       to: [to],
       subject: `Your PayChain Transaction Statement — ${periodLabel}`,
@@ -1514,8 +1542,10 @@ export const sendStatementEmail = async ({ to, businessName, periodLabel, pdfBas
           </div>
         </div>
       `,
-    });
+    };
+    const data = await resend.emails.send(emailPayload);
     console.log(`📧 Statement (${periodLabel}) emailed to ${to}`);
+    logEmail({ to, type: 'statement', subject: emailPayload.subject, bodyHtml: emailPayload.html, resendId: data?.data?.id || data?.id || null }).catch(() => {});
     return data;
   } catch (error) {
     console.error('❌ Resend Statement Email Error:', error);
@@ -1531,7 +1561,7 @@ export const sendDormancyReminderEmail = async (email, name, businessName, daysR
     const safeName = (name || 'there').toString().replace(/</g, '&lt;');
     const safeBiz  = (businessName || 'your business').toString().replace(/</g, '&lt;');
 
-    const data = await resend.emails.send({
+    const emailPayload = {
       from: 'PayChain <info@paychain.co.ke>',
       to: [email],
       subject: `Reminder: keep your PayChain account active (${daysRemaining} day${daysRemaining === 1 ? '' : 's'} left)`,
@@ -1570,8 +1600,10 @@ export const sendDormancyReminderEmail = async (email, name, businessName, daysR
           </div>
         </div>
       `,
-    });
+    };
+    const data = await resend.emails.send(emailPayload);
     console.log(`📧 Dormancy reminder → ${email} (${daysRemaining}d remaining)`);
+    logEmail({ to: email, type: 'dormancy_reminder', subject: emailPayload.subject, bodyHtml: emailPayload.html, resendId: data?.data?.id || data?.id || null }).catch(() => {});
     return data;
   } catch (error) {
     console.error('❌ Resend Dormancy Reminder Error:', error);
@@ -1586,7 +1618,7 @@ export const sendDormancyFinalWarningEmail = async (email, name, businessName) =
     const safeName = (name || 'there').toString().replace(/</g, '&lt;');
     const safeBiz  = (businessName || 'your business').toString().replace(/</g, '&lt;');
 
-    const data = await resend.emails.send({
+    const emailPayload = {
       from: 'PayChain <info@paychain.co.ke>',
       to: [email],
       subject: `Action required: your PayChain account is now dormant`,
@@ -1625,8 +1657,10 @@ export const sendDormancyFinalWarningEmail = async (email, name, businessName) =
           </div>
         </div>
       `,
-    });
+    };
+    const data = await resend.emails.send(emailPayload);
     console.log(`📧 Dormancy final warning → ${email}`);
+    logEmail({ to: email, type: 'dormancy_final_warning', subject: emailPayload.subject, bodyHtml: emailPayload.html, resendId: data?.data?.id || data?.id || null }).catch(() => {});
     return data;
   } catch (error) {
     console.error('❌ Resend Dormancy Final Warning Error:', error);
@@ -1648,7 +1682,7 @@ export const sendDormancyFinalWarningEmail = async (email, name, businessName) =
 // sendNewsletterEmail's wrapper around an admin's newsletter body.
 export const sendDormantAccountReminderEmail = async (email, subject, bodyHtml) => {
   try {
-    const data = await resend.emails.send({
+    const emailPayload = {
       from: 'PayChain <info@paychain.co.ke>',
       to: [email],
       subject,
@@ -1677,8 +1711,10 @@ export const sendDormantAccountReminderEmail = async (email, subject, bodyHtml) 
           </div>
         </div>
       `,
-    });
+    };
+    const data = await resend.emails.send(emailPayload);
     console.log(`📧 Dormant account reminder (manual) → ${email}`);
+    logEmail({ to: email, type: 'dormant_account_reminder_manual', subject: emailPayload.subject, bodyHtml: emailPayload.html, resendId: data?.data?.id || data?.id || null }).catch(() => {});
     return data;
   } catch (error) {
     console.error('❌ Resend Dormant Account Reminder Error:', error);
