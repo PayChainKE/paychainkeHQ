@@ -33,6 +33,10 @@ const smsLogSchema = new mongoose.Schema({
   deliveredAt: { type: Date, default: null },
 }, { timestamps: true });
 
+// Auto-delete after 45 days — these exist for short-term delivery-dispute
+// escalation with Africa's Talking, not as a permanent record.
+smsLogSchema.index({ createdAt: 1 }, { expireAfterSeconds: 45 * 24 * 60 * 60 });
+
 const SmsLog = mongoose.model('SmsLog', smsLogSchema);
 
 export default SmsLog;
