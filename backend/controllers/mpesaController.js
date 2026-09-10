@@ -352,11 +352,12 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
               reference: receipt,
               // Unlike C2B (processMpesaC2bPayload above), Safaricom's STK
               // Push callback never includes the payer's registered name —
-              // only their phone number. That's the one real sender detail
-              // available, so it's the sender identity here too, same as a
-              // real M-Pesa confirmation SMS falls back to showing the
-              // number when it has no name to show.
-              sender: { name: formatPhoneDisplay(stkReq.phone), id: formatPhoneDisplay(stkReq.phone) },
+              // only their phone number. stkReq.payerName is captured
+              // directly on PayChain's own checkout step instead (see
+              // STKRequest.js), so it's used here when present; falls back
+              // to the phone number the same way a real M-Pesa confirmation
+              // SMS does when it has no name to show.
+              sender: { name: stkReq.payerName || formatPhoneDisplay(stkReq.phone), id: formatPhoneDisplay(stkReq.phone) },
               recipient: { name: merchant.businessName, id: merchant.ncbaMerchantCode },
               balanceAfter: updatedMerchant.kesBalance,
               paymentLinkId: link.linkId,
@@ -569,9 +570,9 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
             status: 'completed',
             reference: receipt,
             // See the identical comment on the PaymentLink branch above —
-            // Safaricom's STK Push callback has no payer-name field, only a
-            // phone number, so that's the sender identity here too.
-            sender: { name: formatPhoneDisplay(stkReq.phone), id: formatPhoneDisplay(stkReq.phone) },
+            // prefers stkReq.payerName (captured on PayChain's own checkout
+            // step) over the bare phone number.
+            sender: { name: stkReq.payerName || formatPhoneDisplay(stkReq.phone), id: formatPhoneDisplay(stkReq.phone) },
             recipient: { name: merchant.businessName, id: 'WALLET' },
             balanceAfter: updatedMerchant.kesBalance,
           });

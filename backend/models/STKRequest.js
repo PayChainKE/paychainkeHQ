@@ -66,6 +66,16 @@ const stkRequestSchema = new Schema({
     required: false,
     default: null,
   },
+  // The payer's name, captured directly on PayChain's own checkout step
+  // (PaymentPage/PayAccountPage/InvoiceView) rather than relied on from
+  // NCBA/Safaricom — those never send one for STK. Carried onto the
+  // resulting Transaction's sender.name in resolveStkOutcome below, so it
+  // doesn't depend on bank/telco data quality the way the direct
+  // account-notification webhook's name resolution does.
+  payerName: {
+    type: String,
+    default: null,
+  },
   status: {
     type: String,
     enum: ['pending', 'success', 'failed'],

@@ -787,6 +787,13 @@ export const processPaymentLink = async (req, res) => {
       throw e;
     }
 
+    // A name already on file — invoice's own customer.name, or a
+    // checkout-page cart that collected one — passed through if present.
+    // Never asked for manually at this step; null just means the resulting
+    // Transaction's sender.name falls back to the phone number, same as
+    // any plain STK payment.
+    const payerName = (link.buyerName || '').trim() || null;
+
     // Checkout initializer: the amount actually prompted on the customer's
     // handset — base bill + PayChain's customer-facing markup. Computed
     // once, up front, so what the customer sees and approves on their phone
@@ -807,7 +814,7 @@ export const processPaymentLink = async (req, res) => {
       merchantId: link.merchantId._id,
       phone: formattedPhone,
       checkoutTotal,
-      extra: { linkId: link.linkId },
+      extra: { linkId: link.linkId, payerName },
     });
     res.status(200).json({ success: true, checkoutRequestId, message: 'STK Push sent to phone' });
 
