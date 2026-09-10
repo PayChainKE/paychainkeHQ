@@ -18,6 +18,12 @@ import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLocked
 import { assertOtpNotLocked, recordFailedOtpAttempt, resetOtpAttempts, OtpLockedError } from '../utils/otpLockout.js';
 import { timingSafeStringEqual } from '../utils/timingSafeCompare.js';
 import { normalizeKraPin, isValidKraPin, KRA_PIN_FORMAT_HINT } from '../utils/kraPinValidator.js';
+import { normalizeNationalId, isValidNationalId, NATIONAL_ID_FORMAT_HINT } from '../utils/nationalIdValidator.js';
+import { KENYA_COUNTY_AREAS } from '../config/kenyaCountyAreas.js';
+import { KYB_REQUIREMENTS_BY_BUSINESS_TYPE, ALL_KYB_DOC_TYPES, KYB_DOC_LABELS } from '../config/kybRequirements.js';
+import { checkAndRecordLoginDevice } from '../utils/newDeviceLoginAlert.js';
+import { hashDocumentBuffer, checkDocumentReuse } from '../utils/documentReuseDetection.js';
+import { notifyAdmins, escapeHtml } from '../utils/securityAlerts.js';
 import { getOrCreatePlatformSettings } from '../models/PlatformSettings.js';
 import { getAvailableBalance } from '../utils/availableBalance.js';
 import { checkImageSharpness } from '../utils/imageBlurCheck.js';
@@ -40,7 +46,10 @@ const BUSINESS_TYPES = [
 ];
 const EMPLOYEE_BANDS = ['1-10', '11-50', '51-200', '201-500', '501+'];
 
-// Mirrored in Login.jsx (web) and Login.tsx (mobile) — keep in sync.
+// Legacy single-document flow — apps/mobile-app/src/pages/Login.tsx only,
+// see registerMerchant's own doc comment on the two request shapes it
+// still accepts. The web dashboard now uses per-business-type multi-
+// document requirements instead (kybRequirements.js).
 const CERTIFICATE_DOCUMENT_TYPES = ['certificate_of_registration', 'business_permit', 'license', 'other'];
 
 // A single, narrowly-scoped exception to "every login requires OTP" — the
@@ -100,13 +109,33 @@ export const registerMerchant = async (req, res) => {
   try {
     let {
       name, email, phone, businessName, password, registrationSource, kraPin, businessNumber,
-      businessType, county, area, employees, ecommerce, agreedToTerms, documentType,
+      businessType, county, area, employees, ecommerce, agreedToTerms, documentType, nationalId,
     } = req.body || {};
-    const certificateFile = req.file;
+
+    // Two request shapes hit this same endpoint right now: the merchant
+    // dashboard (web) sends the new per-business-type `doc_<type>` fields;
+    // apps/mobile-app still sends the old single `certificate` +
+    // `documentType` pair (not updated yet — held off deliberately during
+    // Google Play review). `legacyCertFile` presence is what tells the two
+    // apart. Remove this branch (and CERTIFICATE_DOCUMENT_TYPES /
+    // certificateUrl / certificateDocumentType below) once the mobile app
+    // is brought up to the same multi-document flow.
+    const legacyCertFile = req.files?.certificate?.[0];
+    const uploadedDocsByType = {};
+    if (!legacyCertFile) {
+      // One `doc_<type>` field per KYB_REQUIREMENTS_BY_BUSINESS_TYPE slot —
+      // which fields are actually present is itself what tells us which
+      // document(s) the merchant is claiming to have uploaded.
+      for (const type of ALL_KYB_DOC_TYPES) {
+        const file = req.files?.[`doc_${type}`]?.[0];
+        if (file) uploadedDocsByType[type] = file;
+      }
+    }
 
     if (phone) phone = String(phone).replace(/\s+/g, '');
     if (email) email = String(email).trim().toLowerCase();
     if (kraPin) kraPin = normalizeKraPin(kraPin);
+    if (nationalId) nationalId = normalizeNationalId(nationalId);
     if (businessNumber) businessNumber = String(businessNumber).trim();
     if (businessType) businessType = String(businessType).trim();
     if (county) county = String(county).trim();
@@ -147,11 +176,14 @@ export const registerMerchant = async (req, res) => {
     if (!businessType || !BUSINESS_TYPES.includes(businessType)) {
       return res.status(400).json({ error: 'Select a valid business type.' });
     }
-    if (!county?.trim()) {
-      return res.status(400).json({ error: 'County is required.' });
+    // Both must be real, matched places — not just "not empty" — so a
+    // signup can't claim an area that doesn't actually exist in the county
+    // it was submitted under (see KENYA_COUNTY_AREAS's own doc comment).
+    if (!county?.trim() || !KENYA_COUNTY_AREAS[county]) {
+      return res.status(400).json({ error: 'Select a valid Kenyan county.' });
     }
-    if (!area?.trim()) {
-      return res.status(400).json({ error: 'Area/Location is required.' });
+    if (!area?.trim() || !KENYA_COUNTY_AREAS[county].includes(area)) {
+      return res.status(400).json({ error: `Select a valid area/location within ${county}.` });
     }
     if (!employees || !EMPLOYEE_BANDS.includes(employees)) {
       return res.status(400).json({ error: 'Select a valid number of employees.' });
@@ -166,28 +198,68 @@ export const registerMerchant = async (req, res) => {
       return res.status(400).json({ error: 'You must agree to the Privacy Policy and Terms of Service to create an account.' });
     }
 
-    // Certificate of Registration / Business Permit / License — mandatory
-    // proof the business is real, same spirit as the officer-led KYB
-    // checklist but lightweight enough for an unattended self-serve signup.
-    if (!certificateFile) {
-      return res.status(400).json({ error: 'Upload your Certificate of Registration, Business Permit, or License to continue.' });
+    // The National ID number of the person registering — not yet collected
+    // by the mobile app (see legacyCertFile's own doc comment above), so
+    // only enforced on the new (web) request shape.
+    if (!legacyCertFile) {
+      if (!nationalId || !isValidNationalId(nationalId)) {
+        return res.status(400).json({ error: `Enter a valid National ID number. ${NATIONAL_ID_FORMAT_HINT}` });
+      }
+      if (await Merchant.exists({ nationalId })) {
+        return res.status(400).json({ error: 'A merchant account already exists for that National ID number.' });
+      }
     }
-    if (!documentType || !CERTIFICATE_DOCUMENT_TYPES.includes(documentType)) {
-      return res.status(400).json({ error: 'Select which document you uploaded.' });
+
+    // Mandatory proof the business (and, for a PLC, the person behind it)
+    // is real. See this function's top-of-body comment for why there are
+    // two shapes here: legacy (mobile, one document, any business type) vs
+    // the new per-business-type requirement (web) — a formally registered
+    // entity has a CR12 to prove it and an informal sole trader doesn't, so
+    // "one document, no matter what kind of business" was never actually
+    // enough. Nothing in either path is optional, on purpose.
+    let requiredDocTypes = [];
+    if (legacyCertFile) {
+      if (!documentType || !CERTIFICATE_DOCUMENT_TYPES.includes(documentType)) {
+        return res.status(400).json({ error: 'Select which document you uploaded.' });
+      }
+    } else {
+      const requirement = KYB_REQUIREMENTS_BY_BUSINESS_TYPE[businessType];
+      if (requirement.mode === 'choice') {
+        const provided = requirement.options.filter((t) => uploadedDocsByType[t]);
+        if (provided.length !== 1) {
+          return res.status(400).json({
+            error: `Upload exactly one of: ${requirement.options.map((t) => KYB_DOC_LABELS[t]).join(' or ')}.`,
+          });
+        }
+        requiredDocTypes = provided;
+      } else {
+        const missing = requirement.required.filter((t) => !uploadedDocsByType[t]);
+        if (missing.length) {
+          return res.status(400).json({
+            error: `Upload the following required document(s): ${missing.map((t) => KYB_DOC_LABELS[t]).join(', ')}.`,
+          });
+        }
+        requiredDocTypes = requirement.required;
+      }
     }
+
     // Only a photo can be "blurry" — a PDF's own text/vector content is
     // already exactly as clear as it will ever be, and sharp isn't
     // guaranteed to have PDF rasterization support in every environment.
-    if (certificateFile.mimetype !== 'application/pdf') {
+    const filesToCheck = legacyCertFile
+      ? [{ type: null, file: legacyCertFile, label: 'document' }]
+      : requiredDocTypes.map((type) => ({ type, file: uploadedDocsByType[type], label: KYB_DOC_LABELS[type] }));
+    for (const { file, label } of filesToCheck) {
+      if (file.mimetype === 'application/pdf') continue;
       let sharpness;
       try {
-        sharpness = await checkImageSharpness(certificateFile.buffer);
+        sharpness = await checkImageSharpness(file.buffer);
       } catch (e) {
-        console.error('Certificate sharpness check failed:', e);
-        return res.status(400).json({ error: 'We could not read that image. Please upload a different photo of your document.' });
+        console.error(`KYB document (${label}) sharpness check failed:`, e);
+        return res.status(400).json({ error: `We could not read your ${label}. Please upload a different photo of that document.` });
       }
       if (sharpness.blurry) {
-        return res.status(400).json({ error: sharpness.reason });
+        return res.status(400).json({ error: legacyCertFile ? sharpness.reason : `${label}: ${sharpness.reason}` });
       }
     }
 
@@ -228,14 +300,27 @@ export const registerMerchant = async (req, res) => {
 
     // Upload last, only once every other check has passed — avoids
     // spending a Cloudinary write on a signup that was going to fail anyway
-    // (duplicate email/phone/KRA PIN, bad business details, etc).
-    let certificateUrl;
+    // (duplicate email/phone/KRA PIN, bad business details, etc). The new
+    // path stores into kybDocuments (the same typed array the officer-led
+    // KYB pipeline and admin's review UI already use — see Merchants.jsx's
+    // KybDrawer); the legacy mobile path keeps writing the older single
+    // certificateUrl/certificateDocumentType fields exactly as before.
+    const kybDocuments = [];
+    let certificateUrl = null;
     try {
-      const uploaded = await uploadBufferToCloudinary(certificateFile.buffer, 'paychain_certificates');
-      certificateUrl = uploaded.secure_url;
+      if (legacyCertFile) {
+        const uploaded = await uploadBufferToCloudinary(legacyCertFile.buffer, 'paychain_certificates');
+        certificateUrl = uploaded.secure_url;
+      } else {
+        for (const type of requiredDocTypes) {
+          const file = uploadedDocsByType[type];
+          const uploaded = await uploadBufferToCloudinary(file.buffer, 'paychain_certificates');
+          kybDocuments.push({ type, url: uploaded.secure_url, status: 'pending', contentHash: hashDocumentBuffer(file.buffer) });
+        }
+      }
     } catch (e) {
-      console.error('Certificate upload to Cloudinary failed:', e);
-      return res.status(500).json({ error: 'We could not upload your document right now. Please try again.' });
+      console.error('KYB document upload to Cloudinary failed:', e);
+      return res.status(500).json({ error: 'We could not upload your document(s) right now. Please try again.' });
     }
     const otp = crypto.randomInt(100000, 1000000).toString();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
@@ -247,9 +332,11 @@ export const registerMerchant = async (req, res) => {
       businessName,
       kraPin: kraPin || null,
       businessNumber: businessNumber || null,
+      nationalId: nationalId || null,
       password,
       certificateUrl,
-      certificateDocumentType: documentType,
+      certificateDocumentType: legacyCertFile ? documentType : null,
+      kybDocuments,
       otp,
       otpExpires,
       kesBalance: 0,
@@ -307,6 +394,28 @@ export const registerMerchant = async (req, res) => {
       metadata: { source: merchant.registrationSource || 'web' },
     });
 
+    // Nothing about self-serve signup was previously reviewed by anyone
+    // before the account could log in and move money — this is the actual
+    // fraud control the multi-document requirement above only sets up:
+    // admins need to know a new KYB submission exists to go verify it, not
+    // stumble onto it later by chance while browsing the merchant list.
+    notifyAdmins({
+      type: 'new_merchant_kyb_submission',
+      severity: 'info',
+      subject: `New merchant registered: ${merchant.businessName}`,
+      heading: 'New Merchant — KYB Documents Pending Review',
+      details: `<strong>${escapeHtml(merchant.businessName)}</strong> (${escapeHtml(merchant.businessType || 'unknown business type')}) just self-registered and submitted ${kybDocuments.length || 1} document(s) for verification. Review in Merchants &gt; ${escapeHtml(merchant.businessName)} &gt; ${kybDocuments.length ? 'KYC/KYB Documents' : 'Certificate'}.`,
+      metadata: { merchantId: String(merchant._id) },
+    });
+
+    // Checks the hashes just stored on this merchant against every OTHER
+    // merchant's kybDocuments — see documentReuseDetection.js's own doc
+    // comment. Not run for the legacy mobile path (no contentHash exists
+    // there at all — see certificateUrl's own single-file, unhashed flow).
+    if (kybDocuments.length) {
+      checkDocumentReuse(merchant, kybDocuments.map((d) => d.contentHash));
+    }
+
     res.status(201).json({
       success: true,
       message: 'Registration successful. Account created.',
@@ -325,6 +434,7 @@ export const registerMerchant = async (req, res) => {
         phone: 'phone number',
         kraPin: 'KRA PIN',
         businessNumber: 'business registration number',
+        nationalId: 'National ID number',
       };
       const label = labels[key] || 'detail';
       return res.status(400).json({ error: `A merchant with that ${label} already exists.` });
@@ -453,6 +563,13 @@ export const verifyMerchantOTP = async (req, res) => {
       title: 'New sign-in detected',
       message: 'Your account was just accessed with a verified sign-in code.',
     });
+
+    // Fires an SMS + email only when this device/IP fingerprint genuinely
+    // hasn't been seen on this account before — unlike the in-app
+    // notification above (which fires on every login), this is the actual
+    // "someone new is in your account" signal. Never awaited into the
+    // response — see the function's own doc comment.
+    checkAndRecordLoginDevice(merchant, req);
 
     const payload = await buildMerchantSessionPayload(merchant);
     res.json({ success: true, ...payload });

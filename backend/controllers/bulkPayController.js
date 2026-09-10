@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import Payee from '../models/Payee.js';
 import PayoutBatch from '../models/PayoutBatch.js';
 import Merchant from '../models/Merchant.js';
@@ -12,6 +13,7 @@ import { safeSendSMS, formatKes } from '../utils/smsSanitizer.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 import { claimPayoutSubmission, DuplicateSubmissionError } from '../utils/idempotencyGuard.js';
+import { assertOutboundVelocityOk, OutboundVelocityLockedError } from '../utils/outboundVelocityGuard.js';
 import { debitAvailableBalance } from '../utils/availableBalance.js';
 import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard.js';
 import { getKplcPostpaidTariff, getKplcPrepaidTariff, getNcwscTariff } from '../config/billPaymentTariffCard.js';
@@ -427,6 +429,26 @@ export const authorizeBatch = async (req, res) => {
       if (e instanceof DuplicateSubmissionError) return res.status(409).json({ message: e.message });
       throw e;
     }
+
+    // Bulk Pay's own rows are exempt from the rapid-transfer *count* (see
+    // Transaction.js's payoutBatchId doc comment) — but an account already
+    // locked by that check must not be able to route around it by switching
+    // to Bulk Pay instead. This call only ever short-circuits on the
+    // existing outboundLocked flag here, since no bulk rows exist yet to
+    // count.
+    try {
+      await assertOutboundVelocityOk(req.merchant._id);
+    } catch (e) {
+      if (e instanceof OutboundVelocityLockedError) return res.status(423).json({ message: e.message });
+      throw e;
+    }
+
+    // Minted upfront (not read off the PayoutBatch doc, which isn't saved
+    // until after every row's Transaction already exists) so every row
+    // created below and the PayoutBatch itself share the same id — the
+    // only thing that lets a row be recognized as "part of a Bulk Pay
+    // batch" later (see Transaction.js's payoutBatchId field doc comment).
+    const payoutBatchId = new mongoose.Types.ObjectId();
 
     // 1. Resolve/create each row's Payee up front, and calculate totals —
     // needed before the balance debit below, since a Mobile Money row paid
@@ -906,6 +928,7 @@ export const authorizeBatch = async (req, res) => {
       try {
         const transaction = await Transaction.create({
           merchantId: merchant._id,
+          payoutBatchId,
           accountNumber: merchant.ncbaMerchantCode || 'WALLET_FUND',
           type: row.isKplcRow ? 'ncba_kplc' : row.isKplcPrepaidRow ? 'ncba_kplc_prepaid' : row.isNcwscRow ? 'ncba_ncwsc' : row.isLnmRow ? 'ncba_lipa_na_mpesa' : (isNcbaRouted ? 'ncba_outbound' : 'bulk_pay'),
           amount: row.netAmount,
@@ -1011,6 +1034,7 @@ export const authorizeBatch = async (req, res) => {
     // 5. Record Batch
     const totalB2cFeesKept = transactions.reduce((sum, t) => sum + (t.b2cFee || 0), 0);
     const batch = new PayoutBatch({
+      _id: payoutBatchId,
       merchantId: req.merchant._id,
       batchReference: generateBatchReference(),
       totalGrossAmount: totalGross,

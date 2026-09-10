@@ -40,10 +40,23 @@ export default function Invoices() {
   const [isSendingInvoice, setIsSendingInvoice] = useState(false);
   const [invoiceDetails, setInvoiceDetails] = useState(blankInvoice());
 
+  // The seller's own KRA PIN — Merchant.kraPin, the same field Profile.jsx
+  // edits. Invoices already pull this onto the PDF automatically
+  // (invoiceController.js's `trader.pin`), but until now a merchant with
+  // none on file had no way to add one without leaving this page. Not
+  // invoice-specific state: saving this updates the merchant's profile via
+  // the same PUT /api/auth/merchant/profile endpoint Profile.jsx uses.
+  const [ownKraPin, setOwnKraPin] = useState(merchant?.kraPin || '')
+  // Same "locked until you click Edit" pattern as Profile.jsx's identical
+  // field — a soft anti-fat-finger guard, not a security gate (self-service,
+  // no OTP needed to unlock).
+  const [ownKraPinLocked, setOwnKraPinLocked] = useState(!!merchant?.kraPin)
+  const [savingOwnKraPin, setSavingOwnKraPin] = useState(false)
+
   // Whether this merchant has an initialized KRA eTIMS OSCU device — the
-  // per-item tax/classification fields and buyer PIN only render at all when
-  // this is true, so the vast majority of merchants (no OSCU registered)
-  // never see fields that don't apply to them.
+  // per-item tax/classification fields only render at all when this is
+  // true (they genuinely don't apply otherwise); the buyer PIN field below
+  // is shown to everyone regardless, just not required unless this is true.
   const [etimsEnabled, setEtimsEnabled] = useState(false);
   const TAX_TYPE_OPTIONS = [
     { code: 'A', label: 'A — Exempt' },
@@ -138,6 +151,28 @@ export default function Invoices() {
   useEffect(() => {
     setInvoicePage(prev => Math.min(prev, totalInvoicePages));
   }, [totalInvoicePages]);
+
+  // Saves the seller's own KRA PIN to their merchant profile (not to the
+  // invoice itself — see ownKraPin's own doc comment above). Mirrors
+  // Profile.jsx's save() exactly, scoped to just this one field.
+  async function saveOwnKraPin() {
+    setSavingOwnKraPin(true)
+    try {
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+      const token = localStorage.getItem('paychain_merchant_token')
+      const res = await axios.put(`${API_URL}/api/auth/merchant/profile`, { kraPin: ownKraPin }, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (res.data.success) {
+        addNotification({ title: 'KRA PIN Saved', message: 'Your KRA PIN has been added to your profile and will appear on this invoice.', type: 'success' })
+        setOwnKraPinLocked(true)
+      }
+    } catch (err) {
+      addNotification({ title: 'Could not save KRA PIN', message: err.response?.data?.error || 'Please try again.', type: 'error' })
+    } finally {
+      setSavingOwnKraPin(false)
+    }
+  }
 
   const handleAddInvoiceItem = () => {
     setInvoiceDetails(prev => ({
@@ -641,19 +676,51 @@ export default function Invoices() {
                      />
                   </div>
 
-                  {etimsEnabled && (
-                    <div className="space-y-2">
-                       <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-60">Buyer KRA PIN *</label>
-                       <input
-                         type="text"
-                         required
-                         value={invoiceDetails.customer.kraPin || ''}
-                         onChange={e => setInvoiceDetails({...invoiceDetails, customer: { ...invoiceDetails.customer, kraPin: e.target.value.toUpperCase() }})}
-                         placeholder="P051892647A"
-                         className="w-full bg-surface-container-lowest border border-outline-variant/20 rounded-2xl px-5 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 uppercase"
-                       />
-                    </div>
-                  )}
+                  <div className="space-y-2">
+                     <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-60">
+                       Your KRA PIN{ownKraPinLocked ? '' : ' (optional)'}
+                     </label>
+                     <div className="relative flex gap-2">
+                       <div className="relative flex-1">
+                         <ValidatedInput
+                           kind="kraPin"
+                           optional
+                           disabled={ownKraPinLocked}
+                           value={ownKraPin}
+                           onChange={e => setOwnKraPin(e.target.value.toUpperCase())}
+                           placeholder="e.g. P051892647A"
+                           className={`w-full border border-outline-variant/20 rounded-2xl px-5 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 uppercase ${ownKraPinLocked ? 'opacity-60 bg-slate-50 cursor-not-allowed pr-10' : 'bg-surface-container-lowest'}`}
+                         />
+                         {ownKraPinLocked && (
+                           <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-primary/40 text-sm pointer-events-none">lock</span>
+                         )}
+                       </div>
+                       {ownKraPinLocked ? (
+                         <button type="button" onClick={() => setOwnKraPinLocked(false)} className="text-[10px] font-black uppercase tracking-widest text-emerald-600 hover:text-emerald-700 px-2 shrink-0">
+                           Edit
+                         </button>
+                       ) : ownKraPin.trim() && ownKraPin !== (merchant?.kraPin || '') ? (
+                         <button type="button" disabled={savingOwnKraPin} onClick={saveOwnKraPin} className="text-[10px] font-black uppercase tracking-widest text-emerald-600 hover:text-emerald-700 px-2 shrink-0 disabled:opacity-50">
+                           {savingOwnKraPin ? 'Saving…' : 'Save'}
+                         </button>
+                       ) : null}
+                     </div>
+                     <p className="text-2xs text-on-surface-variant/50">Shown as the seller's PIN on this invoice. Saved to your profile.</p>
+                  </div>
+
+                  <div className="space-y-2">
+                     <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-60">
+                       Buyer KRA PIN{etimsEnabled ? ' *' : ' (optional)'}
+                     </label>
+                     <input
+                       type="text"
+                       required={etimsEnabled}
+                       value={invoiceDetails.customer.kraPin || ''}
+                       onChange={e => setInvoiceDetails({...invoiceDetails, customer: { ...invoiceDetails.customer, kraPin: e.target.value.toUpperCase() }})}
+                       placeholder="P051892647A"
+                       className="w-full bg-surface-container-lowest border border-outline-variant/20 rounded-2xl px-5 py-3 text-sm font-bold text-primary focus:ring-0 focus:border-emerald-500/50 uppercase"
+                     />
+                  </div>
 
                   <div className="space-y-2">
                     <label className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] opacity-60 pr-1 flex items-center gap-1">

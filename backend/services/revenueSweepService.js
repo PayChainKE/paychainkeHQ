@@ -172,11 +172,12 @@ async function computeUnsweptRevenue() {
 // other than a merchant's own withdrawal or the revenue sweep itself.
 export async function computeExpectedPoolBalance() {
   const [merchantAgg, { grossUnswept, netUnswept, totalCharges, totalWriteOffs, transactionCount }] = await Promise.all([
-    // Demo merchant's simulated kesBalance is not real money PayChain owes
-    // anyone — must never inflate what the pool is expected to hold, same
-    // discipline computeUnsweptRevenue below already applies to fee revenue.
+    // Demo merchant's simulated kesBalance (and the Play Store reviewer
+    // account's, same reasoning) is not real money PayChain owes anyone —
+    // must never inflate what the pool is expected to hold, same discipline
+    // computeUnsweptRevenue below already applies to fee revenue.
     Merchant.aggregate([
-      { $match: { isDemoMerchant: { $ne: true } } },
+      { $match: { isDemoMerchant: { $ne: true }, isAppReviewAccount: { $ne: true } } },
       { $group: { _id: null, total: { $sum: '$kesBalance' }, count: { $sum: 1 } } },
     ]),
     computeUnsweptRevenue(),
@@ -313,7 +314,7 @@ export async function runRevenueSweep() {
   // goes out next run (computeUnsweptRevenue is a running total); a wrong
   // guess here would risk moving merchant money.
   const merchantAgg = await Merchant.aggregate([
-    { $match: { isDemoMerchant: { $ne: true } } },
+    { $match: { isDemoMerchant: { $ne: true }, isAppReviewAccount: { $ne: true } } },
     { $group: { _id: null, total: { $sum: '$kesBalance' } } },
   ]);
   const merchantBalanceTotal = Math.round((merchantAgg[0]?.total || 0) * 100) / 100;

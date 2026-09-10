@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { generateRandomMerchantCode } from '../utils/ncbaValidators.js';
 import RetiredMerchantCode from './RetiredMerchantCode.js';
 import { normalizeKraPin, isValidKraPin, KRA_PIN_FORMAT_HINT } from '../utils/kraPinValidator.js';
+import { normalizeNationalId, isValidNationalId, NATIONAL_ID_FORMAT_HINT } from '../utils/nationalIdValidator.js';
 import { broadcastMerchantEvent } from '../utils/merchantEventStream.js';
 
 const merchantSchema = new mongoose.Schema({
@@ -36,6 +37,29 @@ const merchantSchema = new mongoose.Schema({
   businessName: {
     type: String,
     required: [true, 'Please add a business name'],
+  },
+  // National ID number of the individual registering the account (the
+  // `name` field above) — not the same thing as a kybDocuments national_id
+  // *photo*, which proves a document exists but never captures the number
+  // on it. Unique so a duplicate-identity self-signup is rejected outright
+  // at registration, rather than only being caught after the fact by
+  // documentReuseDetection.js's photo-hash comparison. Required for new
+  // (web) signups only — see registerMerchant's own doc comment on the
+  // legacy mobile request shape this isn't enforced against yet.
+  nationalId: {
+    type: String,
+    default: null,
+    unique: true,
+    sparse: true,
+    set: (v) => normalizeNationalId(v),
+    validate: {
+      validator: function (v) {
+        if (!v) return true;
+        if (typeof this.isModified === 'function' && !this.isModified('nationalId')) return true;
+        return isValidNationalId(v);
+      },
+      message: `Invalid National ID number. ${NATIONAL_ID_FORMAT_HINT}`,
+    },
   },
   businessNumber: {
     type: String,
@@ -387,6 +411,40 @@ const merchantSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  // The one account app-store reviewers log into (matched at login time
+  // against APP_REVIEW_BYPASS_EMAIL — see merchantAuthController.js) is
+  // seeded with realistic-looking demo balance/transactions so a reviewer
+  // sees a working app. That data is exactly as fake as isDemoMerchant's,
+  // so every real-money admin total (Pool Reconciliation, merchant balance
+  // lists, revenue KPIs, bookkeeping P&L) must exclude it the same way —
+  // see utils/demoMerchantExclusion.js.
+  isAppReviewAccount: {
+    type: Boolean,
+    default: false,
+  },
+  // Auto-set by utils/outboundVelocityGuard.js the instant a merchant
+  // attempts a 3rd ad-hoc outbound transfer (bank payout, M-Pesa, bill pay
+  // — NOT Bulk Pay, a different already-controlled pattern) within 5
+  // minutes — the signature of an account being rapidly drained after a
+  // takeover. Deliberately narrower than `status: 'locked'`: login,
+  // balance/history viewing, and everything else stays unaffected, only
+  // money actually leaving the account is blocked, so a false positive
+  // doesn't strand a real merchant out of their own account. Self-clears
+  // 15 minutes after outboundLockedAt (see outboundVelocityGuard.js) — no
+  // admin action required, though the OTP-gated 'unlock_outbound' admin
+  // action (adminController.js) can still clear it early.
+  outboundLocked: {
+    type: Boolean,
+    default: false,
+  },
+  outboundLockedAt: {
+    type: Date,
+    default: null,
+  },
+  outboundLockReason: {
+    type: String,
+    default: null,
+  },
   // ── Onboarding-Officer KYC pipeline (unset for self-serve merchants) ──
   // kybStatus has NO default — it must stay genuinely absent on every
   // merchant created by self-serve signup or the admin direct-onboard flow,
@@ -440,11 +498,20 @@ const merchantSchema = new mongoose.Schema({
   },
   kybDocuments: {
     type: [{
-      type: { type: String, enum: ['business_registration', 'kra_pin', 'national_id', 'address_proof'], required: true },
+      type: { type: String, enum: ['business_registration', 'kra_pin', 'national_id', 'address_proof', 'business_permit_or_license'], required: true },
       url: { type: String, required: true },
       uploadedAt: { type: Date, default: Date.now },
       status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
       note: { type: String, default: null },
+      // sha256 of the uploaded file's raw bytes — lets
+      // utils/documentReuseDetection.js catch the same ID photo/CR12 scan
+      // being reused across two different merchant accounts (a strong
+      // signal of a fraud ring reusing one stolen identity), which nothing
+      // previously checked for at all. Indexed, not unique — a genuine
+      // re-upload of one's own document (e.g. after a rejection) must
+      // still be allowed; only a match against a DIFFERENT merchant is
+      // the actual signal.
+      contentHash: { type: String, default: null, index: true },
     }],
     default: [],
   },

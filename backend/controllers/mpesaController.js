@@ -14,6 +14,7 @@ import { createNotification } from './notificationController.js';
 import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 import { claimPayoutSubmission, DuplicateSubmissionError } from '../utils/idempotencyGuard.js';
+import { assertOutboundVelocityOk, OutboundVelocityLockedError } from '../utils/outboundVelocityGuard.js';
 import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard.js';
 import { getLipaNaMpesaTariff } from '../config/lipaNaMpesaTariffCard.js';
 import { withMerchantTariffLock } from '../services/tariffCardCache.js';
@@ -1093,6 +1094,13 @@ export const initiateB2C = async (req, res) => {
       await claimPayoutSubmission(merchantId, ['b2c', phone, amount]);
     } catch (e) {
       if (e instanceof DuplicateSubmissionError) return res.status(409).json({ error: e.message });
+      throw e;
+    }
+
+    try {
+      await assertOutboundVelocityOk(merchantId);
+    } catch (e) {
+      if (e instanceof OutboundVelocityLockedError) return res.status(423).json({ error: e.message });
       throw e;
     }
 

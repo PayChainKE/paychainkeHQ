@@ -14,6 +14,19 @@ const transactionSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Account number (virtual account) is required'],
   },
+  // Set only on rows created inside bulkPayController.js#authorizeBatch —
+  // null for every ad-hoc single transaction (bank payout, bill pay, B2C).
+  // The only thing that tells the two apart, since a bulk row and a
+  // standalone one can share the exact same `type` (e.g. 'ncba_outbound').
+  // Used by utils/outboundVelocityGuard.js to exempt Bulk Pay (already one
+  // deliberate PIN-authorized batch) from the rapid-outbound-transfer check
+  // that watches for a compromised account draining funds one-by-one.
+  payoutBatchId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'PayoutBatch',
+    default: null,
+    index: true,
+  },
   type: {
     type: String,
     enum: ['inbound', 'outbound', 'bulk_pay', 'settlement', 'fx_swap', 'top_up', 'withdrawal', 'ncba_inbound', 'ncba_outbound', 'mpesa_b2c', 'mpesa_b2b', 'ncba_mobile_b2w', 'ncba_lipa_na_mpesa', 'ncba_kplc', 'ncba_kplc_prepaid', 'ncba_ncwsc'],
