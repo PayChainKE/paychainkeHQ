@@ -3,6 +3,8 @@ import Layout from '../components/layout/Layout';
 import api from '../api/api';
 import TablePagination from '../components/ui/TablePagination';
 import { formatKES } from '../utils/formatCurrency';
+import { formatName } from '../utils/formatName';
+import { formatPhoneDisplay } from '../utils/formatPhoneDisplay';
 
 const PAGE_SIZE = 25;
 
@@ -207,7 +209,8 @@ const TransactionAudit = () => {
                         ) : <span className="text-on-surface-variant/40 italic">Deleted Merchant</span>}
                       </td>
                       <td className="px-3 py-2 border-b border-outline-variant/5">
-                        <p className="text-on-surface-variant/80 font-mono truncate max-w-[140px]">{t.sender?.id || t.recipient?.id || t.accountNumber || '—'}</p>
+                        <p className="font-bold text-on-surface truncate max-w-[160px]">{formatName(t.sender?.name) || formatName(t.recipient?.name) || '—'}</p>
+                        <p className="text-on-surface-variant/70 font-mono truncate max-w-[160px]">{formatPhoneDisplay(t.sender?.id || t.recipient?.id) || t.accountNumber || '—'}</p>
                       </td>
                       <td className="px-3 py-2 border-b border-outline-variant/5 text-right font-bold text-on-surface tabular-nums">
                         {t.currency === 'USDC' ? `${t.amount} USDC` : fmtKES(t.amount)}
@@ -352,15 +355,15 @@ const AuditDrawer = ({ id, onClose }) => {
                   {(txn.sender?.name || txn.sender?.id) && (
                     <div className="bg-surface-container-low/60 rounded-lg p-3 mb-2">
                       <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 mb-1">Sender</p>
-                      <p className="text-xs font-bold text-on-surface">{txn.sender.name || '—'}</p>
-                      {txn.sender.id && <p className="text-2xs text-on-surface-variant/60 font-mono">{txn.sender.id}</p>}
+                      <p className="text-xs font-bold text-on-surface">{formatName(txn.sender.name) || '—'}</p>
+                      {txn.sender.id && <p className="text-2xs text-on-surface-variant/60 font-mono">{formatPhoneDisplay(txn.sender.id)}</p>}
                     </div>
                   )}
                   {(txn.recipient?.name || txn.recipient?.id) && (
                     <div className="bg-surface-container-low/60 rounded-lg p-3">
                       <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 mb-1">Recipient</p>
-                      <p className="text-xs font-bold text-on-surface">{txn.recipient.name || '—'}</p>
-                      {txn.recipient.id && <p className="text-2xs text-on-surface-variant/60 font-mono">{txn.recipient.id}</p>}
+                      <p className="text-xs font-bold text-on-surface">{formatName(txn.recipient.name) || '—'}</p>
+                      {txn.recipient.id && <p className="text-2xs text-on-surface-variant/60 font-mono">{formatPhoneDisplay(txn.recipient.id)}</p>}
                     </div>
                   )}
                 </Section>

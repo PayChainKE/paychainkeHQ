@@ -343,7 +343,7 @@ export const handleNcbaAccountNotification = async (req, res) => {
         merchant,
         grossAmount: transAmount,
         bankRef: transId,
-        customerPhone: formatPhoneDisplay(rawPhoneNr) || null,
+        customerPhone: formatPhoneDisplay(validPayerPhone) || null,
         customerName: parsedCustomer.name || null,
       });
     } catch (err) {
