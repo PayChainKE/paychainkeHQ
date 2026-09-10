@@ -34,12 +34,26 @@ const REGISTERED_ENTITY_ALL = {
     { type: 'business_permit_or_license', label: 'Business Permit or License' },
   ],
 }
+// LLC's directors are its accountable individuals — CR12 is always
+// mandatory (slots), plus exactly one of Director's ID or the company's
+// own KRA PIN Certificate (choiceOptions), replacing Business Permit or
+// License for LLC specifically.
+const LLC_REQUIREMENT = {
+  mode: 'all_plus_choice',
+  slots: [
+    { type: 'business_registration', label: 'Business Registration (CR12)' },
+  ],
+  choiceOptions: [
+    { type: 'national_id', label: "Director's ID (National ID / Passport)" },
+    { type: 'kra_pin', label: 'KRA PIN Certificate (Company)' },
+  ],
+}
 const KYB_REQUIREMENTS_BY_BUSINESS_TYPE = {
   'Sole Proprietorship': SOLE_TRADER_CHOICE,
   'Partnership': SOLE_TRADER_CHOICE,
   'NGO/Non-Profit': SOLE_TRADER_CHOICE,
   'Other': SOLE_TRADER_CHOICE,
-  'Limited Liability Company (LLC)': REGISTERED_ENTITY_ALL,
+  'Limited Liability Company (LLC)': LLC_REQUIREMENT,
   'SACCO': REGISTERED_ENTITY_ALL,
   'Cooperative Society': REGISTERED_ENTITY_ALL,
   'Public Limited Company (PLC)': {
@@ -682,6 +696,21 @@ export default function Login() {
             return
           }
         }
+      } else if (requirement?.mode === 'all_plus_choice') {
+        for (const slot of requirement.slots) {
+          if (!signupDocs[slot.type]) {
+            setErr(docErrors[slot.type] || `Upload your ${slot.label} to continue.`)
+            return
+          }
+        }
+        if (!signupDocType) {
+          setErr('Select which document you are uploading.')
+          return
+        }
+        if (!signupDocs[signupDocType]) {
+          setErr(docErrors[signupDocType] || 'Upload your document to continue.')
+          return
+        }
       }
     }
     setErr('')
@@ -717,7 +746,9 @@ export default function Login() {
     payload.append('agreedToTerms', agreedToTerms)
     {
       const requirement = KYB_REQUIREMENTS_BY_BUSINESS_TYPE[signupBusinessType]
-      const types = requirement?.mode === 'choice' ? [signupDocType] : (requirement?.slots.map(s => s.type) || [])
+      const types = requirement?.mode === 'choice' ? [signupDocType]
+        : requirement?.mode === 'all_plus_choice' ? [...requirement.slots.map(s => s.type), signupDocType]
+        : (requirement?.slots.map(s => s.type) || [])
       for (const type of types) {
         payload.append(`doc_${type}`, signupDocs[type])
       }
@@ -1293,14 +1324,16 @@ export default function Login() {
                       <>
                         <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1 flex items-center gap-1.5">
                           <span className="material-symbols-outlined text-sm">verified_user</span>
-                          Business Verification Document{requirement?.mode === 'all' && requirement.slots.length > 1 ? 's' : ''} *
+                          Business Verification Document{(requirement?.mode === 'all' && requirement.slots.length > 1) || requirement?.mode === 'all_plus_choice' ? 's' : ''} *
                         </label>
                         <p className="text-2xs text-on-surface-variant/60 pl-1 -mt-1">
                           {!requirement
                             ? 'Select a business type above to see which document(s) are required.'
                             : requirement.mode === 'choice'
                               ? 'Upload one of the documents below. Required to create an account.'
-                              : `Required for a ${signupBusinessType}: ${requirement.slots.map(s => s.label).join(', ')}.`}
+                              : requirement.mode === 'all_plus_choice'
+                                ? `Required for a ${signupBusinessType}: ${requirement.slots.map(s => s.label).join(', ')}, plus either ${requirement.choiceOptions.map(o => o.label).join(' or ')}.`
+                                : `Required for a ${signupBusinessType}: ${requirement.slots.map(s => s.label).join(', ')}.`}
                         </p>
 
                         {requirement?.mode === 'choice' && (
@@ -1327,6 +1360,30 @@ export default function Login() {
                         )}
 
                         {requirement?.mode === 'all' && requirement.slots.map(slot => renderDocUploadSlot(slot.type, slot.label))}
+
+                        {requirement?.mode === 'all_plus_choice' && (
+                          <>
+                            {requirement.slots.map(slot => renderDocUploadSlot(slot.type, slot.label))}
+                            <div className="relative">
+                              <select
+                                required
+                                value={signupDocType}
+                                onChange={e => setSignupDocType(e.target.value)}
+                                className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 pl-4 pr-10 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all appearance-none cursor-pointer"
+                              >
+                                <option value="">—Also upload: Director's ID or KRA PIN Certificate?—</option>
+                                {requirement.choiceOptions.map(o => (
+                                  <option key={o.type} value={o.type}>{o.label}</option>
+                                ))}
+                              </select>
+                              <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-primary/40 pointer-events-none">expand_more</span>
+                            </div>
+                            {signupDocType && renderDocUploadSlot(
+                              signupDocType,
+                              requirement.choiceOptions.find(o => o.type === signupDocType)?.label || 'Document'
+                            )}
+                          </>
+                        )}
                       </>
                     )
                   })()}

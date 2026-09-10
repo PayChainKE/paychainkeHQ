@@ -248,6 +248,18 @@ export const registerMerchant = async (req, res) => {
           });
         }
         requiredDocTypes = requirement.required;
+
+        // LLC-only, on top of `required` above — see LLC_REQUIREMENT's own
+        // doc comment (kybRequirements.js).
+        if (requirement.choiceAlso) {
+          const provided = requirement.choiceAlso.filter((t) => uploadedDocsByType[t]);
+          if (provided.length !== 1) {
+            return res.status(400).json({
+              error: `Also upload exactly one of: ${requirement.choiceAlso.map((t) => KYB_DOC_LABELS[t]).join(' or ')}.`,
+            });
+          }
+          requiredDocTypes = [...requiredDocTypes, ...provided];
+        }
       }
     }
 
