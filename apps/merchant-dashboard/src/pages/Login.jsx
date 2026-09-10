@@ -1232,7 +1232,7 @@ export default function Login() {
                       onChange={e => setSignupStreet(e.target.value)}
                       onFocus={() => streetResults.length > 0 && setStreetResultsOpen(true)}
                       onBlur={() => setTimeout(() => setStreetResultsOpen(false), 150)}
-                      placeholder={signupCounty ? `Search a street or landmark in ${signupCounty}...` : 'Search a street or landmark...'}
+                      placeholder={signupCounty ? `Type your street/estate/landmark, or search ${signupCounty}...` : 'Type your street/estate/landmark, or search...'}
                       className="w-full bg-white border border-outline-variant/15 rounded-2xl py-3 pl-9 pr-8 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all"
                     />
                     {streetSearching && (
