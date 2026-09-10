@@ -19,6 +19,7 @@ export default function PayAccountPage() {
 
   const [amount, setAmount] = useState('');
   const [phone, setPhone] = useState('');
+  const [name, setName] = useState('');
   const [isPaying, setIsPaying] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState('');
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
@@ -75,7 +76,7 @@ export default function PayAccountPage() {
 
   const handlePayment = async (e) => {
     e.preventDefault();
-    if (!phone || !amount || Number(amount) <= 0) return;
+    if (!phone || !name.trim() || !amount || Number(amount) <= 0) return;
     setIsPaying(true);
     setPaymentError('');
     setPaymentConfirmed(false);
@@ -83,7 +84,7 @@ export default function PayAccountPage() {
 
     try {
       const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
-      const res = await axios.post(`${API_URL}/api/transactions/pay-account/${account}`, { phone, amount: Number(amount) });
+      const res = await axios.post(`${API_URL}/api/transactions/pay-account/${account}`, { phone, name: name.trim(), amount: Number(amount) });
 
       if (res.data.success && res.data.checkoutRequestId) {
         setPaymentStatus('Awaiting M-PESA PIN on your phone...');
@@ -205,6 +206,25 @@ export default function PayAccountPage() {
 
             <div className="space-y-3">
               <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1 block text-left">
+                Your Full Name
+              </label>
+              <div className="relative group">
+                <div className="absolute left-5 top-1/2 -translate-y-1/2 text-primary/40 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-lg">person</span>
+                </div>
+                <input
+                  type="text"
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Jane Wanjiru"
+                  className="w-full bg-surface-container-low border border-outline-variant/5 rounded-2xl md:rounded-3xl py-4 md:py-5 pl-14 pr-6 text-xl md:text-2xl font-headline text-primary focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1 block text-left">
                 Your M-PESA Number
               </label>
               <div className="relative group">
@@ -239,7 +259,7 @@ export default function PayAccountPage() {
 
             <button
               type="submit"
-              disabled={isPaying || !phone || !amount || Number(amount) <= 0}
+              disabled={isPaying || !phone || !name.trim() || !amount || Number(amount) <= 0}
               className="w-full bg-[#00351D] text-white py-5 rounded-3xl font-bold text-lg shadow-[0_10px_30px_rgba(0,53,29,0.3)] hover:shadow-[0_15px_40px_rgba(0,53,29,0.4)] active:scale-[0.98] transition-all flex items-center justify-center gap-3 border border-white/5 disabled:opacity-50 disabled:grayscale group"
             >
               {!isPaying && <span className="material-symbols-outlined text-emerald-400 group-hover:scale-110 transition-transform">send_to_mobile</span>}

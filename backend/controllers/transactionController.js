@@ -754,7 +754,11 @@ export const getPaymentLink = async (req, res) => {
       // PayChain Account, not an internal reference that means nothing to
       // them.
       account: getNcbaVirtualAccountNumber(link.merchantId.ncbaMerchantCode) || link.merchantId.ncbaMerchantCode || 'Pending',
-      expiresAt: link.expiresAt
+      expiresAt: link.expiresAt,
+      // Already known (invoice's own customer.name, or a checkout-page cart
+      // that collected it) — lets the payment page skip asking for a name
+      // it already has instead of prompting twice.
+      buyerName: link.buyerName || null,
     });
   } catch (error) {
     console.error('❌ Error fetching payment link:', error);
@@ -787,6 +791,16 @@ export const processPaymentLink = async (req, res) => {
       throw e;
     }
 
+    // Prefer a name already on file (invoice's own customer.name, or a
+    // checkout-page cart that collected one) over asking the payer fresh —
+    // either way, this is required: unlike Safaricom's STK callback (no
+    // name field at all), PayChain's own checkout step is the one place we
+    // can actually guarantee a real sender name on every collection.
+    const payerName = (link.buyerName || String(req.body?.name || '')).trim();
+    if (!payerName) {
+      return res.status(400).json({ error: 'Enter your name to continue.' });
+    }
+
     // Checkout initializer: the amount actually prompted on the customer's
     // handset — base bill + PayChain's customer-facing markup. Computed
     // once, up front, so what the customer sees and approves on their phone
@@ -807,7 +821,7 @@ export const processPaymentLink = async (req, res) => {
       merchantId: link.merchantId._id,
       phone: formattedPhone,
       checkoutTotal,
-      extra: { linkId: link.linkId },
+      extra: { linkId: link.linkId, payerName },
     });
     res.status(200).json({ success: true, checkoutRequestId, message: 'STK Push sent to phone' });
 
@@ -1253,6 +1267,14 @@ export const payToMerchantAccount = async (req, res) => {
       throw e;
     }
 
+    // No PaymentLink/invoice to source a name from on this open-amount
+    // rail — always collected fresh at this step. See processPaymentLink's
+    // identical comment for why this is required rather than best-effort.
+    const payerName = String(req.body?.name || '').trim();
+    if (!payerName) {
+      return res.status(400).json({ error: 'Enter your name to continue.' });
+    }
+
     // Grandfathering — see tariffCardCache.js.
     const checkoutTotal = await withMerchantTariffLock(merchant, () => getCheckoutTotal(amount));
 
@@ -1262,7 +1284,7 @@ export const payToMerchantAccount = async (req, res) => {
       merchantId: merchant._id,
       phone: formattedPhone,
       checkoutTotal,
-      extra: { baseAmount: amount, kind: 'pay_account' },
+      extra: { baseAmount: amount, kind: 'pay_account', payerName },
     });
     res.status(200).json({ success: true, checkoutRequestId, message: 'STK Push sent to phone' });
 

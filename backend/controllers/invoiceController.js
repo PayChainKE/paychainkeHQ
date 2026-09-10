@@ -394,6 +394,11 @@ export const sendInvoice = async (req, res) => {
         status: 'active',
         expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
         invoiceId: invoice._id,
+        // The merchant already entered their client's real name when
+        // raising this invoice — reusing it here means processPaymentLink
+        // never has to ask the payer for a name at all, and it's more
+        // reliable than whatever they'd type in on the spot.
+        buyerName: invoice.customer?.name || null,
       });
       invoice.paymentLinkId = link._id;
     }
