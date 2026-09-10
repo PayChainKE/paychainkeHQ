@@ -1086,6 +1086,12 @@ const KYC_DOC_TYPES = [
   { type: 'business_registration',       label: 'Business Registration' },
   { type: 'kra_pin',                     label: 'KRA PIN Certificate' },
   { type: 'national_id',                 label: 'National ID' },
+  // Front/back camera capture's two-photo alternative to a single
+  // national_id entry (see backend/config/kybRequirements.js) — shown as
+  // their own rows since they're stored as two separate kybDocuments
+  // entries, not one.
+  { type: 'national_id_front',           label: 'National ID (front)' },
+  { type: 'national_id_back',            label: 'National ID (back)' },
   { type: 'address_proof',               label: 'Proof of Address' },
   { type: 'business_permit_or_license',  label: 'Business Permit or License' },
 ];

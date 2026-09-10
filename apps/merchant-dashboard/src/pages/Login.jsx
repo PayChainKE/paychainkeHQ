@@ -538,6 +538,25 @@ export default function Login() {
     otpRefs.current[nextEmpty === -1 ? 5 : nextEmpty]?.focus()
   }
 
+  // national_id is the one document type with two valid shapes — a single
+  // uploaded file, or a front+back camera-captured pair (see
+  // renderNationalIdSlot below). Mirrors
+  // backend/controllers/merchantAuthController.js's isDocProvided/
+  // resolveDocTypes exactly, so what this form considers "done" always
+  // matches what the server will actually accept.
+  function isDocSelected(type) {
+    if (type === 'national_id') {
+      return !!(signupDocs.national_id || (signupDocs.national_id_front && signupDocs.national_id_back))
+    }
+    return !!signupDocs[type]
+  }
+  function resolveDocTypes(type) {
+    if (type === 'national_id' && !signupDocs.national_id && signupDocs.national_id_front && signupDocs.national_id_back) {
+      return ['national_id_front', 'national_id_back']
+    }
+    return signupDocs[type] ? [type] : []
+  }
+
   async function handleDocFileChange(docType, e) {
     const file = e.target.files?.[0] || null
     const clearInput = () => { if (docInputRefs.current[docType]) docInputRefs.current[docType].value = '' }
@@ -578,8 +597,20 @@ export default function Login() {
 
   // One upload box per required document type — reused for both a
   // 'choice'-mode business type's single selected slot and every fixed
-  // slot of an 'all'-mode one.
+  // slot of an 'all'-mode one. national_id is special-cased below
+  // (renderNationalIdSlot) since it's the only type with two valid
+  // shapes — this stays the plain single-file renderer for everything
+  // else.
   function renderDocUploadSlot(type, label) {
+    if (type === 'national_id') return renderNationalIdSlot(label)
+    return renderGenericDocBox(type, label, { capture: true })
+  }
+
+  // The shared single-file upload box, factored out of the old
+  // renderDocUploadSlot so renderNationalIdSlot below can reuse it for
+  // both its "Upload" path (no capture attr — a real file/gallery picker)
+  // and its per-side camera boxes (capture: true).
+  function renderGenericDocBox(type, label, { capture } = {}) {
     const file = signupDocs[type]
     const error = docErrors[type]
     const preview = docPreviews[type]
@@ -597,7 +628,7 @@ export default function Login() {
             <img src={preview} alt={`${label} preview`} className="w-14 h-14 object-cover rounded-lg border border-outline-variant/20 shrink-0" />
           ) : (
             <span className={`material-symbols-outlined text-2xl shrink-0 ${file ? 'text-emerald-600' : 'text-primary/30'}`}>
-              {file ? 'description' : 'upload_file'}
+              {file ? 'description' : capture ? 'photo_camera' : 'upload_file'}
             </span>
           )}
           <div className="min-w-0 flex-1">
@@ -611,7 +642,7 @@ export default function Login() {
             ref={el => { docInputRefs.current[type] = el }}
             type="file"
             accept="image/*,application/pdf"
-            capture="environment"
+            {...(capture ? { capture: 'environment' } : {})}
             onChange={e => handleDocFileChange(type, e)}
             className="hidden"
           />
@@ -622,6 +653,135 @@ export default function Login() {
             {error}
           </p>
         )}
+      </div>
+    )
+  }
+
+  // National ID is the one document where a camera capture is split into
+  // two required shots (front, then back) instead of one — an ID's back
+  // (address, signature, sometimes date of birth) is as much a KYC
+  // requirement as its front, and a merchant taking their own photos
+  // otherwise has no reason to think to include it. Uploading an existing
+  // file instead (e.g. an already-scanned copy) stays single-file, same
+  // as every other document type — the two-photo requirement is
+  // specifically a camera-capture thing, not blanket-applied to uploads.
+  // Each shot gets the same per-file blur check as any other upload
+  // (handleDocFileChange, reused as-is) — a blurry front or back is
+  // rejected and must be retaken before continuing, exactly like a
+  // blurry single-file upload already is.
+  function renderNationalIdSlot(label) {
+    const uploadFile = signupDocs.national_id
+    const front = signupDocs.national_id_front
+    const frontOk = front && !docErrors.national_id_front
+    const back = signupDocs.national_id_back
+    const mode = uploadFile ? 'upload' : (front || back) ? 'camera' : null
+
+    function resetNationalId() {
+      setSignupDocs(prev => ({ ...prev, national_id: null, national_id_front: null, national_id_back: null }))
+      setDocErrors(prev => ({ ...prev, national_id: '', national_id_front: '', national_id_back: '' }))
+      setDocPreviews(prev => ({ ...prev, national_id: '', national_id_front: '', national_id_back: '' }))
+    }
+
+    if (mode === null) {
+      return (
+        <div className="space-y-2">
+          <div className="flex items-center gap-3 w-full border-2 border-dashed border-outline-variant/25 bg-slate-50 rounded-xl px-4 py-4">
+            <span className="material-symbols-outlined text-2xl shrink-0 text-primary/30">badge</span>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold text-primary">{label}</p>
+              <p className="text-2xs text-on-surface-variant/50">Upload an existing scan, or take photos of both sides with your camera.</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => docInputRefs.current.national_id?.click()}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-primary/10 text-primary text-2xs font-bold uppercase tracking-widest hover:bg-primary/20 transition-all"
+            >
+              <span className="material-symbols-outlined text-sm">upload_file</span>
+              Upload File
+            </button>
+            <button
+              type="button"
+              onClick={() => docInputRefs.current.national_id_front?.click()}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-primary/10 text-primary text-2xs font-bold uppercase tracking-widest hover:bg-primary/20 transition-all"
+            >
+              <span className="material-symbols-outlined text-sm">photo_camera</span>
+              Take Photo
+            </button>
+          </div>
+          {/* Hidden triggers only — the two-button choice above is the
+              actual UI; once either is used, mode becomes 'upload' or
+              'camera' and the boxes below take over. */}
+          <input
+            ref={el => { docInputRefs.current.national_id = el }}
+            type="file"
+            accept="image/*,application/pdf"
+            onChange={e => handleDocFileChange('national_id', e)}
+            className="hidden"
+          />
+          <input
+            ref={el => { docInputRefs.current.national_id_front = el }}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={e => handleDocFileChange('national_id_front', e)}
+            className="hidden"
+          />
+        </div>
+      )
+    }
+
+    return (
+      <div className="space-y-2">
+        {mode === 'upload' && renderGenericDocBox('national_id', label, { capture: false })}
+        {mode === 'camera' && (
+          <>
+            {renderGenericDocBox('national_id_front', `${label} — Front of ID`, { capture: true })}
+            {frontOk && (
+              back
+                ? renderGenericDocBox('national_id_back', `${label} — Back of ID`, { capture: true })
+                : (
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => docInputRefs.current.national_id_back?.click()}
+                      className="w-full flex items-center justify-center gap-1.5 py-3 rounded-xl border-2 border-dashed border-outline-variant/25 bg-slate-50 hover:border-primary/40 text-primary text-xs font-bold transition-all"
+                    >
+                      <span className="material-symbols-outlined text-sm">{docChecking.national_id_back ? 'hourglass_top' : 'photo_camera'}</span>
+                      {docChecking.national_id_back ? 'Checking image quality…' : 'Take Photo — Back of ID'}
+                    </button>
+                    {docErrors.national_id_back && (
+                      <p className="text-2xs font-bold text-red-600 pl-1 flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-sm">error</span>
+                        {docErrors.national_id_back}
+                      </p>
+                    )}
+                  </div>
+                )
+            )}
+            {/* Hidden back-camera input — rendered once so the "Take
+                Photo — Back of ID" button above (and renderGenericDocBox
+                once `back` is set) both have a ref to click. */}
+            {!back && (
+              <input
+                ref={el => { docInputRefs.current.national_id_back = el }}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={e => handleDocFileChange('national_id_back', e)}
+                className="hidden"
+              />
+            )}
+          </>
+        )}
+        <button
+          type="button"
+          onClick={resetNationalId}
+          className="text-2xs font-bold text-on-surface-variant/50 hover:text-primary transition-colors pl-1"
+        >
+          Start over
+        </button>
       </div>
     )
   }
@@ -685,20 +845,20 @@ export default function Login() {
           setErr('Select which document you are uploading.')
           return
         }
-        if (!signupDocs[signupDocType]) {
+        if (!isDocSelected(signupDocType)) {
           setErr(docErrors[signupDocType] || 'Upload your document to continue.')
           return
         }
       } else if (requirement?.mode === 'all') {
         for (const slot of requirement.slots) {
-          if (!signupDocs[slot.type]) {
+          if (!isDocSelected(slot.type)) {
             setErr(docErrors[slot.type] || `Upload your ${slot.label} to continue.`)
             return
           }
         }
       } else if (requirement?.mode === 'all_plus_choice') {
         for (const slot of requirement.slots) {
-          if (!signupDocs[slot.type]) {
+          if (!isDocSelected(slot.type)) {
             setErr(docErrors[slot.type] || `Upload your ${slot.label} to continue.`)
             return
           }
@@ -707,7 +867,7 @@ export default function Login() {
           setErr('Select which document you are uploading.')
           return
         }
-        if (!signupDocs[signupDocType]) {
+        if (!isDocSelected(signupDocType)) {
           setErr(docErrors[signupDocType] || 'Upload your document to continue.')
           return
         }
@@ -749,7 +909,7 @@ export default function Login() {
       const types = requirement?.mode === 'choice' ? [signupDocType]
         : requirement?.mode === 'all_plus_choice' ? [...requirement.slots.map(s => s.type), signupDocType]
         : (requirement?.slots.map(s => s.type) || [])
-      for (const type of types) {
+      for (const type of types.flatMap(resolveDocTypes)) {
         payload.append(`doc_${type}`, signupDocs[type])
       }
     }

@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import api from '../api/api';
+import { isImageFile, estimateImageSharpness } from '../utils/imageBlurCheck';
 
 const DOC_TYPES = [
   { key: 'business_registration', label: 'Business Registration Certificate' },
@@ -115,7 +116,9 @@ const NewApplication = () => {
             <p className="text-2xs text-on-surface-variant/50 mb-3">Optional — none of these are required to submit. Add what you have now; the rest can be uploaded later.</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {DOC_TYPES.map((d) => (
-                <DocUploadField key={d.key} label={d.label} file={files[d.key]} onChange={(f) => setFile(d.key, f)} />
+                d.key === 'national_id'
+                  ? <NationalIdUploadField key={d.key} files={files} setFile={setFile} />
+                  : <DocUploadField key={d.key} label={d.label} file={files[d.key]} onChange={(f) => setFile(d.key, f)} />
               ))}
             </div>
           </div>
@@ -201,6 +204,142 @@ const DocUploadField = ({ label, file, onChange }) => {
       ) : (
         <p className="text-2xs text-on-surface-variant/60 mt-1.5 truncate">{file ? file.name : 'No document selected yet'}</p>
       )}
+    </div>
+  );
+};
+
+// National ID is the one document with two valid shapes: upload a single
+// existing file (files.national_id — e.g. an already-scanned copy), or
+// capture both sides with the camera (files.national_id_front +
+// files.national_id_back) — an ID's back (address, signature) is as much
+// a KYC requirement as its front, so the camera path always needs both;
+// uploading a file stays single, same as every other document. Each
+// camera shot is blur-checked client-side and rejected if not clear
+// enough (see utils/imageBlurCheck.js's own doc comment on why this is
+// the only gate in this app — Cloudinary streaming means the backend
+// never has the raw bytes to re-check).
+const NationalIdUploadField = ({ files, setFile }) => {
+  const fileInputRef = useRef(null);
+  const frontInputRef = useRef(null);
+  const backInputRef = useRef(null);
+  const [errors, setErrors] = useState({ front: '', back: '' });
+  const [checking, setChecking] = useState({ front: false, back: false });
+
+  const uploadFile = files.national_id;
+  const front = files.national_id_front;
+  const back = files.national_id_back;
+  const mode = uploadFile ? 'upload' : (front || back) ? 'camera' : null;
+
+  function handleUpload(picked) {
+    if (picked && picked.size > MAX_FILE_SIZE_BYTES) {
+      setErrors({ front: `File is too large (max 10MB). "${picked.name}" is ${(picked.size / (1024 * 1024)).toFixed(1)}MB.`, back: '' });
+      return;
+    }
+    setErrors({ front: '', back: '' });
+    setFile('national_id', picked);
+  }
+
+  async function handleCapture(side, picked) {
+    const key = side === 'front' ? 'national_id_front' : 'national_id_back';
+    if (!picked) return;
+    if (picked.size > MAX_FILE_SIZE_BYTES) {
+      setErrors((e) => ({ ...e, [side]: `File is too large (max 10MB). "${picked.name}" is ${(picked.size / (1024 * 1024)).toFixed(1)}MB.` }));
+      return;
+    }
+    setErrors((e) => ({ ...e, [side]: '' }));
+    if (!isImageFile(picked)) {
+      setFile(key, picked);
+      return;
+    }
+    setChecking((c) => ({ ...c, [side]: true }));
+    try {
+      const result = await estimateImageSharpness(picked);
+      if (result.blurry) {
+        setErrors((e) => ({ ...e, [side]: result.reason }));
+        setFile(key, null);
+      } else {
+        setFile(key, picked);
+      }
+    } catch {
+      // Couldn't read the image client-side (unsupported format, etc.) —
+      // nothing server-side to fall back on in this app, so accept it
+      // rather than block the officer with no way to proceed.
+      setFile(key, picked);
+    } finally {
+      setChecking((c) => ({ ...c, [side]: false }));
+    }
+  }
+
+  function reset() {
+    setFile('national_id', null);
+    setFile('national_id_front', null);
+    setFile('national_id_back', null);
+    setErrors({ front: '', back: '' });
+  }
+
+  return (
+    <div>
+      <label className="block text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 mb-1.5">National ID / Passport</label>
+
+      {mode === null && (
+        <>
+          <p className="text-2xs text-on-surface-variant/50 mb-1.5">Upload an existing scan, or take photos of both sides with the camera.</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button type="button" onClick={() => fileInputRef.current?.click()} className="px-3 py-2 rounded-lg bg-primary/10 text-primary text-2xs font-bold uppercase tracking-widest flex items-center gap-1.5 hover:bg-primary/20 transition-all">
+              <span className="material-symbols-outlined text-sm">upload_file</span>
+              Upload
+            </button>
+            <button type="button" onClick={() => frontInputRef.current?.click()} className="px-3 py-2 rounded-lg bg-primary/10 text-primary text-2xs font-bold uppercase tracking-widest flex items-center gap-1.5 hover:bg-primary/20 transition-all">
+              <span className="material-symbols-outlined text-sm">photo_camera</span>
+              Take Photo
+            </button>
+          </div>
+        </>
+      )}
+
+      {mode === 'upload' && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <button type="button" onClick={() => fileInputRef.current?.click()} className="px-3 py-2 rounded-lg bg-primary/10 text-primary text-2xs font-bold uppercase tracking-widest flex items-center gap-1.5 hover:bg-primary/20 transition-all">
+            <span className="material-symbols-outlined text-sm">upload_file</span>
+            Replace
+          </button>
+          <button type="button" onClick={reset} title="Remove" className="p-2 text-on-surface-variant/40 hover:text-red-600 transition-colors">
+            <span className="material-symbols-outlined text-sm">close</span>
+          </button>
+          <p className="text-2xs text-on-surface-variant/60 truncate">{uploadFile.name}</p>
+        </div>
+      )}
+
+      {mode === 'camera' && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button type="button" onClick={() => frontInputRef.current?.click()} className="px-3 py-2 rounded-lg bg-primary/10 text-primary text-2xs font-bold uppercase tracking-widest flex items-center gap-1.5 hover:bg-primary/20 transition-all">
+              <span className="material-symbols-outlined text-sm">photo_camera</span>
+              {checking.front ? 'Checking…' : front ? 'Retake Front' : 'Front of ID'}
+            </button>
+            {front && (
+              <button type="button" onClick={() => backInputRef.current?.click()} className="px-3 py-2 rounded-lg bg-primary/10 text-primary text-2xs font-bold uppercase tracking-widest flex items-center gap-1.5 hover:bg-primary/20 transition-all">
+                <span className="material-symbols-outlined text-sm">photo_camera</span>
+                {checking.back ? 'Checking…' : back ? 'Retake Back' : 'Back of ID'}
+              </button>
+            )}
+            <button type="button" onClick={reset} title="Start over" className="p-2 text-on-surface-variant/40 hover:text-red-600 transition-colors">
+              <span className="material-symbols-outlined text-sm">close</span>
+            </button>
+          </div>
+          <p className="text-2xs text-on-surface-variant/60">
+            Front: {front ? front.name : 'not captured yet'}{front ? ` · Back: ${back ? back.name : 'not captured yet'}` : ''}
+          </p>
+        </div>
+      )}
+
+      {(errors.front || errors.back) && (
+        <p className="text-2xs text-red-600 mt-1.5">{errors.front || errors.back}</p>
+      )}
+
+      <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,application/pdf" onChange={(e) => handleUpload(e.target.files?.[0] || null)} className="hidden" />
+      <input ref={frontInputRef} type="file" accept="image/*" capture="environment" onChange={(e) => handleCapture('front', e.target.files?.[0] || null)} className="hidden" />
+      <input ref={backInputRef} type="file" accept="image/*" capture="environment" onChange={(e) => handleCapture('back', e.target.files?.[0] || null)} className="hidden" />
     </div>
   );
 };

@@ -40,6 +40,11 @@ const docFields = [
   { name: 'business_registration', maxCount: 1 },
   { name: 'kra_pin', maxCount: 1 },
   { name: 'national_id', maxCount: 1 },
+  // The two-photo alternative to a single national_id file, captured via
+  // NewApplication.jsx's front/back camera flow — see officerController.js's
+  // isDocProvided/resolveDocTypes.
+  { name: 'national_id_front', maxCount: 1 },
+  { name: 'national_id_back', maxCount: 1 },
   { name: 'address_proof', maxCount: 1 },
 ];
 

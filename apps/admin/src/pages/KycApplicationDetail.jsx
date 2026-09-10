@@ -37,6 +37,13 @@ const DOC_LABELS = {
   business_registration: 'Business Registration Certificate',
   kra_pin: 'KRA PIN Certificate',
   national_id: 'National ID / Passport',
+  // Front/back camera capture's two-photo alternative to a single
+  // national_id entry (see backend/config/kybRequirements.js) — an
+  // application only ever has one shape or the other, never both, so
+  // these two rows and the plain national_id row above are mutually
+  // exclusive in practice, not actually 3 separate documents.
+  national_id_front: 'National ID / Passport (front)',
+  national_id_back: 'National ID / Passport (back)',
   address_proof: 'Proof of Address',
 };
 

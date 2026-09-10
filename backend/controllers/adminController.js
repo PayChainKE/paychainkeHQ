@@ -1231,7 +1231,7 @@ export const updateMerchantVerification = async (req, res) => {
 // business_permit_or_license included, since this endpoint (and
 // Merchants.jsx's KybDrawer) is the shared admin view/replace surface for
 // both.
-const KYC_DOC_TYPES = ['business_registration', 'kra_pin', 'national_id', 'address_proof', 'business_permit_or_license'];
+const KYC_DOC_TYPES = ['business_registration', 'kra_pin', 'national_id', 'national_id_front', 'national_id_back', 'address_proof', 'business_permit_or_license'];
 
 // @desc    Admin adds or replaces one KYC/KYB document for a merchant — the
 //          same kybDocuments array the officer-onboarding pipeline and the

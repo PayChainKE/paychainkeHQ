@@ -54,6 +54,28 @@ const EMPLOYEE_BANDS = ['1-10', '11-50', '51-200', '201-500', '501+'];
 // document requirements instead (kybRequirements.js).
 const CERTIFICATE_DOCUMENT_TYPES = ['certificate_of_registration', 'business_permit', 'license', 'other'];
 
+// national_id is the one KYB document type with two valid shapes: a
+// single pre-scanned file (doc_national_id, from the signup form's
+// "Upload" option), or a matched front+back pair captured via its
+// "Take Photo" option (doc_national_id_front + doc_national_id_back —
+// see Login.jsx's national-ID upload slot). Every requirement in
+// kybRequirements.js still just says 'national_id'; these two helpers
+// are the only place that shape ambiguity is resolved, so the rest of
+// registerMerchant (sharpness check, kybDocuments storage) only ever
+// deals in concrete type(s) that actually exist as uploaded files.
+function isDocProvided(type, uploadedDocsByType) {
+  if (type === 'national_id') {
+    return !!(uploadedDocsByType.national_id || (uploadedDocsByType.national_id_front && uploadedDocsByType.national_id_back));
+  }
+  return !!uploadedDocsByType[type];
+}
+function resolveDocTypes(type, uploadedDocsByType) {
+  if (type === 'national_id' && !uploadedDocsByType.national_id && uploadedDocsByType.national_id_front && uploadedDocsByType.national_id_back) {
+    return ['national_id_front', 'national_id_back'];
+  }
+  return uploadedDocsByType[type] ? [type] : [];
+}
+
 // A single, narrowly-scoped exception to "every login requires OTP" — the
 // Google Play (and, if ever needed, App Store) reviewer account. Reviewers
 // can't receive an OTP by email/SMS, and Google explicitly disallows asking
@@ -233,32 +255,32 @@ export const registerMerchant = async (req, res) => {
     } else {
       const requirement = KYB_REQUIREMENTS_BY_BUSINESS_TYPE[businessType];
       if (requirement.mode === 'choice') {
-        const provided = requirement.options.filter((t) => uploadedDocsByType[t]);
+        const provided = requirement.options.filter((t) => isDocProvided(t, uploadedDocsByType));
         if (provided.length !== 1) {
           return res.status(400).json({
             error: `Upload exactly one of: ${requirement.options.map((t) => KYB_DOC_LABELS[t]).join(' or ')}.`,
           });
         }
-        requiredDocTypes = provided;
+        requiredDocTypes = provided.flatMap((t) => resolveDocTypes(t, uploadedDocsByType));
       } else {
-        const missing = requirement.required.filter((t) => !uploadedDocsByType[t]);
+        const missing = requirement.required.filter((t) => !isDocProvided(t, uploadedDocsByType));
         if (missing.length) {
           return res.status(400).json({
             error: `Upload the following required document(s): ${missing.map((t) => KYB_DOC_LABELS[t]).join(', ')}.`,
           });
         }
-        requiredDocTypes = requirement.required;
+        requiredDocTypes = requirement.required.flatMap((t) => resolveDocTypes(t, uploadedDocsByType));
 
         // LLC-only, on top of `required` above — see LLC_REQUIREMENT's own
         // doc comment (kybRequirements.js).
         if (requirement.choiceAlso) {
-          const provided = requirement.choiceAlso.filter((t) => uploadedDocsByType[t]);
+          const provided = requirement.choiceAlso.filter((t) => isDocProvided(t, uploadedDocsByType));
           if (provided.length !== 1) {
             return res.status(400).json({
               error: `Also upload exactly one of: ${requirement.choiceAlso.map((t) => KYB_DOC_LABELS[t]).join(' or ')}.`,
             });
           }
-          requiredDocTypes = [...requiredDocTypes, ...provided];
+          requiredDocTypes = [...requiredDocTypes, ...provided.flatMap((t) => resolveDocTypes(t, uploadedDocsByType))];
         }
       }
     }

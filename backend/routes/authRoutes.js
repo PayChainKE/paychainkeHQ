@@ -214,6 +214,8 @@ router.post('/merchant/register', merchantLoginLimiter, uploadMemory.fields([
   { name: 'certificate', maxCount: 1 },
   { name: 'doc_business_registration', maxCount: 1 },
   { name: 'doc_national_id', maxCount: 1 },
+  { name: 'doc_national_id_front', maxCount: 1 },
+  { name: 'doc_national_id_back', maxCount: 1 },
   { name: 'doc_kra_pin', maxCount: 1 },
   { name: 'doc_business_permit_or_license', maxCount: 1 },
 ]), registerMerchant);

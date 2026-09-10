@@ -518,7 +518,11 @@ const merchantSchema = new mongoose.Schema({
   },
   kybDocuments: {
     type: [{
-      type: { type: String, enum: ['business_registration', 'kra_pin', 'national_id', 'address_proof', 'business_permit_or_license'], required: true },
+      // national_id_front/national_id_back: the two-photo alternative to a
+      // single national_id entry, stored as two separate array entries
+      // when captured via the front/back camera flow — see
+      // kybRequirements.js's ALL_KYB_DOC_TYPES doc comment.
+      type: { type: String, enum: ['business_registration', 'kra_pin', 'national_id', 'national_id_front', 'national_id_back', 'address_proof', 'business_permit_or_license'], required: true },
       url: { type: String, required: true },
       uploadedAt: { type: Date, default: Date.now },
       status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },

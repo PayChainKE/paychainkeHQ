@@ -43,12 +43,20 @@ export const KYB_REQUIREMENTS_BY_BUSINESS_TYPE = {
 
 // Every document type any requirement above can reference — the full set
 // of possible `doc_<type>` multipart fields registerMerchant's route
-// accepts.
-export const ALL_KYB_DOC_TYPES = ['business_registration', 'national_id', 'kra_pin', 'business_permit_or_license'];
+// accepts. national_id_front/national_id_back are never referenced in a
+// requirement above directly (every requirement still just says
+// 'national_id') — they're the two-photo alternative registerMerchant
+// accepts in place of a single national_id file when the merchant used
+// the signup form's front/back camera capture flow instead of uploading
+// one pre-scanned file. See resolveDocTypes/isDocProvided in
+// merchantAuthController.js.
+export const ALL_KYB_DOC_TYPES = ['business_registration', 'national_id', 'national_id_front', 'national_id_back', 'kra_pin', 'business_permit_or_license'];
 
 export const KYB_DOC_LABELS = {
   business_registration: 'Business Registration (CR12)',
   national_id: 'National ID / Passport',
+  national_id_front: 'National ID / Passport (front)',
+  national_id_back: 'National ID / Passport (back)',
   kra_pin: 'KRA PIN Certificate',
   business_permit_or_license: 'Business Permit or License',
 };

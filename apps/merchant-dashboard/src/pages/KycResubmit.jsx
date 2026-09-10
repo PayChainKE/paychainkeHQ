@@ -14,6 +14,8 @@ const DOC_LABELS = {
   business_registration: 'Business Registration Certificate',
   kra_pin: 'KRA PIN Certificate',
   national_id: 'National ID / Passport',
+  national_id_front: 'National ID / Passport (front)',
+  national_id_back: 'National ID / Passport (back)',
   address_proof: 'Proof of Address',
 }
 
