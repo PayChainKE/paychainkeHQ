@@ -20,6 +20,8 @@ import { timingSafeStringEqual } from '../utils/timingSafeCompare.js';
 import { normalizeKraPin, isValidKraPin, KRA_PIN_FORMAT_HINT } from '../utils/kraPinValidator.js';
 import { normalizeNationalId, isValidNationalId, NATIONAL_ID_FORMAT_HINT } from '../utils/nationalIdValidator.js';
 import { KENYA_COUNTY_AREAS } from '../config/kenyaCountyAreas.js';
+import { KENYA_COUNTY_WARDS } from '../config/kenyaCountyWards.js';
+import { searchKenyaPlaces } from '../utils/nominatimSearch.js';
 import { KYB_REQUIREMENTS_BY_BUSINESS_TYPE, ALL_KYB_DOC_TYPES, KYB_DOC_LABELS } from '../config/kybRequirements.js';
 import { checkAndRecordLoginDevice } from '../utils/newDeviceLoginAlert.js';
 import { hashDocumentBuffer, checkDocumentReuse } from '../utils/documentReuseDetection.js';
@@ -109,7 +111,7 @@ export const registerMerchant = async (req, res) => {
   try {
     let {
       name, email, phone, businessName, password, registrationSource, kraPin, businessNumber,
-      businessType, county, area, employees, ecommerce, agreedToTerms, documentType, nationalId,
+      businessType, county, area, ward, street, employees, ecommerce, agreedToTerms, documentType, nationalId,
     } = req.body || {};
 
     // Two request shapes hit this same endpoint right now: the merchant
@@ -184,6 +186,12 @@ export const registerMerchant = async (req, res) => {
     }
     if (!area?.trim() || !KENYA_COUNTY_AREAS[county].includes(area)) {
       return res.status(400).json({ error: `Select a valid area/location within ${county}.` });
+    }
+    // Ward is optional (unlike county/area) — but if one was submitted, it
+    // must be real and actually inside the chosen area, same reasoning as
+    // area-within-county above.
+    if (ward?.trim() && !(KENYA_COUNTY_WARDS[county]?.[area] || []).includes(ward.trim())) {
+      return res.status(400).json({ error: `Select a valid ward within ${area}.` });
     }
     if (!employees || !EMPLOYEE_BANDS.includes(employees)) {
       return res.status(400).json({ error: 'Select a valid number of employees.' });
@@ -346,6 +354,8 @@ export const registerMerchant = async (req, res) => {
       businessType,
       county,
       businessArea: area,
+      ward: ward?.trim() || null,
+      street: street?.trim() || null,
       employeeCount: employees,
       isEcommerce,
       agreedToTerms: true,
@@ -1769,5 +1779,51 @@ export const verifyPaymentPin = async (req, res) => {
   } catch (error) {
     console.error('Verify Payment PIN Error:', error);
     res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    County -> constituency (Area) taxonomy for the signup form's
+//          location pickers — served from the API rather than baked into
+//          every frontend bundle, so web and mobile always show the exact
+//          same list registerMerchant below actually validates against
+//          (previously duplicated by hand into Login.jsx and easy to drift).
+// @route   GET /api/auth/merchant/locations
+// @access  Public
+export const getSignupLocations = (req, res) => {
+  res.json({
+    success: true,
+    counties: Object.keys(KENYA_COUNTY_AREAS),
+    areas: KENYA_COUNTY_AREAS,
+    wards: KENYA_COUNTY_WARDS,
+  });
+};
+
+// @desc    Public street/place search for the signup form's optional Street
+//          field — same OpenStreetMap Nominatim proxy as the admin
+//          Merchants Map (see adminController.js's geocodeSearch), just
+//          publicly reachable and tightly rate-limited instead of
+//          admin-gated. This is a free-text convenience, not validated
+//          against any list — unlike County/Area, a street can't be
+//          enumerated, so whatever the merchant picks (or types) is stored
+//          as-is.
+// @route   GET /api/auth/merchant/geocode?q=...&county=...
+// @access  Public (rate-limited at the route layer)
+export const searchSignupPlaces = async (req, res) => {
+  try {
+    const q = String(req.query.q || '').trim();
+    if (q.length < 3) return res.json({ success: true, results: [] });
+
+    // Biases results toward the merchant's already-chosen county — Nominatim
+    // has no structured "restrict to this county" param for a query this
+    // loose, so appending it as text is the same trick a person would use
+    // searching Google Maps themselves.
+    const county = String(req.query.county || '').trim();
+    const query = county && KENYA_COUNTY_AREAS[county] ? `${q}, ${county} County, Kenya` : q;
+
+    const results = await searchKenyaPlaces(query, { userAgent: 'PayChain-Signup/1.0 (support@paychain.co.ke)' });
+    res.json({ success: true, results });
+  } catch (error) {
+    console.error('Signup Place Search Error:', error);
+    res.status(502).json({ error: 'Place search is temporarily unavailable.' });
   }
 };

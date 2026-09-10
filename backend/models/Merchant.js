@@ -472,6 +472,26 @@ const merchantSchema = new mongoose.Schema({
     default: null,
     trim: true,
   },
+  // Ward within businessArea (constituency) — optional, finer-grained than
+  // county/businessArea. Free-text like businessArea above (validated
+  // against KENYA_COUNTY_WARDS by registerMerchant before persisting, not
+  // enforced at the schema level), so it stays valid regardless of which
+  // list the frontend currently offers.
+  ward: {
+    type: String,
+    default: null,
+    trim: true,
+  },
+  // Street/estate/landmark — free text, sourced from the signup form's
+  // optional live place search (see merchantAuthController.js's
+  // searchSignupPlaces) or typed directly. Unlike county/businessArea/ward,
+  // there's no fixed list a street name could be validated against, so
+  // whatever the merchant picks or types is stored as-is.
+  street: {
+    type: String,
+    default: null,
+    trim: true,
+  },
   employeeCount: {
     type: String,
     default: null,

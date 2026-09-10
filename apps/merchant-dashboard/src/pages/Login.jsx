@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import axios from 'axios'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { useNotification } from '../context/NotificationContext'
 import mainLogo from '../assets/signin-logo.png'
@@ -204,6 +205,14 @@ export default function Login() {
   const [signupArea, setSignupArea] = useState('')
   const [areaSearch, setAreaSearch] = useState('')
   const [editingArea, setEditingArea] = useState(false)
+  const [countyWards, setCountyWards] = useState({})
+  const [signupWard, setSignupWard] = useState('')
+  const [wardSearch, setWardSearch] = useState('')
+  const [editingWard, setEditingWard] = useState(false)
+  const [signupStreet, setSignupStreet] = useState('')
+  const [streetResults, setStreetResults] = useState([])
+  const [streetSearching, setStreetSearching] = useState(false)
+  const [streetResultsOpen, setStreetResultsOpen] = useState(false)
   const [signupEmployees, setSignupEmployees] = useState('')
   const [signupEcommerce, setSignupEcommerce] = useState('')
   const [agreedToTerms, setAgreedToTerms] = useState(false)
@@ -279,6 +288,43 @@ export default function Login() {
       return () => clearInterval(interval)
     }
   }, [isOTPMode, resendTimer])
+
+  // Ward taxonomy for the (optional) ward picker below Area — fetched once
+  // rather than duplicated as another multi-hundred-entry literal in this
+  // file (KENYA_COUNTY_AREAS above already is one; wards are 5x that).
+  useEffect(() => {
+    const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+    axios.get(`${API_URL}/api/auth/merchant/locations`)
+      .then(res => { if (res.data?.wards) setCountyWards(res.data.wards) })
+      .catch(() => {}) // Non-critical — ward stays optional; area/county picking still works fully offline of this.
+  }, [])
+
+  // Optional street/estate/landmark search — live suggestions from the
+  // public Nominatim proxy (see merchantAuthController.js's
+  // searchSignupPlaces), biased toward the county already picked above.
+  // Debounced so normal typing stays well under that endpoint's rate limit.
+  useEffect(() => {
+    const q = signupStreet.trim()
+    if (q.length < 3) {
+      setStreetResults([])
+      setStreetSearching(false)
+      return
+    }
+    setStreetSearching(true)
+    const timer = setTimeout(async () => {
+      try {
+        const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+        const res = await axios.get(`${API_URL}/api/auth/merchant/geocode`, { params: { q, county: signupCounty } })
+        setStreetResults(Array.isArray(res.data?.results) ? res.data.results : [])
+        setStreetResultsOpen(true)
+      } catch {
+        setStreetResults([])
+      } finally {
+        setStreetSearching(false)
+      }
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [signupStreet, signupCounty])
 
   async function handleLogin(e) {
     if (e) e.preventDefault()
@@ -664,6 +710,8 @@ export default function Login() {
     payload.append('businessType', signupBusinessType)
     payload.append('county', signupCounty)
     payload.append('area', signupArea.trim())
+    if (signupWard.trim()) payload.append('ward', signupWard.trim())
+    if (signupStreet.trim()) payload.append('street', signupStreet.trim())
     payload.append('employees', signupEmployees)
     payload.append('ecommerce', signupEcommerce)
     payload.append('agreedToTerms', agreedToTerms)
@@ -1046,10 +1094,11 @@ export default function Login() {
                             key={county}
                             type="button"
                             onClick={() => {
-                              // A different county invalidates whatever area was
-                              // picked for the old one — it can't possibly still
-                              // be a real place inside the new county.
-                              if (county !== signupCounty) { setSignupArea(''); setAreaSearch('') }
+                              // A different county invalidates whatever area (and
+                              // therefore ward) was picked for the old one — it
+                              // can't possibly still be a real place inside the
+                              // new county.
+                              if (county !== signupCounty) { setSignupArea(''); setAreaSearch(''); setSignupWard(''); setWardSearch('') }
                               setSignupCounty(county)
                               setEditingCounty(false)
                               setCountySearch('')
@@ -1108,7 +1157,7 @@ export default function Login() {
                           <button
                             key={area}
                             type="button"
-                            onClick={() => { setSignupArea(area); setEditingArea(false); setAreaSearch('') }}
+                            onClick={() => { if (area !== signupArea) { setSignupWard(''); setWardSearch('') }; setSignupArea(area); setEditingArea(false); setAreaSearch('') }}
                             className={`py-3 px-3 rounded-xl border text-xs font-bold transition-all text-left truncate flex items-center justify-between group ${
                               signupArea === area
                               ? 'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-sm'
@@ -1122,6 +1171,89 @@ export default function Login() {
                       </div>
                     </div>
                   )}
+                </div>
+
+                {signupArea && (countyWards[signupCounty]?.[signupArea]?.length > 0) && (
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Ward (optional)</label>
+                    {signupWard && !editingWard ? (
+                      <div className="flex items-center justify-between bg-emerald-50 border border-emerald-500 rounded-2xl py-3 px-4">
+                        <div className="flex items-center gap-2 text-emerald-700 min-w-0">
+                          <span className="material-symbols-outlined text-[18px] shrink-0">check_circle</span>
+                          <span className="text-sm font-bold truncate">{signupWard}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => { setEditingWard(true); setWardSearch('') }}
+                          className="text-[10px] font-black uppercase tracking-widest text-emerald-700 hover:text-emerald-800 shrink-0 pl-3"
+                        >
+                          Change
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="bg-white border border-outline-variant/15 rounded-2xl p-2 lg:p-3 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all">
+                        <div className="relative mb-3">
+                           <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-primary/40 pointer-events-none text-sm">search</span>
+                           <input
+                             className="w-full bg-slate-50 rounded-xl py-2 pl-9 pr-4 text-xs font-headline text-primary outline-none placeholder:text-outline-variant/40"
+                             placeholder={`Search wards in ${signupArea}...`}
+                             value={wardSearch}
+                             onChange={e => setWardSearch(e.target.value)}
+                           />
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-40 overflow-y-auto pr-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-outline-variant/20 [&::-webkit-scrollbar-thumb]:rounded-full">
+                          {(countyWards[signupCounty]?.[signupArea] || []).filter(w => w.toLowerCase().includes(wardSearch.toLowerCase())).map(ward => (
+                            <button
+                              key={ward}
+                              type="button"
+                              onClick={() => { setSignupWard(ward); setEditingWard(false); setWardSearch('') }}
+                              className={`py-3 px-3 rounded-xl border text-xs font-bold transition-all text-left truncate flex items-center justify-between group ${
+                                signupWard === ward
+                                ? 'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-sm'
+                                : 'bg-white border-outline-variant/10 text-primary hover:border-emerald-200 hover:bg-emerald-50/30'
+                              }`}
+                            >
+                              <span className="truncate">{ward}</span>
+                              {signupWard === ward && <span className="material-symbols-outlined text-[14px]">check_circle</span>}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Street / Estate / Landmark (optional)</label>
+                  <div className="relative">
+                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-primary/40 pointer-events-none text-sm">search</span>
+                    <input
+                      value={signupStreet}
+                      onChange={e => setSignupStreet(e.target.value)}
+                      onFocus={() => streetResults.length > 0 && setStreetResultsOpen(true)}
+                      onBlur={() => setTimeout(() => setStreetResultsOpen(false), 150)}
+                      placeholder={signupCounty ? `Search a street or landmark in ${signupCounty}...` : 'Search a street or landmark...'}
+                      className="w-full bg-white border border-outline-variant/15 rounded-2xl py-3 pl-9 pr-8 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all"
+                    />
+                    {streetSearching && (
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 border-2 border-outline-variant/30 border-t-primary rounded-full animate-spin" />
+                    )}
+                    {streetResultsOpen && streetResults.length > 0 && (
+                      <div className="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto bg-white rounded-xl shadow-xl border border-outline-variant/20">
+                        {streetResults.map(r => (
+                          <button
+                            key={r.place_id}
+                            type="button"
+                            onMouseDown={e => e.preventDefault()}
+                            onClick={() => { setSignupStreet(r.display_name.split(',').slice(0, 2).join(',').trim()); setStreetResultsOpen(false); setStreetResults([]) }}
+                            className="w-full text-left px-3 py-2 hover:bg-emerald-50/50 transition-colors border-b border-outline-variant/10 last:border-0"
+                          >
+                            <p className="text-xs font-bold text-primary truncate">{r.display_name}</p>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="space-y-2">
