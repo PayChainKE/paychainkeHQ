@@ -11,6 +11,53 @@ const DOC_TYPES = [
   { key: 'address_proof', label: 'Proof of Address' },
 ];
 
+const DOC_LABELS = {
+  business_registration: 'Business Registration Certificate',
+  kra_pin: 'KRA PIN Certificate',
+  national_id: 'National ID / Passport',
+  address_proof: 'Proof of Address',
+  business_permit_or_license: 'Business Permit or License',
+};
+
+// Same list registerMerchant validates against (BUSINESS_TYPES,
+// merchantAuthController.js) — an officer's application should offer the
+// same business types self-serve signup does, so the KYB requirement
+// lookup below actually has something to match.
+const BUSINESS_TYPES = [
+  'Sole Proprietorship',
+  'Partnership',
+  'Limited Liability Company (LLC)',
+  'Public Limited Company (PLC)',
+  'SACCO',
+  'NGO/Non-Profit',
+  'Cooperative Society',
+  'Other',
+];
+
+// Mirrors backend/config/kybRequirements.js exactly — same document
+// requirement per business type self-serve registration enforces
+// (blocking, there); here it's purely informational (this app's
+// documents stay optional, by design — an officer can file an
+// application with paperwork still outstanding and follow up later), so
+// this only drives which upload slots are shown/labeled, nothing is
+// required to submit. Keep both in sync if kybRequirements.js changes.
+// address_proof isn't part of this vocabulary at all (self-serve signup
+// never collects it) — stays a separate, always-shown optional field
+// below, same as it always has been.
+const SOLE_TRADER_CHOICE = { mode: 'choice', options: ['national_id', 'business_permit_or_license'] };
+const REGISTERED_ENTITY_ALL = { mode: 'all', required: ['business_registration', 'business_permit_or_license'] };
+const LLC_REQUIREMENT = { mode: 'all', required: ['business_registration'], choiceAlso: ['national_id', 'kra_pin'] };
+const KYB_REQUIREMENTS_BY_BUSINESS_TYPE = {
+  'Sole Proprietorship': SOLE_TRADER_CHOICE,
+  'Partnership': SOLE_TRADER_CHOICE,
+  'NGO/Non-Profit': SOLE_TRADER_CHOICE,
+  'Other': SOLE_TRADER_CHOICE,
+  'Limited Liability Company (LLC)': LLC_REQUIREMENT,
+  'SACCO': REGISTERED_ENTITY_ALL,
+  'Cooperative Society': REGISTERED_ENTITY_ALL,
+  'Public Limited Company (PLC)': { mode: 'all', required: ['business_registration', 'national_id', 'kra_pin'] },
+};
+
 // Mirrors the backend multer limit (backend/utils/cloudinary.js) — checking
 // client-side gives an immediate, specific error instead of letting an
 // oversized file reach the server and bounce back as a raw non-JSON
@@ -41,6 +88,10 @@ const NewApplication = () => {
   const navigate = useNavigate();
   const [form, setForm] = useState({ name: '', email: '', phone: '', businessName: '', businessType: '', kraPin: '', businessNumber: '' });
   const [files, setFiles] = useState({});
+  // Which option the officer picked for a 'choice'/'all_plus_choice'
+  // business type's flexible slot (e.g. LLC's Director's ID vs KRA
+  // Certificate) — mirrors Login.jsx's signupDocType.
+  const [docChoiceType, setDocChoiceType] = useState('');
   const [businessPhotos, setBusinessPhotos] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -98,7 +149,16 @@ const NewApplication = () => {
               <input required value={form.phone} onChange={(e) => setField('phone', e.target.value)} className={inputClass} placeholder="07XXXXXXXX" />
             </Field>
             <Field label="Business Type">
-              <input value={form.businessType} onChange={(e) => setField('businessType', e.target.value)} className={inputClass} placeholder="e.g. Sole Proprietorship" />
+              <select
+                value={form.businessType}
+                onChange={(e) => { setField('businessType', e.target.value); setDocChoiceType(''); }}
+                className={inputClass}
+              >
+                <option value="">—Select a business type—</option>
+                {BUSINESS_TYPES.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
             </Field>
             <Field label="Business (Trading) Name" required>
               <input required value={form.businessName} onChange={(e) => setField('businessName', e.target.value)} className={inputClass} />
@@ -113,14 +173,69 @@ const NewApplication = () => {
 
           <div className="border-t border-outline-variant/10 pt-5">
             <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 mb-1">KYC Documents</p>
-            <p className="text-2xs text-on-surface-variant/50 mb-3">Optional — none of these are required to submit. Add what you have now; the rest can be uploaded later.</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {DOC_TYPES.map((d) => (
-                d.key === 'national_id'
-                  ? <NationalIdUploadField key={d.key} files={files} setFile={setFile} />
-                  : <DocUploadField key={d.key} label={d.label} file={files[d.key]} onChange={(f) => setFile(d.key, f)} />
-              ))}
-            </div>
+            {(() => {
+              const requirement = KYB_REQUIREMENTS_BY_BUSINESS_TYPE[form.businessType];
+              const renderSlot = (type) => (
+                type === 'national_id'
+                  ? <NationalIdUploadField key={type} files={files} setFile={setFile} />
+                  : <DocUploadField key={type} label={DOC_LABELS[type]} file={files[type]} onChange={(f) => setFile(type, f)} />
+              );
+              return (
+                <>
+                  <p className="text-2xs text-on-surface-variant/50 mb-3">
+                    {!requirement
+                      ? 'Optional — none of these are required to submit. Add what you have now; the rest can be uploaded later. Select a business type above to see which document(s) it normally needs.'
+                      : requirement.mode === 'choice'
+                        ? `Normally needs one of: ${requirement.options.map((t) => DOC_LABELS[t]).join(' or ')} — still optional here, add what's available now.`
+                        : requirement.mode === 'all_plus_choice'
+                          ? `Normally needs: ${requirement.required.map((t) => DOC_LABELS[t]).join(', ')}, plus either ${requirement.choiceAlso.map((t) => DOC_LABELS[t]).join(' or ')} — still optional here, add what's available now.`
+                          : `Normally needs: ${requirement.required.map((t) => DOC_LABELS[t]).join(', ')} — still optional here, add what's available now.`}
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {!requirement && DOC_TYPES.map((d) => renderSlot(d.key))}
+
+                    {requirement?.mode === 'all' && requirement.required.map((t) => renderSlot(t))}
+
+                    {requirement?.mode === 'all_plus_choice' && (
+                      <>
+                        {requirement.required.map((t) => renderSlot(t))}
+                        <div>
+                          <label className="block text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 mb-1.5">
+                            Also (choose one): {requirement.choiceAlso.map((t) => DOC_LABELS[t]).join(' or ')}
+                          </label>
+                          <select value={docChoiceType} onChange={(e) => setDocChoiceType(e.target.value)} className={inputClass}>
+                            <option value="">—Which document is this?—</option>
+                            {requirement.choiceAlso.map((t) => (
+                              <option key={t} value={t}>{DOC_LABELS[t]}</option>
+                            ))}
+                          </select>
+                          {docChoiceType && <div className="mt-2">{renderSlot(docChoiceType)}</div>}
+                        </div>
+                      </>
+                    )}
+
+                    {requirement?.mode === 'choice' && (
+                      <div>
+                        <label className="block text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 mb-1.5">Which document is this?</label>
+                        <select value={docChoiceType} onChange={(e) => setDocChoiceType(e.target.value)} className={inputClass}>
+                          <option value="">—Select—</option>
+                          {requirement.options.map((t) => (
+                            <option key={t} value={t}>{DOC_LABELS[t]}</option>
+                          ))}
+                        </select>
+                        {docChoiceType && <div className="mt-2">{renderSlot(docChoiceType)}</div>}
+                      </div>
+                    )}
+
+                    {/* Not part of any business type's KYB requirement
+                        (self-serve registration never collects it) —
+                        stays a separate, always-available optional
+                        extra, same as before this was business-type-aware. */}
+                    {requirement && renderSlot('address_proof')}
+                  </div>
+                </>
+              );
+            })()}
           </div>
 
           <div className="border-t border-outline-variant/10 pt-5">

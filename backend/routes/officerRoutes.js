@@ -46,6 +46,10 @@ const docFields = [
   { name: 'national_id_front', maxCount: 1 },
   { name: 'national_id_back', maxCount: 1 },
   { name: 'address_proof', maxCount: 1 },
+  // Optional, business-type-dependent — mirrors self-serve registration's
+  // own KYB requirements (backend/config/kybRequirements.js), which this
+  // app's NewApplication.jsx now surfaces the same way.
+  { name: 'business_permit_or_license', maxCount: 1 },
 ];
 
 // Application intake only — optional on-site photos (e.g. the shopfront) an

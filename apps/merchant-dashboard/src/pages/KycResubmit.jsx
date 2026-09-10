@@ -17,6 +17,7 @@ const DOC_LABELS = {
   national_id_front: 'National ID / Passport (front)',
   national_id_back: 'National ID / Passport (back)',
   address_proof: 'Proof of Address',
+  business_permit_or_license: 'Business Permit or License',
 }
 
 export default function KycResubmit() {

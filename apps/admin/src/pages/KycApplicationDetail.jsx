@@ -45,6 +45,10 @@ const DOC_LABELS = {
   national_id_front: 'National ID / Passport (front)',
   national_id_back: 'National ID / Passport (back)',
   address_proof: 'Proof of Address',
+  // Business-type-dependent, mirroring self-serve registration's own KYB
+  // requirements (backend/config/kybRequirements.js) — NewApplication.jsx
+  // now surfaces the same requirement per business type.
+  business_permit_or_license: 'Business Permit or License',
 };
 
 const STATUS_META = {

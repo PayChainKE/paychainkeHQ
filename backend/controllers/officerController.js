@@ -27,15 +27,16 @@ import { normalizeKraPin, isValidKraPin, KRA_PIN_FORMAT_HINT } from '../utils/kr
 
 export const QUEUE_DOC_TYPES = ['business_registration', 'kra_pin', 'national_id', 'address_proof'];
 
-// national_id is the one QUEUE_DOC_TYPES slot with two valid shapes — a
-// single file (files.national_id) or a front+back pair captured via
+// national_id is the one doc type with two valid shapes — a single file
+// (files.national_id) or a front+back pair captured via
 // NewApplication.jsx's camera flow (files.national_id_front +
 // files.national_id_back). Mirrors merchantAuthController.js's identical
 // isDocProvided/resolveDocTypes for self-serve signup's own national_id
-// dual-shape. Used where kybDocuments actually gets built/checked below
-// (createApplication) — resubmitDocuments handles the pair separately
-// via RESUBMITTABLE_DOC_TYPES, since a resubmission can legitimately
-// replace just one side without the other being re-sent.
+// dual-shape. isDocProvided is used for createApplication's missingDocs
+// nudge; resolveDocTypes for actually building kybDocuments entries —
+// resubmitDocuments accepts the pair as two independently-replaceable
+// slots instead (see ALL_OFFICER_DOC_TYPES), since a resubmission can
+// legitimately replace just one side without the other being re-sent.
 function isDocProvided(type, files) {
   if (type === 'national_id') {
     return !!(files.national_id?.[0] || (files.national_id_front?.[0] && files.national_id_back?.[0]));
@@ -49,13 +50,21 @@ function resolveDocTypes(type, files) {
   return files[type]?.[0] ? [type] : [];
 }
 
-// Only used by resubmitDocuments below — an admin can flag either side
-// individually via KycApplicationDetail.jsx's RevisionModal (its
-// DOC_LABELS now includes both), so a resubmission must accept
-// national_id_front/national_id_back as their own replaceable slots, not
-// just as a matched pair the way createApplication's initial intake
-// requires.
-const RESUBMITTABLE_DOC_TYPES = [...QUEUE_DOC_TYPES, 'national_id_front', 'national_id_back'];
+// Every doc type this pipeline can ever store/reference — broader than
+// QUEUE_DOC_TYPES, which stays the fixed "X of 4" checklist shown in the
+// UI (unaffected: business_permit_or_license is business-type-dependent,
+// not universal, so it's deliberately never counted as "missing").
+// national_id_front/national_id_back are national_id's two-photo
+// camera-capture alternative; business_permit_or_license is
+// NewApplication.jsx's new business-type-driven parity with self-serve
+// registration's own KYB requirements (kybRequirements.js). Used
+// wherever a doc type just needs to be recognized as valid/acceptable —
+// storing an upload (createApplication), approving/rejecting one
+// (updateDocumentStatus), flagging one for revision (requestRevision),
+// or accepting its resubmission (resubmitDocuments) — an admin can flag
+// any of these individually via KycApplicationDetail.jsx's RevisionModal
+// (its DOC_LABELS now includes all of them).
+const ALL_OFFICER_DOC_TYPES = [...QUEUE_DOC_TYPES, 'national_id_front', 'national_id_back', 'business_permit_or_license'];
 
 const MERCHANT_DASHBOARD_URL = process.env.MERCHANT_DASHBOARD_URL || 'https://app.paychain.co.ke';
 
@@ -146,7 +155,7 @@ export const createApplication = async (req, res) => {
     }
 
     const files = req.files || {};
-    const kybDocuments = QUEUE_DOC_TYPES.flatMap((t) => resolveDocTypes(t, files)).map((t) => ({
+    const kybDocuments = ALL_OFFICER_DOC_TYPES.flatMap((t) => resolveDocTypes(t, files)).map((t) => ({
       type: t,
       url: files[t][0].path,
       uploadedAt: new Date(),
@@ -443,7 +452,7 @@ export const updateDocumentStatus = async (req, res) => {
     }
     const { docType } = req.params;
     const { status, note } = req.body || {};
-    if (!QUEUE_DOC_TYPES.includes(docType)) return res.status(400).json({ error: 'Invalid document type.' });
+    if (!ALL_OFFICER_DOC_TYPES.includes(docType)) return res.status(400).json({ error: 'Invalid document type.' });
     if (!['approved', 'rejected', 'pending'].includes(status)) return res.status(400).json({ error: 'status must be approved, rejected, or pending.' });
 
     const application = await Merchant.findOneAndUpdate(
@@ -620,7 +629,7 @@ export const requestRevision = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ error: 'Invalid id.' });
     }
-    const docTypes = Array.isArray(req.body?.docTypes) ? req.body.docTypes.filter((t) => QUEUE_DOC_TYPES.includes(t)) : [];
+    const docTypes = Array.isArray(req.body?.docTypes) ? req.body.docTypes.filter((t) => ALL_OFFICER_DOC_TYPES.includes(t)) : [];
     const message = String(req.body?.message || '').trim();
     if (docTypes.length === 0) return res.status(400).json({ error: 'Select at least one document type that needs fixing.' });
     if (!message) return res.status(400).json({ error: 'A message for the applicant is required.' });
@@ -751,7 +760,7 @@ export const resubmitDocuments = async (req, res) => {
 
     const files = req.files || {};
     let replaced = 0;
-    for (const t of RESUBMITTABLE_DOC_TYPES) {
+    for (const t of ALL_OFFICER_DOC_TYPES) {
       if (!files[t]?.[0]) continue;
       const existing = application.kybDocuments.find((d) => d.type === t);
       if (existing) {
