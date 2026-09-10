@@ -44,7 +44,17 @@
           "backgroundColor": "#faf9f6"
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "./plugins/withNoMediaPermissions",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableProguardInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true
+          }
+        }
+      ]
     ],
     "web": {
       "favicon": "./assets/icon.png"
