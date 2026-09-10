@@ -32,6 +32,7 @@ import { resolvePeriod } from '../utils/resolvePeriod.js';
 import { buildInstallReminderSms } from '../utils/accountSmsTemplates.js';
 import { uploadBufferToCloudinary } from '../utils/cloudinary.js';
 import { hashDocumentBuffer, checkDocumentReuse } from '../utils/documentReuseDetection.js';
+import { searchKenyaPlaces } from '../utils/nominatimSearch.js';
 
 // Build an `actor` shape from req.admin so audit rows attribute admin-initiated
 // actions to the right operator even when the merchant is the subject.
@@ -697,29 +698,11 @@ export const geocodeSearch = async (req, res) => {
     const q = String(req.query.q || '').trim();
     if (q.length < 3) return res.json({ success: true, results: [] });
 
-    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&countrycodes=ke&limit=8&q=${encodeURIComponent(q)}`;
-    const nominatimRes = await fetch(url, {
-      headers: {
-        // Required by Nominatim's usage policy for non-interactive callers.
-        'User-Agent': 'PayChain-AdminDashboard/1.0 (support@paychain.co.ke)',
-        Accept: 'application/json',
-      },
-    });
-    if (!nominatimRes.ok) {
-      return res.status(502).json({ error: 'Place search is temporarily unavailable.' });
-    }
-    const data = await nominatimRes.json();
-    const results = (Array.isArray(data) ? data : []).map((r) => ({
-      place_id: r.place_id,
-      display_name: r.display_name,
-      type: r.type,
-      lat: r.lat,
-      lon: r.lon,
-    }));
+    const results = await searchKenyaPlaces(q, { userAgent: 'PayChain-AdminDashboard/1.0 (support@paychain.co.ke)' });
     res.json({ success: true, results });
   } catch (error) {
     console.error('Geocode Search Error:', error);
-    res.status(500).json({ error: 'Server Error' });
+    res.status(502).json({ error: 'Place search is temporarily unavailable.' });
   }
 };
 
@@ -1248,7 +1231,7 @@ export const updateMerchantVerification = async (req, res) => {
 // business_permit_or_license included, since this endpoint (and
 // Merchants.jsx's KybDrawer) is the shared admin view/replace surface for
 // both.
-const KYC_DOC_TYPES = ['business_registration', 'kra_pin', 'national_id', 'address_proof', 'business_permit_or_license'];
+const KYC_DOC_TYPES = ['business_registration', 'kra_pin', 'national_id', 'national_id_front', 'national_id_back', 'address_proof', 'business_permit_or_license'];
 
 // @desc    Admin adds or replaces one KYC/KYB document for a merchant — the
 //          same kybDocuments array the officer-onboarding pipeline and the

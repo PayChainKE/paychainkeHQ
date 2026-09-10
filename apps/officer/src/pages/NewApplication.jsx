@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import api from '../api/api';
+import { isImageFile, estimateImageSharpness } from '../utils/imageBlurCheck';
 
 const DOC_TYPES = [
   { key: 'business_registration', label: 'Business Registration Certificate' },
@@ -9,6 +10,53 @@ const DOC_TYPES = [
   { key: 'national_id', label: 'National ID / Passport' },
   { key: 'address_proof', label: 'Proof of Address' },
 ];
+
+const DOC_LABELS = {
+  business_registration: 'Business Registration Certificate',
+  kra_pin: 'KRA PIN Certificate',
+  national_id: 'National ID / Passport',
+  address_proof: 'Proof of Address',
+  business_permit_or_license: 'Business Permit or License',
+};
+
+// Same list registerMerchant validates against (BUSINESS_TYPES,
+// merchantAuthController.js) — an officer's application should offer the
+// same business types self-serve signup does, so the KYB requirement
+// lookup below actually has something to match.
+const BUSINESS_TYPES = [
+  'Sole Proprietorship',
+  'Partnership',
+  'Limited Liability Company (LLC)',
+  'Public Limited Company (PLC)',
+  'SACCO',
+  'NGO/Non-Profit',
+  'Cooperative Society',
+  'Other',
+];
+
+// Mirrors backend/config/kybRequirements.js exactly — same document
+// requirement per business type self-serve registration enforces
+// (blocking, there); here it's purely informational (this app's
+// documents stay optional, by design — an officer can file an
+// application with paperwork still outstanding and follow up later), so
+// this only drives which upload slots are shown/labeled, nothing is
+// required to submit. Keep both in sync if kybRequirements.js changes.
+// address_proof isn't part of this vocabulary at all (self-serve signup
+// never collects it) — stays a separate, always-shown optional field
+// below, same as it always has been.
+const SOLE_TRADER_CHOICE = { mode: 'choice', options: ['national_id', 'business_permit_or_license'] };
+const REGISTERED_ENTITY_ALL = { mode: 'all', required: ['business_registration', 'business_permit_or_license'] };
+const LLC_REQUIREMENT = { mode: 'all', required: ['business_registration'], choiceAlso: ['national_id', 'kra_pin'] };
+const KYB_REQUIREMENTS_BY_BUSINESS_TYPE = {
+  'Sole Proprietorship': SOLE_TRADER_CHOICE,
+  'Partnership': SOLE_TRADER_CHOICE,
+  'NGO/Non-Profit': SOLE_TRADER_CHOICE,
+  'Other': SOLE_TRADER_CHOICE,
+  'Limited Liability Company (LLC)': LLC_REQUIREMENT,
+  'SACCO': REGISTERED_ENTITY_ALL,
+  'Cooperative Society': REGISTERED_ENTITY_ALL,
+  'Public Limited Company (PLC)': { mode: 'all', required: ['business_registration', 'national_id', 'kra_pin'] },
+};
 
 // Mirrors the backend multer limit (backend/utils/cloudinary.js) — checking
 // client-side gives an immediate, specific error instead of letting an
@@ -40,6 +88,10 @@ const NewApplication = () => {
   const navigate = useNavigate();
   const [form, setForm] = useState({ name: '', email: '', phone: '', businessName: '', businessType: '', kraPin: '', businessNumber: '' });
   const [files, setFiles] = useState({});
+  // Which option the officer picked for a 'choice'/'all_plus_choice'
+  // business type's flexible slot (e.g. LLC's Director's ID vs KRA
+  // Certificate) — mirrors Login.jsx's signupDocType.
+  const [docChoiceType, setDocChoiceType] = useState('');
   const [businessPhotos, setBusinessPhotos] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -97,7 +149,16 @@ const NewApplication = () => {
               <input required value={form.phone} onChange={(e) => setField('phone', e.target.value)} className={inputClass} placeholder="07XXXXXXXX" />
             </Field>
             <Field label="Business Type">
-              <input value={form.businessType} onChange={(e) => setField('businessType', e.target.value)} className={inputClass} placeholder="e.g. Sole Proprietorship" />
+              <select
+                value={form.businessType}
+                onChange={(e) => { setField('businessType', e.target.value); setDocChoiceType(''); }}
+                className={inputClass}
+              >
+                <option value="">—Select a business type—</option>
+                {BUSINESS_TYPES.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
             </Field>
             <Field label="Business (Trading) Name" required>
               <input required value={form.businessName} onChange={(e) => setField('businessName', e.target.value)} className={inputClass} />
@@ -112,12 +173,69 @@ const NewApplication = () => {
 
           <div className="border-t border-outline-variant/10 pt-5">
             <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 mb-1">KYC Documents</p>
-            <p className="text-2xs text-on-surface-variant/50 mb-3">Optional — none of these are required to submit. Add what you have now; the rest can be uploaded later.</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {DOC_TYPES.map((d) => (
-                <DocUploadField key={d.key} label={d.label} file={files[d.key]} onChange={(f) => setFile(d.key, f)} />
-              ))}
-            </div>
+            {(() => {
+              const requirement = KYB_REQUIREMENTS_BY_BUSINESS_TYPE[form.businessType];
+              const renderSlot = (type) => (
+                type === 'national_id'
+                  ? <NationalIdUploadField key={type} files={files} setFile={setFile} />
+                  : <DocUploadField key={type} label={DOC_LABELS[type]} file={files[type]} onChange={(f) => setFile(type, f)} />
+              );
+              return (
+                <>
+                  <p className="text-2xs text-on-surface-variant/50 mb-3">
+                    {!requirement
+                      ? 'Optional — none of these are required to submit. Add what you have now; the rest can be uploaded later. Select a business type above to see which document(s) it normally needs.'
+                      : requirement.mode === 'choice'
+                        ? `Normally needs one of: ${requirement.options.map((t) => DOC_LABELS[t]).join(' or ')} — still optional here, add what's available now.`
+                        : requirement.mode === 'all_plus_choice'
+                          ? `Normally needs: ${requirement.required.map((t) => DOC_LABELS[t]).join(', ')}, plus either ${requirement.choiceAlso.map((t) => DOC_LABELS[t]).join(' or ')} — still optional here, add what's available now.`
+                          : `Normally needs: ${requirement.required.map((t) => DOC_LABELS[t]).join(', ')} — still optional here, add what's available now.`}
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {!requirement && DOC_TYPES.map((d) => renderSlot(d.key))}
+
+                    {requirement?.mode === 'all' && requirement.required.map((t) => renderSlot(t))}
+
+                    {requirement?.mode === 'all_plus_choice' && (
+                      <>
+                        {requirement.required.map((t) => renderSlot(t))}
+                        <div>
+                          <label className="block text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 mb-1.5">
+                            Also (choose one): {requirement.choiceAlso.map((t) => DOC_LABELS[t]).join(' or ')}
+                          </label>
+                          <select value={docChoiceType} onChange={(e) => setDocChoiceType(e.target.value)} className={inputClass}>
+                            <option value="">—Which document is this?—</option>
+                            {requirement.choiceAlso.map((t) => (
+                              <option key={t} value={t}>{DOC_LABELS[t]}</option>
+                            ))}
+                          </select>
+                          {docChoiceType && <div className="mt-2">{renderSlot(docChoiceType)}</div>}
+                        </div>
+                      </>
+                    )}
+
+                    {requirement?.mode === 'choice' && (
+                      <div>
+                        <label className="block text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 mb-1.5">Which document is this?</label>
+                        <select value={docChoiceType} onChange={(e) => setDocChoiceType(e.target.value)} className={inputClass}>
+                          <option value="">—Select—</option>
+                          {requirement.options.map((t) => (
+                            <option key={t} value={t}>{DOC_LABELS[t]}</option>
+                          ))}
+                        </select>
+                        {docChoiceType && <div className="mt-2">{renderSlot(docChoiceType)}</div>}
+                      </div>
+                    )}
+
+                    {/* Not part of any business type's KYB requirement
+                        (self-serve registration never collects it) —
+                        stays a separate, always-available optional
+                        extra, same as before this was business-type-aware. */}
+                    {requirement && renderSlot('address_proof')}
+                  </div>
+                </>
+              );
+            })()}
           </div>
 
           <div className="border-t border-outline-variant/10 pt-5">
@@ -201,6 +319,142 @@ const DocUploadField = ({ label, file, onChange }) => {
       ) : (
         <p className="text-2xs text-on-surface-variant/60 mt-1.5 truncate">{file ? file.name : 'No document selected yet'}</p>
       )}
+    </div>
+  );
+};
+
+// National ID is the one document with two valid shapes: upload a single
+// existing file (files.national_id — e.g. an already-scanned copy), or
+// capture both sides with the camera (files.national_id_front +
+// files.national_id_back) — an ID's back (address, signature) is as much
+// a KYC requirement as its front, so the camera path always needs both;
+// uploading a file stays single, same as every other document. Each
+// camera shot is blur-checked client-side and rejected if not clear
+// enough (see utils/imageBlurCheck.js's own doc comment on why this is
+// the only gate in this app — Cloudinary streaming means the backend
+// never has the raw bytes to re-check).
+const NationalIdUploadField = ({ files, setFile }) => {
+  const fileInputRef = useRef(null);
+  const frontInputRef = useRef(null);
+  const backInputRef = useRef(null);
+  const [errors, setErrors] = useState({ front: '', back: '' });
+  const [checking, setChecking] = useState({ front: false, back: false });
+
+  const uploadFile = files.national_id;
+  const front = files.national_id_front;
+  const back = files.national_id_back;
+  const mode = uploadFile ? 'upload' : (front || back) ? 'camera' : null;
+
+  function handleUpload(picked) {
+    if (picked && picked.size > MAX_FILE_SIZE_BYTES) {
+      setErrors({ front: `File is too large (max 10MB). "${picked.name}" is ${(picked.size / (1024 * 1024)).toFixed(1)}MB.`, back: '' });
+      return;
+    }
+    setErrors({ front: '', back: '' });
+    setFile('national_id', picked);
+  }
+
+  async function handleCapture(side, picked) {
+    const key = side === 'front' ? 'national_id_front' : 'national_id_back';
+    if (!picked) return;
+    if (picked.size > MAX_FILE_SIZE_BYTES) {
+      setErrors((e) => ({ ...e, [side]: `File is too large (max 10MB). "${picked.name}" is ${(picked.size / (1024 * 1024)).toFixed(1)}MB.` }));
+      return;
+    }
+    setErrors((e) => ({ ...e, [side]: '' }));
+    if (!isImageFile(picked)) {
+      setFile(key, picked);
+      return;
+    }
+    setChecking((c) => ({ ...c, [side]: true }));
+    try {
+      const result = await estimateImageSharpness(picked);
+      if (result.blurry) {
+        setErrors((e) => ({ ...e, [side]: result.reason }));
+        setFile(key, null);
+      } else {
+        setFile(key, picked);
+      }
+    } catch {
+      // Couldn't read the image client-side (unsupported format, etc.) —
+      // nothing server-side to fall back on in this app, so accept it
+      // rather than block the officer with no way to proceed.
+      setFile(key, picked);
+    } finally {
+      setChecking((c) => ({ ...c, [side]: false }));
+    }
+  }
+
+  function reset() {
+    setFile('national_id', null);
+    setFile('national_id_front', null);
+    setFile('national_id_back', null);
+    setErrors({ front: '', back: '' });
+  }
+
+  return (
+    <div>
+      <label className="block text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 mb-1.5">National ID / Passport</label>
+
+      {mode === null && (
+        <>
+          <p className="text-2xs text-on-surface-variant/50 mb-1.5">Upload an existing scan, or take photos of both sides with the camera.</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button type="button" onClick={() => fileInputRef.current?.click()} className="px-3 py-2 rounded-lg bg-primary/10 text-primary text-2xs font-bold uppercase tracking-widest flex items-center gap-1.5 hover:bg-primary/20 transition-all">
+              <span className="material-symbols-outlined text-sm">upload_file</span>
+              Upload
+            </button>
+            <button type="button" onClick={() => frontInputRef.current?.click()} className="px-3 py-2 rounded-lg bg-primary/10 text-primary text-2xs font-bold uppercase tracking-widest flex items-center gap-1.5 hover:bg-primary/20 transition-all">
+              <span className="material-symbols-outlined text-sm">photo_camera</span>
+              Take Photo
+            </button>
+          </div>
+        </>
+      )}
+
+      {mode === 'upload' && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <button type="button" onClick={() => fileInputRef.current?.click()} className="px-3 py-2 rounded-lg bg-primary/10 text-primary text-2xs font-bold uppercase tracking-widest flex items-center gap-1.5 hover:bg-primary/20 transition-all">
+            <span className="material-symbols-outlined text-sm">upload_file</span>
+            Replace
+          </button>
+          <button type="button" onClick={reset} title="Remove" className="p-2 text-on-surface-variant/40 hover:text-red-600 transition-colors">
+            <span className="material-symbols-outlined text-sm">close</span>
+          </button>
+          <p className="text-2xs text-on-surface-variant/60 truncate">{uploadFile.name}</p>
+        </div>
+      )}
+
+      {mode === 'camera' && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button type="button" onClick={() => frontInputRef.current?.click()} className="px-3 py-2 rounded-lg bg-primary/10 text-primary text-2xs font-bold uppercase tracking-widest flex items-center gap-1.5 hover:bg-primary/20 transition-all">
+              <span className="material-symbols-outlined text-sm">photo_camera</span>
+              {checking.front ? 'Checking…' : front ? 'Retake Front' : 'Front of ID'}
+            </button>
+            {front && (
+              <button type="button" onClick={() => backInputRef.current?.click()} className="px-3 py-2 rounded-lg bg-primary/10 text-primary text-2xs font-bold uppercase tracking-widest flex items-center gap-1.5 hover:bg-primary/20 transition-all">
+                <span className="material-symbols-outlined text-sm">photo_camera</span>
+                {checking.back ? 'Checking…' : back ? 'Retake Back' : 'Back of ID'}
+              </button>
+            )}
+            <button type="button" onClick={reset} title="Start over" className="p-2 text-on-surface-variant/40 hover:text-red-600 transition-colors">
+              <span className="material-symbols-outlined text-sm">close</span>
+            </button>
+          </div>
+          <p className="text-2xs text-on-surface-variant/60">
+            Front: {front ? front.name : 'not captured yet'}{front ? ` · Back: ${back ? back.name : 'not captured yet'}` : ''}
+          </p>
+        </div>
+      )}
+
+      {(errors.front || errors.back) && (
+        <p className="text-2xs text-red-600 mt-1.5">{errors.front || errors.back}</p>
+      )}
+
+      <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,application/pdf" onChange={(e) => handleUpload(e.target.files?.[0] || null)} className="hidden" />
+      <input ref={frontInputRef} type="file" accept="image/*" capture="environment" onChange={(e) => handleCapture('front', e.target.files?.[0] || null)} className="hidden" />
+      <input ref={backInputRef} type="file" accept="image/*" capture="environment" onChange={(e) => handleCapture('back', e.target.files?.[0] || null)} className="hidden" />
     </div>
   );
 };

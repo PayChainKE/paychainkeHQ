@@ -472,6 +472,26 @@ const merchantSchema = new mongoose.Schema({
     default: null,
     trim: true,
   },
+  // Ward within businessArea (constituency) — optional, finer-grained than
+  // county/businessArea. Free-text like businessArea above (validated
+  // against KENYA_COUNTY_WARDS by registerMerchant before persisting, not
+  // enforced at the schema level), so it stays valid regardless of which
+  // list the frontend currently offers.
+  ward: {
+    type: String,
+    default: null,
+    trim: true,
+  },
+  // Street/estate/landmark — free text, sourced from the signup form's
+  // optional live place search (see merchantAuthController.js's
+  // searchSignupPlaces) or typed directly. Unlike county/businessArea/ward,
+  // there's no fixed list a street name could be validated against, so
+  // whatever the merchant picks or types is stored as-is.
+  street: {
+    type: String,
+    default: null,
+    trim: true,
+  },
   employeeCount: {
     type: String,
     default: null,
@@ -498,7 +518,11 @@ const merchantSchema = new mongoose.Schema({
   },
   kybDocuments: {
     type: [{
-      type: { type: String, enum: ['business_registration', 'kra_pin', 'national_id', 'address_proof', 'business_permit_or_license'], required: true },
+      // national_id_front/national_id_back: the two-photo alternative to a
+      // single national_id entry, stored as two separate array entries
+      // when captured via the front/back camera flow — see
+      // kybRequirements.js's ALL_KYB_DOC_TYPES doc comment.
+      type: { type: String, enum: ['business_registration', 'kra_pin', 'national_id', 'national_id_front', 'national_id_back', 'address_proof', 'business_permit_or_license'], required: true },
       url: { type: String, required: true },
       uploadedAt: { type: Date, default: Date.now },
       status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },

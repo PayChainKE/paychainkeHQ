@@ -38,7 +38,9 @@ import {
   completeAccountsWalkthrough,
   completeSecurityWalkthrough,
   completeProfileWalkthrough,
-  completeTransactionsWalkthrough
+  completeTransactionsWalkthrough,
+  getSignupLocations,
+  searchSignupPlaces
 } from '../controllers/merchantAuthController.js';
 import { protectMerchant, protectMerchantSSE, protectDeveloper } from '../middleware/authMiddleware.js';
 import { registerMerchantEventClient } from '../utils/merchantEventStream.js';
@@ -97,6 +99,17 @@ const merchantOtpLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many verification attempts. Restart the login flow.' },
+});
+
+// Debounced client-side typing naturally stays well under this — same
+// reasoning and limit as adminRoutes.js's geocodeLimiter, just public
+// instead of admin-gated (signup has no session yet to authenticate).
+const signupGeocodeLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many place searches. Wait a moment and try again.' },
 });
 
 // PIN endpoints guard a 4-digit code (10,000 combinations) with a valid
@@ -201,9 +214,15 @@ router.post('/merchant/register', merchantLoginLimiter, uploadMemory.fields([
   { name: 'certificate', maxCount: 1 },
   { name: 'doc_business_registration', maxCount: 1 },
   { name: 'doc_national_id', maxCount: 1 },
+  { name: 'doc_national_id_front', maxCount: 1 },
+  { name: 'doc_national_id_back', maxCount: 1 },
   { name: 'doc_kra_pin', maxCount: 1 },
   { name: 'doc_business_permit_or_license', maxCount: 1 },
 ]), registerMerchant);
+// County/Area location pickers and the optional street search on the
+// signup form — public, no session yet at this point in the flow.
+router.get('/merchant/locations', getSignupLocations);
+router.get('/merchant/geocode', signupGeocodeLimiter, searchSignupPlaces);
 router.post('/merchant/verify-otp', merchantOtpLimiter, verifyMerchantOTP);
 router.post('/merchant/login', merchantLoginLimiter, loginMerchant);
 router.post('/merchant/resend-otp', merchantOtpLimiter, resendMerchantOTP);
