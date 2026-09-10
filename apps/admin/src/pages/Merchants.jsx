@@ -1078,12 +1078,16 @@ const Chip = ({ children, onClear }) => (
 // the admin can sight-verify the merchant's KYB submission.
 // Same taxonomy as backend/models/Merchant.js's kybDocuments.type enum /
 // adminController.js's KYC_DOC_TYPES — human labels for the drawer's upload
-// rows below.
+// rows below. business_permit_or_license is self-serve signup's addition
+// (see backend/config/kybRequirements.js) — included here so those
+// submissions actually show up in this drawer instead of silently existing
+// in the database with nowhere for an admin to see or act on them.
 const KYC_DOC_TYPES = [
-  { type: 'business_registration', label: 'Business Registration' },
-  { type: 'kra_pin',               label: 'KRA PIN Certificate' },
-  { type: 'national_id',           label: 'National ID' },
-  { type: 'address_proof',         label: 'Proof of Address' },
+  { type: 'business_registration',       label: 'Business Registration' },
+  { type: 'kra_pin',                     label: 'KRA PIN Certificate' },
+  { type: 'national_id',                 label: 'National ID' },
+  { type: 'address_proof',               label: 'Proof of Address' },
+  { type: 'business_permit_or_license',  label: 'Business Permit or License' },
 ];
 
 const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated }) => {
@@ -1093,7 +1097,7 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
   // backend always resolves to a concrete object, see
   // adminController.js#getMerchantDetail) — matches the current schema
   // default (false) rather than the old default, since this never persists.
-  const [features, setFeatures] = React.useState(merchant?.features || { digitalWallet: false, inflationShield: false, cashAdvanceForm: false });
+  const [features, setFeatures] = React.useState(merchant?.features || { digitalWallet: false, inflationShield: false });
   const [kybDocuments, setKybDocuments] = React.useState(merchant?.kybDocuments || []);
   const [uploadingDocType, setUploadingDocType] = React.useState(null);
   const [docUploadError, setDocUploadError] = React.useState('');
@@ -1235,24 +1239,6 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
       setDocUploadError(err.response?.data?.error || 'Failed to upload document. Please try again.');
     } finally {
       setUploadingDocType(null);
-    }
-  };
-
-  const [installReminderBusy, setInstallReminderBusy] = React.useState(false);
-  const [installReminderSentAt, setInstallReminderSentAt] = React.useState(merchant?.pwaInstallReminderSentAt || null);
-  const INSTALL_REMINDER_COOLDOWN_MS = 5 * 60 * 1000; // mirrors adminController.js#sendInstallReminder
-
-  const handleResendInstallReminder = async () => {
-    try {
-      setInstallReminderBusy(true);
-      const res = await api.post(`/api/admin/merchants/${merchant._id}/send-install-reminder`);
-      if (res.data.success) {
-        setInstallReminderSentAt(res.data.pwaInstallReminderSentAt);
-      }
-    } catch (err) {
-      alert(err.response?.data?.error || 'Failed to send the install reminder.');
-    } finally {
-      setInstallReminderBusy(false);
     }
   };
 
@@ -1483,6 +1469,7 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
                   }}
                 />
               } />
+              <Row label="National ID Number" value={m.nationalId || <span className="text-on-surface-variant/50">— not provided —</span>} mono />
               <Row label="Email" value={contactOverride?.email ?? m.email} />
               <Row label="Phone" value={contactOverride?.phone ?? m.phone} mono />
               <Row label="Reset Email / Phone" value={
@@ -1602,74 +1589,12 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
               <Row label="Lifetime USDC Volume" value={`${(m.totalUsdcVolume ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} USDC`} />
             </Section>
 
-            {/* Last 10 transactions, any type/status — so an admin can check
-                a merchant's real recent activity right here, no need to
-                jump to Transactions and filter by merchant. */}
-            <Section title="Recent Transactions" icon="receipt_long">
-              {(m.recentTransactions?.length ?? 0) === 0 ? (
-                <div className="px-4 py-3 text-[13px] text-on-surface-variant/50">No transactions yet.</div>
-              ) : (
-                <div className="px-4 py-2 overflow-x-auto">
-                  <table className="w-full text-left text-[12px]">
-                    <thead>
-                      <tr className="text-on-surface-variant/50 uppercase text-[10px] tracking-widest">
-                        <th className="py-1.5 pr-3 font-semibold">Type</th>
-                        <th className="py-1.5 pr-3 font-semibold text-right">Amount</th>
-                        <th className="py-1.5 pr-3 font-semibold">Status</th>
-                        <th className="py-1.5 pr-3 font-semibold">When</th>
-                        <th className="py-1.5 font-semibold">Reference</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {m.recentTransactions.map((t) => (
-                        <tr key={t._id} className="border-t border-outline-variant/10">
-                          <td className="py-1.5 pr-3 text-on-surface-variant/70">{t.type}</td>
-                          <td className="py-1.5 pr-3 text-right font-semibold text-on-surface tabular-nums">KES {Number(t.kesAmount || t.amount || 0).toLocaleString()}</td>
-                          <td className="py-1.5 pr-3">
-                            <span className={`text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full border ${
-                              t.status === 'completed' || t.status === 'verified' ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                              : t.status === 'pending' ? 'bg-amber-50 text-amber-700 border-amber-200'
-                              : 'bg-red-50 text-red-700 border-red-200'
-                            }`}>{t.pendingReason === 'stuck_timeout_needs_manual_review' ? 'stuck' : t.status}</span>
-                          </td>
-                          <td className="py-1.5 pr-3 text-on-surface-variant/60 whitespace-nowrap">{fmtDate(t.createdAt)}</td>
-                          <td className="py-1.5 font-mono text-on-surface-variant/50 truncate max-w-[140px]">{t.reference}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </Section>
-
             {/* Security flags */}
             <Section title="Security & Access" icon="shield">
               <Row label="Dashboard Password" value={<Badge tone={m.hasPassword ? 'emerald' : 'amber'} icon={m.hasPassword ? 'check' : 'pending'}>{m.hasPassword ? 'Set' : 'Not set (pending setup)'}</Badge>} />
               <Row label="Mobile App PIN" value={<Badge tone={m.hasAppPin ? 'emerald' : 'gray'} icon={m.hasAppPin ? 'check' : 'remove'}>{m.hasAppPin ? 'Configured' : 'Not set'}</Badge>} />
               <Row label="Bulk Pay PIN" value={<Badge tone={m.hasBulkPayPin ? 'emerald' : 'gray'} icon={m.hasBulkPayPin ? 'check' : 'remove'}>{m.hasBulkPayPin ? 'Configured' : 'Not set'}</Badge>} />
               <Row label="Biometrics" value={<Badge tone={m.biometricsEnabled ? 'emerald' : 'gray'} icon={m.biometricsEnabled ? 'check' : 'remove'}>{m.biometricsEnabled ? 'Enabled' : 'Disabled'}</Badge>} />
-              <Row
-                label="Web App (PWA)"
-                value={<Badge tone={m.pwaInstalledAt ? 'emerald' : 'gray'} icon={m.pwaInstalledAt ? 'check' : 'remove'}>{m.pwaInstalledAt ? `Installed ${fmtDate(m.pwaInstalledAt)}` : 'Not installed'}</Badge>}
-              />
-              {!m.pwaInstalledAt && (
-                <Row
-                  label="Install Reminder"
-                  value={
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={handleResendInstallReminder}
-                        disabled={installReminderBusy || (installReminderSentAt && (Date.now() - new Date(installReminderSentAt).getTime()) < INSTALL_REMINDER_COOLDOWN_MS)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-white text-2xs font-bold uppercase tracking-widest hover:opacity-90 transition-opacity disabled:opacity-40"
-                      >
-                        <span className="material-symbols-outlined text-[14px]">send</span>
-                        {installReminderBusy ? 'Sending…' : 'Resend Install Link'}
-                      </button>
-                      {installReminderSentAt && <span className="text-2xs text-on-surface-variant/60">Last sent {fmtDate(installReminderSentAt)}</span>}
-                    </div>
-                  }
-                />
-              )}
             </Section>
 
             {/* Feature Access */}
@@ -1702,22 +1627,7 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
                     </button>
                     <span className="text-[12px] font-semibold text-on-surface-variant/80">{features.inflationShield ? 'Enabled' : 'Disabled'}</span>
                   </div>
-                }
-              />
-              <Row
-                label="Cash Advance"
-                value={
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => handleToggleFeature('cashAdvanceForm', !features.cashAdvanceForm)}
-                      disabled={updatingFeatures}
-                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${features.cashAdvanceForm ? 'bg-primary' : 'bg-outline-variant/40'}`}
-                    >
-                      <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${features.cashAdvanceForm ? 'translate-x-4.5' : 'translate-x-1'}`} />
-                    </button>
-                    <span className="text-[12px] font-semibold text-on-surface-variant/80">{features.cashAdvanceForm ? 'Enabled' : 'Disabled'}</span>
-                  </div>
-                }
+                } 
               />
             </Section>
           </div>

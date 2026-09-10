@@ -193,7 +193,17 @@ router.post('/setup-password', adminOtpLimiter, setupPasswordWithToken);
 // Registration is public and accepts a file upload — same abuse surface as
 // login, so it gets the same per-IP throttle (merchantLoginLimiter was
 // previously only applied to login itself, leaving this endpoint unlimited).
-router.post('/merchant/register', merchantLoginLimiter, uploadMemory.single('certificate'), registerMerchant);
+// 'certificate' (single, legacy) is still here for apps/mobile-app, which
+// hasn't been updated to the new per-business-type multi-document flow yet
+// (deliberately held off during Google Play review — see
+// registerMerchant's own doc comment on the two code paths this enables).
+router.post('/merchant/register', merchantLoginLimiter, uploadMemory.fields([
+  { name: 'certificate', maxCount: 1 },
+  { name: 'doc_business_registration', maxCount: 1 },
+  { name: 'doc_national_id', maxCount: 1 },
+  { name: 'doc_kra_pin', maxCount: 1 },
+  { name: 'doc_business_permit_or_license', maxCount: 1 },
+]), registerMerchant);
 router.post('/merchant/verify-otp', merchantOtpLimiter, verifyMerchantOTP);
 router.post('/merchant/login', merchantLoginLimiter, loginMerchant);
 router.post('/merchant/resend-otp', merchantOtpLimiter, resendMerchantOTP);

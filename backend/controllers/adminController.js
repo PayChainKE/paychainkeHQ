@@ -30,6 +30,8 @@ import { getCountyCentroid } from '../config/kenyaCountyCentroids.js';
 import { getOrCreatePlatformSettings } from '../models/PlatformSettings.js';
 import { resolvePeriod } from '../utils/resolvePeriod.js';
 import { buildInstallReminderSms } from '../utils/accountSmsTemplates.js';
+import { uploadBufferToCloudinary } from '../utils/cloudinary.js';
+import { hashDocumentBuffer, checkDocumentReuse } from '../utils/documentReuseDetection.js';
 
 // Build an `actor` shape from req.admin so audit rows attribute admin-initiated
 // actions to the right operator even when the merchant is the subject.
@@ -46,6 +48,7 @@ const ACTION_LABELS = {
   unlock: 'Unlock merchant account',
   delete: 'Permanently delete merchant account',
   reset_contact: 'Reset merchant primary email/phone',
+  unlock_outbound: 'Unlock outbound transfers',
 };
 
 // Derive an activity tier from a Date — used to colour-code merchant rows.
@@ -232,7 +235,7 @@ export const getMerchants = async (req, res) => {
 // @access  Private (Admin)
 export const getMerchantBalances = async (req, res) => {
   try {
-    const merchants = await Merchant.find({ isDemoMerchant: { $ne: true } })
+    const merchants = await Merchant.find({ isDemoMerchant: { $ne: true }, isAppReviewAccount: { $ne: true } })
       .select('businessName name email phone kesBalance ncbaMerchantCode status')
       .sort('-kesBalance')
       .lean();
@@ -255,9 +258,10 @@ export const getMerchantBalances = async (req, res) => {
 // @access  Private (Admin)
 export const exportMerchantBalances = async (req, res) => {
   try {
-    // Demo merchant's simulated balance is not real money owed to anyone —
-    // must never appear on a record meant to settle a real dispute.
-    const merchants = await Merchant.find({ isDemoMerchant: { $ne: true } })
+    // Demo merchant's simulated balance (and the Play Store reviewer
+    // account's) is not real money owed to anyone — must never appear on a
+    // record meant to settle a real dispute.
+    const merchants = await Merchant.find({ isDemoMerchant: { $ne: true }, isAppReviewAccount: { $ne: true } })
       .select('businessName name email phone kesBalance ncbaMerchantCode status')
       .sort('-kesBalance')
       .lean();
@@ -320,7 +324,7 @@ export const requestMerchantAction = async (req, res) => {
       return res.status(400).json({ error: 'Invalid merchant id.' });
     }
 
-    const merchant = await Merchant.findById(id).select('email phone businessName status');
+    const merchant = await Merchant.findById(id).select('email phone businessName status outboundLocked');
     if (!merchant) return res.status(404).json({ error: 'Merchant not found.' });
 
     // No-op guards — also stops admin from racking up OTPs against a no-op.
@@ -329,6 +333,9 @@ export const requestMerchantAction = async (req, res) => {
     }
     if (action === 'unlock' && merchant.status !== 'locked') {
       return res.status(409).json({ error: 'Account is not locked.' });
+    }
+    if (action === 'unlock_outbound' && !merchant.outboundLocked) {
+      return res.status(409).json({ error: 'Outbound transfers are not locked on this account.' });
     }
 
     // reset_contact carries its own payload (the new email/phone) which must
@@ -564,6 +571,16 @@ export const confirmMerchantAction = async (req, res) => {
       // above this block).
       await recordDeletion({ collectionName: 'Merchant', doc: merchant, label: merchant.businessName || merchant.email, deletedBy: admin._id });
       await Merchant.deleteOne({ _id: merchant._id });
+    } else if (action === 'unlock_outbound') {
+      merchant.outboundLocked = false;
+      merchant.outboundLockedAt = null;
+      merchant.outboundLockReason = null;
+      await merchant.save();
+      logAudit({
+        action: 'admin.merchant.outbound_unlocked', category: 'admin', severity: 'success',
+        message: 'Outbound transfers unlocked by admin (OTP-verified)',
+        merchant, actor: adminActor(admin), req,
+      });
     }
 
     // Single-use: clear the binding now that it has been consumed.
@@ -579,7 +596,9 @@ export const confirmMerchantAction = async (req, res) => {
           ? 'Merchant account locked.'
           : action === 'reset_contact'
             ? 'Primary email/phone updated. The merchant has been signed out everywhere.'
-            : 'Merchant account unlocked.',
+            : action === 'unlock_outbound'
+              ? 'Outbound transfers unlocked.'
+              : 'Merchant account unlocked.',
       data: action === 'reset_contact' ? { email: merchant.email, phone: merchant.phone } : undefined,
     });
   } catch (error) {
@@ -1222,11 +1241,14 @@ export const updateMerchantVerification = async (req, res) => {
   }
 };
 
-// Mirrors models/Merchant.js's kybDocuments.type enum and
-// officerController.js's QUEUE_DOC_TYPES — kept as a separate local copy
-// (not imported) since officerController.js already imports from this file,
-// and importing back would create a circular dependency.
-const KYC_DOC_TYPES = ['business_registration', 'kra_pin', 'national_id', 'address_proof'];
+// Mirrors models/Merchant.js's kybDocuments.type enum. Deliberately NOT
+// the same list as officerController.js's QUEUE_DOC_TYPES (that pipeline's
+// own fixed 4-document checklist, unrelated to business type) — this one
+// covers every type either pipeline can produce, self-serve's
+// business_permit_or_license included, since this endpoint (and
+// Merchants.jsx's KybDrawer) is the shared admin view/replace surface for
+// both.
+const KYC_DOC_TYPES = ['business_registration', 'kra_pin', 'national_id', 'address_proof', 'business_permit_or_license'];
 
 // @desc    Admin adds or replaces one KYC/KYB document for a merchant — the
 //          same kybDocuments array the officer-onboarding pipeline and the
@@ -1257,17 +1279,22 @@ export const updateMerchantKycDocument = async (req, res) => {
     const merchant = await Merchant.findById(id);
     if (!merchant) return res.status(404).json({ error: 'Merchant not found' });
 
+    const contentHash = hashDocumentBuffer(req.file.buffer);
+    const uploaded = await uploadBufferToCloudinary(req.file.buffer, 'paychain_certificates');
+
     const existing = merchant.kybDocuments.find((d) => d.type === type);
     const isReplace = !!existing;
     if (existing) {
-      existing.url = req.file.path;
+      existing.url = uploaded.secure_url;
+      existing.contentHash = contentHash;
       existing.uploadedAt = new Date();
       existing.status = 'pending';
       existing.note = null;
     } else {
       merchant.kybDocuments.push({
         type,
-        url: req.file.path,
+        url: uploaded.secure_url,
+        contentHash,
         uploadedAt: new Date(),
         status: 'pending',
       });
@@ -1281,6 +1308,8 @@ export const updateMerchantKycDocument = async (req, res) => {
       merchant, actor: adminActor(req.admin), req,
       metadata: { type, replaced: isReplace },
     });
+
+    checkDocumentReuse(merchant, [contentHash]);
 
     res.json({
       success: true,
@@ -2382,13 +2411,14 @@ export const getInsights = async (req, res) => {
 // @access  Private (Admin)
 export const getMerchantAnalytics = async (req, res) => {
   try {
-    // Demo merchant(s) — Merchant.isDemoMerchant — must never count toward
-    // headline figures shown to admin (merchant counts, wallet counts, USDC
-    // locked). This mirrors revenueController.js's excludeDemo discipline,
-    // which these same figures had drifted from: a demo merchant's
-    // simulated usdcBalance was previously summed straight into "Total USDC
-    // Locked" on the Overview page.
-    const notDemo = { isDemoMerchant: { $ne: true } };
+    // Demo merchant(s) — Merchant.isDemoMerchant — and the Play Store
+    // reviewer account — Merchant.isAppReviewAccount — must never count
+    // toward headline figures shown to admin (merchant counts, wallet
+    // counts, USDC locked). This mirrors revenueController.js's excludeDemo
+    // discipline, which these same figures had drifted from: a demo
+    // merchant's simulated usdcBalance was previously summed straight into
+    // "Total USDC Locked" on the Overview page.
+    const notDemo = { isDemoMerchant: { $ne: true }, isAppReviewAccount: { $ne: true } };
 
     const totalMerchants = await Merchant.countDocuments(notDemo);
     const verifiedMerchants = await Merchant.countDocuments({ ...notDemo, isVerified: true });

@@ -29,6 +29,7 @@ import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 import { claimPayoutSubmission, DuplicateSubmissionError } from '../utils/idempotencyGuard.js';
+import { assertOutboundVelocityOk, OutboundVelocityLockedError } from '../utils/outboundVelocityGuard.js';
 import { debitAvailableBalance } from '../utils/availableBalance.js';
 import { KENYAN_BANK_CODES } from '../config/kenyanBankCodes.js';
 import { getB2cTariff } from '../config/mpesaB2cTariffCard.js';
@@ -554,6 +555,13 @@ export const handleBankPayout = async (req, res) => {
       await claimPayoutSubmission(merchantId, ['bank-payout', rail, bankCode, accountNumber, amount]);
     } catch (e) {
       if (e instanceof DuplicateSubmissionError) return res.status(409).json({ error: e.message });
+      throw e;
+    }
+
+    try {
+      await assertOutboundVelocityOk(merchantId);
+    } catch (e) {
+      if (e instanceof OutboundVelocityLockedError) return res.status(423).json({ error: e.message });
       throw e;
     }
 

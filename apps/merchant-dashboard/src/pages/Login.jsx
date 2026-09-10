@@ -10,15 +10,46 @@ import { validators } from '../utils/validators'
 import { BiometricLoginButton } from '../components/BiometricButton'
 import { estimateImageSharpness, isImageFile } from '../utils/imageBlurCheck'
 
-// Mirrors the backend's canonical list (merchantAuthController.js's
-// CERTIFICATE_DOCUMENT_TYPES) and apps/mobile-app/src/pages/Login.tsx's
-// picker — keep all three in sync if this ever changes.
-const CERTIFICATE_DOCUMENT_TYPES = [
-  { value: 'certificate_of_registration', label: 'Certificate of Registration' },
-  { value: 'business_permit', label: 'Business Permit' },
-  { value: 'license', label: 'License' },
-  { value: 'other', label: 'Other Business Document' },
-]
+// Which KYB document(s) a signup must provide, keyed by business type —
+// mirrors backend/config/kybRequirements.js exactly (including its
+// 'choice' vs 'all' modes: a formally registered entity has a CR12 to
+// prove it, an informal sole trader doesn't). registerMerchant enforces
+// this server-side too — this only drives what the form asks for, so a
+// request bypassing the UI can't skip it. Keep both in sync if this ever
+// changes. apps/mobile-app/src/pages/Login.tsx is NOT on this yet
+// (deliberately held off during Google Play review) — it still uses the
+// old single-document flow, which the backend still accepts from it.
+const SOLE_TRADER_CHOICE = {
+  mode: 'choice',
+  options: [
+    { type: 'national_id', label: 'National ID / Passport' },
+    { type: 'business_permit_or_license', label: 'Business Permit or License' },
+  ],
+}
+const REGISTERED_ENTITY_ALL = {
+  mode: 'all',
+  slots: [
+    { type: 'business_registration', label: 'Business Registration (CR12)' },
+    { type: 'business_permit_or_license', label: 'Business Permit or License' },
+  ],
+}
+const KYB_REQUIREMENTS_BY_BUSINESS_TYPE = {
+  'Sole Proprietorship': SOLE_TRADER_CHOICE,
+  'Partnership': SOLE_TRADER_CHOICE,
+  'NGO/Non-Profit': SOLE_TRADER_CHOICE,
+  'Other': SOLE_TRADER_CHOICE,
+  'Limited Liability Company (LLC)': REGISTERED_ENTITY_ALL,
+  'SACCO': REGISTERED_ENTITY_ALL,
+  'Cooperative Society': REGISTERED_ENTITY_ALL,
+  'Public Limited Company (PLC)': {
+    mode: 'all',
+    slots: [
+      { type: 'business_registration', label: 'Business Registration (CR12)' },
+      { type: 'national_id', label: 'National ID / Passport (Company Director)' },
+      { type: 'kra_pin', label: 'KRA PIN Certificate (Company)' },
+    ],
+  },
+}
 
 const KENYAN_COUNTIES = [
   "Baringo", "Bomet", "Bungoma", "Busia", "Elgeyo-Marakwet", "Embu", "Garissa",
@@ -29,6 +60,65 @@ const KENYAN_COUNTIES = [
   "Siaya", "Taita-Taveta", "Tana River", "Tharaka-Nithi", "Trans Nzoia", "Turkana",
   "Uasin Gishu", "Vihiga", "Wajir", "West Pokot"
 ]
+
+// Real sub-county divisions (constituencies) for each county — lets the
+// Area/Location step offer only places that actually exist within the
+// selected county, instead of a free-text field anyone could type an
+// unrelated or made-up value into. Constituency level was chosen
+// deliberately: real, official, fixed (per IEBC/Wikipedia), granular
+// enough to mean something without requiring ward-level precision no
+// merchant would reliably know for their own business. Mirrored
+// server-side in backend/config/kenyaCountyAreas.js, which is what
+// actually enforces this — keep both in sync if this ever changes.
+const KENYA_COUNTY_AREAS = {
+  'Baringo': ['Tiaty', 'Baringo North', 'Baringo Central', 'Baringo South', 'Mogotio', 'Eldama Ravine'],
+  'Bomet': ['Sotik', 'Chepalungu', 'Bomet East', 'Bomet Central', 'Konoin'],
+  'Bungoma': ['Mount Elgon', 'Sirisia', 'Kabuchai', 'Bumula', 'Kanduyi', 'Webuye East', 'Webuye West', 'Kimilili', 'Tongaren'],
+  'Busia': ['Teso North', 'Teso South', 'Nambale', 'Matayos', 'Butula', 'Funyula', 'Budalangi'],
+  'Elgeyo-Marakwet': ['Marakwet East', 'Marakwet West', 'Keiyo North', 'Keiyo South'],
+  'Embu': ['Manyatta', 'Runyenjes', 'Mbeere South', 'Mbeere North'],
+  'Garissa': ['Garissa Township', 'Balambala', 'Lagdera', 'Dadaab', 'Fafi', 'Ijara'],
+  'Homa Bay': ['Kasipul', 'Kabondo Kasipul', 'Karachuonyo', 'Rangwe', 'Homa Bay Town', 'Ndhiwa', 'Suba North', 'Suba South'],
+  'Isiolo': ['Isiolo North', 'Isiolo South'],
+  'Kajiado': ['Kajiado North', 'Kajiado Central', 'Kajiado East', 'Kajiado West', 'Kajiado South'],
+  'Kakamega': ['Lugari', 'Likuyani', 'Malava', 'Lurambi', 'Navakholo', 'Mumias West', 'Mumias East', 'Matungu', 'Butere', 'Khwisero', 'Shinyalu', 'Ikolomani'],
+  'Kericho': ['Kipkelion East', 'Kipkelion West', 'Ainamoi', 'Bureti', 'Belgut', 'Sigowet-Soin'],
+  'Kiambu': ['Gatundu South', 'Gatundu North', 'Juja', 'Thika Town', 'Ruiru', 'Githunguri', 'Kiambu', 'Kiambaa', 'Kabete', 'Kikuyu', 'Limuru', 'Lari'],
+  'Kilifi': ['Kilifi North', 'Kilifi South', 'Kaloleni', 'Rabai', 'Ganze', 'Malindi', 'Magarini'],
+  'Kirinyaga': ['Mwea', 'Gichugu', 'Ndia', 'Kirinyaga Central'],
+  'Kisii': ['Bonchari', 'South Mugirango', 'Bomachoge Borabu', 'Bobasi', 'Bomachoge Chache', 'Nyaribari Masaba', 'Nyaribari Chache', 'Kitutu Chache North', 'Kitutu Chache South'],
+  'Kisumu': ['Kisumu East', 'Kisumu West', 'Kisumu Central', 'Seme', 'Nyando', 'Muhoroni', 'Nyakach'],
+  'Kitui': ['Mwingi North', 'Mwingi West', 'Mwingi Central', 'Kitui West', 'Kitui Rural', 'Kitui Central', 'Kitui East', 'Kitui South'],
+  'Kwale': ['Msambweni', 'Lunga Lunga', 'Matuga', 'Kinango'],
+  'Laikipia': ['Laikipia West', 'Laikipia East', 'Laikipia North'],
+  'Lamu': ['Lamu East', 'Lamu West'],
+  'Machakos': ['Masinga', 'Yatta', 'Kangundo', 'Matungulu', 'Kathiani', 'Mavoko', 'Machakos Town', 'Mwala'],
+  'Makueni': ['Mbooni', 'Kilome', 'Kaiti', 'Makueni', 'Kibwezi West', 'Kibwezi East'],
+  'Mandera': ['Mandera West', 'Banissa', 'Mandera North', 'Mandera South', 'Mandera East', 'Lafey'],
+  'Marsabit': ['Moyale', 'North Horr', 'Saku', 'Laisamis'],
+  'Meru': ['Igembe South', 'Igembe Central', 'Igembe North', 'Tigania West', 'Tigania East', 'North Imenti', 'Buuri', 'Central Imenti', 'South Imenti'],
+  'Migori': ['Rongo', 'Awendo', 'Suna East', 'Suna West', 'Uriri', 'Nyatike', 'Kuria West', 'Kuria East'],
+  'Mombasa': ['Changamwe', 'Jomvu', 'Kisauni', 'Nyali', 'Likoni', 'Mvita'],
+  "Murang'a": ['Kangema', 'Mathioya', 'Kiharu', 'Kigumo', 'Maragwa', 'Kandara', 'Gatanga'],
+  'Nairobi': ['Westlands', 'Dagoretti North', 'Dagoretti South', "Lang'ata", 'Kibra', 'Roysambu', 'Kasarani', 'Ruaraka', 'Embakasi South', 'Embakasi North', 'Embakasi Central', 'Embakasi East', 'Embakasi West', 'Makadara', 'Kamukunji', 'Starehe', 'Mathare'],
+  'Nakuru': ['Molo', 'Njoro', 'Naivasha', 'Gilgil', 'Kuresoi South', 'Kuresoi North', 'Subukia', 'Rongai', 'Bahati', 'Nakuru Town West', 'Nakuru Town East'],
+  'Nandi': ['Tinderet', 'Aldai', 'Nandi Hills', 'Chesumei', 'Emgwen', 'Mosop'],
+  'Narok': ['Kilgoris', 'Emurua Dikirr', 'Narok North', 'Narok East', 'Narok South', 'Narok West'],
+  'Nyamira': ['Kitutu Masaba', 'West Mugirango', 'North Mugirango', 'Borabu'],
+  'Nyandarua': ['Kinangop', 'Kipipiri', 'Ol Kalou', 'Ol Jorok', 'Ndaragwa'],
+  'Nyeri': ['Tetu', 'Kieni', 'Mathira', 'Othaya', 'Mukurweini', 'Nyeri Town'],
+  'Samburu': ['Samburu West', 'Samburu North', 'Samburu East'],
+  'Siaya': ['Ugenya', 'Ugunja', 'Alego Usonga', 'Gem', 'Bondo', 'Rarieda'],
+  'Taita-Taveta': ['Taveta', 'Wundanyi', 'Mwatate', 'Voi'],
+  'Tana River': ['Garsen', 'Galole', 'Bura'],
+  'Tharaka-Nithi': ['Maara', "Chuka/Igambang'ombe", 'Tharaka'],
+  'Trans Nzoia': ['Kwanza', 'Endebess', 'Saboti', 'Kiminini', 'Cherangany'],
+  'Turkana': ['Turkana North', 'Turkana West', 'Turkana Central', 'Loima', 'Turkana South', 'Turkana East'],
+  'Uasin Gishu': ['Soy', 'Turbo', 'Moiben', 'Ainabkoi', 'Kapseret', 'Kesses'],
+  'Vihiga': ['Vihiga', 'Sabatia', 'Hamisi', 'Luanda', 'Emuhaya'],
+  'Wajir': ['Wajir North', 'Wajir East', 'Tarbaj', 'Wajir West', 'Eldas', 'Wajir South'],
+  'West Pokot': ['Kapenguria', 'Sigor', 'Kacheliba', 'Pokot South'],
+}
 
 // Mirrors the backend's canonical list (merchantAuthController.js's
 // registerMerchant) and apps/mobile-app/src/pages/Login.tsx's picker — keep
@@ -103,21 +193,31 @@ export default function Login() {
 
   // Signup Flow States
   const [signupName, setSignupName] = useState('')
+  const [signupNationalId, setSignupNationalId] = useState('')
   const [signupEmail, setSignupEmail] = useState('')
   const [signupPhone, setSignupPhone] = useState('')
   const [signupBusinessName, setSignupBusinessName] = useState('')
   const [signupBusinessType, setSignupBusinessType] = useState('')
   const [signupCounty, setSignupCounty] = useState('')
   const [countySearch, setCountySearch] = useState('')
+  const [editingCounty, setEditingCounty] = useState(true)
   const [signupArea, setSignupArea] = useState('')
+  const [areaSearch, setAreaSearch] = useState('')
+  const [editingArea, setEditingArea] = useState(false)
   const [signupEmployees, setSignupEmployees] = useState('')
   const [signupEcommerce, setSignupEcommerce] = useState('')
   const [agreedToTerms, setAgreedToTerms] = useState(false)
+  // signupDocType: which option was picked, 'choice'-mode business types
+  // only (e.g. Sole Proprietorship choosing National ID vs Business
+  // Permit/License) — irrelevant for 'all'-mode types, which have fixed
+  // slots instead. Everything else below is keyed by doc type so both
+  // modes share the same file-handling code, whether that's one slot or
+  // three (see KYB_REQUIREMENTS_BY_BUSINESS_TYPE).
   const [signupDocType, setSignupDocType] = useState('')
-  const [signupCertFile, setSignupCertFile] = useState(null)
-  const [signupCertPreview, setSignupCertPreview] = useState('')
-  const [certChecking, setCertChecking] = useState(false)
-  const [certError, setCertError] = useState('')
+  const [signupDocs, setSignupDocs] = useState({})
+  const [docPreviews, setDocPreviews] = useState({})
+  const [docChecking, setDocChecking] = useState({})
+  const [docErrors, setDocErrors] = useState({})
   // Flipped true the first time Continue is pressed with an invalid field —
   // forces every ValidatedInput on this step to show its own inline error
   // immediately (via forceTouched), not just the ones the user happened to
@@ -143,7 +243,11 @@ export default function Login() {
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
 
   const signupSubmittingRef = useRef(false)
-  const certInputRef = useRef(null)
+  // One native file-input ref per doc type, keyed the same way as
+  // signupDocs/docErrors/etc — needed so a rejected file's <input> can be
+  // manually cleared (browsers won't re-fire onChange for the exact same
+  // file otherwise).
+  const docInputRefs = useRef({})
 
   // Navigation Tabs — a brand-new visitor (no remembered identifier, same
   // signal quickLogin above uses) lands on Signup instead of Login, so
@@ -374,41 +478,92 @@ export default function Login() {
     otpRefs.current[nextEmpty === -1 ? 5 : nextEmpty]?.focus()
   }
 
-  async function handleCertFileChange(e) {
+  async function handleDocFileChange(docType, e) {
     const file = e.target.files?.[0] || null
-    setCertError('')
-    setSignupCertFile(file)
-    setSignupCertPreview('')
+    const clearInput = () => { if (docInputRefs.current[docType]) docInputRefs.current[docType].value = '' }
+    setDocErrors(prev => ({ ...prev, [docType]: '' }))
+    setSignupDocs(prev => ({ ...prev, [docType]: file }))
+    setDocPreviews(prev => ({ ...prev, [docType]: '' }))
     if (!file) return
 
     if (!isImageFile(file) && file.type !== 'application/pdf') {
-      setCertError('Upload a JPG, PNG or PDF file.')
-      setSignupCertFile(null)
-      if (certInputRef.current) certInputRef.current.value = ''
+      setDocErrors(prev => ({ ...prev, [docType]: 'Upload a JPG, PNG or PDF file.' }))
+      setSignupDocs(prev => ({ ...prev, [docType]: null }))
+      clearInput()
       return
     }
     if (file.size > 10 * 1024 * 1024) {
-      setCertError('File is too large — the limit is 10MB.')
-      setSignupCertFile(null)
-      if (certInputRef.current) certInputRef.current.value = ''
+      setDocErrors(prev => ({ ...prev, [docType]: 'File is too large — the limit is 10MB.' }))
+      setSignupDocs(prev => ({ ...prev, [docType]: null }))
+      clearInput()
       return
     }
     if (!isImageFile(file)) return // PDF — nothing to preview/blur-check client-side
 
-    setCertChecking(true)
+    setDocChecking(prev => ({ ...prev, [docType]: true }))
     try {
       const result = await estimateImageSharpness(file)
-      setSignupCertPreview(result.dataUrl || '')
+      setDocPreviews(prev => ({ ...prev, [docType]: result.dataUrl || '' }))
       if (result.blurry) {
-        setCertError(result.reason)
-        setSignupCertFile(null)
-        if (certInputRef.current) certInputRef.current.value = ''
+        setDocErrors(prev => ({ ...prev, [docType]: result.reason }))
+        setSignupDocs(prev => ({ ...prev, [docType]: null }))
+        clearInput()
       }
     } catch {
       // Couldn't read the image client-side — let the server's own check decide.
     } finally {
-      setCertChecking(false)
+      setDocChecking(prev => ({ ...prev, [docType]: false }))
     }
+  }
+
+  // One upload box per required document type — reused for both a
+  // 'choice'-mode business type's single selected slot and every fixed
+  // slot of an 'all'-mode one.
+  function renderDocUploadSlot(type, label) {
+    const file = signupDocs[type]
+    const error = docErrors[type]
+    const preview = docPreviews[type]
+    const checking = docChecking[type]
+    const inputId = `docUpload_${type}`
+    return (
+      <div key={type} className="space-y-2">
+        <label
+          htmlFor={inputId}
+          className={`flex items-center gap-3 w-full border-2 border-dashed rounded-xl px-4 py-4 cursor-pointer transition-all ${
+            error ? 'border-red-300 bg-red-50/50' : file ? 'border-emerald-400 bg-emerald-50/40' : 'border-outline-variant/25 bg-slate-50 hover:border-primary/40'
+          }`}
+        >
+          {preview ? (
+            <img src={preview} alt={`${label} preview`} className="w-14 h-14 object-cover rounded-lg border border-outline-variant/20 shrink-0" />
+          ) : (
+            <span className={`material-symbols-outlined text-2xl shrink-0 ${file ? 'text-emerald-600' : 'text-primary/30'}`}>
+              {file ? 'description' : 'upload_file'}
+            </span>
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-bold text-primary truncate">
+              {checking ? 'Checking image quality…' : file ? file.name : label}
+            </p>
+            <p className="text-2xs text-on-surface-variant/50">JPG, PNG or PDF, up to 10MB. Must be clear and in focus.</p>
+          </div>
+          <input
+            id={inputId}
+            ref={el => { docInputRefs.current[type] = el }}
+            type="file"
+            accept="image/*,application/pdf"
+            capture="environment"
+            onChange={e => handleDocFileChange(type, e)}
+            className="hidden"
+          />
+        </label>
+        {error && (
+          <p className="text-2xs font-bold text-red-600 pl-1 flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-sm">error</span>
+            {error}
+          </p>
+        )}
+      </div>
+    )
   }
 
   async function handleSignup(e) {
@@ -425,6 +580,10 @@ export default function Login() {
 
     if (!validators.personName(signupName).valid) {
       setErr('Please enter a valid name before continuing.')
+      return
+    }
+    if (!validators.nationalId(signupNationalId).valid) {
+      setErr('Please enter a valid National ID number before continuing.')
       return
     }
     if (!validators.email(signupEmail).valid) {
@@ -459,13 +618,25 @@ export default function Login() {
       setErr('Please let us know whether this is an eCommerce business.')
       return
     }
-    if (!signupDocType) {
-      setErr('Select which registration document you are uploading.')
-      return
-    }
-    if (!signupCertFile) {
-      setErr(certError || 'Upload your Certificate of Registration, Business Permit, or License to continue.')
-      return
+    {
+      const requirement = KYB_REQUIREMENTS_BY_BUSINESS_TYPE[signupBusinessType]
+      if (requirement?.mode === 'choice') {
+        if (!signupDocType) {
+          setErr('Select which document you are uploading.')
+          return
+        }
+        if (!signupDocs[signupDocType]) {
+          setErr(docErrors[signupDocType] || 'Upload your document to continue.')
+          return
+        }
+      } else if (requirement?.mode === 'all') {
+        for (const slot of requirement.slots) {
+          if (!signupDocs[slot.type]) {
+            setErr(docErrors[slot.type] || `Upload your ${slot.label} to continue.`)
+            return
+          }
+        }
+      }
     }
     setErr('')
     setSignupStepTouched(false)
@@ -485,6 +656,7 @@ export default function Login() {
     }
     const payload = new FormData()
     payload.append('name', signupName.trim())
+    payload.append('nationalId', signupNationalId.trim())
     payload.append('email', signupEmail.trim())
     payload.append('phone', signupPhone.trim())
     payload.append('businessName', signupBusinessName.trim())
@@ -495,8 +667,13 @@ export default function Login() {
     payload.append('employees', signupEmployees)
     payload.append('ecommerce', signupEcommerce)
     payload.append('agreedToTerms', agreedToTerms)
-    payload.append('documentType', signupDocType)
-    payload.append('certificate', signupCertFile)
+    {
+      const requirement = KYB_REQUIREMENTS_BY_BUSINESS_TYPE[signupBusinessType]
+      const types = requirement?.mode === 'choice' ? [signupDocType] : (requirement?.slots.map(s => s.type) || [])
+      for (const type of types) {
+        payload.append(`doc_${type}`, signupDocs[type])
+      }
+    }
 
     signupSubmittingRef.current = true
     setLoading(true)
@@ -517,9 +694,9 @@ export default function Login() {
     setPassword('')
     setAgreedToTerms(false)
     setSignupDocType('')
-    setSignupCertFile(null)
-    setSignupCertPreview('')
-    setCertError('')
+    setSignupDocs({})
+    setDocPreviews({})
+    setDocErrors({})
     addNotification({
       title: 'Account Created',
       message: 'Log in with your new credentials to access your dashboard.',
@@ -785,6 +962,13 @@ export default function Login() {
                 </div>
 
                 <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Your National ID Number *</label>
+                  <ValidatedInput kind="nationalId" required value={signupNationalId} onChange={e => setSignupNationalId(e.target.value)} placeholder="12345678" forceTouched={signupStepTouched}
+                    className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" />
+                  <p className="text-[11px] text-outline-variant/60 pl-1">Used to verify the identity of the person registering this account.</p>
+                </div>
+
+                <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Your Phone *</label>
                   {/* Icon is absolutely positioned inside the input's own padding, not a
                       flex sibling of it — ValidatedInput renders <input> and its error
@@ -828,39 +1012,116 @@ export default function Login() {
 
                 <div className="space-y-3">
                   <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">County *</label>
-                  <div className="bg-white border border-outline-variant/15 rounded-2xl p-2 lg:p-3 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all">
-                    <div className="relative mb-3">
-                       <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-primary/40 pointer-events-none text-sm">search</span>
-                       <input
-                         className="w-full bg-slate-50 rounded-xl py-2 pl-9 pr-4 text-xs font-headline text-primary outline-none placeholder:text-outline-variant/40"
-                         placeholder="Search your county..."
-                         value={countySearch}
-                         onChange={e => setCountySearch(e.target.value)}
-                       />
+                  {signupCounty && !editingCounty ? (
+                    /* Collapsed to just the chosen county once selected — showing
+                       all 46 unselected counties underneath it forever isn't a
+                       "selection", it's clutter. "Change" re-opens the picker. */
+                    <div className="flex items-center justify-between bg-emerald-50 border border-emerald-500 rounded-2xl py-3 px-4">
+                      <div className="flex items-center gap-2 text-emerald-700 min-w-0">
+                        <span className="material-symbols-outlined text-[18px] shrink-0">check_circle</span>
+                        <span className="text-sm font-bold truncate">{signupCounty}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => { setEditingCounty(true); setCountySearch('') }}
+                        className="text-[10px] font-black uppercase tracking-widest text-emerald-700 hover:text-emerald-800 shrink-0 pl-3"
+                      >
+                        Change
+                      </button>
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 max-h-40 overflow-y-auto pr-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-outline-variant/20 [&::-webkit-scrollbar-thumb]:rounded-full">
-                      {KENYAN_COUNTIES.filter(c => c.toLowerCase().includes(countySearch.toLowerCase())).map(county => (
-                        <button
-                          key={county}
-                          type="button"
-                          onClick={() => setSignupCounty(county)}
-                          className={`py-3 px-3 rounded-xl border text-xs font-bold transition-all text-left truncate flex items-center justify-between group ${
-                            signupCounty === county
-                            ? 'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-sm'
-                            : 'bg-white border-outline-variant/10 text-primary hover:border-emerald-200 hover:bg-emerald-50/30'
-                          }`}
-                        >
-                          <span className="truncate">{county}</span>
-                          {signupCounty === county && <span className="material-symbols-outlined text-[14px]">check_circle</span>}
-                        </button>
-                      ))}
+                  ) : (
+                    <div className="bg-white border border-outline-variant/15 rounded-2xl p-2 lg:p-3 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all">
+                      <div className="relative mb-3">
+                         <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-primary/40 pointer-events-none text-sm">search</span>
+                         <input
+                           className="w-full bg-slate-50 rounded-xl py-2 pl-9 pr-4 text-xs font-headline text-primary outline-none placeholder:text-outline-variant/40"
+                           placeholder="Search your county..."
+                           value={countySearch}
+                           onChange={e => setCountySearch(e.target.value)}
+                         />
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 max-h-40 overflow-y-auto pr-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-outline-variant/20 [&::-webkit-scrollbar-thumb]:rounded-full">
+                        {KENYAN_COUNTIES.filter(c => c.toLowerCase().includes(countySearch.toLowerCase())).map(county => (
+                          <button
+                            key={county}
+                            type="button"
+                            onClick={() => {
+                              // A different county invalidates whatever area was
+                              // picked for the old one — it can't possibly still
+                              // be a real place inside the new county.
+                              if (county !== signupCounty) { setSignupArea(''); setAreaSearch('') }
+                              setSignupCounty(county)
+                              setEditingCounty(false)
+                              setCountySearch('')
+                            }}
+                            className={`py-3 px-3 rounded-xl border text-xs font-bold transition-all text-left truncate flex items-center justify-between group ${
+                              signupCounty === county
+                              ? 'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-sm'
+                              : 'bg-white border-outline-variant/10 text-primary hover:border-emerald-200 hover:bg-emerald-50/30'
+                            }`}
+                          >
+                            <span className="truncate">{county}</span>
+                            {signupCounty === county && <span className="material-symbols-outlined text-[14px]">check_circle</span>}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Area/Location *</label>
-                  <input required value={signupArea} onChange={e => setSignupArea(e.target.value)} className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" placeholder="Westlands" />
+                  {!signupCounty ? (
+                    <div className="bg-slate-50 border border-dashed border-outline-variant/20 rounded-2xl py-3 px-4 text-xs text-primary/40 font-bold">
+                      Select a county first
+                    </div>
+                  ) : signupArea && !editingArea ? (
+                    <div className="flex items-center justify-between bg-emerald-50 border border-emerald-500 rounded-2xl py-3 px-4">
+                      <div className="flex items-center gap-2 text-emerald-700 min-w-0">
+                        <span className="material-symbols-outlined text-[18px] shrink-0">check_circle</span>
+                        <span className="text-sm font-bold truncate">{signupArea}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => { setEditingArea(true); setAreaSearch('') }}
+                        className="text-[10px] font-black uppercase tracking-widest text-emerald-700 hover:text-emerald-800 shrink-0 pl-3"
+                      >
+                        Change
+                      </button>
+                    </div>
+                  ) : (
+                    /* Picker only, no free-text entry — a real place inside the
+                       chosen county is the only thing selectable here, so there
+                       is nothing to "guess" or mismatch against the county. */
+                    <div className="bg-white border border-outline-variant/15 rounded-2xl p-2 lg:p-3 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all">
+                      <div className="relative mb-3">
+                         <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-primary/40 pointer-events-none text-sm">search</span>
+                         <input
+                           className="w-full bg-slate-50 rounded-xl py-2 pl-9 pr-4 text-xs font-headline text-primary outline-none placeholder:text-outline-variant/40"
+                           placeholder={`Search areas in ${signupCounty}...`}
+                           value={areaSearch}
+                           onChange={e => setAreaSearch(e.target.value)}
+                         />
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-40 overflow-y-auto pr-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-outline-variant/20 [&::-webkit-scrollbar-thumb]:rounded-full">
+                        {(KENYA_COUNTY_AREAS[signupCounty] || []).filter(a => a.toLowerCase().includes(areaSearch.toLowerCase())).map(area => (
+                          <button
+                            key={area}
+                            type="button"
+                            onClick={() => { setSignupArea(area); setEditingArea(false); setAreaSearch('') }}
+                            className={`py-3 px-3 rounded-xl border text-xs font-bold transition-all text-left truncate flex items-center justify-between group ${
+                              signupArea === area
+                              ? 'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-sm'
+                              : 'bg-white border-outline-variant/10 text-primary hover:border-emerald-200 hover:bg-emerald-50/30'
+                            }`}
+                          >
+                            <span className="truncate">{area}</span>
+                            {signupArea === area && <span className="material-symbols-outlined text-[14px]">check_circle</span>}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -894,67 +1155,53 @@ export default function Login() {
                 </div>
 
                 <div className="space-y-3 pt-2 border-t border-outline-variant/10 mt-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1 flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-sm">verified_user</span>
-                    Business Verification Document *
-                  </label>
-                  <p className="text-2xs text-on-surface-variant/60 pl-1 -mt-1">
-                    Upload your Certificate of Registration, Business Permit, or License. Required to create an account.
-                  </p>
-                  <div className="relative">
-                    <select
-                      required
-                      value={signupDocType}
-                      onChange={e => setSignupDocType(e.target.value)}
-                      className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 pl-4 pr-10 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all appearance-none cursor-pointer"
-                    >
-                      <option value="">—Which document is this?—</option>
-                      {CERTIFICATE_DOCUMENT_TYPES.map(t => (
-                        <option key={t.value} value={t.value}>{t.label}</option>
-                      ))}
-                    </select>
-                    <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-primary/40 pointer-events-none">expand_more</span>
-                  </div>
+                  {(() => {
+                    const requirement = KYB_REQUIREMENTS_BY_BUSINESS_TYPE[signupBusinessType]
+                    return (
+                      <>
+                        <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1 flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-sm">verified_user</span>
+                          Business Verification Document{requirement?.mode === 'all' && requirement.slots.length > 1 ? 's' : ''} *
+                        </label>
+                        <p className="text-2xs text-on-surface-variant/60 pl-1 -mt-1">
+                          {!requirement
+                            ? 'Select a business type above to see which document(s) are required.'
+                            : requirement.mode === 'choice'
+                              ? 'Upload one of the documents below. Required to create an account.'
+                              : `Required for a ${signupBusinessType}: ${requirement.slots.map(s => s.label).join(', ')}.`}
+                        </p>
 
-                  <label
-                    htmlFor="certificateUpload"
-                    className={`flex items-center gap-3 w-full border-2 border-dashed rounded-xl px-4 py-4 cursor-pointer transition-all ${
-                      certError ? 'border-red-300 bg-red-50/50' : signupCertFile ? 'border-emerald-400 bg-emerald-50/40' : 'border-outline-variant/25 bg-slate-50 hover:border-primary/40'
-                    }`}
-                  >
-                    {signupCertPreview ? (
-                      <img src={signupCertPreview} alt="Document preview" className="w-14 h-14 object-cover rounded-lg border border-outline-variant/20 shrink-0" />
-                    ) : (
-                      <span className={`material-symbols-outlined text-2xl shrink-0 ${signupCertFile ? 'text-emerald-600' : 'text-primary/30'}`}>
-                        {signupCertFile ? 'description' : 'upload_file'}
-                      </span>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-bold text-primary truncate">
-                        {certChecking ? 'Checking image quality…' : signupCertFile ? signupCertFile.name : 'Take a photo or choose a file'}
-                      </p>
-                      <p className="text-2xs text-on-surface-variant/50">JPG, PNG or PDF, up to 10MB. Must be clear and in focus.</p>
-                    </div>
-                    <input
-                      id="certificateUpload"
-                      ref={certInputRef}
-                      type="file"
-                      accept="image/*,application/pdf"
-                      capture="environment"
-                      onChange={handleCertFileChange}
-                      className="hidden"
-                    />
-                  </label>
-                  {certError && (
-                    <p className="text-2xs font-bold text-red-600 pl-1 flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-sm">error</span>
-                      {certError}
-                    </p>
-                  )}
+                        {requirement?.mode === 'choice' && (
+                          <>
+                            <div className="relative">
+                              <select
+                                required
+                                value={signupDocType}
+                                onChange={e => setSignupDocType(e.target.value)}
+                                className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 pl-4 pr-10 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all appearance-none cursor-pointer"
+                              >
+                                <option value="">—Which document is this?—</option>
+                                {requirement.options.map(o => (
+                                  <option key={o.type} value={o.type}>{o.label}</option>
+                                ))}
+                              </select>
+                              <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-primary/40 pointer-events-none">expand_more</span>
+                            </div>
+                            {signupDocType && renderDocUploadSlot(
+                              signupDocType,
+                              requirement.options.find(o => o.type === signupDocType)?.label || 'Document'
+                            )}
+                          </>
+                        )}
+
+                        {requirement?.mode === 'all' && requirement.slots.map(slot => renderDocUploadSlot(slot.type, slot.label))}
+                      </>
+                    )
+                  })()}
                 </div>
 
                 <div className="sticky bottom-0 bg-white pt-2 pb-1 z-10">
-                  <button disabled={loading || certChecking} className="w-full bg-[#06201B] text-white py-4 rounded-xl font-black text-sm shadow-xl hover:bg-[#0a3029] active:scale-[0.98] transition-all flex items-center justify-center gap-2 group border border-white/5 disabled:opacity-50">
+                  <button disabled={loading || Object.values(docChecking).some(Boolean)} className="w-full bg-[#06201B] text-white py-4 rounded-xl font-black text-sm shadow-xl hover:bg-[#0a3029] active:scale-[0.98] transition-all flex items-center justify-center gap-2 group border border-white/5 disabled:opacity-50">
                     {loading ? (
                       <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                     ) : (

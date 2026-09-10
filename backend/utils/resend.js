@@ -1024,6 +1024,78 @@ export const sendPasswordResetConfirmation = async (email, name, when, ip, ua) =
   }
 };
 
+// Fired by utils/newDeviceLoginAlert.js the moment a merchant's account is
+// used from a device+IP fingerprint we haven't recorded before — usually
+// the earliest real signal of an account takeover, well before any money
+// actually moves. Same "when & where" layout as sendPasswordResetConfirmation
+// above, deliberately — a merchant who's seen one of these emails should
+// instantly recognize the shape of the other.
+export const sendNewDeviceLoginEmail = async (email, name, when, ip, ua) => {
+  try {
+    const safeName = (name || 'there').toString().replace(/</g, '&lt;');
+    const safeWhen = String(when || '').replace(/</g, '&lt;');
+    const safeIp   = String(ip   || 'unknown').replace(/</g, '&lt;');
+    const safeUa   = String(ua   || 'unknown device').replace(/</g, '&lt;').slice(0, 200);
+
+    const emailPayload = {
+      from: 'PayChain Security <info@paychain.co.ke>',
+      to: [email],
+      subject: 'New sign-in to your PayChain account',
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 560px; margin: auto; background: #ffffff; border: 1px solid #eef0ee; border-radius: 18px; overflow: hidden;">
+          <div style="background: linear-gradient(135deg, #06201B 0%, #0a3029 100%); padding: 32px 32px 36px;">
+            <div style="margin-bottom: 20px;">${logoImgWhite(108, 'left')}</div>
+            <div style="display: inline-flex; align-items: center; gap: 10px;">
+              <span style="display: inline-block; width: 36px; height: 36px; border-radius: 999px; background: rgba(94, 254, 179, 0.15); text-align: center; line-height: 36px; color: #5EFEB3; font-size: 18px; font-weight: 800;">⚠</span>
+              <div>
+                <p style="margin: 0; color: #5EFEB3; font-size: 11px; font-weight: 800; letter-spacing: 2.5px; text-transform: uppercase;">PayChain Security</p>
+                <h1 style="margin: 4px 0 0; color: #fff; font-size: 22px; font-weight: 800; letter-spacing: -0.3px;">New sign-in detected</h1>
+              </div>
+            </div>
+          </div>
+
+          <div style="padding: 36px 32px;">
+            <p style="margin: 0 0 16px; color: #111; font-size: 15px;">Hi ${safeName},</p>
+            <p style="margin: 0 0 22px; color: #4b5563; font-size: 15px; line-height: 1.6;">
+              Your PayChain merchant account was just signed into from a device or location we haven't seen before.
+            </p>
+
+            <div style="background: #f6fbf7; border: 1px solid #d8ecdd; border-radius: 12px; padding: 18px 20px; margin: 0 0 26px;">
+              <p style="margin: 0 0 10px; color: #06201B; font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;">When &amp; where</p>
+              <table style="width: 100%; border-collapse: collapse; font-size: 13px; color: #1f2937;">
+                <tr><td style="padding: 4px 0; color: #6b7280; width: 90px;">Time</td><td style="padding: 4px 0; font-weight: 600;">${safeWhen} EAT</td></tr>
+                <tr><td style="padding: 4px 0; color: #6b7280;">IP address</td><td style="padding: 4px 0; font-family: ui-monospace, Menlo, monospace;">${safeIp}</td></tr>
+                <tr><td style="padding: 4px 0; color: #6b7280;">Device</td><td style="padding: 4px 0; word-break: break-word;">${safeUa}</td></tr>
+              </table>
+            </div>
+
+            <div style="background: #fff7ed; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 16px 18px; margin: 0 0 26px;">
+              <p style="margin: 0 0 6px; color: #92400e; font-size: 13px; font-weight: 700;">Wasn't you?</p>
+              <p style="margin: 0; color: #78350f; font-size: 13px; line-height: 1.5;">
+                Contact <a href="mailto:support@paychain.co.ke" style="color: #b45309; font-weight: 700;">support@paychain.co.ke</a> immediately and change your password — we can lock the account and verify your identity before anyone else can sign in.
+              </p>
+            </div>
+
+            <a href="https://www.app.paychain.co.ke/login" style="display: inline-block; background: #06201B; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 12px; font-weight: 800; font-size: 14px; letter-spacing: 0.4px;">It was me, dismiss →</a>
+          </div>
+
+          <div style="padding: 22px 30px; background: #fafafa; border-top: 1px solid #eef0ee; text-align: center;">
+            <p style="margin: 0; color: #9ca3af; font-size: 11px;">We send this every time your account is used from a new device or network — it's not a sign anything is wrong on its own.</p>
+            <p style="margin: 8px 0 0; color: #bbb; font-size: 11px;">&copy; ${new Date().getFullYear()} PayChainKE · Nairobi, Kenya</p>
+          </div>
+        </div>
+      `,
+    };
+    const data = await resend.emails.send(emailPayload);
+    console.log(`📧 New-device login alert → ${email}`);
+    logEmail({ to: email, type: 'new_device_login', subject: emailPayload.subject, bodyHtml: emailPayload.html, resendId: data?.data?.id || data?.id || null }).catch(() => {});
+    return data;
+  } catch (error) {
+    console.error('❌ Resend New-Device Login Error:', error);
+    throw error;
+  }
+};
+
 // Sent to the OLD email on file when an admin resets a merchant's primary
 // email and/or phone (adminController.js's confirmMerchantAction,
 // action:'reset_contact') — deliberately notifies the address being

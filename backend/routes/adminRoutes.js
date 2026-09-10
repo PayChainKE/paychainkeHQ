@@ -104,7 +104,7 @@ import {
   deleteTaxDeadline,
 } from '../controllers/taxDeadlineController.js';
 import { protect, protectAdminSSE, requireRole } from '../middleware/authMiddleware.js';
-import { upload, uploadReceipt } from '../utils/cloudinary.js';
+import { upload, uploadReceipt, uploadMemory } from '../utils/cloudinary.js';
 import { registerAdminEventClient } from '../utils/adminEventStream.js';
 
 const router = express.Router();
@@ -178,7 +178,7 @@ router.post('/merchants/:id/send-install-reminder', protect, requireMutator, sen
 router.get('/platform-settings', protect, excludeOfficer, getPlatformSettings);
 router.patch('/platform-settings', protect, requireMutator, sensitiveActionLimiter, updatePlatformSettings);
 router.patch('/merchants/:id/verification', protect, requireMutator, sensitiveActionLimiter, updateMerchantVerification);
-router.patch('/merchants/:id/kyc-documents', protect, requireMutator, sensitiveActionLimiter, upload.single('document'), updateMerchantKycDocument);
+router.patch('/merchants/:id/kyc-documents', protect, requireMutator, sensitiveActionLimiter, uploadMemory.single('document'), updateMerchantKycDocument);
 router.patch('/merchants/:id/business-name', protect, requireMutator, sensitiveActionLimiter, updateMerchantBusinessName);
 router.patch('/merchants/:id/contact-name', protect, requireMutator, sensitiveActionLimiter, updateMerchantContactName);
 router.patch('/merchants/:id/certificate', protect, requireMutator, sensitiveActionLimiter, upload.single('certificate'), updateMerchantCertificate);
