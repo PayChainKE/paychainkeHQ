@@ -22,6 +22,9 @@ import { claimPayoutSubmission, DuplicateSubmissionError } from '../utils/idempo
 import { debitAvailableBalance } from '../utils/availableBalance.js';
 import { notifyAdmins, escapeHtml } from '../utils/securityAlerts.js';
 import { withMerchantTariffLock } from '../services/tariffCardCache.js';
+import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard.js';
+import { getLipaNaMpesaTariff } from '../config/lipaNaMpesaTariffCard.js';
+import { getBankTransferTariff } from '../config/bankTransferTariffCard.js';
 
 // Transfers at or above this amount get an admin visibility alert — not a
 // block, just a heads-up. Configurable since "large" depends on the
@@ -55,6 +58,53 @@ export const getTransactions = async (req, res) => {
   } catch (error) {
     console.error('❌ Error fetching transactions:', error);
     res.status(500).json({ error: 'Server Error: Failed to fetch transactions' });
+  }
+};
+
+// @desc    Live fee preview for an outbound payout, before the merchant
+//          confirms — computed via the exact same tariff functions and
+//          per-merchant tariff lock used at execution time
+//          (mpesaController.js#initiateB2C for 'mobile', #initiateB2B for
+//          'till'/'paybill', ncbaOpenBankingController.js#handleBankPayout
+//          for 'bank'), so the number shown here can never drift from what
+//          actually gets charged. Replaces
+//          apps/merchant-dashboard/src/pages/SendMoney.jsx's old hardcoded
+//          fee-band constants, which had no way to reflect an admin tariff
+//          change and had already gone stale (and been manually re-synced)
+//          at least twice before per that file's own comments.
+// @route   GET /api/transactions/fee-preview?type=mobile|till|paybill|bank&rail=pesalink|rtgs&amount=100
+// @access  Private
+export const getFeePreview = async (req, res) => {
+  try {
+    const { type, rail } = req.query;
+    const numericAmount = Number(req.query.amount);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      return res.json({ success: true, totalFee: 0 });
+    }
+    const merchantId = req.merchant._id;
+
+    let totalFee;
+    if (type === 'mobile') {
+      try {
+        ({ totalFee } = await withMerchantTariffLock(merchantId, () => getB2cTariff(numericAmount)));
+      } catch (e) {
+        // Amount out of bounds (0, negative, or over the B2C ceiling) — the
+        // merchant is still typing, not a real error to surface.
+        if (e instanceof B2cTariffBoundsError) return res.json({ success: true, totalFee: 0 });
+        throw e;
+      }
+    } else if (type === 'till' || type === 'paybill') {
+      ({ totalFee } = await withMerchantTariffLock(merchantId, () => getLipaNaMpesaTariff(numericAmount)));
+    } else if (type === 'bank') {
+      ({ totalFee } = await withMerchantTariffLock(merchantId, () => getBankTransferTariff(rail, numericAmount)));
+    } else {
+      return res.status(400).json({ error: 'Invalid preview type.' });
+    }
+
+    res.json({ success: true, totalFee });
+  } catch (error) {
+    console.error('Get Fee Preview Error:', error);
+    res.status(500).json({ error: 'Server Error' });
   }
 };
 
