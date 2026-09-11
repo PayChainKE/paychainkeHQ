@@ -36,7 +36,10 @@ import { uploadBufferToCloudinary } from '../utils/cloudinary.js';
 // write an arbitrary string into a field the admin/officer dashboards
 // display and filter on. Mirrored exactly in Login.jsx (web) and
 // Login.tsx (mobile); keep all three in sync if this list ever changes.
-const BUSINESS_TYPES = [
+// Exported so adminController.js's updateMerchantSignupDetails can validate
+// admin-entered business types against the same canonical list, rather than
+// a fourth copy of it.
+export const BUSINESS_TYPES = [
   'Sole Proprietorship',
   'Partnership',
   'Limited Liability Company (LLC)',
@@ -441,7 +444,9 @@ export const registerMerchant = async (req, res) => {
 
     logAudit({
       action: 'merchant.signup', category: 'auth', severity: 'success',
-      message: `Merchant signed up — ${merchant.businessName || merchant.email}`,
+      message: merchant.name
+        ? `The merchant registered the ${merchant.businessName || 'account'} account under the name ${merchant.name}.`
+        : `Merchant signed up — ${merchant.businessName || merchant.email}`,
       merchant, req,
       metadata: { source: merchant.registrationSource || 'web' },
     });

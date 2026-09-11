@@ -260,7 +260,9 @@ export default function AuditLog() {
         'Severity': r.severity || '',
         'Platform': r.platform || '',
         'Actor Type': r.actor?.type || 'self',
-        'Actor': ['admin', 'officer'].includes(r.actor?.type) ? (r.actor?.name || r.actor?.email || r.actor.type) : '',
+        'Actor': ['admin', 'officer'].includes(r.actor?.type)
+          ? (r.actor?.name || r.actor?.email || r.actor.type)
+          : (r.actor?.type === 'system' ? 'System' : (r.actor?.name || '')),
         'Merchant Name': r.merchantName || '',
         'Merchant Email': r.merchantEmail || '',
         'IP': r.ip || '',
@@ -479,7 +481,7 @@ export default function AuditLog() {
                           {r.actor?.type === 'admin' ? r.actor?.name || r.actor?.email || 'admin'
                             : r.actor?.type === 'officer' ? r.actor?.name || r.actor?.email || 'officer'
                             : r.actor?.type === 'system' ? 'System'
-                            : 'Merchant'}
+                            : r.actor?.name || 'Merchant'}
                         </p>
                         <p className="text-2xs text-on-surface-variant/50 capitalize">{r.actor?.type || 'self'}</p>
                       </td>
@@ -591,6 +593,9 @@ const EntryDrawer = ({ entry, onClose }) => {
               <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 mb-1">Merchant</p>
               <p className="text-xs font-semibold text-on-surface">{entry.merchantName || '—'}</p>
               <p className="text-xs text-on-surface-variant/60 break-all">{entry.merchantEmail}</p>
+              {!['admin', 'officer'].includes(entry.actor?.type) && entry.actor?.name && (
+                <p className="text-xs text-on-surface-variant/60 mt-0.5">Registered contact: <span className="font-semibold text-on-surface">{entry.actor.name}</span></p>
+              )}
             </div>
           )}
 
