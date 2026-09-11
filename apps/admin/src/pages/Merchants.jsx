@@ -8,6 +8,13 @@ import { formatAccountNumber } from '../utils/formatAccountNumber'
 import EditableField from '../components/modals/EditableField'
 import UploadableDocRow from '../components/modals/UploadableDocRow'
 import ResetContactModal from '../components/modals/ResetContactModal';
+import EditSignupDetailsModal from '../components/modals/EditSignupDetailsModal';
+import GenerateStatementModal from '../components/modals/GenerateStatementModal';
+import GenerateAuditReportModal from '../components/modals/GenerateAuditReportModal';
+import { formatKES } from '../utils/formatCurrency';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import logo from '../assets/logo.png';
 
 const PAGE_SIZE = 20;
 
@@ -1116,6 +1123,21 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
   const [certificateUrl, setCertificateUrl] = React.useState(merchant?.certificateUrl || null);
   const [resetContactOpen, setResetContactOpen] = React.useState(false);
   const [contactOverride, setContactOverride] = React.useState(null); // { email, phone } after a reset_contact confirm
+  // Signup-details fields (National ID, business type, county/area/ward/
+  // street) — editable via EditSignupDetailsModal, mainly so an admin can
+  // fill these in for merchants created before the fields existed. Local
+  // state (not read straight from `merchant`) so a save reflects instantly
+  // without waiting on a full drawer refetch, same pattern as businessName/
+  // contactName above.
+  const [signupDetails, setSignupDetails] = React.useState({
+    nationalId: merchant?.nationalId || null,
+    businessType: merchant?.businessType || null,
+    county: merchant?.county || null,
+    businessArea: merchant?.businessArea || null,
+    ward: merchant?.ward || null,
+    street: merchant?.street || null,
+  });
+  const [editSignupDetailsOpen, setEditSignupDetailsOpen] = React.useState(false);
 
   React.useEffect(() => {
     if (merchant?.features) {
@@ -1128,6 +1150,14 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
     setContactName(merchant?.name || '');
     setCertificateUrl(merchant?.certificateUrl || null);
     setContactOverride(null);
+    setSignupDetails({
+      nationalId: merchant?.nationalId || null,
+      businessType: merchant?.businessType || null,
+      county: merchant?.county || null,
+      businessArea: merchant?.businessArea || null,
+      ward: merchant?.ward || null,
+      street: merchant?.street || null,
+    });
   }, [merchant]);
 
   const startEditBusinessName = () => {
@@ -1197,6 +1227,190 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
     } finally {
       setBusy(false);
     }
+  };
+
+  const [statementModalOpen, setStatementModalOpen] = React.useState(false);
+  const [auditReportModalOpen, setAuditReportModalOpen] = React.useState(false);
+
+  // Built purely from `merchant` — the same detail record already fetched
+  // for this drawer — so there's no second round trip and the report can
+  // never show numbers that don't match what the admin is looking at. A
+  // point-in-time profile/activity snapshot, not a transaction ledger —
+  // see GenerateStatementModal for the full ledger-style statement, which
+  // does need its own fetch since it covers more than the last 10 rows.
+  const downloadMerchantReportPdf = () => {
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const W = doc.internal.pageSize.getWidth();
+    const H = doc.internal.pageSize.getHeight();
+    const L = 14, R = W - 14;
+    const now = new Date();
+    const reportId = `PC-MR-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+
+    const fitText = (text, maxWidth) => {
+      let str = String(text ?? '');
+      if (doc.getTextWidth(str) <= maxWidth) return str;
+      while (str.length > 1 && doc.getTextWidth(str + '…') > maxWidth) {
+        str = str.slice(0, -1);
+      }
+      return str + '…';
+    };
+
+    // ── HEADER BAND ───────────────────────────────────────────────────────
+    doc.setFillColor(6, 32, 27);
+    doc.rect(0, 0, W, 38, 'F');
+    const logoW = 30, logoH = logoW * (75 / 338);
+    try { doc.addImage(logo, 'PNG', L, (38 - logoH) / 2, logoW, logoH, undefined, 'FAST'); } catch (_) {}
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text('PayChain Kenya', R, 15, { align: 'right' });
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(94, 254, 179);
+    doc.text('MERCHANT ACCOUNT REPORT', R, 22, { align: 'right' });
+    doc.setTextColor(200, 220, 210);
+    doc.text(`Report Ref: ${reportId}`, R, 27, { align: 'right' });
+    doc.text(`Issued: ${now.toLocaleString('en-KE', { dateStyle: 'medium', timeStyle: 'short' })}`, R, 32, { align: 'right' });
+
+    // ── ACCOUNT DETAILS BLOCK ────────────────────────────────────────────
+    let y = 48;
+    doc.setTextColor(6, 32, 27);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text('Account Details', L, y);
+    doc.setDrawColor(220, 230, 225);
+    doc.setLineWidth(0.3);
+    doc.line(L, y + 2, R, y + 2);
+
+    y += 8;
+    const col2 = W / 2 + 4;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    const acctLines = [
+      ['Business Name', m.businessName || '—', 'Contact Name', m.name || '—'],
+      ['Email', m.email || '—', 'Phone', m.phone || '—'],
+      ['National ID', m.nationalId || '—', 'Business Type', m.businessType || '—'],
+      ['County', m.county || '—', 'Area / Sub-County', m.businessArea || '—'],
+      ['Ward', m.ward || '—', 'Street', m.street || '—'],
+      ['Joined', fmtDate(m.createdAt), 'Registration Source', m.registrationSource === 'mobile' ? 'Mobile App' : 'Web Dashboard'],
+    ];
+    acctLines.forEach(([lk, lv, rk, rv]) => {
+      doc.setTextColor(100, 110, 105); doc.setFont('helvetica', 'normal');
+      doc.text(lk + ':', L, y);
+      doc.setTextColor(6, 32, 27); doc.setFont('helvetica', 'bold');
+      doc.text(fitText(lv, col2 - (L + 32) - 4), L + 32, y);
+      doc.setTextColor(100, 110, 105); doc.setFont('helvetica', 'normal');
+      doc.text(rk + ':', col2, y);
+      doc.setTextColor(6, 32, 27); doc.setFont('helvetica', 'bold');
+      doc.text(fitText(rv, R - (col2 + 30)), col2 + 30, y);
+      y += 7;
+    });
+
+    // ── SUMMARY STRIP ──────────────────────────────────────────────────────
+    y += 3;
+    const summaryItems = [
+      { label: 'Account Status', value: m.status === 'locked' ? 'Locked' : 'Active', color: m.status === 'locked' ? [180, 30, 30] : [6, 32, 27] },
+      { label: 'KYB Status', value: m.kybStatus ? m.kybStatus.replace(/_/g, ' ') : 'Self-Serve', color: [6, 32, 27] },
+      { label: 'Risk Tier', value: m.riskTier || 'Unrated', color: m.flagged ? [180, 30, 30] : [6, 32, 27] },
+      { label: 'Lifetime Volume', value: formatKES(m.totalVolume), color: [40, 80, 120] },
+    ];
+    const boxW = (R - L) / summaryItems.length - 2;
+    summaryItems.forEach((item, i) => {
+      const bx = L + i * (boxW + 2);
+      doc.setFillColor(244, 247, 245);
+      doc.roundedRect(bx, y, boxW, 18, 2, 2, 'F');
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(100, 110, 105);
+      doc.text(item.label.toUpperCase(), bx + boxW / 2, y + 6, { align: 'center' });
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(...item.color);
+      doc.text(fitText(item.value, boxW - 4), bx + boxW / 2, y + 13, { align: 'center' });
+    });
+    y += 26;
+
+    const section = (title) => {
+      if (y > 265) { doc.addPage(); y = 20; }
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.setTextColor(6, 32, 27);
+      doc.text(title, L, y);
+      doc.setDrawColor(220, 230, 225);
+      doc.line(L, y + 2, R, y + 2);
+      y += 9;
+    };
+    const row = (label, value) => {
+      if (y > 275) { doc.addPage(); y = 20; }
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(90, 100, 95);
+      doc.text(label, L, y);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(6, 32, 27);
+      doc.text(fitText(String(value ?? '—'), R - L - 60), R, y, { align: 'right' });
+      y += 7;
+    };
+
+    section('KYB / Verification');
+    row('KRA PIN', m.kraPin ? `${m.kraPin}${m.isKRAVerified || m.kraAdminVerified ? ' (verified)' : ''}` : '—');
+    row('Business Number', m.businessNumber ? `${m.businessNumber}${m.businessNumberAdminVerified ? ' (verified)' : ''}` : '—');
+    row('Account Verified', m.isVerified ? 'Yes' : 'No');
+    row('Risk Signals', m.riskSignals?.length ? m.riskSignals.join(', ') : 'None');
+    row('Flagged', m.flagged ? `Yes — ${m.flagReason || 'no reason on file'}` : 'No');
+    y += 3;
+
+    section('Activity Summary');
+    row('Activity Tier', ACTIVITY_STYLE[m.activityTier]?.label || 'Dormant');
+    row('Last Login', fmtDate(m.lastLogin));
+    row('Login Count', (m.loginCount ?? 0).toLocaleString());
+    row('Last Activity', fmtDate(m.lastActivityAt));
+    row('Transactions (24h)', (m.txnCount24h ?? 0).toLocaleString());
+    row('Transactions (30d)', (m.txnCount30d ?? 0).toLocaleString());
+    row('KES Volume (30d)', formatKES(m.volume30d));
+    row('Lifetime Transaction Count', (m.totalCount ?? 0).toLocaleString());
+    row('KES Wallet Balance', formatKES(m.kesBalance));
+    row('USDC Wallet Balance', `${(m.usdcBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDC`);
+    y += 3;
+
+    if (m.volumeByType) {
+      section('Lifetime Volume by Type');
+      autoTable(doc, {
+        startY: y,
+        margin: { left: L, right: L },
+        head: [['Type', 'KES Volume']],
+        body: [
+          ['Inbound', formatKES(m.volumeByType.inbound)],
+          ['Outbound', formatKES(m.volumeByType.outbound)],
+          ['Bulk Pay', formatKES(m.volumeByType.bulk_pay)],
+          ['FX Swap', formatKES(m.volumeByType.fx_swap)],
+          ['Settlement', formatKES(m.volumeByType.settlement)],
+        ],
+        styles: { font: 'helvetica', fontSize: 8.5, textColor: [60, 70, 65] },
+        headStyles: { fillColor: [6, 32, 27], textColor: [255, 255, 255], fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [244, 247, 245] },
+      });
+      y = doc.lastAutoTable.finalY + 10;
+    }
+
+    // ── CERTIFICATION STRIP ─────────────────────────────────────────────
+    if (y > H - 30) { doc.addPage(); y = 20; }
+    doc.setFillColor(6, 32, 27);
+    doc.rect(L, y, R - L, 12, 'F');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(94, 254, 179);
+    doc.text('Report prepared by PayChain Admin System', L + 4, y + 7.5);
+    doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'normal');
+    doc.text(reportId, R - 4, y + 7.5, { align: 'right' });
+
+    // ── FOOTER (every page) ──────────────────────────────────────────────
+    const totalPages = doc.internal.getNumberOfPages();
+    for (let p = 1; p <= totalPages; p++) {
+      doc.setPage(p);
+      const footerY = H - 14;
+      doc.setDrawColor(200, 210, 205); doc.setLineWidth(0.3);
+      doc.line(L, footerY - 4, R, footerY - 4);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(140, 150, 145);
+      doc.text('Generated by PayChain Admin — internal use only, not for distribution to the merchant.', W / 2, footerY, { align: 'center' });
+      doc.text(`© ${now.getFullYear()} Paychain Ltd  •  Ref: ${reportId}  •  Page ${p} of ${totalPages}`, W / 2, footerY + 5, { align: 'center' });
+    }
+
+    doc.save(`PayChain_Merchant_Report_${(m.businessName || m._id).toString().replace(/[^a-z0-9]+/gi, '-').toLowerCase()}_${now.toISOString().slice(0, 10)}.pdf`);
   };
 
   const saveBusinessName = async () => {
@@ -1403,6 +1617,7 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
                   )
                 }
               />
+              <Row label="Business Type" value={signupDetails.businessType || <span className="text-on-surface-variant/50">— not provided —</span>} />
               <Row label="KRA PIN" value={m.kraPin} mono badge={m.isKRAVerified ? { tone: 'emerald', text: 'Verified' } : { tone: 'gray', text: 'Not verified' }} />
               <Row label="Business Reg #" value={m.businessNumber} mono />
               <Row label="Certificate" value={
@@ -1475,7 +1690,7 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
                   }}
                 />
               } />
-              <Row label="National ID Number" value={m.nationalId || <span className="text-on-surface-variant/50">— not provided —</span>} mono />
+              <Row label="National ID Number" value={signupDetails.nationalId || <span className="text-on-surface-variant/50">— not provided —</span>} mono />
               <Row label="Email" value={contactOverride?.email ?? m.email} />
               <Row label="Phone" value={contactOverride?.phone ?? m.phone} mono />
               <Row label="Reset Email / Phone" value={
@@ -1511,6 +1726,44 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
               />
             </Section>
 
+            {/* Location — county/area/ward/street as typed at signup (self-
+                serve web/mobile or officer onboarding), plus whatever exact
+                lat/lng an admin has separately pinned on the merchants map
+                (Merchants.jsx's "Set map location" row action). The two are
+                independent — a merchant can have one, both, or neither. */}
+            <Section title="Business Location" icon="location_on">
+              <Row label="Signup Details" value={
+                <button
+                  onClick={() => setEditSignupDetailsOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-outline-variant/30 text-on-surface-variant hover:bg-surface-container-low text-[11px] font-bold uppercase tracking-widest transition-all"
+                >
+                  <span className="material-symbols-outlined text-[14px]">edit_location_alt</span>
+                  Edit National ID / Location
+                </button>
+              } />
+              <Row label="County" value={signupDetails.county || <span className="text-on-surface-variant/50">— not provided —</span>} />
+              <Row label="Area / Sub-County" value={signupDetails.businessArea || <span className="text-on-surface-variant/50">— not provided —</span>} />
+              <Row label="Ward" value={signupDetails.ward || <span className="text-on-surface-variant/50">— not provided —</span>} />
+              <Row label="Street" value={signupDetails.street || <span className="text-on-surface-variant/50">— not provided —</span>} />
+              <Row
+                label="Exact Map Location"
+                value={
+                  m.mapLocation?.lat != null
+                    ? (
+                      <a
+                        href={`https://www.google.com/maps?q=${m.mapLocation.lat},${m.mapLocation.lng}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 font-semibold underline"
+                      >
+                        {m.mapLocation.lat.toFixed(5)}, {m.mapLocation.lng.toFixed(5)}{m.mapLocation.label ? ` — ${m.mapLocation.label}` : ''} ↗
+                      </a>
+                    )
+                    : <span className="text-on-surface-variant/50">— not pinned by admin —</span>
+                }
+              />
+            </Section>
+
             {/* Account */}
             <Section title="PayChain Account" icon="account_balance_wallet">
               <Row label="Account Number" value={<span className="font-mono font-bold text-base text-on-surface bg-surface-container-low px-2 py-1 rounded">{formatAccountNumber(m.ncbaVirtualAccountNumber || m.ncbaMerchantCode) || '—'}</span>} />
@@ -1535,6 +1788,27 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
                       >
                         <span className="material-symbols-outlined text-[14px]">{downloadingQr ? 'hourglass_empty' : 'qr_code_2'}</span>
                         {downloadingQr ? 'Downloading…' : 'QR Code'}
+                      </button>
+                      <button
+                        onClick={downloadMerchantReportPdf}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-outline-variant/30 text-on-surface-variant hover:bg-surface-container-low text-[11px] font-bold uppercase tracking-widest transition-all"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">summarize</span>
+                        Merchant Report
+                      </button>
+                      <button
+                        onClick={() => setStatementModalOpen(true)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-outline-variant/30 text-on-surface-variant hover:bg-surface-container-low text-[11px] font-bold uppercase tracking-widest transition-all"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">receipt_long</span>
+                        Account Statement
+                      </button>
+                      <button
+                        onClick={() => setAuditReportModalOpen(true)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-outline-variant/30 text-on-surface-variant hover:bg-surface-container-low text-[11px] font-bold uppercase tracking-widest transition-all"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">fact_check</span>
+                        Audit Report
                       </button>
                     </div>
                     {downloadError && <p className="text-[11px] text-red-600 font-medium">{downloadError}</p>}
@@ -1644,6 +1918,25 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
           merchant={m}
           onClose={() => setResetContactOpen(false)}
           onSuccess={(data) => setContactOverride(data)}
+        />
+      )}
+      {editSignupDetailsOpen && (
+        <EditSignupDetailsModal
+          merchant={{ ...m, ...signupDetails }}
+          onClose={() => setEditSignupDetailsOpen(false)}
+          onSaved={(data) => setSignupDetails((prev) => ({ ...prev, ...data }))}
+        />
+      )}
+      {statementModalOpen && (
+        <GenerateStatementModal
+          merchant={m}
+          onClose={() => setStatementModalOpen(false)}
+        />
+      )}
+      {auditReportModalOpen && (
+        <GenerateAuditReportModal
+          merchant={m}
+          onClose={() => setAuditReportModalOpen(false)}
         />
       )}
       <style>{`@keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }`}</style>

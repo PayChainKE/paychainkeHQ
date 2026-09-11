@@ -23,6 +23,10 @@ import { reversedTransactionExclusionMatch } from '../utils/reversedTransactions
 import { provisionMerchantWallet } from '../utils/stellarHelper.js';
 import { encryptKey } from '../utils/cryptoHelper.js';
 import { normalizeKraPin, isValidKraPin, KRA_PIN_FORMAT_HINT } from '../utils/kraPinValidator.js';
+import { normalizeNationalId, isValidNationalId, NATIONAL_ID_FORMAT_HINT } from '../utils/nationalIdValidator.js';
+import { KENYA_COUNTY_AREAS } from '../config/kenyaCountyAreas.js';
+import { KENYA_COUNTY_WARDS } from '../config/kenyaCountyWards.js';
+import { BUSINESS_TYPES } from './merchantAuthController.js';
 import { isValidEmail, EMAIL_FORMAT_HINT } from '../utils/emailValidator.js';
 import { safeSendSMS } from '../utils/smsSanitizer.js';
 import { generateBrandedQrDataUri } from '../utils/qrCode.js';
@@ -1404,6 +1408,125 @@ export const updateMerchantContactName = async (req, res) => {
   }
 };
 
+// @desc    Admin fills in (or corrects) the signup-details fields that
+//          self-serve registration collects — National ID, business type,
+//          and county/area/ward/street. Mainly for merchants created
+//          before these fields existed on the schema (they'd otherwise
+//          have no way to ever get this data), but works for any merchant.
+//          Every field is optional in the request body — only the fields
+//          actually present are validated and updated, so an admin can fix
+//          just one field without having to resupply the rest. Uses the
+//          exact same canonical option sets and validators as self-serve
+//          signup (registerMerchant, merchantAuthController.js) so
+//          admin-entered data can never drift into a shape the rest of the
+//          codebase (KYB requirement resolution, ward-within-area checks)
+//          doesn't recognize.
+// @route   PATCH /api/admin/merchants/:id/signup-details
+// @access  Private (Admin — owner/admin only, see routes)
+export const updateMerchantSignupDetails = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid merchant id.' });
+    }
+    const merchant = await Merchant.findById(id);
+    if (!merchant) return res.status(404).json({ error: 'Merchant not found.' });
+
+    const { nationalId, businessType, county, businessArea, ward, street } = req.body || {};
+    const changes = {};
+
+    if (nationalId !== undefined) {
+      const trimmed = String(nationalId || '').trim();
+      if (trimmed) {
+        const normalized = normalizeNationalId(trimmed);
+        if (!isValidNationalId(normalized)) {
+          return res.status(400).json({ error: `Invalid National ID number. ${NATIONAL_ID_FORMAT_HINT}` });
+        }
+        changes.nationalId = normalized;
+      } else {
+        changes.nationalId = null;
+      }
+    }
+    if (businessType !== undefined) {
+      const trimmed = String(businessType || '').trim();
+      if (trimmed && !BUSINESS_TYPES.includes(trimmed)) {
+        return res.status(400).json({ error: 'Select a valid business type.' });
+      }
+      changes.businessType = trimmed || null;
+    }
+    // County/area/ward validate together, since area must exist within
+    // county and ward within area — resolve against whatever's actually
+    // being saved (the request value if present, else the merchant's
+    // existing value), same as registerMerchant's own validation.
+    const effectiveCounty = county !== undefined ? String(county || '').trim() : (merchant.county || '');
+    const effectiveArea = businessArea !== undefined ? String(businessArea || '').trim() : (merchant.businessArea || '');
+    if (county !== undefined) {
+      if (effectiveCounty && !KENYA_COUNTY_AREAS[effectiveCounty]) {
+        return res.status(400).json({ error: 'Select a valid Kenyan county.' });
+      }
+      changes.county = effectiveCounty || null;
+    }
+    if (businessArea !== undefined) {
+      if (effectiveArea) {
+        if (!effectiveCounty || !KENYA_COUNTY_AREAS[effectiveCounty]) {
+          return res.status(400).json({ error: 'Select a county before an area.' });
+        }
+        if (!KENYA_COUNTY_AREAS[effectiveCounty].includes(effectiveArea)) {
+          return res.status(400).json({ error: `Select a valid area within ${effectiveCounty}.` });
+        }
+      }
+      changes.businessArea = effectiveArea || null;
+    }
+    if (ward !== undefined) {
+      const trimmedWard = String(ward || '').trim();
+      if (trimmedWard && !(KENYA_COUNTY_WARDS[effectiveCounty]?.[effectiveArea] || []).includes(trimmedWard)) {
+        return res.status(400).json({ error: `Select a valid ward within ${effectiveArea || 'the chosen area'}.` });
+      }
+      changes.ward = trimmedWard || null;
+    }
+    if (street !== undefined) {
+      changes.street = String(street || '').trim() || null;
+    }
+
+    if (Object.keys(changes).length === 0) {
+      return res.json({ success: true, message: 'No change.', data: {} });
+    }
+
+    Object.assign(merchant, changes);
+    await merchant.save();
+
+    logAudit({
+      action: 'admin.merchant.signup_details_updated', category: 'admin', severity: 'info',
+      message: `Signup details updated for ${merchant.businessName}: ${Object.keys(changes).join(', ')}`,
+      merchant, actor: adminActor(req.admin), req,
+      metadata: changes,
+    });
+
+    res.json({
+      success: true,
+      message: 'Signup details updated.',
+      data: {
+        nationalId: merchant.nationalId,
+        businessType: merchant.businessType,
+        county: merchant.county,
+        businessArea: merchant.businessArea,
+        ward: merchant.ward,
+        street: merchant.street,
+      },
+    });
+  } catch (error) {
+    console.error('Update Merchant Signup Details Error:', error);
+    if (error.code === 11000) {
+      return res.status(409).json({ error: 'A merchant with that National ID already exists.' });
+    }
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map((v) => v.message);
+      return res.status(400).json({ error: messages.join(', ') });
+    }
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
 // @desc    Admin adds or replaces the merchant's single self-serve signup
 //          certificate (Merchant.certificateUrl) — separate from the typed,
 //          multi-document kybDocuments array (see updateMerchantKycDocument
@@ -1528,9 +1651,21 @@ export const getMerchantDetail = async (req, res) => {
         _id: merchant._id,
         // Identity
         name: merchant.name,
+        nationalId: merchant.nationalId,
         email: merchant.email,
         phone: merchant.phone,
         businessName: merchant.businessName,
+        businessType: merchant.businessType,
+        // Location, as typed at signup (self-serve web/mobile) or by the
+        // onboarding officer — county/area/ward come from a fixed picker,
+        // street is free text. Distinct from `mapLocation` below, which is
+        // a separate admin-only pin, not signup data (see
+        // Merchant.js#mapLocation's own doc comment).
+        county: merchant.county,
+        businessArea: merchant.businessArea,
+        ward: merchant.ward,
+        street: merchant.street,
+        mapLocation: merchant.mapLocation || null,
         // KYB
         kraPin: merchant.kraPin,
         isKRAVerified: merchant.isKRAVerified,
@@ -1640,6 +1775,126 @@ export const getMerchantDetail = async (req, res) => {
     });
   } catch (error) {
     console.error('Get Merchant Detail Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Full transaction list for one merchant, for an admin-generated
+//          account statement — same underlying data as the merchant's own
+//          `GET /api/transactions`, just scoped by an admin-chosen date
+//          range. Defaults to the merchant's entire lifetime (their
+//          `createdAt` through now), matching "statement since the day
+//          they joined". The PDF itself is built client-side from this
+//          data (apps/admin/src/pages/Merchants.jsx), same pattern as the
+//          merchant-dashboard's own self-serve statement export.
+// @route   GET /api/admin/merchants/:id/statement
+// @access  Private (Admin)
+export const getMerchantStatementData = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid merchant id.' });
+    }
+    const merchant = await Merchant.findById(id)
+      .select('name email phone businessName createdAt kesBalance usdcBalance ncbaMerchantCode')
+      .lean();
+    if (!merchant) return res.status(404).json({ error: 'Merchant not found.' });
+
+    const from = req.query.from ? new Date(req.query.from) : new Date(merchant.createdAt);
+    const to = req.query.to ? new Date(req.query.to) : new Date();
+    if (isNaN(from.getTime()) || isNaN(to.getTime())) {
+      return res.status(400).json({ error: 'Invalid date range.' });
+    }
+
+    // paychainFee/safaricomFee/usdcAmount are needed client-side for the
+    // same fee-corrected running-balance math the merchant's own dashboard
+    // uses (utils/transactionDirection.js#netBalanceImpact) — without them
+    // the PDF's running/closing balance would silently drift from the
+    // merchant's real kesBalance for every fee-bearing NCBA row.
+    const transactions = await Transaction.find({
+      merchantId: merchant._id,
+      createdAt: { $gte: from, $lte: to },
+    })
+      .sort('-createdAt')
+      .select('type status amount kesAmount usdcAmount currency reference sender recipient pendingReason paychainFee safaricomFee createdAt')
+      .lean();
+
+    // The statement's opening balance has to work backwards from the
+    // merchant's real, current kesBalance (there's no stored historical
+    // balance snapshot), same approach as the merchant's own self-serve
+    // export: current balance, minus this period's net change (computed
+    // client-side from `transactions`), minus whatever happened AFTER the
+    // period ended (computed here, since those rows aren't returned to the
+    // client). Mirrors netBalanceImpact's exact credit/debit/fee logic —
+    // see utils/transactionDirection.js on the frontend for the canonical
+    // version this must stay in sync with.
+    const afterPeriodAgg = await Transaction.aggregate([
+      { $match: { merchantId: merchant._id, createdAt: { $gt: to }, status: { $in: ['completed', 'verified'] } } },
+      {
+        $group: {
+          _id: null,
+          net: {
+            $sum: {
+              $switch: {
+                branches: [
+                  {
+                    case: { $eq: ['$type', 'ncba_inbound'] },
+                    then: {
+                      $subtract: [
+                        { $ifNull: ['$kesAmount', { $ifNull: ['$amount', 0] }] },
+                        { $add: [{ $ifNull: ['$paychainFee', 0] }, { $ifNull: ['$safaricomFee', 0] }] },
+                      ],
+                    },
+                  },
+                  {
+                    case: { $in: ['$type', ['inbound', 'top_up']] },
+                    then: { $ifNull: ['$kesAmount', { $ifNull: ['$amount', 0] }] },
+                  },
+                  {
+                    case: { $eq: ['$type', 'fx_swap'] },
+                    then: { $multiply: [-1, { $ifNull: ['$kesAmount', 0] }] },
+                  },
+                  {
+                    case: { $in: ['$type', ['ncba_outbound', 'ncba_mobile_b2w', 'ncba_lipa_na_mpesa', 'ncba_kplc', 'ncba_kplc_prepaid', 'ncba_ncwsc', 'mpesa_b2c', 'mpesa_b2b']] },
+                    then: {
+                      $multiply: [-1, {
+                        $add: [
+                          { $ifNull: ['$kesAmount', { $ifNull: ['$amount', 0] }] },
+                          { $add: [{ $ifNull: ['$paychainFee', 0] }, { $ifNull: ['$safaricomFee', 0] }] },
+                        ],
+                      }],
+                    },
+                  },
+                ],
+                default: { $multiply: [-1, { $ifNull: ['$kesAmount', { $ifNull: ['$amount', 0] }] }] },
+              },
+            },
+          },
+        },
+      },
+    ]);
+    const netChangeAfterPeriod = afterPeriodAgg[0]?.net || 0;
+
+    res.json({
+      success: true,
+      merchant: {
+        _id: merchant._id,
+        name: merchant.name,
+        email: merchant.email,
+        phone: merchant.phone,
+        businessName: merchant.businessName,
+        createdAt: merchant.createdAt,
+        kesBalance: merchant.kesBalance,
+        usdcBalance: merchant.usdcBalance,
+        ncbaMerchantCode: merchant.ncbaMerchantCode,
+        ncbaVirtualAccountNumber: getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode),
+      },
+      range: { from, to },
+      netChangeAfterPeriod,
+      transactions,
+    });
+  } catch (error) {
+    console.error('Get Merchant Statement Data Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };
