@@ -33,7 +33,7 @@ export const formatters: Record<FieldKind, (raw: string) => string> = {
   phoneKE: (raw) => raw.replace(/\D/g, '').slice(0, 12),
   // KRA PIN: A123456789Z — letter + 9 digits + letter, 11 chars, uppercase.
   kraPin: (raw) => raw.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 11),
-  // National ID: 7-8 digits.
+  // National ID: 6-8 digits.
   nationalId: (raw) => raw.replace(/\D/g, '').slice(0, 8),
   // M-Pesa Paybill: 5-7 digits.
   paybill: (raw) => raw.replace(/\D/g, '').slice(0, 7),
@@ -100,6 +100,31 @@ export const isValidKraPin = (raw: string): boolean => {
   return isPlausibleKraPinDigits(match[2]);
 };
 
+// Mirrors backend/utils/nationalIdValidator.js exactly — same shape check
+// (6-8 digits, historically 7-8 with a shrinking number of older 6-digit
+// IDs) plus the same obviously-fake-pattern rejection (all digits
+// identical, or a strictly ascending/descending run). Keep both in sync if
+// either changes: this only saves a merchant a round trip to the server,
+// the backend validator is still the actual source of truth.
+const NATIONAL_ID_SHAPE_REGEX = /^\d{6,8}$/;
+
+const isPlausibleNationalIdDigits = (digits: string): boolean => {
+  const d = digits.split('').map(Number);
+  if (d.every((n) => n === d[0])) return false;
+  let ascending = true, descending = true;
+  for (let i = 1; i < d.length; i++) {
+    if (d[i] !== d[i - 1] + 1) ascending = false;
+    if (d[i] !== d[i - 1] - 1) descending = false;
+  }
+  return !ascending && !descending;
+};
+
+export const isValidNationalId = (raw: string): boolean => {
+  const v = String(raw ?? '');
+  if (!NATIONAL_ID_SHAPE_REGEX.test(v)) return false;
+  return isPlausibleNationalIdDigits(v);
+};
+
 // ─── Validators ──────────────────────────────────────────────────────────────
 const VALID: ValidationResult = { valid: true };
 
@@ -119,7 +144,7 @@ export const validators: Record<FieldKind, (v: string) => ValidationResult> = {
   },
   nationalId: (v) => {
     if (!v) return { valid: false, error: 'National ID is required.' };
-    if (!/^\d{7,9}$/.test(v)) return { valid: false, error: 'ID must be 7 to 9 digits.' };
+    if (!isValidNationalId(v)) return { valid: false, error: 'Enter a valid 6-8 digit Kenyan National ID number, e.g. 12345678.' };
     return VALID;
   },
   paybill: (v) => {

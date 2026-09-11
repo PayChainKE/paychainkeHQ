@@ -40,7 +40,8 @@ import {
   completeProfileWalkthrough,
   completeTransactionsWalkthrough,
   getSignupLocations,
-  searchSignupPlaces
+  searchSignupPlaces,
+  getMerchantKycStatus
 } from '../controllers/merchantAuthController.js';
 import { protectMerchant, protectMerchantSSE, protectDeveloper } from '../middleware/authMiddleware.js';
 import { registerMerchantEventClient } from '../utils/merchantEventStream.js';
@@ -243,6 +244,7 @@ router.post('/merchant/sign-out-all-devices', protectMerchant, signOutAllDevices
 // local token clear that leaves the JWT valid until its 30-day expiry.
 router.post('/merchant/logout', protectMerchant, signOutAllDevices);
 router.get('/merchant/me', protectMerchant, getMerchantMe);
+router.get('/merchant/kyc-status', protectMerchant, getMerchantKycStatus);
 
 // Live dashboard updates (Server-Sent Events) — mirrors the admin
 // dashboard's identical stream (routes/adminRoutes.js#/events/stream). The

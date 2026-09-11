@@ -8,16 +8,9 @@ import { useBiometrics } from '../hooks/useBiometrics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ValidatedTextInput } from '../components/ValidatedTextInput';
 import { validators } from '../utils/validators';
-
-// Mirrors the backend's canonical list (merchantAuthController.js's
-// CERTIFICATE_DOCUMENT_TYPES) and apps/merchant-dashboard/src/pages/Login.jsx's
-// picker — keep all three in sync if this ever changes.
-const CERTIFICATE_DOCUMENT_TYPES = [
-  { value: 'certificate_of_registration', label: 'Certificate of Registration' },
-  { value: 'business_permit', label: 'Business Permit' },
-  { value: 'license', label: 'License' },
-  { value: 'other', label: 'Other Business Document' },
-];
+import { KENYA_COUNTY_AREAS } from '../utils/kenyaCountyAreas';
+import { fetchSignupWards, searchSignupPlaces, StreetSearchResult } from '../utils/kenyaLocations';
+import { KYB_REQUIREMENTS_BY_BUSINESS_TYPE, KYB_DOC_LABELS, isDocSelected, resolveDocTypes } from '../utils/kybRequirements';
 
 const KENYAN_COUNTIES = [
   "Baringo", "Bomet", "Bungoma", "Busia", "Elgeyo-Marakwet", "Embu", "Garissa", 
@@ -56,6 +49,7 @@ export default function Login({ route }: any) {
 
   // Signup Flow States
   const [signupName, setSignupName] = useState('');
+  const [signupNationalId, setSignupNationalId] = useState('');
   const [signupEmail, setSignupEmail] = useState('');
   const [signupPhone, setSignupPhone] = useState('');
   const [signupBusinessName, setSignupBusinessName] = useState('');
@@ -63,12 +57,26 @@ export default function Login({ route }: any) {
   const [signupCounty, setSignupCounty] = useState('');
   const [countySearch, setCountySearch] = useState('');
   const [businessType, setBusinessType] = useState('');
-  const [area, setArea] = useState('');
+  const [signupArea, setSignupArea] = useState('');
+  const [areaSearch, setAreaSearch] = useState('');
+  const [countyWards, setCountyWards] = useState<Record<string, Record<string, string[]>>>({});
+  const [signupWard, setSignupWard] = useState('');
+  const [wardSearch, setWardSearch] = useState('');
+  const [signupStreet, setSignupStreet] = useState('');
+  const [streetResults, setStreetResults] = useState<StreetSearchResult[]>([]);
+  const [streetSearching, setStreetSearching] = useState(false);
+  const [streetResultsOpen, setStreetResultsOpen] = useState(false);
   const [employees, setEmployees] = useState('');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
-  const [certDocType, setCertDocType] = useState('');
-  const [certFile, setCertFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
-  const [certError, setCertError] = useState('');
+  // signupDocType: which option was picked, 'choice'-mode business types
+  // only (e.g. Sole Proprietorship choosing National ID vs Business
+  // Permit/License) or the extra choiceAlso slot (LLC) — irrelevant for a
+  // fixed 'all'-mode slot. signupDocs/docErrors are keyed by doc type so
+  // every slot, whether one or several, shares the same file-handling code.
+  const [signupDocType, setSignupDocType] = useState('');
+  const [docTypeModalOptions, setDocTypeModalOptions] = useState<string[]>([]);
+  const [signupDocs, setSignupDocs] = useState<Record<string, DocumentPicker.DocumentPickerAsset | null>>({});
+  const [docErrors, setDocErrors] = useState<Record<string, string>>({});
   const [showDocTypeModal, setShowDocTypeModal] = useState(false);
   // Flipped true the first time Continue is pressed with an invalid field —
   // forces every ValidatedTextInput on this step to show its own inline
@@ -79,6 +87,8 @@ export default function Login({ route }: any) {
 
   // Modals for Selection
   const [showCountyModal, setShowCountyModal] = useState(false);
+  const [showAreaModal, setShowAreaModal] = useState(false);
+  const [showWardModal, setShowWardModal] = useState(false);
   const [showBusinessModal, setShowBusinessModal] = useState(false);
   const [showEmployeesModal, setShowEmployeesModal] = useState(false);
 
@@ -131,6 +141,34 @@ export default function Login({ route }: any) {
       return () => clearInterval(interval);
     }
   }, [isOTPMode, resendTimer]);
+
+  // Ward taxonomy for the (optional) ward picker below Area — fetched once
+  // rather than duplicated as another multi-hundred-entry literal (see
+  // kenyaLocations.ts). Non-critical: a failure just means the ward step
+  // never appears — county/area picking still works fully offline of this.
+  useEffect(() => {
+    fetchSignupWards().then(setCountyWards);
+  }, []);
+
+  // Optional street/estate/landmark search — live suggestions from the
+  // public Nominatim proxy, biased toward the county already picked above.
+  // Debounced so normal typing stays well under that endpoint's rate limit.
+  useEffect(() => {
+    const q = signupStreet.trim();
+    if (q.length < 3) {
+      setStreetResults([]);
+      setStreetSearching(false);
+      return;
+    }
+    setStreetSearching(true);
+    const timer = setTimeout(async () => {
+      const results = await searchSignupPlaces(q, signupCounty);
+      setStreetResults(results);
+      setStreetResultsOpen(true);
+      setStreetSearching(false);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [signupStreet, signupCounty]);
 
   const handleLogin = async () => {
     if (!phone || !password) {
@@ -239,8 +277,15 @@ export default function Login({ route }: any) {
     }
   };
 
-  const pickCertificate = async () => {
-    setCertError('');
+  // Shared picker for every KYB document slot — one per doc type
+  // (business_registration, national_id, kra_pin, etc.), keyed the same
+  // way signupDocs/docErrors are. Blur detection is deliberately not done
+  // here (no canvas API in React Native) — the backend independently
+  // re-checks sharpness on every upload and is the real enforcement gate
+  // even on web; a blurry photo surfaces as a server error after submit,
+  // prompting retake.
+  const pickDoc = async (type: string) => {
+    setDocErrors(prev => ({ ...prev, [type]: '' }));
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: ['image/*', 'application/pdf'],
@@ -249,12 +294,12 @@ export default function Login({ route }: any) {
       if (result.canceled || !result.assets?.[0]) return;
       const asset = result.assets[0];
       if (asset.size && asset.size > 10 * 1024 * 1024) {
-        setCertError('File is too large — the limit is 10MB.');
+        setDocErrors(prev => ({ ...prev, [type]: 'File is too large — the limit is 10MB.' }));
         return;
       }
-      setCertFile(asset);
+      setSignupDocs(prev => ({ ...prev, [type]: asset }));
     } catch {
-      setCertError('Could not open the file picker. Please try again.');
+      setDocErrors(prev => ({ ...prev, [type]: 'Could not open the file picker. Please try again.' }));
     }
   };
 
@@ -271,6 +316,10 @@ export default function Login({ route }: any) {
 
     if (!validators.personName(signupName).valid) {
       setErr('Please enter a valid name before continuing.');
+      return;
+    }
+    if (!validators.nationalId(signupNationalId).valid) {
+      setErr('Please enter a valid National ID number before continuing.');
       return;
     }
     if (!validators.email(signupEmail).valid) {
@@ -293,8 +342,8 @@ export default function Login({ route }: any) {
       setErr('Please select your county.');
       return;
     }
-    if (!area.trim()) {
-      setErr('Please enter your area/location.');
+    if (!signupArea) {
+      setErr('Please select your area/location.');
       return;
     }
     if (!employees) {
@@ -305,13 +354,35 @@ export default function Login({ route }: any) {
       setErr('Please let us know whether this is an eCommerce business.');
       return;
     }
-    if (!certDocType) {
-      setErr('Select which registration document you are uploading.');
-      return;
-    }
-    if (!certFile) {
-      setErr(certError || 'Upload your Certificate of Registration, Business Permit, or License to continue.');
-      return;
+    {
+      const requirement = KYB_REQUIREMENTS_BY_BUSINESS_TYPE[businessType];
+      if (requirement?.mode === 'choice') {
+        if (!signupDocType) {
+          setErr('Select which document you are uploading.');
+          return;
+        }
+        if (!isDocSelected(signupDocType, signupDocs)) {
+          setErr(docErrors[signupDocType] || 'Upload your document to continue.');
+          return;
+        }
+      } else if (requirement?.mode === 'all') {
+        for (const type of requirement.required) {
+          if (!isDocSelected(type, signupDocs)) {
+            setErr(docErrors[type] || `Upload your ${KYB_DOC_LABELS[type]} to continue.`);
+            return;
+          }
+        }
+        if (requirement.choiceAlso) {
+          if (!signupDocType) {
+            setErr('Select which document you are uploading.');
+            return;
+          }
+          if (!isDocSelected(signupDocType, signupDocs)) {
+            setErr(docErrors[signupDocType] || 'Upload your document to continue.');
+            return;
+          }
+        }
+      }
     }
     setErr('');
     setSignupStepTouched(false);
@@ -330,6 +401,7 @@ export default function Login({ route }: any) {
 
     const payload = new FormData();
     payload.append('name', signupName);
+    payload.append('nationalId', signupNationalId.trim());
     payload.append('email', signupEmail);
     payload.append('phone', signupPhone);
     payload.append('businessName', signupBusinessName);
@@ -337,16 +409,26 @@ export default function Login({ route }: any) {
     payload.append('ecommerce', signupEcommerce);
     payload.append('businessType', businessType);
     payload.append('county', signupCounty);
-    payload.append('area', area);
+    payload.append('area', signupArea);
+    if (signupWard.trim()) payload.append('ward', signupWard.trim());
+    if (signupStreet.trim()) payload.append('street', signupStreet.trim());
     payload.append('employees', employees);
     payload.append('agreedToTerms', String(agreedToTerms));
-    payload.append('documentType', certDocType);
-    if (certFile) {
-      payload.append('certificate', {
-        uri: certFile.uri,
-        name: certFile.name || 'certificate.jpg',
-        type: certFile.mimeType || 'image/jpeg',
-      } as any);
+    {
+      const requirement = KYB_REQUIREMENTS_BY_BUSINESS_TYPE[businessType];
+      const types = requirement?.mode === 'choice' ? [signupDocType]
+        : requirement?.choiceAlso ? [...requirement.required, signupDocType]
+        : (requirement?.required || []);
+      for (const type of types.flatMap(t => resolveDocTypes(t, signupDocs))) {
+        const file = signupDocs[type];
+        if (file) {
+          payload.append(`doc_${type}`, {
+            uri: file.uri,
+            name: file.name || `${type}.jpg`,
+            type: file.mimeType || 'image/jpeg',
+          } as any);
+        }
+      }
     }
 
     setLoading(true);
@@ -403,6 +485,41 @@ export default function Login({ route }: any) {
       </Text>
     </View>
   );
+
+  // One upload box per required document type — reused for a 'choice'-mode
+  // business type's single selected slot, every fixed slot of an 'all'-mode
+  // one, and the LLC-only choiceAlso slot. No camera capture yet (see
+  // kybRequirements.ts's doc comment) — every slot, National ID included,
+  // uses the same generic file/gallery picker.
+  const renderDocBox = (type: string) => {
+    const file = signupDocs[type];
+    const error = docErrors[type];
+    return (
+      <View key={type} className="mb-3">
+        <TouchableOpacity
+          onPress={() => pickDoc(type)}
+          className={`w-full border-2 border-dashed rounded-2xl px-4 py-4 flex-row items-center ${
+            error ? 'border-red-300 bg-red-50' : file ? 'border-emerald-400 bg-[#ecfdf5]' : 'border-[#d1d5db] bg-[#f9fafb]'
+          }`}
+        >
+          {file && file.mimeType?.startsWith('image/') ? (
+            <Image source={{ uri: file.uri }} style={{ width: 48, height: 48, borderRadius: 10 }} />
+          ) : (
+            <Feather name={file ? 'file-text' : 'upload'} size={22} color={file ? '#047857' : '#9ca3af'} />
+          )}
+          <View className="ml-3 flex-1 min-w-0">
+            <Text className="text-[13px] font-jakarta-bold text-[#0c2010]" numberOfLines={1} ellipsizeMode="middle">
+              {file ? (file.name || 'Document selected') : KYB_DOC_LABELS[type] || 'Choose a file'}
+            </Text>
+            <Text className="text-[10px] font-jakarta-bold text-[#9ca3af] mt-0.5">JPG, PNG or PDF, up to 10MB. Must be clear and in focus.</Text>
+          </View>
+        </TouchableOpacity>
+        {error ? (
+          <Text className="text-red-500 text-[11px] font-jakarta-bold mt-1.5">{error}</Text>
+        ) : null}
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-[#0b2114]" edges={['top', 'left', 'right']}>
@@ -587,6 +704,11 @@ export default function Login({ route }: any) {
                       className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-bold text-[#0c2010]" />
                   </View>
                   <View>
+                    <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">National ID Number *</Text>
+                    <ValidatedTextInput kind="nationalId" value={signupNationalId} onChangeText={setSignupNationalId} placeholder="12345678" forceTouched={signupStepTouched}
+                      className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-bold text-[#0c2010]" />
+                  </View>
+                  <View>
                     <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Your Email *</Text>
                     <ValidatedTextInput kind="email" value={signupEmail} onChangeText={setSignupEmail} placeholder="john@example.com" forceTouched={signupStepTouched}
                       className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-bold text-[#0c2010]" />
@@ -617,8 +739,54 @@ export default function Login({ route }: any) {
                   </View>
                   <View>
                     <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Area/Location *</Text>
-                    <ValidatedTextInput kind="personName" value={area} onChangeText={setArea} placeholder="Westlands"
-                      className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-bold text-[#0c2010]" />
+                    <TouchableOpacity
+                      disabled={!signupCounty}
+                      onPress={() => setShowAreaModal(true)}
+                      className={`w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 flex-row justify-between items-center ${!signupCounty ? 'opacity-50' : ''}`}
+                    >
+                      <Text className={`text-[14px] font-jakarta-bold flex-1 min-w-0 pr-2 ${signupArea ? 'text-[#0c2010]' : 'text-[#9ca3af]'}`} numberOfLines={1} ellipsizeMode="tail">
+                        {signupArea || (signupCounty ? `Search areas in ${signupCounty}...` : 'Select a county first')}
+                      </Text>
+                      <Feather name="search" size={16} color="#9ca3af" style={{ flexShrink: 0 }} />
+                    </TouchableOpacity>
+                  </View>
+                  {signupArea && (countyWards[signupCounty]?.[signupArea]?.length || 0) > 0 && (
+                    <View>
+                      <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Ward (optional)</Text>
+                      <TouchableOpacity onPress={() => setShowWardModal(true)} className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 flex-row justify-between items-center">
+                        <Text className={`text-[14px] font-jakarta-bold flex-1 min-w-0 pr-2 ${signupWard ? 'text-[#0c2010]' : 'text-[#9ca3af]'}`} numberOfLines={1} ellipsizeMode="tail">
+                          {signupWard || `Search wards in ${signupArea}...`}
+                        </Text>
+                        <Feather name="search" size={16} color="#9ca3af" style={{ flexShrink: 0 }} />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                  <View>
+                    <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Street / Estate / Landmark (optional)</Text>
+                    <TextInput
+                      value={signupStreet}
+                      onChangeText={setSignupStreet}
+                      onFocus={() => streetResults.length > 0 && setStreetResultsOpen(true)}
+                      onBlur={() => setTimeout(() => setStreetResultsOpen(false), 150)}
+                      placeholder={signupCounty ? `Type your street/estate/landmark, or search ${signupCounty}...` : 'Type your street/estate/landmark...'}
+                      placeholderTextColor="#9ca3af"
+                      className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-bold text-[#0c2010]"
+                    />
+                    {streetResultsOpen && streetResults.length > 0 && (
+                      <View className="mt-1 bg-white rounded-2xl border border-[#e5e7eb] max-h-48">
+                        <ScrollView keyboardShouldPersistTaps="handled">
+                          {streetResults.map(r => (
+                            <TouchableOpacity
+                              key={r.place_id}
+                              onPress={() => { setSignupStreet(r.display_name.split(',').slice(0, 2).join(',').trim()); setStreetResultsOpen(false); setStreetResults([]); }}
+                              className="px-3 py-2.5 border-b border-[#e5e7eb]"
+                            >
+                              <Text className="text-[12px] font-jakarta-bold text-[#0c2010]" numberOfLines={1}>{r.display_name}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </ScrollView>
+                      </View>
+                    )}
                   </View>
                   <View>
                     <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Employees *</Text>
@@ -638,40 +806,57 @@ export default function Login({ route }: any) {
                       </TouchableOpacity>
                     </View>
                   </View>
-                  <View className="pt-2 border-t border-[#e5e7eb] mt-2">
-                    <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Business Verification Document *</Text>
-                    <Text className="text-[#5b645c] text-[11px] font-jakarta-bold mb-3 opacity-70">
-                      Upload your Certificate of Registration, Business Permit, or License. Required to create an account.
-                    </Text>
-                    <TouchableOpacity onPress={() => setShowDocTypeModal(true)} className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 flex-row justify-between items-center mb-3">
-                      <Text className={`text-[14px] font-jakarta-bold flex-1 min-w-0 pr-2 ${certDocType ? 'text-[#0c2010]' : 'text-[#9ca3af]'}`} numberOfLines={1} ellipsizeMode="tail">
-                        {CERTIFICATE_DOCUMENT_TYPES.find(t => t.value === certDocType)?.label || '—Which document is this?—'}
-                      </Text>
-                      <Feather name="chevron-down" size={16} color="#9ca3af" style={{ flexShrink: 0 }} />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      onPress={pickCertificate}
-                      className={`w-full border-2 border-dashed rounded-2xl px-4 py-4 flex-row items-center ${
-                        certError ? 'border-red-300 bg-red-50' : certFile ? 'border-emerald-400 bg-[#ecfdf5]' : 'border-[#d1d5db] bg-[#f9fafb]'
-                      }`}
-                    >
-                      {certFile && certFile.mimeType?.startsWith('image/') ? (
-                        <Image source={{ uri: certFile.uri }} style={{ width: 48, height: 48, borderRadius: 10 }} />
-                      ) : (
-                        <Feather name={certFile ? 'file-text' : 'upload'} size={22} color={certFile ? '#047857' : '#9ca3af'} />
-                      )}
-                      <View className="ml-3 flex-1 min-w-0">
-                        <Text className="text-[13px] font-jakarta-bold text-[#0c2010]" numberOfLines={1} ellipsizeMode="middle">
-                          {certFile ? (certFile.name || 'Document selected') : 'Take a photo or choose a file'}
+                  {(() => {
+                    const requirement = KYB_REQUIREMENTS_BY_BUSINESS_TYPE[businessType];
+                    return (
+                      <View className="pt-2 border-t border-[#e5e7eb] mt-2">
+                        <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">
+                          Business Verification Document{(requirement?.mode === 'all' && (requirement.required.length > 1 || requirement.choiceAlso)) ? 's' : ''} *
                         </Text>
-                        <Text className="text-[10px] font-jakarta-bold text-[#9ca3af] mt-0.5">JPG, PNG or PDF, up to 10MB. Must be clear and in focus.</Text>
+                        <Text className="text-[#5b645c] text-[11px] font-jakarta-bold mb-3 opacity-70">
+                          {!requirement
+                            ? 'Select a business type above to see which document(s) are required.'
+                            : requirement.mode === 'choice'
+                              ? 'Upload one of the documents below. Required to create an account.'
+                              : requirement.choiceAlso
+                                ? `Required for a ${businessType}: ${requirement.required.map(t => KYB_DOC_LABELS[t]).join(', ')}, plus either ${requirement.choiceAlso.map(t => KYB_DOC_LABELS[t]).join(' or ')}.`
+                                : `Required for a ${businessType}: ${requirement.required.map(t => KYB_DOC_LABELS[t]).join(', ')}.`}
+                        </Text>
+
+                        {requirement?.mode === 'choice' && (
+                          <>
+                            <TouchableOpacity
+                              onPress={() => { setDocTypeModalOptions(requirement.options); setShowDocTypeModal(true); }}
+                              className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 flex-row justify-between items-center mb-3"
+                            >
+                              <Text className={`text-[14px] font-jakarta-bold flex-1 min-w-0 pr-2 ${signupDocType ? 'text-[#0c2010]' : 'text-[#9ca3af]'}`} numberOfLines={1} ellipsizeMode="tail">
+                                {KYB_DOC_LABELS[signupDocType] || '—Which document is this?—'}
+                              </Text>
+                              <Feather name="chevron-down" size={16} color="#9ca3af" style={{ flexShrink: 0 }} />
+                            </TouchableOpacity>
+                            {signupDocType && renderDocBox(signupDocType)}
+                          </>
+                        )}
+
+                        {requirement?.mode === 'all' && requirement.required.map(type => renderDocBox(type))}
+
+                        {requirement?.mode === 'all' && requirement.choiceAlso && (
+                          <>
+                            <TouchableOpacity
+                              onPress={() => { setDocTypeModalOptions(requirement.choiceAlso!); setShowDocTypeModal(true); }}
+                              className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 flex-row justify-between items-center mb-3"
+                            >
+                              <Text className={`text-[14px] font-jakarta-bold flex-1 min-w-0 pr-2 ${signupDocType ? 'text-[#0c2010]' : 'text-[#9ca3af]'}`} numberOfLines={1} ellipsizeMode="tail">
+                                {KYB_DOC_LABELS[signupDocType] || "—Also upload: Director's ID or KRA PIN Certificate?—"}
+                              </Text>
+                              <Feather name="chevron-down" size={16} color="#9ca3af" style={{ flexShrink: 0 }} />
+                            </TouchableOpacity>
+                            {signupDocType && renderDocBox(signupDocType)}
+                          </>
+                        )}
                       </View>
-                    </TouchableOpacity>
-                    {certError ? (
-                      <Text className="text-red-500 text-[11px] font-jakarta-bold mt-1.5">{certError}</Text>
-                    ) : null}
-                  </View>
+                    );
+                  })()}
 
                   <TouchableOpacity onPress={handleSignupContinue} className="w-full bg-[#06201b] py-4 rounded-2xl flex-row justify-center items-center mt-4">
                     <Text className="text-white font-jakarta-bold text-[16px]">Submit Application</Text>
@@ -754,11 +939,71 @@ export default function Login({ route }: any) {
               value={countySearch}
               onChangeText={setCountySearch}
             />
-            <FlatList 
+            <FlatList
               data={KENYAN_COUNTIES.filter(c => c.toLowerCase().includes(countySearch.toLowerCase()))}
               keyExtractor={item => item}
               renderItem={({item}) => (
-                <TouchableOpacity className="py-4 border-b border-[#e5e7eb]" onPress={() => { setSignupCounty(item); setShowCountyModal(false); }}>
+                <TouchableOpacity className="py-4 border-b border-[#e5e7eb]" onPress={() => {
+                  if (item !== signupCounty) { setSignupArea(''); setAreaSearch(''); setSignupWard(''); setWardSearch(''); }
+                  setSignupCounty(item);
+                  setShowCountyModal(false);
+                }}>
+                  <Text className="text-[16px] font-jakarta-bold text-[#0c2010]">{item}</Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showAreaModal} animationType="slide" transparent={true}>
+        <View className="flex-1 justify-end bg-black/50">
+          <View className="bg-white rounded-t-3xl h-[70%] p-6">
+            <View className="flex-row justify-between items-center mb-4">
+              <Text className="text-[#0c2010] text-[18px] font-jakarta-bold">Select Area</Text>
+              <TouchableOpacity onPress={() => setShowAreaModal(false)}><Feather name="x" size={24} color="#0c2010" /></TouchableOpacity>
+            </View>
+            <TextInput
+              className="w-full bg-[#f9fafb] border border-[#e5e7eb] rounded-xl py-3 px-4 mb-4 text-[14px] font-jakarta-bold"
+              placeholder={`Search areas in ${signupCounty}...`}
+              value={areaSearch}
+              onChangeText={setAreaSearch}
+            />
+            <FlatList
+              data={(KENYA_COUNTY_AREAS[signupCounty] || []).filter(a => a.toLowerCase().includes(areaSearch.toLowerCase()))}
+              keyExtractor={item => item}
+              renderItem={({item}) => (
+                <TouchableOpacity className="py-4 border-b border-[#e5e7eb]" onPress={() => {
+                  if (item !== signupArea) { setSignupWard(''); setWardSearch(''); }
+                  setSignupArea(item);
+                  setShowAreaModal(false);
+                }}>
+                  <Text className="text-[16px] font-jakarta-bold text-[#0c2010]">{item}</Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showWardModal} animationType="slide" transparent={true}>
+        <View className="flex-1 justify-end bg-black/50">
+          <View className="bg-white rounded-t-3xl h-[70%] p-6">
+            <View className="flex-row justify-between items-center mb-4">
+              <Text className="text-[#0c2010] text-[18px] font-jakarta-bold">Select Ward</Text>
+              <TouchableOpacity onPress={() => setShowWardModal(false)}><Feather name="x" size={24} color="#0c2010" /></TouchableOpacity>
+            </View>
+            <TextInput
+              className="w-full bg-[#f9fafb] border border-[#e5e7eb] rounded-xl py-3 px-4 mb-4 text-[14px] font-jakarta-bold"
+              placeholder={`Search wards in ${signupArea}...`}
+              value={wardSearch}
+              onChangeText={setWardSearch}
+            />
+            <FlatList
+              data={(countyWards[signupCounty]?.[signupArea] || []).filter(w => w.toLowerCase().includes(wardSearch.toLowerCase()))}
+              keyExtractor={item => item}
+              renderItem={({item}) => (
+                <TouchableOpacity className="py-4 border-b border-[#e5e7eb]" onPress={() => { setSignupWard(item); setShowWardModal(false); }}>
                   <Text className="text-[16px] font-jakarta-bold text-[#0c2010]">{item}</Text>
                 </TouchableOpacity>
               )}
@@ -775,7 +1020,11 @@ export default function Login({ route }: any) {
               <TouchableOpacity onPress={() => setShowBusinessModal(false)}><Feather name="x" size={24} color="#0c2010" /></TouchableOpacity>
             </View>
             {['Sole Proprietorship', 'Partnership', 'Limited Liability Company (LLC)', 'Public Limited Company (PLC)', 'SACCO', 'NGO/Non-Profit', 'Cooperative Society', 'Other'].map(type => (
-              <TouchableOpacity key={type} className="py-4 border-b border-[#e5e7eb]" onPress={() => { setBusinessType(type); setShowBusinessModal(false); }}>
+              <TouchableOpacity key={type} className="py-4 border-b border-[#e5e7eb]" onPress={() => {
+                setBusinessType(type);
+                setSignupDocType('');
+                setShowBusinessModal(false);
+              }}>
                 <Text className="text-[16px] font-jakarta-bold text-[#0c2010]">{type}</Text>
               </TouchableOpacity>
             ))}
@@ -790,9 +1039,9 @@ export default function Login({ route }: any) {
               <Text className="text-[#0c2010] text-[18px] font-jakarta-bold">Document Type</Text>
               <TouchableOpacity onPress={() => setShowDocTypeModal(false)}><Feather name="x" size={24} color="#0c2010" /></TouchableOpacity>
             </View>
-            {CERTIFICATE_DOCUMENT_TYPES.map(t => (
-              <TouchableOpacity key={t.value} className="py-4 border-b border-[#e5e7eb]" onPress={() => { setCertDocType(t.value); setShowDocTypeModal(false); }}>
-                <Text className="text-[16px] font-jakarta-bold text-[#0c2010]">{t.label}</Text>
+            {docTypeModalOptions.map(type => (
+              <TouchableOpacity key={type} className="py-4 border-b border-[#e5e7eb]" onPress={() => { setSignupDocType(type); setShowDocTypeModal(false); }}>
+                <Text className="text-[16px] font-jakarta-bold text-[#0c2010]">{KYB_DOC_LABELS[type]}</Text>
               </TouchableOpacity>
             ))}
           </View>

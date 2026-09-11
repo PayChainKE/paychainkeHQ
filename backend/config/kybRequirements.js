@@ -5,8 +5,10 @@
 // so they instead prove identity + trading legitimacy some other way. This
 // exists specifically so someone can't register a PayChain account (and
 // start moving other people's money) on nothing more than a name and an
-// unverifiable claim. Mirrored in
-// apps/merchant-dashboard/src/pages/Login.jsx (web) — keep both in sync.
+// unverifiable claim. Mirrored in apps/merchant-dashboard/src/pages/Login.jsx
+// (web, different naming: mode 'all_plus_choice'/slots/choiceOptions) and
+// apps/mobile-app/src/utils/kybRequirements.ts (mobile, same naming as
+// here) — keep all three in sync.
 //
 // mode: 'choice'  — upload exactly ONE of `options` (self-employed/informal
 //                    businesses have no fixed registration document).
