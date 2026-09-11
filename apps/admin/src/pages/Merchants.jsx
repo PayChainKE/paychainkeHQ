@@ -1232,6 +1232,23 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
   const [statementModalOpen, setStatementModalOpen] = React.useState(false);
   const [auditReportModalOpen, setAuditReportModalOpen] = React.useState(false);
 
+  const [sendingInstallReminder, setSendingInstallReminder] = React.useState(false);
+  const [installReminderStatus, setInstallReminderStatus] = React.useState('');
+  const [installReminderError, setInstallReminderError] = React.useState('');
+  const sendInstallReminder = async () => {
+    setSendingInstallReminder(true);
+    setInstallReminderStatus('');
+    setInstallReminderError('');
+    try {
+      await api.post(`/api/admin/merchants/${m._id}/send-install-reminder`);
+      setInstallReminderStatus('Reminder sent.');
+    } catch (err) {
+      setInstallReminderError(err.response?.data?.error || 'Could not send the reminder.');
+    } finally {
+      setSendingInstallReminder(false);
+    }
+  };
+
   // Built purely from `merchant` — the same detail record already fetched
   // for this drawer — so there's no second round trip and the report can
   // never show numbers that don't match what the admin is looking at. A
@@ -1286,12 +1303,32 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
     const col2 = W / 2 + 4;
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
+    // Business Name/Contact/Email/Phone/Joined/Source are always present
+    // for every merchant regardless of when they signed up, so those stay
+    // fixed. Everything else here is signup data that didn't exist as a
+    // required field until later (National ID, business type, location) —
+    // pilot-era merchants often have none of it, and printing a page of
+    // "—" placeholders for a formal report reads as broken rather than
+    // "not collected at the time." Only fields actually on file are shown,
+    // so the two-column layout stays dense instead of half-empty.
+    const optionalFields = [
+      ['National ID', m.nationalId],
+      ['Business Type', m.businessType],
+      ['County', m.county],
+      ['Area / Sub-County', m.businessArea],
+      ['Ward', m.ward],
+      ['Street', m.street],
+    ].filter(([, v]) => !!v);
+    const optionalLines = [];
+    for (let i = 0; i < optionalFields.length; i += 2) {
+      const [lk, lv] = optionalFields[i];
+      const right = optionalFields[i + 1];
+      optionalLines.push([lk, lv, right ? right[0] : '', right ? right[1] : '']);
+    }
     const acctLines = [
       ['Business Name', m.businessName || '—', 'Contact Name', m.name || '—'],
       ['Email', m.email || '—', 'Phone', m.phone || '—'],
-      ['National ID', m.nationalId || '—', 'Business Type', m.businessType || '—'],
-      ['County', m.county || '—', 'Area / Sub-County', m.businessArea || '—'],
-      ['Ward', m.ward || '—', 'Street', m.street || '—'],
+      ...optionalLines,
       ['Joined', fmtDate(m.createdAt), 'Registration Source', m.registrationSource === 'mobile' ? 'Mobile App' : 'Web Dashboard'],
     ];
     acctLines.forEach(([lk, lv, rk, rv]) => {
@@ -1299,10 +1336,12 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
       doc.text(lk + ':', L, y);
       doc.setTextColor(6, 32, 27); doc.setFont('helvetica', 'bold');
       doc.text(fitText(lv, col2 - (L + 32) - 4), L + 32, y);
-      doc.setTextColor(100, 110, 105); doc.setFont('helvetica', 'normal');
-      doc.text(rk + ':', col2, y);
-      doc.setTextColor(6, 32, 27); doc.setFont('helvetica', 'bold');
-      doc.text(fitText(rv, R - (col2 + 30)), col2 + 30, y);
+      if (rk) {
+        doc.setTextColor(100, 110, 105); doc.setFont('helvetica', 'normal');
+        doc.text(rk + ':', col2, y);
+        doc.setTextColor(6, 32, 27); doc.setFont('helvetica', 'bold');
+        doc.text(fitText(rv, R - (col2 + 30)), col2 + 30, y);
+      }
       y += 7;
     });
 
@@ -1349,8 +1388,8 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
     };
 
     section('KYB / Verification');
-    row('KRA PIN', m.kraPin ? `${m.kraPin}${m.isKRAVerified || m.kraAdminVerified ? ' (verified)' : ''}` : '—');
-    row('Business Number', m.businessNumber ? `${m.businessNumber}${m.businessNumberAdminVerified ? ' (verified)' : ''}` : '—');
+    if (m.kraPin) row('KRA PIN', `${m.kraPin}${m.isKRAVerified || m.kraAdminVerified ? ' (verified)' : ''}`);
+    if (m.businessNumber) row('Business Number', `${m.businessNumber}${m.businessNumberAdminVerified ? ' (verified)' : ''}`);
     row('Account Verified', m.isVerified ? 'Yes' : 'No');
     row('Risk Signals', m.riskSignals?.length ? m.riskSignals.join(', ') : 'None');
     row('Flagged', m.flagged ? `Yes — ${m.flagReason || 'no reason on file'}` : 'No');
@@ -1366,31 +1405,48 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
     row('KES Volume (30d)', formatKES(m.volume30d));
     row('Lifetime Transaction Count', (m.totalCount ?? 0).toLocaleString());
     row('KES Wallet Balance', formatKES(m.kesBalance));
-    row('USDC Wallet Balance', `${(m.usdcBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDC`);
     y += 3;
 
-    if (m.volumeByType) {
-      section('Lifetime Volume by Type');
-      autoTable(doc, {
-        startY: y,
-        margin: { left: L, right: L },
-        head: [['Type', 'KES Volume']],
-        body: [
-          ['Inbound', formatKES(m.volumeByType.inbound)],
-          ['Outbound', formatKES(m.volumeByType.outbound)],
-          ['Bulk Pay', formatKES(m.volumeByType.bulk_pay)],
-          ['FX Swap', formatKES(m.volumeByType.fx_swap)],
-          ['Settlement', formatKES(m.volumeByType.settlement)],
-        ],
-        styles: { font: 'helvetica', fontSize: 8.5, textColor: [60, 70, 65] },
-        headStyles: { fillColor: [6, 32, 27], textColor: [255, 255, 255], fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: [244, 247, 245] },
-      });
-      y = doc.lastAutoTable.finalY + 10;
-    }
+    // FX Swap deliberately excluded — not a merchant-facing money-in/out
+    // category the way the other four are, so it doesn't belong on a
+    // report meant to summarize real inbound/outbound activity.
+    if (y > 250) { doc.addPage(); y = 20; }
+    section('Lifetime Volume by Type');
+    autoTable(doc, {
+      startY: y,
+      margin: { left: L, right: L },
+      head: [['Type', 'KES Volume']],
+      body: [
+        ['Inbound', formatKES(m.volumeByType?.inbound)],
+        ['Outbound', formatKES(m.volumeByType?.outbound)],
+        ['Bulk Pay', formatKES(m.volumeByType?.bulk_pay)],
+        ['Settlement', formatKES(m.volumeByType?.settlement)],
+      ],
+      styles: { font: 'helvetica', fontSize: 8.5, textColor: [60, 70, 65] },
+      headStyles: { fillColor: [6, 32, 27], textColor: [255, 255, 255], fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [244, 247, 245] },
+    });
+    y = doc.lastAutoTable.finalY + 10;
+
+    // Pilot-phase disclaimer — every merchant outside Nairobi county
+    // (including accounts with no county on file at all, an even stronger
+    // signal of predating the location taxonomy) predates PayChain's
+    // KYC/KYB verification requirements for self-serve signup. Printed in
+    // the footer of every page, not a banner, per instruction — kept
+    // factual/neutral, not alarmist. Wording reviewed and approved by
+    // Brandon before this went into the generator; any further change to
+    // this exact text should go through the same review given it may be
+    // read by a bank, regulator, or in connection with a fraud case.
+    const showPilotNotice = m.county !== 'Nairobi';
+    const pilotNoticeText = "Pilot Account Notice: This account was registered before PayChain's KYC/KYB verification requirements were implemented for self-serve signups, during internal product testing following completion of PayChain's live payment integrations and ahead of public launch (pending mobile app store approval). Information shown reflects what was collected at signup.";
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(6.5);
+    const pilotNoticeLines = showPilotNotice ? doc.splitTextToSize(pilotNoticeText, R - L) : [];
+    const noticeLineH = 3;
+    const footerReserve = 18 + (showPilotNotice ? pilotNoticeLines.length * noticeLineH + 2 : 0);
 
     // ── CERTIFICATION STRIP ─────────────────────────────────────────────
-    if (y > H - 30) { doc.addPage(); y = 20; }
+    if (y > H - footerReserve - 12) { doc.addPage(); y = 20; }
     doc.setFillColor(6, 32, 27);
     doc.rect(L, y, R - L, 12, 'F');
     doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(94, 254, 179);
@@ -1402,12 +1458,25 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
     const totalPages = doc.internal.getNumberOfPages();
     for (let p = 1; p <= totalPages; p++) {
       doc.setPage(p);
-      const footerY = H - 14;
+      const copyrightY = H - 9;
+      const generatedByY = copyrightY - 5;
+      let dividerY = generatedByY - 4;
+
+      if (showPilotNotice) {
+        dividerY = generatedByY - 4 - (pilotNoticeLines.length * noticeLineH) - 2;
+        doc.setFont('helvetica', 'italic'); doc.setFontSize(6.5); doc.setTextColor(140, 150, 145);
+        let ny = dividerY + 4;
+        pilotNoticeLines.forEach((line) => {
+          doc.text(line, W / 2, ny, { align: 'center' });
+          ny += noticeLineH;
+        });
+      }
+
       doc.setDrawColor(200, 210, 205); doc.setLineWidth(0.3);
-      doc.line(L, footerY - 4, R, footerY - 4);
+      doc.line(L, dividerY, R, dividerY);
       doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(140, 150, 145);
-      doc.text('Generated by PayChain Admin — internal use only, not for distribution to the merchant.', W / 2, footerY, { align: 'center' });
-      doc.text(`© ${now.getFullYear()} Paychain Ltd  •  Ref: ${reportId}  •  Page ${p} of ${totalPages}`, W / 2, footerY + 5, { align: 'center' });
+      doc.text('Generated by PayChain Admin — internal use only, not for distribution to the merchant.', W / 2, generatedByY, { align: 'center' });
+      doc.text(`© ${now.getFullYear()} Paychain Ltd  •  Ref: ${reportId}  •  Page ${p} of ${totalPages}`, W / 2, copyrightY, { align: 'center' });
     }
 
     doc.save(`PayChain_Merchant_Report_${(m.businessName || m._id).toString().replace(/[^a-z0-9]+/gi, '-').toLowerCase()}_${now.toISOString().slice(0, 10)}.pdf`);
@@ -1824,6 +1893,59 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
                   {m.lockedBy?.email && <Row label="Locked By" value={m.lockedBy.email} />}
                 </>
               )}
+            </Section>
+
+            {/* Platform & App Usage — installed-at-a-glance is different
+                from used-at-all: pwaInstalledAt only means "added to home
+                screen" and never reads back to false, while platformUsage
+                (derived from AuditLog.platform) reflects real, ongoing
+                request activity from either app. A merchant can show one,
+                both, or neither. */}
+            <Section title="Platform & App Usage" icon="devices">
+              <Row
+                label="Web App (PWA)"
+                value={
+                  <div className="flex flex-col gap-1.5 w-full">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {m.pwaInstalledAt
+                        ? <Badge tone="emerald" icon="check_circle">Installed {fmtDate(m.pwaInstalledAt)}</Badge>
+                        : <Badge tone="gray" icon="remove">Not installed</Badge>}
+                      {!m.pwaInstalledAt && (
+                        <button
+                          onClick={sendInstallReminder}
+                          disabled={sendingInstallReminder || !m.phone}
+                          title={!m.phone ? 'No phone number on file' : undefined}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-outline-variant/30 text-on-surface-variant hover:bg-surface-container-low text-[11px] font-bold uppercase tracking-widest transition-all disabled:opacity-50"
+                        >
+                          <span className="material-symbols-outlined text-[14px]">{sendingInstallReminder ? 'hourglass_empty' : 'sms'}</span>
+                          {sendingInstallReminder ? 'Sending…' : 'Send Install Reminder'}
+                        </button>
+                      )}
+                    </div>
+                    {!m.pwaInstalledAt && m.pwaInstallReminderSentAt && (
+                      <p className="text-[11px] text-on-surface-variant/50">Last reminder sent {fmtDate(m.pwaInstallReminderSentAt)}</p>
+                    )}
+                    {installReminderStatus && <p className="text-[11px] text-emerald-600 font-medium">{installReminderStatus}</p>}
+                    {installReminderError && <p className="text-[11px] text-red-600 font-medium">{installReminderError}</p>}
+                  </div>
+                }
+              />
+              <Row
+                label="Mobile App"
+                value={
+                  m.platformUsage?.mobile
+                    ? <Badge tone="emerald" icon="check_circle">Used — last seen {fmtDate(m.platformUsage.mobile.lastSeen)}</Badge>
+                    : <Badge tone="gray" icon="remove">Not used</Badge>
+                }
+              />
+              <Row
+                label="Web Dashboard"
+                value={
+                  m.platformUsage?.web
+                    ? <Badge tone="emerald" icon="check_circle">Used — last seen {fmtDate(m.platformUsage.web.lastSeen)}</Badge>
+                    : <Badge tone="gray" icon="remove">Not used</Badge>
+                }
+              />
             </Section>
 
             {/* Settlement */}
