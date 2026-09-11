@@ -1,5 +1,7 @@
 import mongoose from 'mongoose';
 import EmailLog from '../models/EmailLog.js';
+import { logAudit } from '../utils/auditLog.js';
+import { adminActor } from './adminController.js';
 
 // Human-readable labels for the `type` values written by utils/emailLog.js —
 // kept here (not in the model) since this is presentation, not data shape.
@@ -86,6 +88,36 @@ export const getEmailLogDetail = async (req, res) => {
     res.json({ success: true, data: row });
   } catch (error) {
     console.error('Get Email Log Detail Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Clear email log entries — either every record, or a specific set
+//          of ids (matches the "select rows, delete selected" pattern used
+//          by the SMS broadcast history). Only removes the log record; it
+//          cannot un-send an email that already went out.
+// @route   POST /api/admin/email-log/clear
+// @access  Private (Admin — owner/admin only, see routes)
+export const clearEmailLogs = async (req, res) => {
+  try {
+    const { ids } = req.body || {};
+    const clearingAll = !Array.isArray(ids) || ids.length === 0;
+
+    const filter = clearingAll ? {} : { _id: { $in: ids.filter((id) => mongoose.Types.ObjectId.isValid(id)) } };
+    const result = await EmailLog.deleteMany(filter);
+
+    logAudit({
+      action: 'admin.email_log.cleared', category: 'admin', severity: 'warning',
+      message: clearingAll
+        ? `Cleared entire email log (${result.deletedCount} entries)`
+        : `Deleted ${result.deletedCount} selected email log entries`,
+      actor: adminActor(req.admin), req,
+      metadata: { deletedCount: result.deletedCount, clearingAll },
+    });
+
+    res.json({ success: true, message: `Removed ${result.deletedCount} entr${result.deletedCount === 1 ? 'y' : 'ies'}.`, deletedCount: result.deletedCount });
+  } catch (error) {
+    console.error('Clear Email Logs Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };
