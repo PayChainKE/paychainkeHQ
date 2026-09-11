@@ -31,6 +31,11 @@ export default function EmailLog() {
 
   const [detail, setDetail] = useState(null); // { loading, error, data } | null
 
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [clearState, setClearState] = useState(null); // { mode: 'selected'|'all', busy, error } | null
+  const [toast, setToast] = useState('');
+  const showToast = useCallback((msg) => { setToast(msg); setTimeout(() => setToast(''), 3000); }, []);
+
   const fetchLogs = useCallback(async (p = 1) => {
     setLoading(true);
     setError('');
@@ -52,8 +57,34 @@ export default function EmailLog() {
   }, [search, type, status]);
 
   useEffect(() => { fetchLogs(1); }, [fetchLogs]);
+  useEffect(() => { setSelectedIds(new Set()); }, [rows]);
 
   const typeOptions = useMemo(() => Object.entries(types), [types]);
+
+  const toggleSelected = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+  const toggleAllSelected = () => {
+    setSelectedIds((prev) => (prev.size === rows.length ? new Set() : new Set(rows.map((r) => r._id))));
+  };
+
+  async function confirmClear() {
+    if (!clearState) return;
+    setClearState((s) => ({ ...s, busy: true, error: '' }));
+    try {
+      const res = await api.post('/api/admin/email-log/clear', clearState.mode === 'selected' ? { ids: Array.from(selectedIds) } : {});
+      showToast(res.data?.message || 'Removed.');
+      setSelectedIds(new Set());
+      setClearState(null);
+      fetchLogs(1);
+    } catch (e) {
+      setClearState((s) => ({ ...s, busy: false, error: e?.response?.data?.error || 'Could not clear the email log.' }));
+    }
+  }
 
   async function openDetail(row) {
     setDetail({ loading: true, error: '', data: null });
@@ -81,6 +112,12 @@ export default function EmailLog() {
             </p>
           </div>
         </div>
+
+        {toast && (
+          <div className="fixed top-6 right-6 z-50 bg-primary text-white text-xs font-bold px-4 py-3 rounded-xl shadow-xl animate-in fade-in slide-in-from-top-2">
+            {toast}
+          </div>
+        )}
 
         {/* Filters */}
         <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/20 p-5 shadow-editorial">
@@ -121,6 +158,37 @@ export default function EmailLog() {
 
         {/* Table */}
         <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/20 overflow-hidden shadow-editorial">
+          {!loading && !error && rows.length > 0 && (
+            <div className="px-4 py-2.5 border-b border-outline-variant/10 flex items-center justify-between gap-2 bg-surface-container-low/30">
+              <label className="flex items-center gap-2 text-2xs font-bold text-on-surface-variant/60 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.size > 0 && selectedIds.size === rows.length}
+                  onChange={toggleAllSelected}
+                  className="w-4 h-4 accent-primary"
+                />
+                Select all on this page
+              </label>
+              <div className="flex items-center gap-1.5">
+                {selectedIds.size > 0 && (
+                  <button
+                    onClick={() => setClearState({ mode: 'selected', busy: false, error: '' })}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-2xs font-bold text-red-600 hover:bg-red-50 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-sm">delete</span>
+                    Delete {selectedIds.size}
+                  </button>
+                )}
+                <button
+                  onClick={() => setClearState({ mode: 'all', busy: false, error: '' })}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-2xs font-bold text-on-surface-variant/60 hover:bg-surface-container-low transition-colors"
+                >
+                  <span className="material-symbols-outlined text-sm">delete_sweep</span>
+                  Clear log
+                </button>
+              </div>
+            </div>
+          )}
           {loading ? (
             <div className="p-6 space-y-3">
               {[...Array(6)].map((_, i) => <div key={i} className="h-10 bg-surface-container animate-pulse rounded" />)}
@@ -132,6 +200,7 @@ export default function EmailLog() {
               <table className="w-full text-left border-collapse font-body">
                 <thead>
                   <tr className="bg-surface-container-low/50">
+                    <Th></Th>
                     <Th>Recipient</Th>
                     <Th>Type</Th>
                     <Th>Subject</Th>
@@ -146,6 +215,14 @@ export default function EmailLog() {
                       onClick={() => openDetail(r)}
                       className="hover:bg-secondary-container/5 transition-colors cursor-pointer"
                     >
+                      <td className="px-4 py-3 border-b border-outline-variant/5" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(r._id)}
+                          onChange={() => toggleSelected(r._id)}
+                          className="w-4 h-4 accent-primary"
+                        />
+                      </td>
                       <td className="px-4 py-3 border-b border-outline-variant/5">
                         <p className="font-bold text-on-surface tracking-tight">{r.merchantId?.businessName || r.merchantId?.name || '—'}</p>
                         <p className="text-2xs text-on-surface-variant/50">{r.to}</p>
@@ -173,7 +250,7 @@ export default function EmailLog() {
                   ))}
                   {rows.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="py-12 text-center text-on-surface-variant/40">
+                      <td colSpan={6} className="py-12 text-center text-on-surface-variant/40">
                         No emails match the current filters.
                       </td>
                     </tr>
@@ -227,6 +304,32 @@ export default function EmailLog() {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Clear log confirmation */}
+      {clearState && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <div className="w-14 h-14 rounded-full bg-red-50 text-red-600 flex items-center justify-center mb-4">
+              <span className="material-symbols-outlined text-3xl">delete</span>
+            </div>
+            <h3 className="text-xl font-bold text-on-surface mb-1">
+              {clearState.mode === 'all' ? 'Clear entire email log?' : `Delete ${selectedIds.size} ${selectedIds.size === 1 ? 'entry' : 'entries'}?`}
+            </h3>
+            <p className="text-sm text-on-surface-variant mb-5">
+              {clearState.mode === 'all'
+                ? 'Permanently removes every logged email record. This does not un-send any email already delivered — only the log record.'
+                : 'Permanently removes the selected email log record(s). This does not un-send any email already delivered.'}
+            </p>
+            {clearState.error && <div className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-medium mb-4">{clearState.error}</div>}
+            <div className="flex gap-3">
+              <button onClick={() => setClearState(null)} disabled={clearState.busy} className="flex-1 py-2.5 rounded-lg border border-outline-variant/40 text-on-surface text-sm font-semibold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40">Cancel</button>
+              <button onClick={confirmClear} disabled={clearState.busy} className="flex-1 py-2.5 rounded-lg bg-red-600 text-white text-sm font-semibold uppercase tracking-widest hover:bg-red-700 disabled:opacity-50">
+                {clearState.busy ? 'Removing…' : 'Delete'}
+              </button>
+            </div>
           </div>
         </div>
       )}

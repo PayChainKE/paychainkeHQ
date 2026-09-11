@@ -80,7 +80,7 @@ import { runWalletAudit } from '../controllers/walletAuditController.js';
 import { adminListInvoices } from '../controllers/invoiceController.js';
 import { sendSmsBroadcast, getSmsBroadcasts, deleteSmsBroadcast, clearSmsBroadcasts } from '../controllers/smsBroadcastController.js';
 import { getDormantMerchants, sendDormantReminders } from '../controllers/dormantAccountsController.js';
-import { getEmailLogs, getEmailLogDetail } from '../controllers/emailLogController.js';
+import { getEmailLogs, getEmailLogDetail, clearEmailLogs } from '../controllers/emailLogController.js';
 import { getRevenue, getRevenueSweeps, archiveRevenueSweep, unarchiveRevenueSweep, exportRevenueSweeps, triggerRevenueSweep, getReconciliations, submitReconciliation, archiveReconciliation, unarchiveReconciliation, bulkArchiveReconciliations, getExpectedPoolBalance, getLivePoolBalance, getPoolAccountStatement, getBankCharges, recordBankCharge, updateBankCharge, archiveBankCharge, writeOffRevenueDeficit, getRevenueTransactions } from '../controllers/revenueController.js';
 import { getApiTransactions, getApiTransactionsSummary } from '../controllers/apiTransactionsController.js';
 import { getTariffs, requestTariffUpdate, confirmTariffUpdate } from '../controllers/tariffController.js';
@@ -343,9 +343,11 @@ router.post('/dormant-accounts/remind', protect, requireMutator, sensitiveAction
 // Durable record of every outbound email PayChain has sent a merchant (KYC
 // review outcomes, welcome, security alerts, receipts, dormancy nudges) —
 // see models/EmailLog.js and utils/emailLog.js for what is/isn't logged and
-// why. Read-only surface; nothing here can trigger a new send.
-router.get('/email-log',     protect, excludeOfficer, getEmailLogs);
-router.get('/email-log/:id', protect, excludeOfficer, getEmailLogDetail);
+// why. Nothing here can trigger a new send — clear only removes the log
+// record, it never un-sends an email.
+router.get('/email-log',       protect, excludeOfficer, getEmailLogs);
+router.get('/email-log/:id',   protect, excludeOfficer, getEmailLogDetail);
+router.post('/email-log/clear', protect, requireMutator, sensitiveActionLimiter, clearEmailLogs);
 
 // Live dashboard updates (Server-Sent Events) — the admin frontend opens
 // one long-lived connection per session (see AuthContext.jsx) and gets a
