@@ -6,6 +6,7 @@ import {
   getMerchantBalances,
   exportMerchantBalances,
   getMerchantDetail,
+  getMerchantStatementData,
   getMerchantAnalytics,
   createMerchant,
   requestMerchantAction,
@@ -20,6 +21,7 @@ import {
   updateMerchantKycDocument,
   updateMerchantBusinessName,
   updateMerchantContactName,
+  updateMerchantSignupDetails,
   updateMerchantCertificate,
   downloadMerchantQrCode,
   getMerchantsMap,
@@ -181,12 +183,17 @@ router.patch('/merchants/:id/verification', protect, requireMutator, sensitiveAc
 router.patch('/merchants/:id/kyc-documents', protect, requireMutator, sensitiveActionLimiter, uploadMemory.single('document'), updateMerchantKycDocument);
 router.patch('/merchants/:id/business-name', protect, requireMutator, sensitiveActionLimiter, updateMerchantBusinessName);
 router.patch('/merchants/:id/contact-name', protect, requireMutator, sensitiveActionLimiter, updateMerchantContactName);
+router.patch('/merchants/:id/signup-details', protect, requireMutator, sensitiveActionLimiter, updateMerchantSignupDetails);
 router.patch('/merchants/:id/certificate', protect, requireMutator, sensitiveActionLimiter, upload.single('certificate'), updateMerchantCertificate);
 router.patch('/merchants/:id/location', protect, requireMutator, sensitiveActionLimiter, setMerchantLocation);
 router.delete('/merchants/:id/location', protect, requireMutator, sensitiveActionLimiter, removeMerchantLocation);
 router.get('/merchants/:id/sticker', protect, excludeOfficer, downloadMerchantSticker);
 router.get('/merchants/:id/qr-code', protect, excludeOfficer, downloadMerchantQrCode);
 router.get('/merchants/:id/audit-log', protect, excludeOfficer, getMerchantAuditLog);
+// Full transaction history for one merchant, admin-scoped — backs the
+// "Generate Statement" download in the merchant detail drawer (defaults to
+// since the merchant joined; caller may narrow with ?from=&to=).
+router.get('/merchants/:id/statement', protect, excludeOfficer, getMerchantStatementData);
 
 // Executive insights — aggregated KPIs / GTV / funnel / leaderboards.
 router.get('/insights', protect, excludeOfficer, getInsights);
