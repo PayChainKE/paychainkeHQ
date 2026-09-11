@@ -12,6 +12,7 @@ import Waitlist from '../models/Waitlist.js';
 import Contact from '../models/Contact.js';
 import Communication from '../models/Communication.js';
 import SmsLog from '../models/SmsLog.js';
+import AuditLog from '../models/AuditLog.js';
 import { sendMerchantInvite, sendAdminActionOTP, sendContactDetailsChangedEmail } from '../utils/resend.js';
 import { logAudit } from '../utils/auditLog.js';
 import { recordDeletion } from '../utils/trash.js';
@@ -1593,7 +1594,7 @@ export const getMerchantDetail = async (req, res) => {
 
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const oneDayAgo    = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const [txnCount30d, txnCount24h, lastTxn, recentTransactions, thirtyDayAgg, lifetimeAgg] = await Promise.all([
+    const [txnCount30d, txnCount24h, lastTxn, recentTransactions, thirtyDayAgg, lifetimeAgg, platformUsageAgg] = await Promise.all([
       Transaction.countDocuments({ merchantId: merchant._id, createdAt: { $gte: thirtyDaysAgo } }),
       Transaction.countDocuments({ merchantId: merchant._id, createdAt: { $gte: oneDayAgo } }),
       Transaction.findOne({ merchantId: merchant._id }).sort('-createdAt').select('createdAt amount status type').lean(),
@@ -1617,7 +1618,16 @@ export const getMerchantDetail = async (req, res) => {
           },
         },
       ]),
-      // All-time KES-normalised volume by transaction type
+      // All-time KES-normalised volume by transaction type. `type` isn't
+      // just the 5 literal buckets below — every rail has its own type
+      // string (ncba_inbound, mpesa_b2c, ncba_kplc, ...; see
+      // Transaction.js's full enum), so matching only the bare 'inbound'/
+      // 'outbound' literal missed almost every real NCBA/M-Pesa-rail
+      // transaction and silently reported ~0 for merchants who'd actually
+      // moved real money. Grouped the same way
+      // apps/admin/src/utils/transactionDirection.js classifies credit vs
+      // debit rails, so this and the drawer's own volume figures can't
+      // disagree with each other.
       Transaction.aggregate([
         { $match: { merchantId: merchant._id } },
         {
@@ -1626,17 +1636,35 @@ export const getMerchantDetail = async (req, res) => {
             totalVolume: { $sum: KES_VOL_REAL },
             totalUsdcVolume: { $sum: USDC_VOL_REAL },
             totalCount:  { $sum: 1 },
-            inbound:     { $sum: { $cond: [{ $eq: ['$type', 'inbound']    }, KES_VOL_REAL, 0] } },
-            outbound:    { $sum: { $cond: [{ $eq: ['$type', 'outbound']   }, KES_VOL_REAL, 0] } },
+            inbound:     { $sum: { $cond: [{ $in: ['$type', ['inbound', 'ncba_inbound', 'top_up']] }, KES_VOL_REAL, 0] } },
+            outbound:    { $sum: { $cond: [{ $in: ['$type', ['outbound', 'withdrawal', 'ncba_outbound', 'mpesa_b2c', 'mpesa_b2b', 'ncba_mobile_b2w', 'ncba_lipa_na_mpesa', 'ncba_kplc', 'ncba_kplc_prepaid', 'ncba_ncwsc']] }, KES_VOL_REAL, 0] } },
             bulk_pay:    { $sum: { $cond: [{ $eq: ['$type', 'bulk_pay']   }, KES_VOL_REAL, 0] } },
             fx_swap:     { $sum: { $cond: [{ $eq: ['$type', 'fx_swap']    }, KES_VOL_REAL, 0] } },
             settlement:  { $sum: { $cond: [{ $eq: ['$type', 'settlement'] }, KES_VOL_REAL, 0] } },
           },
         },
       ]),
+      // Which surface(s) this merchant has actually used, not just signed
+      // up through — every request from either app already gets tagged
+      // AuditLog.platform ('web'/'mobile', see utils/auditLog.js#detectPlatform,
+      // which trusts the X-Client-Platform header each app sends, with a
+      // user-agent fallback). Grouping by platform gives a real first/last-
+      // seen per surface for free, no new field or app-side change needed —
+      // distinct from Merchant.pwaInstalledAt below, which only means "added
+      // the web app to the home screen," not "has used it since."
+      AuditLog.aggregate([
+        { $match: { merchantId: merchant._id, platform: { $in: ['web', 'mobile'] } } },
+        { $group: { _id: '$platform', firstSeen: { $min: '$createdAt' }, lastSeen: { $max: '$createdAt' }, count: { $sum: 1 } } },
+      ]),
     ]);
     const t30 = thirtyDayAgg[0] || { volume30d: 0, usdcVolume30d: 0 };
     const lt = lifetimeAgg[0] || { totalVolume: 0, totalUsdcVolume: 0, totalCount: 0, inbound: 0, outbound: 0, bulk_pay: 0, fx_swap: 0, settlement: 0 };
+    const platformUsage = { web: null, mobile: null };
+    for (const row of platformUsageAgg) {
+      if (row._id === 'web' || row._id === 'mobile') {
+        platformUsage[row._id] = { firstSeen: row.firstSeen, lastSeen: row.lastSeen, eventCount: row.count };
+      }
+    }
 
     const lastActivityAt = [merchant.lastLogin, lastTxn?.createdAt]
       .filter(Boolean)
@@ -1736,6 +1764,9 @@ export const getMerchantDetail = async (req, res) => {
         // comment and apps/merchant-dashboard/src/hooks/useInstallPrompt.js.
         pwaInstalledAt: merchant.pwaInstalledAt || null,
         pwaInstallReminderSentAt: merchant.pwaInstallReminderSentAt || null,
+        // Which app(s) this merchant has actually been seen using — see the
+        // platformUsageAgg comment above for how this is derived.
+        platformUsage,
         // Activity
         lastLogin: merchant.lastLogin,
         loginCount: merchant.loginCount,
