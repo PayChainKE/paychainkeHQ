@@ -48,10 +48,17 @@ const BUSINESS_TYPES = [
 ];
 const EMPLOYEE_BANDS = ['1-10', '11-50', '51-200', '201-500', '501+'];
 
-// Legacy single-document flow — apps/mobile-app/src/pages/Login.tsx only,
-// see registerMerchant's own doc comment on the two request shapes it
-// still accepts. The web dashboard now uses per-business-type multi-
-// document requirements instead (kybRequirements.js).
+// Same env var / fallback officerController.js uses to build the public
+// KYC resubmission link — reused by getMerchantKycStatus below so the
+// authenticated-merchant link and the officer-emailed one always point at
+// the same place.
+const MERCHANT_DASHBOARD_URL = process.env.MERCHANT_DASHBOARD_URL || 'https://app.paychain.co.ke';
+
+// Legacy single-document flow — kept only for any not-yet-updated mobile
+// app install still sending the old shape (apps/mobile-app/src/pages/
+// Login.tsx moved to the current per-business-type multi-document flow
+// on 2026-09-11, same as web — see kybRequirements.js). See
+// registerMerchant's own doc comment on the two request shapes it accepts.
 const CERTIFICATE_DOCUMENT_TYPES = ['certificate_of_registration', 'business_permit', 'license', 'other'];
 
 // national_id is the one KYB document type with two valid shapes: a
@@ -136,14 +143,14 @@ export const registerMerchant = async (req, res) => {
       businessType, county, area, ward, street, employees, ecommerce, agreedToTerms, documentType, nationalId,
     } = req.body || {};
 
-    // Two request shapes hit this same endpoint right now: the merchant
-    // dashboard (web) sends the new per-business-type `doc_<type>` fields;
-    // apps/mobile-app still sends the old single `certificate` +
-    // `documentType` pair (not updated yet — held off deliberately during
-    // Google Play review). `legacyCertFile` presence is what tells the two
-    // apart. Remove this branch (and CERTIFICATE_DOCUMENT_TYPES /
-    // certificateUrl / certificateDocumentType below) once the mobile app
-    // is brought up to the same multi-document flow.
+    // Two request shapes can hit this same endpoint: the current
+    // per-business-type `doc_<type>` fields (web, and mobile as of
+    // 2026-09-11), or the legacy single `certificate` + `documentType`
+    // pair — kept only so a merchant on an older, not-yet-updated mobile
+    // app build isn't broken by this change. `legacyCertFile` presence is
+    // what tells the two apart. This branch (and CERTIFICATE_DOCUMENT_TYPES /
+    // certificateUrl / certificateDocumentType below) can be removed once
+    // that old build is no longer in the wild.
     const legacyCertFile = req.files?.certificate?.[0];
     const uploadedDocsByType = {};
     if (!legacyCertFile) {
@@ -228,9 +235,10 @@ export const registerMerchant = async (req, res) => {
       return res.status(400).json({ error: 'You must agree to the Privacy Policy and Terms of Service to create an account.' });
     }
 
-    // The National ID number of the person registering — not yet collected
-    // by the mobile app (see legacyCertFile's own doc comment above), so
-    // only enforced on the new (web) request shape.
+    // The National ID number of the person registering — not collected by
+    // the legacy single-document request shape (see legacyCertFile's own
+    // doc comment above), so only enforced on the current (web + mobile)
+    // request shape.
     if (!legacyCertFile) {
       if (!nationalId || !isValidNationalId(nationalId)) {
         return res.status(400).json({ error: `Enter a valid National ID number. ${NATIONAL_ID_FORMAT_HINT}` });
@@ -1291,6 +1299,57 @@ export const getMerchantMe = async (req, res) => {
     });
   } catch (error) {
     console.error('Get Merchant Me Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Does this merchant currently need to resubmit any KYC documents,
+//          and if so, a fresh link to do it — lets an authenticated
+//          merchant (e.g. the mobile app's "KYC Verification" card, which
+//          previously had no way to check this at all) self-serve instead
+//          of only ever finding out by email. kybStatus is only ever set
+//          on officer-onboarded applications (see requestRevision in
+//          officerController.js) — a self-serve merchant's kybStatus is
+//          undefined, so this correctly always reports
+//          needsResubmission: false for them, not a bug.
+//
+//          A fresh single-use token is minted every time this reports
+//          needsResubmission: true, the same way requestRevision does —
+//          kybResubmitToken only ever stores a hash (select: false), never
+//          the raw value, so there is no previously-issued token to hand
+//          back out; issuing a new one simply supersedes whatever was last
+//          emailed, exactly as if an officer re-triggered the request.
+// @route   GET /api/auth/merchant/kyc-status
+// @access  Private (Merchant)
+export const getMerchantKycStatus = async (req, res) => {
+  try {
+    // Loaded without a restrictive projection (unlike getMerchantMe above)
+    // so the later save() — which sets kybResubmitToken/Expires — is a
+    // plain full-document save, same as requestRevision's own pattern in
+    // officerController.js.
+    const merchant = await Merchant.findById(req.merchant._id);
+    if (!merchant || merchant.kybStatus !== 'requires_revision') {
+      return res.json({ success: true, needsResubmission: false });
+    }
+
+    const flagged = merchant.kybDocuments
+      .filter((d) => d.status === 'rejected')
+      .map((d) => ({ type: d.type, label: KYB_DOC_LABELS[d.type] || d.type, note: d.note || null }));
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    merchant.kybResubmitToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+    merchant.kybResubmitTokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days, matches requestRevision
+    await merchant.save();
+
+    res.json({
+      success: true,
+      needsResubmission: true,
+      businessName: merchant.businessName,
+      flagged,
+      resubmitUrl: `${MERCHANT_DASHBOARD_URL.replace(/\/$/, '')}/kyc-resubmit?token=${rawToken}`,
+    });
+  } catch (error) {
+    console.error('Get Merchant KYC Status Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };

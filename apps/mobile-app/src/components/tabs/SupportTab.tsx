@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, Linking } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, Linking, Alert, ActivityIndicator } from 'react-native';
 import { MaterialIcons, Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import api from '../../api/config';
 
 // Same real contact details as the merchant dashboard's Support page
 // (apps/merchant-dashboard/src/pages/Support.jsx) — single source of truth
@@ -32,6 +33,42 @@ export default function SupportTab() {
   ];
 
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
+  const [checkingKyc, setCheckingKyc] = useState(false);
+
+  // The "KYC Verification" card previously did nothing when tapped. This
+  // checks the authenticated merchant's own resubmission status
+  // (GET /api/auth/merchant/kyc-status — only ever true for an
+  // officer-flagged application; a self-serve merchant simply has nothing
+  // to resubmit) and, when documents are flagged, opens the same public
+  // resubmission page the "Request Revision" email links to, with a fresh
+  // token minted for this check.
+  const handleKycCheck = async () => {
+    if (checkingKyc) return;
+    setCheckingKyc(true);
+    try {
+      const res = await api.get('/api/auth/merchant/kyc-status');
+      const data = res.data;
+      if (data?.needsResubmission) {
+        const docList = (data.flagged || [])
+          .map((d: { label: string; note: string | null }) => `• ${d.label}${d.note ? ` — ${d.note}` : ''}`)
+          .join('\n');
+        Alert.alert(
+          'Documents need resubmission',
+          `${docList || 'One or more of your KYC documents were flagged for revision.'}\n\nTap Continue to resubmit them.`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Continue', onPress: () => Linking.openURL(data.resubmitUrl) },
+          ]
+        );
+      } else {
+        Alert.alert('All good', 'Your KYC documents are up to date — nothing needs resubmission right now.');
+      }
+    } catch {
+      Alert.alert('Could not check status', 'Please try again, or contact support if this keeps happening.');
+    } finally {
+      setCheckingKyc(false);
+    }
+  };
 
   return (
     <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
@@ -65,14 +102,20 @@ export default function SupportTab() {
           <Text className="text-[16px] font-jakarta-extrabold text-[#00351d] mb-4">Quick Solutions</Text>
           <View className="flex-row flex-wrap justify-between gap-y-4">
             {solutions.map((s, i) => (
-              <TouchableOpacity 
-                key={i} 
+              <TouchableOpacity
+                key={i}
                 className="w-[48%] rounded-[28px] overflow-hidden"
                 activeOpacity={0.8}
+                disabled={s.title === 'KYC Verification' && checkingKyc}
+                onPress={s.title === 'KYC Verification' ? handleKycCheck : undefined}
               >
                 <View className="p-5 border border-black/5" style={{ backgroundColor: s.color, height: 160 }}>
                   <View className="w-12 h-12 rounded-2xl bg-white/80 shadow-sm flex items-center justify-center mb-auto">
-                    <MaterialIcons name={s.icon as any} size={24} color={s.iconColor} />
+                    {s.title === 'KYC Verification' && checkingKyc ? (
+                      <ActivityIndicator size="small" color={s.iconColor} />
+                    ) : (
+                      <MaterialIcons name={s.icon as any} size={24} color={s.iconColor} />
+                    )}
                   </View>
                   <Text className="text-[14px] font-jakarta-extrabold text-[#00351d] tracking-tight mb-1">{s.title}</Text>
                   <Text className="text-[11px] text-[#00351d]/60 font-jakarta-bold leading-tight">{s.desc}</Text>
