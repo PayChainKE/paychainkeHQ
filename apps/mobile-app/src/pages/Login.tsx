@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingVi
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../context/AuthContext';
 import { useBiometrics } from '../hooks/useBiometrics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -11,6 +12,8 @@ import { validators } from '../utils/validators';
 import { KENYA_COUNTY_AREAS } from '../utils/kenyaCountyAreas';
 import { fetchSignupWards, searchSignupPlaces, StreetSearchResult } from '../utils/kenyaLocations';
 import { KYB_REQUIREMENTS_BY_BUSINESS_TYPE, KYB_DOC_LABELS, isDocSelected, resolveDocTypes } from '../utils/kybRequirements';
+
+type PickedFile = { uri: string; name?: string; mimeType?: string; size?: number };
 
 const KENYAN_COUNTIES = [
   "Baringo", "Bomet", "Bungoma", "Busia", "Elgeyo-Marakwet", "Embu", "Garissa", 
@@ -75,7 +78,10 @@ export default function Login({ route }: any) {
   // every slot, whether one or several, shares the same file-handling code.
   const [signupDocType, setSignupDocType] = useState('');
   const [docTypeModalOptions, setDocTypeModalOptions] = useState<string[]>([]);
-  const [signupDocs, setSignupDocs] = useState<Record<string, DocumentPicker.DocumentPickerAsset | null>>({});
+  // Common shape for a picked file regardless of source (expo-document-picker's
+  // upload path vs expo-image-picker's camera path use differently-named
+  // asset fields — normalized to this on the way in, see pickDoc/captureIdPhoto).
+  const [signupDocs, setSignupDocs] = useState<Record<string, PickedFile | null>>({});
   const [docErrors, setDocErrors] = useState<Record<string, string>>({});
   const [showDocTypeModal, setShowDocTypeModal] = useState(false);
   // Flipped true the first time Continue is pressed with an invalid field —
@@ -303,6 +309,42 @@ export default function Login({ route }: any) {
     }
   };
 
+  // Camera-only capture for the National ID front/back slots — separate
+  // from pickDoc (which opens a file/gallery picker) since this always
+  // opens the device camera directly, never the gallery (the app.json
+  // plugin config also disables the library/microphone permissions
+  // launchCameraAsync doesn't need). No client-side blur check — no
+  // canvas API in React Native, and the backend already independently
+  // re-checks sharpness on every upload (the real gate even on web); a
+  // blurry shot surfaces as a server error after submit, prompting retake.
+  const captureIdPhoto = async (side: 'national_id_front' | 'national_id_back') => {
+    setDocErrors(prev => ({ ...prev, [side]: '' }));
+    try {
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) {
+        setDocErrors(prev => ({ ...prev, [side]: 'Camera permission is required to take this photo.' }));
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.8 });
+      if (result.canceled || !result.assets?.[0]) return;
+      const asset = result.assets[0];
+      setSignupDocs(prev => ({
+        ...prev,
+        [side]: { uri: asset.uri, name: asset.fileName || `${side}.jpg`, mimeType: asset.mimeType || 'image/jpeg', size: asset.fileSize },
+      }));
+    } catch {
+      setDocErrors(prev => ({ ...prev, [side]: 'Could not open the camera. Please try again.' }));
+    }
+  };
+
+  // Resets both National ID capture slots and the upload slot, so
+  // switching between "Upload File" and "Take Photo" (or retaking after a
+  // mistake) never leaves a stale file from the other mode behind.
+  const resetNationalId = () => {
+    setSignupDocs(prev => ({ ...prev, national_id: null, national_id_front: null, national_id_back: null }));
+    setDocErrors(prev => ({ ...prev, national_id: '', national_id_front: '', national_id_back: '' }));
+  };
+
   const handleSignupContinue = () => {
     // Real validators, not the previous name/phone presence-or-length-only
     // checks — those were weaker than what ValidatedTextInput itself uses to
@@ -488,16 +530,17 @@ export default function Login({ route }: any) {
 
   // One upload box per required document type — reused for a 'choice'-mode
   // business type's single selected slot, every fixed slot of an 'all'-mode
-  // one, and the LLC-only choiceAlso slot. No camera capture yet (see
-  // kybRequirements.ts's doc comment) — every slot, National ID included,
-  // uses the same generic file/gallery picker.
-  const renderDocBox = (type: string) => {
+  // one, and the LLC-only choiceAlso slot. `onPick` defaults to the
+  // file/gallery picker (pickDoc); renderNationalIdSlot below overrides it
+  // with the camera capture function for the front/back camera-mode tiles,
+  // reusing this same box markup rather than duplicating it.
+  const renderDocBox = (type: string, onPick: () => void = () => pickDoc(type)) => {
     const file = signupDocs[type];
     const error = docErrors[type];
     return (
       <View key={type} className="mb-3">
         <TouchableOpacity
-          onPress={() => pickDoc(type)}
+          onPress={onPick}
           className={`w-full border-2 border-dashed rounded-2xl px-4 py-4 flex-row items-center ${
             error ? 'border-red-300 bg-red-50' : file ? 'border-emerald-400 bg-[#ecfdf5]' : 'border-[#d1d5db] bg-[#f9fafb]'
           }`}
@@ -517,6 +560,54 @@ export default function Login({ route }: any) {
         {error ? (
           <Text className="text-red-500 text-[11px] font-jakarta-bold mt-1.5">{error}</Text>
         ) : null}
+      </View>
+    );
+  };
+
+  // National ID is the one document type with a camera-capture option
+  // (front, then back) alongside the plain upload-a-file option every
+  // other document type has — the two are mutually exclusive per submission,
+  // matching the dual shape the backend already accepts (a single
+  // national_id file, or a matched national_id_front + national_id_back
+  // pair). "mode" is derived from which slot(s) are actually filled, not
+  // tracked as separate state, so it can never drift out of sync with
+  // signupDocs itself.
+  const renderNationalIdSlot = () => {
+    const uploadFile = signupDocs.national_id;
+    const front = signupDocs.national_id_front;
+    const frontOk = !!front && !docErrors.national_id_front;
+    const back = signupDocs.national_id_back;
+    const mode: 'upload' | 'camera' | null = uploadFile ? 'upload' : (front || back) ? 'camera' : null;
+
+    if (mode === null) {
+      return (
+        <View key="national_id" className="mb-3">
+          <Text className="text-[11px] font-jakarta-bold text-[#5b645c] mb-2 opacity-70">{KYB_DOC_LABELS.national_id}</Text>
+          <View className="flex-row" style={{ gap: 10 }}>
+            <TouchableOpacity onPress={() => pickDoc('national_id')} className="flex-1 border-2 border-dashed border-[#d1d5db] bg-[#f9fafb] rounded-2xl py-5 items-center">
+              <Feather name="upload" size={20} color="#9ca3af" />
+              <Text className="text-[12px] font-jakarta-bold text-[#0c2010] mt-2">Upload File</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => captureIdPhoto('national_id_front')} className="flex-1 border-2 border-dashed border-[#d1d5db] bg-[#f9fafb] rounded-2xl py-5 items-center">
+              <Feather name="camera" size={20} color="#9ca3af" />
+              <Text className="text-[12px] font-jakarta-bold text-[#0c2010] mt-2">Take Photo</Text>
+            </TouchableOpacity>
+          </View>
+          {docErrors.national_id_front ? (
+            <Text className="text-red-500 text-[11px] font-jakarta-bold mt-1.5">{docErrors.national_id_front}</Text>
+          ) : null}
+        </View>
+      );
+    }
+
+    return (
+      <View key="national_id">
+        {mode === 'upload' && renderDocBox('national_id')}
+        {mode === 'camera' && renderDocBox('national_id_front', () => captureIdPhoto('national_id_front'))}
+        {mode === 'camera' && frontOk && renderDocBox('national_id_back', () => captureIdPhoto('national_id_back'))}
+        <TouchableOpacity onPress={resetNationalId} className="mb-3 -mt-1">
+          <Text className="text-[11px] font-jakarta-bold text-[#5b645c] underline">Start over</Text>
+        </TouchableOpacity>
       </View>
     );
   };
@@ -834,11 +925,11 @@ export default function Login({ route }: any) {
                               </Text>
                               <Feather name="chevron-down" size={16} color="#9ca3af" style={{ flexShrink: 0 }} />
                             </TouchableOpacity>
-                            {signupDocType && renderDocBox(signupDocType)}
+                            {signupDocType && (signupDocType === 'national_id' ? renderNationalIdSlot() : renderDocBox(signupDocType))}
                           </>
                         )}
 
-                        {requirement?.mode === 'all' && requirement.required.map(type => renderDocBox(type))}
+                        {requirement?.mode === 'all' && requirement.required.map(type => type === 'national_id' ? renderNationalIdSlot() : renderDocBox(type))}
 
                         {requirement?.mode === 'all' && requirement.choiceAlso && (
                           <>
@@ -851,7 +942,7 @@ export default function Login({ route }: any) {
                               </Text>
                               <Feather name="chevron-down" size={16} color="#9ca3af" style={{ flexShrink: 0 }} />
                             </TouchableOpacity>
-                            {signupDocType && renderDocBox(signupDocType)}
+                            {signupDocType && (signupDocType === 'national_id' ? renderNationalIdSlot() : renderDocBox(signupDocType))}
                           </>
                         )}
                       </View>

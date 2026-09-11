@@ -47,6 +47,14 @@
       "expo-secure-store",
       "./plugins/withNoMediaPermissions",
       [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Allow PayChain to use your camera to photograph your National ID during signup.",
+          "photosPermission": false,
+          "microphonePermission": false
+        }
+      ],
+      [
         "expo-build-properties",
         {
           "android": {
