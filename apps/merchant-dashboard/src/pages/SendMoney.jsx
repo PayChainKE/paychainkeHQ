@@ -173,7 +173,50 @@ export default function SendMoney() {
   const selectedDest = DESTINATIONS.find(d => d.id === destination)
   const isMobileDest = destination === 'mpesa-primary' || destination === 'mobile'
   const isB2bDest     = destination === 'till' || destination === 'paybill'
-  const fee          = isMobileDest ? estimateB2cFee(Number(amount) || 0) : isB2bDest ? estimateB2bFee(Number(amount) || 0) : destination === 'bank' ? estimateBankFee(bankRail, Number(amount) || 0) : (selectedDest?.fee || 0)
+  // Instant client-side estimate — shown only while the live fee below is
+  // still loading (or if that request fails), never used to actually gate
+  // Confirm. This is exactly what used to be the only source of the fee:
+  // a hardcoded table that had no way to reflect an admin tariff change and
+  // had already gone stale twice before (see the tables' own comments
+  // above) — the reported bug (UI shows KES 5, backend charges KES 10) is
+  // this same failure a third time. `liveFee` below fixes it structurally.
+  const clientEstimate = isMobileDest ? estimateB2cFee(Number(amount) || 0) : isB2bDest ? estimateB2bFee(Number(amount) || 0) : destination === 'bank' ? estimateBankFee(bankRail, Number(amount) || 0) : (selectedDest?.fee || 0)
+
+  // Live fee, fetched from the same tariff functions/per-merchant lock the
+  // backend uses to actually charge (GET /api/transactions/fee-preview) —
+  // null until a successful response comes back for the CURRENT amount/
+  // destination/rail, so canContinue() below can block Confirm on it
+  // rather than ever letting the merchant authorize against a guess.
+  const [liveFee, setLiveFee] = useState(null)
+  const [feeLoading, setFeeLoading] = useState(false)
+  const [feeRetryToken, setFeeRetryToken] = useState(0)
+
+  useEffect(() => {
+    const numAmount = Number(amount) || 0
+    const previewType = isMobileDest ? 'mobile' : isB2bDest ? destination : destination === 'bank' ? 'bank' : null
+    if (!previewType || numAmount <= 0) { setLiveFee(null); setFeeLoading(false); return }
+
+    let cancelled = false
+    setLiveFee(null)
+    setFeeLoading(true)
+    const t = setTimeout(async () => {
+      try {
+        const { data } = await axios.get(`${API_URL}/api/transactions/fee-preview`, {
+          params: { type: previewType, amount: numAmount, ...(destination === 'bank' ? { rail: bankRail } : {}) },
+          ...cfg(),
+        })
+        if (!cancelled) setLiveFee(Number(data?.totalFee) || 0)
+      } catch {
+        if (!cancelled) setLiveFee(null) // canContinue() keeps Confirm blocked; clientEstimate still shows on screen
+      } finally {
+        if (!cancelled) setFeeLoading(false)
+      }
+    }, 350)
+    return () => { cancelled = true; clearTimeout(t) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [destination, bankRail, amount, feeRetryToken])
+
+  const fee          = liveFee != null ? liveFee : clientEstimate
   const totalAmount  = Number(amount || 0) + fee
   // availableBalance (kesBalance minus anything credited in the last 2
   // minutes and still held server-side — see
@@ -327,7 +370,7 @@ export default function SendMoney() {
     if (step === 1) return !!destination
     if (step === 2) return !!amount && Number(amount) > 0 && (!isMobileDest || (Number(amount) >= 50 && Number(amount) <= 250000)) && !!recipientAccount && (destination !== 'bank' || !!bankCode) && (destination !== 'bank' || bankRail !== 'rtgs' || !!beneficiaryCountry) && (destination !== 'paybill' || !!paybillAccountRef)
     if (!hasPin && step === 3) return newPin.length === 4 && confirmPin.length === 4
-    if (step === confirmStep) return pin.length === 4
+    if (step === confirmStep) return pin.length === 4 && liveFee !== null
     return true
   }
 
@@ -784,6 +827,22 @@ export default function SendMoney() {
                   </div>
                 </div>
               </div>
+
+              {liveFee === null && !confirmLocked && (
+                <div className="flex items-center gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+                  {feeLoading
+                    ? <span className="material-symbols-outlined text-amber-600 text-base shrink-0 animate-spin" style={{ animationDuration: '1.2s' }}>progress_activity</span>
+                    : <span className="material-symbols-outlined text-amber-600 text-base shrink-0">error_outline</span>}
+                  <p className="text-xs font-bold text-amber-800 flex-1">
+                    {feeLoading ? 'Verifying the current transaction fee before you can confirm…' : 'Could not verify the current fee.'}
+                  </p>
+                  {!feeLoading && (
+                    <button type="button" onClick={() => setFeeRetryToken(t => t + 1)} className="text-xs font-black text-amber-900 uppercase tracking-wider underline shrink-0">
+                      Retry
+                    </button>
+                  )}
+                </div>
+              )}
 
               {/* PIN entry, or a locked status once a transfer attempt has
                   been made — never both, so a merchant can't re-tap Confirm
