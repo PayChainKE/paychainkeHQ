@@ -169,7 +169,13 @@ export const getMerchants = async (req, res) => {
           },
         },
       ]),
-      // All-time: total KES volume + count + per-type breakdown since account creation
+      // All-time: total KES volume + count + per-type breakdown since account
+      // creation. `type` isn't just the 5 literal buckets below — every rail
+      // has its own type string (ncba_inbound, mpesa_b2c, ncba_kplc, ...;
+      // see Transaction.js's full enum) — matching only the bare literal
+      // missed almost every real NCBA/M-Pesa-rail transaction. Same fix and
+      // same grouping as getMerchantDetail's lifetimeAgg, so the list and
+      // drawer can't disagree with each other.
       Transaction.aggregate([
         {
           $group: {
@@ -177,8 +183,8 @@ export const getMerchants = async (req, res) => {
             totalVolume: { $sum: KES_VOL_REAL },
             totalUsdcVolume: { $sum: USDC_VOL_REAL },
             totalCount:  { $sum: 1 },
-            inbound:     { $sum: { $cond: [{ $eq: ['$type', 'inbound']    }, KES_VOL_REAL, 0] } },
-            outbound:    { $sum: { $cond: [{ $eq: ['$type', 'outbound']   }, KES_VOL_REAL, 0] } },
+            inbound:     { $sum: { $cond: [{ $in: ['$type', ['inbound', 'ncba_inbound', 'top_up']] }, KES_VOL_REAL, 0] } },
+            outbound:    { $sum: { $cond: [{ $in: ['$type', ['outbound', 'withdrawal', 'ncba_outbound', 'mpesa_b2c', 'mpesa_b2b', 'ncba_mobile_b2w', 'ncba_lipa_na_mpesa', 'ncba_kplc', 'ncba_kplc_prepaid', 'ncba_ncwsc']] }, KES_VOL_REAL, 0] } },
             bulk_pay:    { $sum: { $cond: [{ $eq: ['$type', 'bulk_pay']   }, KES_VOL_REAL, 0] } },
             fx_swap:     { $sum: { $cond: [{ $eq: ['$type', 'fx_swap']    }, KES_VOL_REAL, 0] } },
             settlement:  { $sum: { $cond: [{ $eq: ['$type', 'settlement'] }, KES_VOL_REAL, 0] } },

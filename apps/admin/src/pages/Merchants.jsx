@@ -18,6 +18,20 @@ import logo from '../assets/logo.png';
 
 const PAGE_SIZE = 20;
 
+// PayChain has not yet publicly launched (pending mobile app store
+// approval) — every merchant that exists as of this date was created
+// during pre-launch pilot/product-validation testing, without the
+// platform's KYC/KYB verification requirements in effect. A merchant
+// created on or after this date is a real, post-launch signup and should
+// read as an active/verified merchant regardless of county — county alone
+// was only ever a proxy for "during the test batch," not a permanent rule.
+// Shared by both the Merchant Report's footer notice and the All Merchants
+// Report so "pilot" can't mean two different things in the same app.
+// Update this once, at actual public launch — never bump it to "now" on
+// each report run, or every merchant would permanently read as pilot.
+const PILOT_CUTOFF_DATE = new Date('2026-09-11T00:00:00Z');
+const isPilotMerchant = (m) => new Date(m.createdAt) < PILOT_CUTOFF_DATE;
+
 const normalizePhoneKE = (value) => {
   let digits = String(value ?? '').replace(/\D/g, '');
   if (digits.startsWith('254')) digits = digits.slice(3);
@@ -397,6 +411,152 @@ const Merchants = () => {
   }
   function closeDetail() { setDetailMerchant(null); setDetailError(''); }
 
+  const [generatingAllReport, setGeneratingAllReport] = useState(false);
+
+  // Platform-wide roster PDF — built entirely from `filteredMerchants`
+  // (already loaded for the table, so this respects whatever search/filter
+  // is currently applied and needs no extra request). Uses the same
+  // isPilotMerchant rule as the per-merchant Merchant Report's footer
+  // notice, so "pilot" means one consistent, date-bounded thing everywhere
+  // in admin — never two definitions that could disagree with each other.
+  function downloadAllMerchantsReportPdf() {
+    setGeneratingAllReport(true);
+    try {
+      const rows = filteredMerchants;
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      const W = doc.internal.pageSize.getWidth();
+      const H = doc.internal.pageSize.getHeight();
+      const L = 14, R = W - 14;
+      const now = new Date();
+      const reportId = `PC-AMR-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+
+      // ── HEADER BAND ─────────────────────────────────────────────────
+      doc.setFillColor(6, 32, 27);
+      doc.rect(0, 0, W, 32, 'F');
+      const logoW = 28, logoH = logoW * (75 / 338);
+      try { doc.addImage(logo, 'PNG', L, (32 - logoH) / 2, logoW, logoH, undefined, 'FAST'); } catch (_) {}
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.text('PayChain Kenya', R, 13, { align: 'right' });
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(94, 254, 179);
+      doc.text('ALL MERCHANTS REPORT', R, 20, { align: 'right' });
+      doc.setTextColor(200, 220, 210);
+      doc.text(`Report Ref: ${reportId}  •  Generated: ${now.toLocaleString('en-KE', { dateStyle: 'medium', timeStyle: 'short' })}`, R, 26, { align: 'right' });
+
+      // ── SUMMARY STRIP ───────────────────────────────────────────────
+      let y = 40;
+      const pilotCount = rows.filter(isPilotMerchant).length;
+      const verifiedCount = rows.filter((m) => m.isVerified).length;
+      const flaggedCount = rows.filter((m) => m.flagged).length;
+      const lockedCount = rows.filter((m) => m.status === 'locked').length;
+      const summaryItems = [
+        { label: 'Total Merchants', value: String(rows.length), color: [6, 32, 27] },
+        { label: 'Pilot / Test Accounts', value: String(pilotCount), color: [160, 110, 6] },
+        { label: 'Verified', value: String(verifiedCount), color: [6, 120, 60] },
+        { label: 'Flagged', value: String(flaggedCount), color: [180, 30, 30] },
+        { label: 'Locked', value: String(lockedCount), color: [100, 110, 105] },
+      ];
+      const boxW = (R - L) / summaryItems.length - 2;
+      summaryItems.forEach((item, i) => {
+        const bx = L + i * (boxW + 2);
+        doc.setFillColor(244, 247, 245);
+        doc.roundedRect(bx, y, boxW, 16, 2, 2, 'F');
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(100, 110, 105);
+        doc.text(item.label.toUpperCase(), bx + boxW / 2, y + 5.5, { align: 'center' });
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(...item.color);
+        doc.text(item.value, bx + boxW / 2, y + 11.5, { align: 'center' });
+      });
+      y += 22;
+
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(6, 32, 27);
+      doc.text('Merchant Roster', L, y);
+      y += 2;
+
+      // ── ROSTER TABLE ────────────────────────────────────────────────
+      const body = rows.map((m) => {
+        const isPilot = isPilotMerchant(m);
+        return [
+          m.businessName || '—',
+          m.name || '—',
+          m.phone || '—',
+          m.county || '—',
+          m.status === 'locked' ? 'Locked' : 'Active',
+          m.isVerified ? 'Verified' : 'Unverified',
+          isPilot ? 'PILOT' : '',
+          new Date(m.createdAt).toLocaleDateString('en-KE', { day: '2-digit', month: 'short', year: 'numeric' }),
+        ];
+      });
+
+      autoTable(doc, {
+        startY: y + 2,
+        margin: { left: L, right: L },
+        head: [['Business Name', 'Contact', 'Phone', 'County', 'Status', 'KYC', 'Pilot', 'Joined']],
+        body,
+        theme: 'plain',
+        headStyles: {
+          fillColor: [6, 32, 27], textColor: [255, 255, 255], fontSize: 7, fontStyle: 'bold',
+          cellPadding: { top: 3.5, bottom: 3.5, left: 3, right: 3 }, halign: 'left', lineWidth: 0,
+        },
+        bodyStyles: {
+          fontSize: 7, textColor: [30, 40, 35], cellPadding: { top: 2.5, bottom: 2.5, left: 3, right: 3 },
+          lineColor: [230, 235, 232], lineWidth: 0.2, valign: 'middle', overflow: 'linebreak',
+        },
+        alternateRowStyles: { fillColor: [246, 249, 247] },
+        columnStyles: { 6: { fontStyle: 'bold', halign: 'center' } },
+        didParseCell(data) {
+          if (data.section === 'body') {
+            if (data.column.index === 4) {
+              data.cell.styles.textColor = String(data.cell.raw) === 'Locked' ? [180, 30, 30] : [6, 120, 60];
+            }
+            if (data.column.index === 5) {
+              data.cell.styles.textColor = String(data.cell.raw) === 'Verified' ? [6, 120, 60] : [160, 110, 6];
+            }
+            if (data.column.index === 6 && data.cell.raw === 'PILOT') {
+              data.cell.styles.textColor = [160, 110, 6];
+            }
+          }
+        },
+        didDrawPage(data) {
+          if (data.pageNumber > 1) {
+            doc.setFillColor(6, 32, 27);
+            doc.rect(0, 0, W, 10, 'F');
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(255, 255, 255);
+            doc.text(`PayChain — ${reportId} — continued`, L, 6.5);
+            doc.text(`Page ${data.pageNumber}`, R, 6.5, { align: 'right' });
+          }
+        },
+      });
+
+      // ── FOOTER (every page) ─────────────────────────────────────────
+      const totalPages = doc.internal.getNumberOfPages();
+      const pilotFooterNote = pilotCount > 0
+        ? `${pilotCount} of ${rows.length} merchant${rows.length === 1 ? '' : 's'} above are pilot/test accounts, registered before PayChain's KYC/KYB verification requirements were implemented — internal product testing ahead of public launch (pending mobile app store approval). `
+        : '';
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(6.5);
+      const footerWrapped = doc.splitTextToSize(`${pilotFooterNote}Generated by PayChain Admin — internal use only.`, R - L);
+      for (let p = 1; p <= totalPages; p++) {
+        doc.setPage(p);
+        const copyrightY = H - 6;
+        const noteBottomY = copyrightY - 5;
+        doc.setDrawColor(200, 210, 205); doc.setLineWidth(0.3);
+        doc.line(L, noteBottomY - (footerWrapped.length * 2.8) - 2, R, noteBottomY - (footerWrapped.length * 2.8) - 2);
+        doc.setFont('helvetica', 'italic'); doc.setFontSize(6.5); doc.setTextColor(140, 150, 145);
+        let ny = noteBottomY - (footerWrapped.length - 1) * 2.8;
+        footerWrapped.forEach((line) => { doc.text(line, W / 2, ny, { align: 'center' }); ny += 2.8; });
+        doc.setFont('helvetica', 'normal');
+        doc.text(`© ${now.getFullYear()} Paychain Ltd  •  Ref: ${reportId}  •  Page ${p} of ${totalPages}`, W / 2, copyrightY, { align: 'center' });
+      }
+
+      doc.save(`PayChain_All_Merchants_Report_${now.toISOString().slice(0, 10)}.pdf`);
+    } finally {
+      setGeneratingAllReport(false);
+    }
+  }
+
   return (
     <Layout>
       <div className="space-y-8">
@@ -427,6 +587,15 @@ const Merchants = () => {
                 Map
               </button>
             </div>
+            <button
+              onClick={downloadAllMerchantsReportPdf}
+              disabled={generatingAllReport}
+              className="flex-1 sm:flex-none bg-white border border-outline-variant/30 text-on-surface-variant px-4 py-2.5 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold hover:bg-surface-container-low transition-all active:scale-95 font-label uppercase tracking-widest disabled:opacity-50"
+              title="Generates a PDF roster of every merchant currently matching the search/filters below"
+            >
+              <span className="material-symbols-outlined text-[18px]">{generatingAllReport ? 'hourglass_empty' : 'summarize'}</span>
+              {generatingAllReport ? 'Generating…' : 'Generate Report'}
+            </button>
             <button
               onClick={openModal}
               className="flex-1 sm:flex-none bg-primary text-white px-5 py-2.5 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold hover:shadow-lg transition-all active:scale-95 font-label uppercase tracking-widest"
@@ -1428,16 +1597,16 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
     });
     y = doc.lastAutoTable.finalY + 10;
 
-    // Pilot-phase disclaimer — every merchant outside Nairobi county
-    // (including accounts with no county on file at all, an even stronger
-    // signal of predating the location taxonomy) predates PayChain's
-    // KYC/KYB verification requirements for self-serve signup. Printed in
-    // the footer of every page, not a banner, per instruction — kept
-    // factual/neutral, not alarmist. Wording reviewed and approved by
-    // Brandon before this went into the generator; any further change to
-    // this exact text should go through the same review given it may be
-    // read by a bank, regulator, or in connection with a fraud case.
-    const showPilotNotice = m.county !== 'Nairobi';
+    // Pilot-phase disclaimer — every merchant created before
+    // PILOT_CUTOFF_DATE predates PayChain's KYC/KYB verification
+    // requirements for self-serve signup (see that constant's doc comment
+    // for why this is date-based, not county-based). Printed in the footer
+    // of every page, not a banner, per instruction — kept factual/neutral,
+    // not alarmist. Wording reviewed and approved by Brandon before this
+    // went into the generator; any further change to this exact text
+    // should go through the same review given it may be read by a bank,
+    // regulator, or in connection with a fraud case.
+    const showPilotNotice = isPilotMerchant(m);
     const pilotNoticeText = "Pilot Account Notice: This account was registered before PayChain's KYC/KYB verification requirements were implemented for self-serve signups, during internal product testing following completion of PayChain's live payment integrations and ahead of public launch (pending mobile app store approval). Information shown reflects what was collected at signup.";
     doc.setFont('helvetica', 'italic');
     doc.setFontSize(6.5);
