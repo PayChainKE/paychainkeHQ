@@ -15,6 +15,19 @@ import { KYB_REQUIREMENTS_BY_BUSINESS_TYPE, KYB_DOC_LABELS, isDocSelected, resol
 
 type PickedFile = { uri: string; name?: string; mimeType?: string; size?: number };
 
+// The camera-capture option below needs the native CAMERA permission
+// declared in app.json's expo-image-picker plugin config — but that only
+// takes effect once compiled into an actual native build (OTA updates
+// never touch permissions). Until that build has gone through its own
+// Play Store review and is what's actually installed on devices, showing
+// "Take Photo" here is a dead end: requestCameraPermissionsAsync() comes
+// back denied on every currently-live install, since the permission was
+// never declared for it in the first place. Flip this to true (and this
+// file ships instantly via the OTA pipeline) once that build is live —
+// no other code change needed, captureIdPhoto/renderNationalIdSlot below
+// are already written to support both modes.
+const NATIONAL_ID_CAMERA_CAPTURE_ENABLED = false;
+
 const KENYAN_COUNTIES = [
   "Baringo", "Bomet", "Bungoma", "Busia", "Elgeyo-Marakwet", "Embu", "Garissa", 
   "Homa Bay", "Isiolo", "Kajiado", "Kakamega", "Kericho", "Kiambu", "Kilifi", 
@@ -588,10 +601,12 @@ export default function Login({ route }: any) {
               <Feather name="upload" size={20} color="#9ca3af" />
               <Text className="text-[12px] font-jakarta-bold text-[#0c2010] mt-2">Upload File</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => captureIdPhoto('national_id_front')} className="flex-1 border-2 border-dashed border-[#d1d5db] bg-[#f9fafb] rounded-2xl py-5 items-center">
-              <Feather name="camera" size={20} color="#9ca3af" />
-              <Text className="text-[12px] font-jakarta-bold text-[#0c2010] mt-2">Take Photo</Text>
-            </TouchableOpacity>
+            {NATIONAL_ID_CAMERA_CAPTURE_ENABLED && (
+              <TouchableOpacity onPress={() => captureIdPhoto('national_id_front')} className="flex-1 border-2 border-dashed border-[#d1d5db] bg-[#f9fafb] rounded-2xl py-5 items-center">
+                <Feather name="camera" size={20} color="#9ca3af" />
+                <Text className="text-[12px] font-jakarta-bold text-[#0c2010] mt-2">Take Photo</Text>
+              </TouchableOpacity>
+            )}
           </View>
           {docErrors.national_id_front ? (
             <Text className="text-red-500 text-[11px] font-jakarta-bold mt-1.5">{docErrors.national_id_front}</Text>
