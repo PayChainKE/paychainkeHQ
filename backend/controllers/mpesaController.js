@@ -1087,28 +1087,15 @@ export const initiateB2C = async (req, res) => {
     }
     await resetPinAttempts(merchantId);
 
-    // Correct PIN alone doesn't stop a double-click or a client retrying a
-    // slow/timed-out request from submitting the exact same withdrawal
-    // twice — reject an identical (merchant, phone, amount) submission
-    // landing within a short window of the last one, before any balance
-    // change happens.
-    try {
-      await claimPayoutSubmission(merchantId, ['b2c', phone, amount]);
-    } catch (e) {
-      if (e instanceof DuplicateSubmissionError) return res.status(409).json({ error: e.message });
-      throw e;
-    }
-
-    try {
-      await assertOutboundVelocityOk(merchantId);
-    } catch (e) {
-      if (e instanceof OutboundVelocityLockedError) return res.status(423).json({ error: e.message });
-      throw e;
-    }
-
     // A large payout from a device/location not recently seen on this
     // account is the clearest takeover signature — require a fresh code
-    // before any money moves. See utils/payoutStepUpGuard.js.
+    // before any money moves. See utils/payoutStepUpGuard.js. Deliberately
+    // runs BEFORE claimPayoutSubmission below: that lock is keyed on
+    // (merchant, phone, amount), identical between this no-code request and
+    // the merchant's resubmission carrying the code — claiming it here on
+    // the challenge-issuing request would make a fast resubmission (well
+    // within the 20s window) collide with its own still-active lock and get
+    // rejected as a false duplicate instead of completing.
     if (await requiresPayoutStepUp({ merchantId, req, amountKes: Number(amount) + Number(b2cFee) })) {
       const submittedCode = req.body.stepUpOtp;
       if (!submittedCode) {
@@ -1128,6 +1115,25 @@ export const initiateB2C = async (req, res) => {
         if (e instanceof PayoutStepUpInvalidError) return res.status(401).json({ error: e.message, stepUpInvalid: true });
         throw e;
       }
+    }
+
+    // Correct PIN alone doesn't stop a double-click or a client retrying a
+    // slow/timed-out request from submitting the exact same withdrawal
+    // twice — reject an identical (merchant, phone, amount) submission
+    // landing within a short window of the last one, before any balance
+    // change happens.
+    try {
+      await claimPayoutSubmission(merchantId, ['b2c', phone, amount]);
+    } catch (e) {
+      if (e instanceof DuplicateSubmissionError) return res.status(409).json({ error: e.message });
+      throw e;
+    }
+
+    try {
+      await assertOutboundVelocityOk(merchantId);
+    } catch (e) {
+      if (e instanceof OutboundVelocityLockedError) return res.status(423).json({ error: e.message });
+      throw e;
     }
 
     // Atomic conditional deduct — avoids two concurrent B2C requests both
@@ -1416,26 +1422,14 @@ export const initiateB2B = async (req, res) => {
     }
     await resetPinAttempts(merchantId);
 
-    // Same double-submission guard as initiateB2C above.
-    try {
-      await claimPayoutSubmission(merchantId, ['b2b', billType, partyB, accountReference, numericAmount]);
-    } catch (e) {
-      if (e instanceof DuplicateSubmissionError) return res.status(409).json({ error: e.message });
-      throw e;
-    }
-
-    // Same rapid-drain guard as initiateB2C above — this function never had
-    // one of its own despite being an equally real ad-hoc outbound rail.
-    try {
-      await assertOutboundVelocityOk(merchantId);
-    } catch (e) {
-      if (e instanceof OutboundVelocityLockedError) return res.status(423).json({ error: e.message });
-      throw e;
-    }
-
     // A large payout from a device/location not recently seen on this
     // account is the clearest takeover signature — require a fresh code
-    // before any money moves. See utils/payoutStepUpGuard.js.
+    // before any money moves. See utils/payoutStepUpGuard.js. Deliberately
+    // runs BEFORE claimPayoutSubmission below — see initiateB2C's identical
+    // comment for why: that lock's fingerprint doesn't change between this
+    // no-code request and the merchant's resubmission carrying the code, so
+    // claiming it here would make a fast resubmission collide with its own
+    // still-active lock and get rejected as a false duplicate.
     if (await requiresPayoutStepUp({ merchantId, req, amountKes: numericAmount + Number(fee) })) {
       const submittedCode = req.body.stepUpOtp;
       if (!submittedCode) {
@@ -1455,6 +1449,23 @@ export const initiateB2B = async (req, res) => {
         if (e instanceof PayoutStepUpInvalidError) return res.status(401).json({ error: e.message, stepUpInvalid: true });
         throw e;
       }
+    }
+
+    // Same double-submission guard as initiateB2C above.
+    try {
+      await claimPayoutSubmission(merchantId, ['b2b', billType, partyB, accountReference, numericAmount]);
+    } catch (e) {
+      if (e instanceof DuplicateSubmissionError) return res.status(409).json({ error: e.message });
+      throw e;
+    }
+
+    // Same rapid-drain guard as initiateB2C above — this function never had
+    // one of its own despite being an equally real ad-hoc outbound rail.
+    try {
+      await assertOutboundVelocityOk(merchantId);
+    } catch (e) {
+      if (e instanceof OutboundVelocityLockedError) return res.status(423).json({ error: e.message });
+      throw e;
     }
 
     // Atomic conditional deduct — same race-avoidance as initiateB2C, also
