@@ -12,6 +12,7 @@ import EditSignupDetailsModal from '../components/modals/EditSignupDetailsModal'
 import GenerateStatementModal from '../components/modals/GenerateStatementModal';
 import GenerateAuditReportModal from '../components/modals/GenerateAuditReportModal';
 import { formatKES } from '../utils/formatCurrency';
+import { formatName } from '../utils/formatName';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import logo from '../assets/logo.png';
@@ -2158,6 +2159,54 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
               <Row label="USDC Volume (30d)" value={`${(m.usdcVolume30d ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} USDC`} />
               <Row label="Lifetime KES Volume" value={`KES ${(m.totalVolume ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`} />
               <Row label="Lifetime USDC Volume" value={`${(m.totalUsdcVolume ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} USDC`} />
+            </Section>
+
+            {/* Recent Transactions — getMerchantDetail already fetches the
+                last 10 (recentTransactions), it just wasn't rendered
+                anywhere in this drawer until now. */}
+            <Section title="Recent Transactions" icon="receipt_long">
+              {m.recentTransactions?.length ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-surface-container-low/50">
+                        <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60">Date</th>
+                        <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60">Type</th>
+                        <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60">Reference</th>
+                        <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60">Counterparty</th>
+                        <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60 text-right">Amount</th>
+                        <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-xs">
+                      {m.recentTransactions.map((t) => (
+                        <tr key={t._id || t.reference} className="hover:bg-secondary-container/5 transition-colors">
+                          <td className="px-4 py-2.5 border-b border-outline-variant/5 text-on-surface-variant/70 whitespace-nowrap">{fmtDate(t.createdAt)}</td>
+                          <td className="px-4 py-2.5 border-b border-outline-variant/5">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest border bg-primary/5 text-primary border-primary/20">
+                              {(t.type || '—').replace(/_/g, ' ')}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2.5 border-b border-outline-variant/5 font-mono text-on-surface-variant/70">{t.reference || '—'}</td>
+                          <td className="px-4 py-2.5 border-b border-outline-variant/5 text-on-surface">{formatName(t.sender?.name) || formatName(t.recipient?.name) || '—'}</td>
+                          <td className="px-4 py-2.5 border-b border-outline-variant/5 text-right font-semibold text-on-surface whitespace-nowrap">{formatKES(t.kesAmount ?? t.amount)}</td>
+                          <td className="px-4 py-2.5 border-b border-outline-variant/5">
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-widest ${
+                              t.status === 'completed' || t.status === 'verified' ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : t.status === 'pending' ? 'bg-amber-50 text-amber-700 border-amber-200'
+                              : 'bg-red-50 text-red-700 border-red-200'
+                            }`}>
+                              {t.status || '—'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="px-4 py-6 text-center text-on-surface-variant/40 text-xs">No transactions yet.</div>
+              )}
             </Section>
 
             {/* Security flags */}
