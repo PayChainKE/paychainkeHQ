@@ -6,6 +6,7 @@ import { notifyAdmins, escapeHtml } from './securityAlerts.js';
 import { dispatchOtp } from './otpDispatch.js';
 import { timingSafeStringEqual } from './timingSafeCompare.js';
 import { LARGE_TRANSACTION_ALERT_KES } from '../config/fraudThresholds.js';
+import { PAYOUT_STEP_UP_ENABLED } from '../config/payoutStepUpFlag.js';
 
 // A login from a device PayChain has never seen, immediately followed by a
 // large payout, is the clearest signature of an account takeover cashing
@@ -43,6 +44,11 @@ export async function isRecentDevice(merchantId, req) {
 }
 
 export async function requiresPayoutStepUp({ merchantId, req, amountKes }) {
+  // Single point of control for the kill switch — every guarded payout
+  // path (B2C, B2B, bank payout, Bulk Pay) calls this one function to
+  // decide whether to challenge, so disabling it here is enough; none of
+  // those call sites, or either frontend's step-up UI, need to change.
+  if (!PAYOUT_STEP_UP_ENABLED) return false;
   if (!(Number(amountKes) >= LARGE_TRANSACTION_ALERT_KES)) return false;
   return isRecentDevice(merchantId, req);
 }
