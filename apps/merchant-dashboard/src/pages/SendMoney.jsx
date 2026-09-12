@@ -159,6 +159,16 @@ export default function SendMoney() {
   // PIN boxes + Confirm button just silently staying live and inviting an
   // instant re-tap that sends a second real transfer.
   const [confirmLocked, setConfirmLocked]   = useState(false)
+  // A large payout from a device PayChain hasn't recently seen on this
+  // account gets challenged server-side with a one-time code (see
+  // backend/utils/payoutStepUpGuard.js) before the transfer actually goes
+  // through — the payout endpoint responds 428 instead of executing. Not a
+  // failure: just one more field to fill in before resubmitting the exact
+  // same request with the code attached.
+  const [stepUpRequired, setStepUpRequired] = useState(false)
+  const [stepUpChannel, setStepUpChannel]   = useState(null)
+  const [stepUpMaskedPhone, setStepUpMaskedPhone] = useState(null)
+  const [stepUpCode, setStepUpCode]         = useState('')
 
   // Snapshotted once at mount, not derived live from `merchant` — the PIN
   // setup step below calls refreshSession() right after saving a first-time
@@ -302,42 +312,64 @@ export default function SendMoney() {
         // 2. Execute transfer — once this starts, lock the step on any
         // failure below (see confirmLocked's own comment) since NCBA may
         // have actually received and processed the request even if this
-        // call throws.
+        // call throws. The one exception is a 428 step-up challenge (caught
+        // below) — that means the transfer never ran at all, so it's safe
+        // to just prompt for the code and let the merchant resubmit.
         const isMobile = destination === 'mpesa-primary' || destination === 'mobile'
+        const stepUpOtp = stepUpRequired ? stepUpCode : undefined
         let tx = null
-        if (isMobile) {
-          const { data } = await axios.post(`${API_URL}/api/callbacks/b2c-request`, {
-            phone: recipientAccount,
-            amount: Number(amount),
-            destination: selectedDest.label,
-            fee,
-            reference,
-            pin,
-            provider,
-          }, cfg())
-          tx = data.transaction
-        } else if (destination === 'bank') {
-          const { data } = await axios.post(`${API_URL}/api/v1/openbanking/bank-payout`, {
-            bankCode,
-            accountNumber: recipientAccount,
-            accountName: reference || undefined,
-            amount: Number(amount),
-            narration: reference || `Transfer to ${recipientAccount}`,
-            pin,
-            rail: bankRail,
-            ...(bankRail === 'rtgs' ? { beneficiaryCountry, beneficiaryAddress: beneficiaryAddress || undefined, purposeCode } : {}),
-          }, cfg())
-          tx = data.transaction
-        } else {
-          const { data } = await axios.post(`${API_URL}/api/callbacks/b2b-request`, {
-            billType: destination, // 'till' | 'paybill'
-            partyB: recipientAccount,
-            accountReference: isB2bDest ? (paybillAccountRef || undefined) : undefined,
-            amount: Number(amount),
-            reference: reference || `Transfer to ${recipientAccount}`,
-            pin,
-          }, cfg())
-          tx = data.transaction
+        try {
+          if (isMobile) {
+            const { data } = await axios.post(`${API_URL}/api/callbacks/b2c-request`, {
+              phone: recipientAccount,
+              amount: Number(amount),
+              destination: selectedDest.label,
+              fee,
+              reference,
+              pin,
+              provider,
+              stepUpOtp,
+            }, cfg())
+            tx = data.transaction
+          } else if (destination === 'bank') {
+            const { data } = await axios.post(`${API_URL}/api/v1/openbanking/bank-payout`, {
+              bankCode,
+              accountNumber: recipientAccount,
+              accountName: reference || undefined,
+              amount: Number(amount),
+              narration: reference || `Transfer to ${recipientAccount}`,
+              pin,
+              rail: bankRail,
+              ...(bankRail === 'rtgs' ? { beneficiaryCountry, beneficiaryAddress: beneficiaryAddress || undefined, purposeCode } : {}),
+              stepUpOtp,
+            }, cfg())
+            tx = data.transaction
+          } else {
+            const { data } = await axios.post(`${API_URL}/api/callbacks/b2b-request`, {
+              billType: destination, // 'till' | 'paybill'
+              partyB: recipientAccount,
+              accountReference: isB2bDest ? (paybillAccountRef || undefined) : undefined,
+              amount: Number(amount),
+              reference: reference || `Transfer to ${recipientAccount}`,
+              pin,
+              stepUpOtp,
+            }, cfg())
+            tx = data.transaction
+          }
+        } catch (payoutErr) {
+          if (payoutErr.response?.status === 428 && payoutErr.response?.data?.stepUpRequired) {
+            setStepUpRequired(true)
+            setStepUpChannel(payoutErr.response.data.channel || null)
+            setStepUpMaskedPhone(payoutErr.response.data.maskedPhone || null)
+            setPinError('')
+            return
+          }
+          if (payoutErr.response?.status === 401 && payoutErr.response?.data?.stepUpInvalid) {
+            setPinError(payoutErr.response.data.error || 'Invalid or expired code.')
+            setStepUpCode('')
+            return
+          }
+          throw payoutErr
         }
 
         await refreshSession()
@@ -358,11 +390,15 @@ export default function SendMoney() {
     setConfirmLocked(false)
     setPinError('')
     setPin('')
+    setStepUpRequired(false)
+    setStepUpCode('')
   }
 
   const handleBack = () => {
     if (step === 1) { navigate('/overview'); return }
     setConfirmLocked(false)
+    setStepUpRequired(false)
+    setStepUpCode('')
     setStep(s => s - 1)
   }
 
@@ -370,7 +406,7 @@ export default function SendMoney() {
     if (step === 1) return !!destination
     if (step === 2) return !!amount && Number(amount) > 0 && (!isMobileDest || (Number(amount) >= 50 && Number(amount) <= 250000)) && !!recipientAccount && (destination !== 'bank' || !!bankCode) && (destination !== 'bank' || bankRail !== 'rtgs' || !!beneficiaryCountry) && (destination !== 'paybill' || !!paybillAccountRef)
     if (!hasPin && step === 3) return newPin.length === 4 && confirmPin.length === 4
-    if (step === confirmStep) return pin.length === 4 && liveFee !== null
+    if (step === confirmStep) return pin.length === 4 && liveFee !== null && (!stepUpRequired || stepUpCode.length === 6)
     return true
   }
 
@@ -874,11 +910,42 @@ export default function SendMoney() {
                       </p>
                     )}
                   </div>
-                  <PinBoxes value={pin} onChange={setPin} autoFocus loading={isLoading} />
+                  <PinBoxes value={pin} onChange={setPin} autoFocus={!stepUpRequired} loading={isLoading} />
                   {pinError && (
                     <div className="flex items-center justify-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 animate-shake">
                       <span className="material-symbols-outlined text-red-500 text-base shrink-0">error_outline</span>
                       <p className="text-xs font-bold text-red-700">{pinError}</p>
+                    </div>
+                  )}
+
+                  {/* Step-up challenge — only appears once the payout
+                      endpoint has responded 428 for this amount/device
+                      combination (see backend/utils/payoutStepUpGuard.js).
+                      Below the PIN, not instead of it: the PIN stays needed
+                      on the resubmit too. */}
+                  {stepUpRequired && (
+                    <div className="space-y-3 pt-2 border-t border-slate-100">
+                      <div className="text-center">
+                        <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-1">Confirm This Payout</p>
+                        <p className="text-[10px] text-slate-400">
+                          {stepUpChannel === 'sms'
+                            ? <>For your security, enter the code sent via SMS to <span className="font-bold text-slate-500">{stepUpMaskedPhone || 'your phone'}</span></>
+                            : 'For your security, enter the code sent to your registered email'}
+                        </p>
+                      </div>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        maxLength={6}
+                        autoFocus
+                        autoComplete="one-time-code"
+                        value={stepUpCode}
+                        onChange={e => setStepUpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        disabled={isLoading}
+                        placeholder="000000"
+                        className="w-full text-center text-2xl font-black tracking-[0.5em] py-4 rounded-2xl bg-slate-100 border-2 border-slate-200 text-[#00351D] outline-none focus:border-[#00351D] focus:bg-white transition-all disabled:opacity-50"
+                      />
                     </div>
                   )}
                 </div>

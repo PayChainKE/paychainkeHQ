@@ -30,6 +30,8 @@ import { getOrCreatePlatformSettings } from '../models/PlatformSettings.js';
 import { getAvailableBalance } from '../utils/availableBalance.js';
 import { checkImageSharpness } from '../utils/imageBlurCheck.js';
 import { uploadBufferToCloudinary } from '../utils/cloudinary.js';
+import { dispatchOtp, maskPhone } from '../utils/otpDispatch.js';
+import { screenMerchantForSanctions } from '../services/sanctionsListCache.js';
 
 // Canonical option sets for self-serve signup's business-details step —
 // kept here (not just in the frontend) so a request bypassing the UI can't
@@ -94,47 +96,6 @@ function resolveDocTypes(type, uploadedDocsByType) {
 // without a deploy and is never accidentally left pointed at a real
 // merchant's email.
 const APP_REVIEW_BYPASS_EMAIL = (process.env.APP_REVIEW_BYPASS_EMAIL || '').trim().toLowerCase();
-
-// Mask a phone number for safe display in the UI, e.g. +254712345678 →
-// +254•••••••78. Falls back to the raw digits if the number can't be
-// normalized to E.164 (still masks — never shows the full number either way).
-const maskPhone = (raw) => {
-  const e164 = toE164Kenyan(raw);
-  const digits = (e164 || String(raw || '')).replace(/\D/g, '');
-  if (digits.length < 6) return null;
-  const start = digits.slice(0, 3);
-  const end = digits.slice(-2);
-  const maskedLen = Math.max(3, digits.length - start.length - end.length);
-  return `+${start}${'•'.repeat(maskedLen)}${end}`;
-};
-
-// Sends the login/resend OTP through whichever channel matches how the
-// merchant is signing in: SMS when they typed their phone number, email
-// otherwise. Never throws (safeSendSMS/sendOTP both swallow their own
-// errors) and always returns enough info for the response to tell the
-// frontend which channel was used and how to render "sent to ...".
-async function dispatchOtp(merchant, { viaPhone, otp }) {
-  if (viaPhone) {
-    const e164Phone = toE164Kenyan(merchant.phone);
-    if (e164Phone) {
-      const result = await safeSendSMS({
-        to: e164Phone,
-        message: `Your PayChain verification code is ${otp}. It expires in 10 minutes. Do not share this code.`,
-      });
-      if (!result.success) {
-        console.error(`📱 SMS Error: Failed to send OTP to ${e164Phone}:`, result.error);
-      }
-      return { channel: 'sms', maskedPhone: maskPhone(merchant.phone) };
-    }
-    console.warn(`📱 Merchant ${merchant._id} phone "${merchant.phone}" would not normalize — falling back to email OTP.`);
-  }
-
-  console.log(`📧 Dispatching OTP via Resend to: ${merchant.email}`);
-  await sendOTP(merchant.email, otp).catch((err) => {
-    console.error(`📧 Resend Error: Failed to send OTP to ${merchant.email}:`, err);
-  });
-  return { channel: 'email', maskedPhone: null };
-}
 
 // @desc    Register a new merchant
 // @route   POST /api/auth/merchant/register
@@ -413,6 +374,14 @@ export const registerMerchant = async (req, res) => {
       // the live Transaction Tariffs sheet exactly like it always has,
       // however many times an admin edits it later (confirmed with
       // Brandon, 2026-09-03).
+    });
+
+    // Free-list name screening (OFAC/UN) — flags for manual review only,
+    // never blocks signup (see services/sanctionsListCache.js). Fire-and-
+    // forget: matching runs against an in-memory list and is fast, but a
+    // signup response must never wait on it regardless.
+    screenMerchantForSanctions(merchant).catch((err) => {
+      console.error('Sanctions screening failed for new signup:', err?.message || err);
     });
 
     console.log(`📧 Dispatching Welcome Email to: ${merchant.email}`);
