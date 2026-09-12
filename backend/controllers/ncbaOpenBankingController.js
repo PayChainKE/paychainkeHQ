@@ -548,29 +548,16 @@ export const handleBankPayout = async (req, res) => {
     }
     await resetPinAttempts(merchantId);
 
-    // Correct PIN alone doesn't stop a double-click or a client retrying a
-    // slow/timed-out request from submitting the exact same real transfer
-    // twice — this rejects an identical (merchant, rail, destination,
-    // amount) submission landing within a short window of the last one.
-    try {
-      await claimPayoutSubmission(merchantId, ['bank-payout', rail, bankCode, accountNumber, amount]);
-    } catch (e) {
-      if (e instanceof DuplicateSubmissionError) return res.status(409).json({ error: e.message });
-      throw e;
-    }
-
-    try {
-      await assertOutboundVelocityOk(merchantId);
-    } catch (e) {
-      if (e instanceof OutboundVelocityLockedError) return res.status(423).json({ error: e.message });
-      throw e;
-    }
-
     // A large payout from a device/location not recently seen on this
     // account is the clearest takeover signature — require a fresh code
     // before any money moves. See utils/payoutStepUpGuard.js. Uses the raw
     // requested amount (the fee isn't known until executeNcbaBankPayout
     // resolves it below) — close enough for a threshold check this coarse.
+    // Deliberately runs BEFORE claimPayoutSubmission below: that lock's
+    // fingerprint doesn't change between this no-code request and the
+    // merchant's resubmission carrying the code, so claiming it here would
+    // make a fast resubmission collide with its own still-active lock and
+    // get rejected as a false duplicate instead of completing.
     if (await requiresPayoutStepUp({ merchantId, req, amountKes: Number(amount) })) {
       const submittedCode = req.body.stepUpOtp;
       if (!submittedCode) {
@@ -590,6 +577,24 @@ export const handleBankPayout = async (req, res) => {
         if (e instanceof PayoutStepUpInvalidError) return res.status(401).json({ error: e.message, stepUpInvalid: true });
         throw e;
       }
+    }
+
+    // Correct PIN alone doesn't stop a double-click or a client retrying a
+    // slow/timed-out request from submitting the exact same real transfer
+    // twice — this rejects an identical (merchant, rail, destination,
+    // amount) submission landing within a short window of the last one.
+    try {
+      await claimPayoutSubmission(merchantId, ['bank-payout', rail, bankCode, accountNumber, amount]);
+    } catch (e) {
+      if (e instanceof DuplicateSubmissionError) return res.status(409).json({ error: e.message });
+      throw e;
+    }
+
+    try {
+      await assertOutboundVelocityOk(merchantId);
+    } catch (e) {
+      if (e instanceof OutboundVelocityLockedError) return res.status(423).json({ error: e.message });
+      throw e;
     }
 
     const { transaction, hostResponse, merchant: updatedMerchant, fee } = await executeNcbaBankPayout({

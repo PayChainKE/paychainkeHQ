@@ -103,7 +103,7 @@ const APP_REVIEW_BYPASS_EMAIL = (process.env.APP_REVIEW_BYPASS_EMAIL || '').trim
 export const registerMerchant = async (req, res) => {
   try {
     let {
-      name, email, phone, businessName, password, registrationSource, kraPin, businessNumber,
+      firstName, surname, otherNames, email, phone, businessName, password, registrationSource, kraPin, businessNumber,
       businessType, county, area, ward, street, employees, ecommerce, agreedToTerms, documentType, nationalId,
     } = req.body || {};
 
@@ -143,9 +143,17 @@ export const registerMerchant = async (req, res) => {
       : ecommerce === false || ecommerce === 'no' ? false
       : null;
 
-    if (!name?.trim() || !email || !phone || !businessName?.trim() || !password) {
-      return res.status(400).json({ error: 'Name, email, phone, business name and password are all required.' });
+    if (!firstName?.trim() || !surname?.trim() || !email || !phone || !businessName?.trim() || !password) {
+      return res.status(400).json({ error: 'First name, surname, email, phone, business name and password are all required.' });
     }
+
+    // Other Names is the one optional part — `name` (still the single
+    // field every other part of the app reads, see Merchant.js's comment)
+    // is computed from all three so nothing downstream needs to change.
+    firstName = firstName.trim();
+    surname = surname.trim();
+    otherNames = otherNames?.trim() || null;
+    const name = [firstName, surname, otherNames].filter(Boolean).join(' ');
 
     if (!isValidEmail(email)) {
       return res.status(400).json({ error: EMAIL_FORMAT_HINT });
@@ -341,6 +349,9 @@ export const registerMerchant = async (req, res) => {
 
     const merchant = await Merchant.create({
       name,
+      firstName,
+      surname,
+      otherNames,
       email,
       phone,
       businessName,

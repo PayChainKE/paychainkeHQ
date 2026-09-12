@@ -750,6 +750,18 @@ export default function BulkPay() {
   const [otpError, setOtpError] = useState('')
   const [otpResendCooldown, setOtpResendCooldown] = useState(0)
 
+  // A large batch from a device PayChain hasn't recently seen on this
+  // account gets challenged server-side with a one-time code (see
+  // backend/utils/payoutStepUpGuard.js) before the batch actually goes
+  // through — /api/bulkpay/authorize responds 428 instead of executing.
+  // Not a failure: just one more field to fill in before resubmitting the
+  // exact same request with the code attached. See SendMoney.jsx's
+  // identical state for the full rationale.
+  const [stepUpRequired, setStepUpRequired] = useState(false)
+  const [stepUpChannel, setStepUpChannel] = useState(null)
+  const [stepUpMaskedPhone, setStepUpMaskedPhone] = useState(null)
+  const [stepUpCode, setStepUpCode] = useState('')
+
   // Real, working SMS-OTP infrastructure (merchantSmsAuthController.js) —
   // this modal used to just require 4+ arbitrary characters be typed with
   // no backend call at all, so no OTP was ever actually sent. Reusing the
@@ -872,13 +884,30 @@ export default function BulkPay() {
       }
 
       const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
-      const res = await axios.post(`${API_URL}/api/bulkpay/authorize`, {
-        batchRows,
-        fundingSource: selectedTill || 'Main Business Till',
-        pin: pin
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      let res;
+      try {
+        res = await axios.post(`${API_URL}/api/bulkpay/authorize`, {
+          batchRows,
+          fundingSource: selectedTill || 'Main Business Till',
+          pin: pin,
+          stepUpOtp: stepUpRequired ? stepUpCode : undefined,
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      } catch (payoutErr) {
+        if (payoutErr.response?.status === 428 && payoutErr.response?.data?.stepUpRequired) {
+          setStepUpRequired(true);
+          setStepUpChannel(payoutErr.response.data.channel || null);
+          setStepUpMaskedPhone(payoutErr.response.data.maskedPhone || null);
+          return;
+        }
+        if (payoutErr.response?.status === 401 && payoutErr.response?.data?.stepUpInvalid) {
+          addNotification({ title: 'Incorrect Code', message: payoutErr.response.data.message || 'Invalid or expired code.', type: 'error' });
+          setStepUpCode('');
+          return;
+        }
+        throw payoutErr;
+      }
 
       const processedBatch = res.data.batch;
 
@@ -904,6 +933,8 @@ export default function BulkPay() {
       setAuthorizedReceipts(newReceipts);
       setStep(4);
       setCsvPreview(null); // Clear preview
+      setStepUpRequired(false);
+      setStepUpCode('');
 
       // Balance was just debited server-side — refresh now instead of
       // waiting for the ambient 5s poll in MerchantAuthContext, so the
@@ -931,6 +962,8 @@ export default function BulkPay() {
          setPin('');
       } else {
          setShowSecurityModal(false);
+         setStepUpRequired(false);
+         setStepUpCode('');
       }
     }
   }
@@ -2484,7 +2517,7 @@ export default function BulkPay() {
                       <p className="text-sm text-primary font-bold">Enter Account PIN to Authorize</p>
                     </div>
 
-                    <input 
+                    <input
                       type="password"
                       maxLength="4"
                       value={pin}
@@ -2493,9 +2526,39 @@ export default function BulkPay() {
                       className="w-full bg-surface-container-low/30 border border-outline-variant/20 rounded-2xl px-5 py-4 text-center font-headline tracking-[1em] text-xl font-bold text-primary focus:ring-0 focus:border-[#00351D]/50 transition-all outline-none"
                     />
 
-                    <button 
+                    {/* Step-up challenge — only appears once
+                        /api/bulkpay/authorize has responded 428 for this
+                        batch/device combination (see
+                        backend/utils/payoutStepUpGuard.js). Below the PIN,
+                        not instead of it. */}
+                    {stepUpRequired && (
+                      <div className="space-y-3 pt-2 border-t border-outline-variant/10">
+                        <div className="text-center">
+                          <p className="text-[11px] font-black uppercase tracking-widest text-on-surface-variant/60 mb-1">Confirm This Batch</p>
+                          <p className="text-[10px] text-on-surface-variant/60">
+                            {stepUpChannel === 'sms'
+                              ? <>For your security, enter the code sent via SMS to <span className="font-bold">{stepUpMaskedPhone || 'your phone'}</span></>
+                              : 'For your security, enter the code sent to your registered email'}
+                          </p>
+                        </div>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          maxLength={6}
+                          autoFocus
+                          autoComplete="one-time-code"
+                          value={stepUpCode}
+                          onChange={(e) => setStepUpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                          placeholder="000000"
+                          className="w-full text-center text-xl font-black tracking-[0.5em] py-4 rounded-2xl bg-surface-container-low/30 border border-outline-variant/20 text-primary outline-none focus:border-[#00351D]/50 transition-all"
+                        />
+                      </div>
+                    )}
+
+                    <button
                       onClick={handleSecurityVerification}
-                      disabled={pin.length !== 4}
+                      disabled={pin.length !== 4 || (stepUpRequired && stepUpCode.length !== 6)}
                       className="w-full py-4 rounded-2xl bg-[#00351D] text-white hover:bg-emerald-950 font-bold text-sm shadow-xl transition-all disabled:opacity-50"
                     >
                       Confirm & Pay

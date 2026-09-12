@@ -11,6 +11,27 @@ const merchantSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Please add a name'],
   },
+  // Self-serve signup captures the registrant's name as three parts
+  // (First Name/Surname required, Other Names optional) and computes `name`
+  // above from them (see merchantAuthController.js's registerMerchant) —
+  // every existing reader of `name` keeps working unchanged. Admin/officer-
+  // created merchants don't populate these (they only ever set `name`
+  // directly), so all three stay optional/nullable rather than required.
+  firstName: {
+    type: String,
+    trim: true,
+    default: null,
+  },
+  surname: {
+    type: String,
+    trim: true,
+    default: null,
+  },
+  otherNames: {
+    type: String,
+    trim: true,
+    default: null,
+  },
   email: {
     type: String,
     required: [true, 'Please add an email'],

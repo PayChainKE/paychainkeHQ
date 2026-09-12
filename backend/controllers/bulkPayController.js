@@ -14,6 +14,7 @@ import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 import { claimPayoutSubmission, DuplicateSubmissionError } from '../utils/idempotencyGuard.js';
 import { assertOutboundVelocityOk, OutboundVelocityLockedError } from '../utils/outboundVelocityGuard.js';
+import { requiresPayoutStepUp, issuePayoutStepUpOtp, verifyPayoutStepUpOtp, PayoutStepUpInvalidError } from '../utils/payoutStepUpGuard.js';
 import { debitAvailableBalance } from '../utils/availableBalance.js';
 import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard.js';
 import { getKplcPostpaidTariff, getKplcPrepaidTariff, getNcwscTariff } from '../config/billPaymentTariffCard.js';
@@ -383,12 +384,14 @@ export const authorizeBatch = async (req, res) => {
     // the merchant via $inc: { kesBalance: -totalNet }. Every row's amounts
     // must be validated as positive before they're allowed anywhere near
     // the balance math.
+    let totalBatchAmount = 0;
     for (const row of batchRows) {
       const netAmount = Number(row.netAmount);
       const grossAmount = Number(row.grossAmount);
       if (!Number.isFinite(netAmount) || netAmount <= 0 || !Number.isFinite(grossAmount) || grossAmount <= 0) {
         return res.status(400).json({ message: `Invalid amount for payee "${row.name || 'unknown'}" — amounts must be positive numbers.` });
       }
+      totalBatchAmount += netAmount;
     }
 
     // Bulk-pay authorization uses the same single Payment PIN as every other
@@ -415,6 +418,39 @@ export const authorizeBatch = async (req, res) => {
       return res.status(401).json({ message: 'Invalid PIN' });
     }
     await resetPinAttempts(req.merchant._id);
+
+    // A large payout from a device/location not recently seen on this
+    // account is the clearest takeover signature — a Bulk Pay batch to
+    // many payees at once is exactly the kind of payout this control
+    // exists for, so it gets the same challenge as a single B2C/B2B/bank
+    // payout (see utils/payoutStepUpGuard.js). Uses the batch's raw total
+    // net amount, not the fee-adjusted totals computed further below (not
+    // known yet at this point). Deliberately runs BEFORE
+    // claimPayoutSubmission below — that lock's fingerprint doesn't change
+    // between this no-code request and the merchant's resubmission
+    // carrying the code, so claiming it here would make a fast resubmission
+    // collide with its own still-active lock and get rejected as a false
+    // duplicate instead of completing.
+    if (await requiresPayoutStepUp({ merchantId: req.merchant._id, req, amountKes: totalBatchAmount })) {
+      const submittedCode = req.body.stepUpOtp;
+      if (!submittedCode) {
+        const { channel, maskedPhone } = await issuePayoutStepUpOtp(merchant, req);
+        return res.status(428).json({
+          stepUpRequired: true,
+          channel,
+          maskedPhone,
+          message: channel === 'sms'
+            ? 'For your security, enter the code sent to your phone to confirm this payout.'
+            : 'For your security, enter the code sent to your email to confirm this payout.',
+        });
+      }
+      try {
+        await verifyPayoutStepUpOtp(merchant, submittedCode);
+      } catch (e) {
+        if (e instanceof PayoutStepUpInvalidError) return res.status(401).json({ message: e.message, stepUpInvalid: true });
+        throw e;
+      }
+    }
 
     // Correct PIN alone doesn't stop a double-click or a client retrying a
     // slow/timed-out request from submitting the exact same batch twice —

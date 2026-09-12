@@ -215,6 +215,15 @@ export default function BulkPay() {
   const [confirmPin, setConfirmPin] = useState('');
   const [authPin, setAuthPin] = useState('');
   const [isAuthorizing, setIsAuthorizing] = useState(false);
+  // A large batch from a device PayChain hasn't recently seen on this
+  // account gets challenged server-side with a one-time code (see
+  // backend/utils/payoutStepUpGuard.js) before the batch actually goes
+  // through — /api/bulkpay/authorize responds 428 instead of executing.
+  // See SendMoney.tsx's identical state for the full rationale.
+  const [stepUpRequired, setStepUpRequired] = useState(false);
+  const [stepUpChannel, setStepUpChannel] = useState<string | null>(null);
+  const [stepUpMaskedPhone, setStepUpMaskedPhone] = useState<string | null>(null);
+  const [stepUpCode, setStepUpCode] = useState('');
 
   // Add payee
   const [addStep, setAddStep] = useState<1 | 2>(1);
@@ -898,11 +907,28 @@ export default function BulkPay() {
               netAmount: payoutAmounts[p._id] || 0,
             }));
 
-      const res = await api.post('/api/bulkpay/authorize', {
-        batchRows,
-        fundingSource: fundingSourceLabel,
-        pin: authPin,
-      });
+      let res;
+      try {
+        res = await api.post('/api/bulkpay/authorize', {
+          batchRows,
+          fundingSource: fundingSourceLabel,
+          pin: authPin,
+          stepUpOtp: stepUpRequired ? stepUpCode : undefined,
+        });
+      } catch (payoutErr: any) {
+        if (payoutErr?.response?.status === 428 && payoutErr?.response?.data?.stepUpRequired) {
+          setStepUpRequired(true);
+          setStepUpChannel(payoutErr.response.data.channel || null);
+          setStepUpMaskedPhone(payoutErr.response.data.maskedPhone || null);
+          return;
+        }
+        if (payoutErr?.response?.status === 401 && payoutErr?.response?.data?.stepUpInvalid) {
+          Alert.alert('Incorrect Code', payoutErr.response.data.message || 'Invalid or expired code.');
+          setStepUpCode('');
+          return;
+        }
+        throw payoutErr;
+      }
 
       const processedBatch = res.data?.batch;
       const ref = processedBatch?.batchReference || `B-${Date.now()}`;
@@ -927,6 +953,8 @@ export default function BulkPay() {
       setAuthPin('');
       setSecurityOtp('');
       setSecurityStep(1);
+      setStepUpRequired(false);
+      setStepUpCode('');
       setSelectedPayees({});
       setCsvPreview([]);
       setCsvSummary(null);
@@ -944,6 +972,8 @@ export default function BulkPay() {
         setAuthPin('');
       } else {
         setShowSecurity(false);
+        setStepUpRequired(false);
+        setStepUpCode('');
       }
     } finally {
       setIsAuthorizing(false);
@@ -1757,11 +1787,39 @@ export default function BulkPay() {
                     placeholderTextColor="#a1a1aa"
                     autoFocus
                   />
+
+                  {/* Step-up challenge — only appears once
+                      /api/bulkpay/authorize has responded 428 for this
+                      batch/device combination (see
+                      backend/utils/payoutStepUpGuard.js). Below the PIN,
+                      not instead of it. */}
+                  {stepUpRequired ? (
+                    <View className="mb-6">
+                      <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#00351d]/60 mb-1 text-center">Confirm This Batch</Text>
+                      <Text className="text-[11px] font-jakarta-bold text-[#5b645c] text-center mb-3">
+                        {stepUpChannel === 'sms'
+                          ? `For your security, enter the code sent via SMS to ${stepUpMaskedPhone || 'your phone'}`
+                          : 'For your security, enter the code sent to your registered email'}
+                      </Text>
+                      <TextInput
+                        value={stepUpCode}
+                        onChangeText={(t) => setStepUpCode(t.replace(/\D/g, '').slice(0, 6))}
+                        keyboardType="numeric"
+                        maxLength={6}
+                        autoFocus
+                        editable={!isAuthorizing}
+                        className="bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-5 py-4 text-[#0c2010] font-jakarta-bold text-[20px] tracking-[0.5em] text-center"
+                        placeholder="000000"
+                        placeholderTextColor="#a1a1aa"
+                      />
+                    </View>
+                  ) : null}
+
                   <TouchableOpacity
                     onPress={handleAuthorize}
-                    disabled={authPin.length !== 4 || isAuthorizing}
+                    disabled={authPin.length !== 4 || isAuthorizing || (stepUpRequired && stepUpCode.length !== 6)}
                     className="w-full bg-[#00351d] h-[56px] rounded-full flex-row items-center justify-center"
-                    style={{ opacity: authPin.length !== 4 || isAuthorizing ? 0.7 : 1 }}
+                    style={{ opacity: authPin.length !== 4 || isAuthorizing || (stepUpRequired && stepUpCode.length !== 6) ? 0.7 : 1 }}
                   >
                     {isAuthorizing ? <ActivityIndicator color="#fff" /> : (
                       <Text className="text-white font-jakarta-bold text-[15px]">Confirm & Pay</Text>
