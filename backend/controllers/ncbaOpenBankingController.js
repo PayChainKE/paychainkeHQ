@@ -30,6 +30,7 @@ import { formatPhoneDisplay } from '../utils/formatPhoneDisplay.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 import { claimPayoutSubmission, DuplicateSubmissionError } from '../utils/idempotencyGuard.js';
 import { assertOutboundVelocityOk, OutboundVelocityLockedError } from '../utils/outboundVelocityGuard.js';
+import { requiresPayoutStepUp, issuePayoutStepUpOtp, verifyPayoutStepUpOtp, PayoutStepUpInvalidError } from '../utils/payoutStepUpGuard.js';
 import { debitAvailableBalance } from '../utils/availableBalance.js';
 import { KENYAN_BANK_CODES } from '../config/kenyanBankCodes.js';
 import { getB2cTariff } from '../config/mpesaB2cTariffCard.js';
@@ -563,6 +564,32 @@ export const handleBankPayout = async (req, res) => {
     } catch (e) {
       if (e instanceof OutboundVelocityLockedError) return res.status(423).json({ error: e.message });
       throw e;
+    }
+
+    // A large payout from a device/location not recently seen on this
+    // account is the clearest takeover signature — require a fresh code
+    // before any money moves. See utils/payoutStepUpGuard.js. Uses the raw
+    // requested amount (the fee isn't known until executeNcbaBankPayout
+    // resolves it below) — close enough for a threshold check this coarse.
+    if (await requiresPayoutStepUp({ merchantId, req, amountKes: Number(amount) })) {
+      const submittedCode = req.body.stepUpOtp;
+      if (!submittedCode) {
+        const { channel, maskedPhone } = await issuePayoutStepUpOtp(merchant, req);
+        return res.status(428).json({
+          stepUpRequired: true,
+          channel,
+          maskedPhone,
+          message: channel === 'sms'
+            ? 'For your security, enter the code sent to your phone to confirm this payout.'
+            : 'For your security, enter the code sent to your email to confirm this payout.',
+        });
+      }
+      try {
+        await verifyPayoutStepUpOtp(merchant, submittedCode);
+      } catch (e) {
+        if (e instanceof PayoutStepUpInvalidError) return res.status(401).json({ error: e.message, stepUpInvalid: true });
+        throw e;
+      }
     }
 
     const { transaction, hostResponse, merchant: updatedMerchant, fee } = await executeNcbaBankPayout({

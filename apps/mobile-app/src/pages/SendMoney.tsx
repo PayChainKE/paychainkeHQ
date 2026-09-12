@@ -229,12 +229,64 @@ export default function SendMoney({ navigation }: any) {
   // reads as a failure — re-tapping Confirm in that case would risk a
   // second real transfer.
   const [confirmLocked, setConfirmLocked] = useState(false);
+  // A large payout from a device PayChain hasn't recently seen on this
+  // account gets challenged server-side with a one-time code (see
+  // backend/utils/payoutStepUpGuard.js) before the transfer actually goes
+  // through — the payout endpoint responds 428 instead of executing. Not a
+  // failure, just one more field to fill in before resubmitting. See
+  // SendMoney.jsx's identical state for the full rationale.
+  const [stepUpRequired, setStepUpRequired] = useState(false);
+  const [stepUpChannel, setStepUpChannel] = useState<string | null>(null);
+  const [stepUpMaskedPhone, setStepUpMaskedPhone] = useState<string | null>(null);
+  const [stepUpCode, setStepUpCode] = useState('');
 
   const isLipaNaMpesaBetaMerchant = LIPA_NA_MPESA_LIVE_TESTING_ENABLED && merchant?._id === LIPA_NA_MPESA_BETA_MERCHANT_ID;
   const selectedDest = DESTINATIONS.find((d) => d.id === destination);
   const isMobileDest = destination === 'mpesa-primary' || destination === 'mobile';
   const isB2bDest = destination === 'till' || destination === 'paybill';
-  const fee = isMobileDest ? estimateB2cFee(Number(amount) || 0) : isB2bDest ? estimateB2bFee(Number(amount) || 0) : destination === 'bank' ? estimateBankFee(bankRail, Number(amount) || 0) : 0;
+  // Instant client-side estimate — shown only while the live fee below is
+  // still loading (or if that request fails), never used to actually gate
+  // Confirm. See SendMoney.jsx's identical clientEstimate for the full
+  // history: this hardcoded table is exactly what caused the original
+  // "UI shows KES 5, backend charges KES 10" bug, since it has no way to
+  // reflect an admin tariff change. `liveFee` below fixes it structurally —
+  // mobile shared the same bug as web until this was ported over.
+  const clientEstimate = isMobileDest ? estimateB2cFee(Number(amount) || 0) : isB2bDest ? estimateB2bFee(Number(amount) || 0) : destination === 'bank' ? estimateBankFee(bankRail, Number(amount) || 0) : 0;
+
+  // Live fee, fetched from the same tariff functions/per-merchant lock the
+  // backend uses to actually charge (GET /api/transactions/fee-preview) —
+  // null until a successful response comes back for the CURRENT amount/
+  // destination/rail, so canContinue() below can block Confirm on it rather
+  // than ever letting the merchant authorize against a guess.
+  const [liveFee, setLiveFee] = useState<number | null>(null);
+  const [feeLoading, setFeeLoading] = useState(false);
+  const [feeRetryToken, setFeeRetryToken] = useState(0);
+
+  useEffect(() => {
+    const numAmount = Number(amount) || 0;
+    const previewType = isMobileDest ? 'mobile' : isB2bDest ? destination : destination === 'bank' ? 'bank' : null;
+    if (!previewType || numAmount <= 0) { setLiveFee(null); setFeeLoading(false); return; }
+
+    let cancelled = false;
+    setLiveFee(null);
+    setFeeLoading(true);
+    const t = setTimeout(async () => {
+      try {
+        const { data } = await api.get('/api/transactions/fee-preview', {
+          params: { type: previewType, amount: numAmount, ...(destination === 'bank' ? { rail: bankRail } : {}) },
+        });
+        if (!cancelled) setLiveFee(Number(data?.totalFee) || 0);
+      } catch {
+        if (!cancelled) setLiveFee(null); // canContinue() keeps Confirm blocked; clientEstimate still shows on screen
+      } finally {
+        if (!cancelled) setFeeLoading(false);
+      }
+    }, 350);
+    return () => { cancelled = true; clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [destination, bankRail, amount, feeRetryToken]);
+
+  const fee = liveFee != null ? liveFee : clientEstimate;
   const totalAmount = Number(amount || 0) + fee;
   // availableBalance (kesBalance minus anything credited in the last 2
   // minutes and still held server-side — see
@@ -271,7 +323,7 @@ export default function SendMoney({ navigation }: any) {
       );
     }
     if (!hasPin && step === 3) return newPin.length === 4 && confirmPin.length === 4;
-    if (step === confirmStep) return pin.length === 4;
+    if (step === confirmStep) return pin.length === 4 && liveFee !== null && (!stepUpRequired || stepUpCode.length === 6);
     return true;
   };
 
@@ -321,39 +373,59 @@ export default function SendMoney({ navigation }: any) {
         }
 
         let tx: any = null;
-        if (isMobileDest) {
-          const { data } = await api.post('/api/callbacks/b2c-request', {
-            phone: recipientAccount,
-            amount: Number(amount),
-            destination: selectedDest?.label,
-            fee,
-            reference,
-            pin,
-            provider,
-          });
-          tx = data.transaction;
-        } else if (destination === 'bank') {
-          const { data } = await api.post('/api/v1/openbanking/bank-payout', {
-            bankCode,
-            accountNumber: recipientAccount,
-            accountName: reference || undefined,
-            amount: Number(amount),
-            narration: reference || `Transfer to ${recipientAccount}`,
-            pin,
-            rail: bankRail,
-            ...(bankRail === 'rtgs' ? { beneficiaryCountry, beneficiaryAddress: beneficiaryAddress || undefined, purposeCode } : {}),
-          });
-          tx = data.transaction;
-        } else {
-          const { data } = await api.post('/api/callbacks/b2b-request', {
-            billType: destination, // 'till' | 'paybill'
-            partyB: recipientAccount,
-            accountReference: isB2bDest ? (paybillAccountRef || undefined) : undefined,
-            amount: Number(amount),
-            reference: reference || `Transfer to ${recipientAccount}`,
-            pin,
-          });
-          tx = data.transaction;
+        const stepUpOtp = stepUpRequired ? stepUpCode : undefined;
+        try {
+          if (isMobileDest) {
+            const { data } = await api.post('/api/callbacks/b2c-request', {
+              phone: recipientAccount,
+              amount: Number(amount),
+              destination: selectedDest?.label,
+              fee,
+              reference,
+              pin,
+              provider,
+              stepUpOtp,
+            });
+            tx = data.transaction;
+          } else if (destination === 'bank') {
+            const { data } = await api.post('/api/v1/openbanking/bank-payout', {
+              bankCode,
+              accountNumber: recipientAccount,
+              accountName: reference || undefined,
+              amount: Number(amount),
+              narration: reference || `Transfer to ${recipientAccount}`,
+              pin,
+              rail: bankRail,
+              ...(bankRail === 'rtgs' ? { beneficiaryCountry, beneficiaryAddress: beneficiaryAddress || undefined, purposeCode } : {}),
+              stepUpOtp,
+            });
+            tx = data.transaction;
+          } else {
+            const { data } = await api.post('/api/callbacks/b2b-request', {
+              billType: destination, // 'till' | 'paybill'
+              partyB: recipientAccount,
+              accountReference: isB2bDest ? (paybillAccountRef || undefined) : undefined,
+              amount: Number(amount),
+              reference: reference || `Transfer to ${recipientAccount}`,
+              pin,
+              stepUpOtp,
+            });
+            tx = data.transaction;
+          }
+        } catch (payoutErr: any) {
+          if (payoutErr?.response?.status === 428 && payoutErr?.response?.data?.stepUpRequired) {
+            setStepUpRequired(true);
+            setStepUpChannel(payoutErr.response.data.channel || null);
+            setStepUpMaskedPhone(payoutErr.response.data.maskedPhone || null);
+            setPinError('');
+            return;
+          }
+          if (payoutErr?.response?.status === 401 && payoutErr?.response?.data?.stepUpInvalid) {
+            setPinError(payoutErr.response.data.error || 'Invalid or expired code.');
+            setStepUpCode('');
+            return;
+          }
+          throw payoutErr;
         }
 
         await refreshSession();
@@ -374,11 +446,17 @@ export default function SendMoney({ navigation }: any) {
     setConfirmLocked(false);
     setPinError('');
     setPin('');
+    setStepUpRequired(false);
+    setStepUpCode('');
   };
 
   const goBack = () => {
-    if (step > 1) { setConfirmLocked(false); setStep((s) => s - 1); }
-    else navigation?.goBack();
+    if (step > 1) {
+      setConfirmLocked(false);
+      setStepUpRequired(false);
+      setStepUpCode('');
+      setStep((s) => s - 1);
+    } else navigation?.goBack();
   };
 
   if (success) {
@@ -771,6 +849,20 @@ export default function SendMoney({ navigation }: any) {
                 </View>
               </View>
 
+              {liveFee === null && !confirmLocked && (
+                <View className="flex-row items-center gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-5">
+                  <Feather name={feeLoading ? 'loader' : 'alert-circle'} size={16} color="#b45309" />
+                  <Text className="text-[12px] font-jakarta-bold text-amber-800 flex-1">
+                    {feeLoading ? 'Verifying the current transaction fee before you can confirm…' : 'Could not verify the current fee.'}
+                  </Text>
+                  {!feeLoading && (
+                    <TouchableOpacity onPress={() => setFeeRetryToken((t) => t + 1)}>
+                      <Text className="text-[11px] font-jakarta-extrabold text-amber-900 uppercase tracking-wider">Retry</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+
               {confirmLocked ? (
                 <View>
                   <View className="items-center gap-3 bg-red-50 border border-red-200 rounded-2xl px-5 py-6">
@@ -810,6 +902,32 @@ export default function SendMoney({ navigation }: any) {
                     <View className="flex-row items-center justify-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 mt-4">
                       <Feather name="alert-circle" size={14} color="#dc2626" />
                       <Text className="text-[12px] font-jakarta-bold text-red-700">{pinError}</Text>
+                    </View>
+                  ) : null}
+
+                  {/* Step-up challenge — only appears once the payout
+                      endpoint has responded 428 for this amount/device
+                      combination (see backend/utils/payoutStepUpGuard.js).
+                      Below the PIN, not instead of it. */}
+                  {stepUpRequired ? (
+                    <View className="mt-5 pt-4 border-t border-[#eff4ef]">
+                      <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#00351d]/60 mb-1 text-center">Confirm This Payout</Text>
+                      <Text className="text-[11px] font-jakarta-bold text-[#5b645c] text-center mb-3">
+                        {stepUpChannel === 'sms'
+                          ? `For your security, enter the code sent via SMS to ${stepUpMaskedPhone || 'your phone'}`
+                          : 'For your security, enter the code sent to your registered email'}
+                      </Text>
+                      <TextInput
+                        value={stepUpCode}
+                        onChangeText={(t) => setStepUpCode(t.replace(/\D/g, '').slice(0, 6))}
+                        keyboardType="numeric"
+                        maxLength={6}
+                        autoFocus
+                        editable={!isLoading}
+                        className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl px-5 py-4 text-[#00351d] font-jakarta-extrabold text-[20px] tracking-[0.5em] text-center"
+                        placeholder="000000"
+                        placeholderTextColor="#a1a1aa"
+                      />
                     </View>
                   ) : null}
                 </>

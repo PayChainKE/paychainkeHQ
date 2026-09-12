@@ -15,6 +15,7 @@ import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 import { claimPayoutSubmission, DuplicateSubmissionError } from '../utils/idempotencyGuard.js';
 import { assertOutboundVelocityOk, OutboundVelocityLockedError } from '../utils/outboundVelocityGuard.js';
+import { requiresPayoutStepUp, issuePayoutStepUpOtp, verifyPayoutStepUpOtp, PayoutStepUpInvalidError } from '../utils/payoutStepUpGuard.js';
 import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard.js';
 import { getLipaNaMpesaTariff } from '../config/lipaNaMpesaTariffCard.js';
 import { withMerchantTariffLock } from '../services/tariffCardCache.js';
@@ -1105,6 +1106,30 @@ export const initiateB2C = async (req, res) => {
       throw e;
     }
 
+    // A large payout from a device/location not recently seen on this
+    // account is the clearest takeover signature — require a fresh code
+    // before any money moves. See utils/payoutStepUpGuard.js.
+    if (await requiresPayoutStepUp({ merchantId, req, amountKes: Number(amount) + Number(b2cFee) })) {
+      const submittedCode = req.body.stepUpOtp;
+      if (!submittedCode) {
+        const { channel, maskedPhone } = await issuePayoutStepUpOtp(merchantWithPin, req);
+        return res.status(428).json({
+          stepUpRequired: true,
+          channel,
+          maskedPhone,
+          message: channel === 'sms'
+            ? 'For your security, enter the code sent to your phone to confirm this payout.'
+            : 'For your security, enter the code sent to your email to confirm this payout.',
+        });
+      }
+      try {
+        await verifyPayoutStepUpOtp(merchantWithPin, submittedCode);
+      } catch (e) {
+        if (e instanceof PayoutStepUpInvalidError) return res.status(401).json({ error: e.message, stepUpInvalid: true });
+        throw e;
+      }
+    }
+
     // Atomic conditional deduct — avoids two concurrent B2C requests both
     // passing a stale in-memory balance check and over-withdrawing. Amount
     // sent to NCBA stays the raw `amount` — the fee is PayChain's own
@@ -1397,6 +1422,39 @@ export const initiateB2B = async (req, res) => {
     } catch (e) {
       if (e instanceof DuplicateSubmissionError) return res.status(409).json({ error: e.message });
       throw e;
+    }
+
+    // Same rapid-drain guard as initiateB2C above — this function never had
+    // one of its own despite being an equally real ad-hoc outbound rail.
+    try {
+      await assertOutboundVelocityOk(merchantId);
+    } catch (e) {
+      if (e instanceof OutboundVelocityLockedError) return res.status(423).json({ error: e.message });
+      throw e;
+    }
+
+    // A large payout from a device/location not recently seen on this
+    // account is the clearest takeover signature — require a fresh code
+    // before any money moves. See utils/payoutStepUpGuard.js.
+    if (await requiresPayoutStepUp({ merchantId, req, amountKes: numericAmount + Number(fee) })) {
+      const submittedCode = req.body.stepUpOtp;
+      if (!submittedCode) {
+        const { channel, maskedPhone } = await issuePayoutStepUpOtp(merchantWithPin, req);
+        return res.status(428).json({
+          stepUpRequired: true,
+          channel,
+          maskedPhone,
+          message: channel === 'sms'
+            ? 'For your security, enter the code sent to your phone to confirm this payout.'
+            : 'For your security, enter the code sent to your email to confirm this payout.',
+        });
+      }
+      try {
+        await verifyPayoutStepUpOtp(merchantWithPin, submittedCode);
+      } catch (e) {
+        if (e instanceof PayoutStepUpInvalidError) return res.status(401).json({ error: e.message, stepUpInvalid: true });
+        throw e;
+      }
     }
 
     // Atomic conditional deduct — same race-avoidance as initiateB2C, also

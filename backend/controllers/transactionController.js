@@ -25,12 +25,7 @@ import { withMerchantTariffLock } from '../services/tariffCardCache.js';
 import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard.js';
 import { getLipaNaMpesaTariff } from '../config/lipaNaMpesaTariffCard.js';
 import { getBankTransferTariff } from '../config/bankTransferTariffCard.js';
-
-// Transfers at or above this amount get an admin visibility alert — not a
-// block, just a heads-up. Configurable since "large" depends on the
-// merchant base's real transaction sizes; defaults to a conservative
-// KES 500,000 in case the env var is unset.
-const LARGE_TRANSACTION_ALERT_KES = Number(process.env.LARGE_TRANSACTION_ALERT_KES) || 500_000;
+import { LARGE_TRANSACTION_ALERT_KES } from '../config/fraudThresholds.js';
 
 // Resolves either the 12-digit NCBA virtual account number or the 8-digit
 // interim merchant code (see getNcbaVirtualAccountNumber) to a merchant.

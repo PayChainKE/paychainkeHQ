@@ -394,6 +394,29 @@ const merchantSchema = new mongoose.Schema({
     select: false,
     default: null,
   },
+  // Step-up confirmation for a large payout attempted from a device
+  // MerchantLoginDevice hasn't seen for long (see utils/payoutStepUpGuard.js).
+  // Deliberately separate from the login otp/otpExpires fields above and from
+  // developerLinkOtp — same reasoning as that field's own comment: a payout
+  // step-up racing a concurrent login/reset OTP for the same merchant must
+  // not silently overwrite either one's pending code. payoutStepUpAttempts
+  // is scoped to this flow only too, so it can't be tripped by unrelated
+  // login-OTP mistakes and vice versa.
+  payoutStepUpOtp: {
+    type: String,
+    select: false,
+    default: null,
+  },
+  payoutStepUpOtpExpires: {
+    type: Date,
+    select: false,
+    default: null,
+  },
+  payoutStepUpAttempts: {
+    type: Number,
+    select: false,
+    default: 0,
+  },
   registrationSource: {
     type: String,
     enum: ['web', 'mobile'],

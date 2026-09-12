@@ -66,6 +66,7 @@ import { backfillTransactionFees } from './migrations/backfillTransactionFees.js
 import { seedTariffCards } from './migrations/seedTariffCards.js';
 import { backfillMerchantTariffLocks } from './migrations/backfillMerchantTariffLocks.js';
 import { loadTariffCache, startTariffCacheRefreshInterval } from './services/tariffCardCache.js';
+import { loadSanctionsList, startSanctionsListRefreshInterval } from './services/sanctionsListCache.js';
 import { backfillNcbaMerchantCodes } from './migrations/backfillNcbaMerchantCodes.js';
 import { checkAndSendDormancyReminders } from './services/dormancyReminderService.js';
 import { checkAndSendTaxDeadlineReminders } from './services/taxDeadlineReminderService.js';
@@ -316,6 +317,14 @@ async function bootstrap() {
     await loadTariffCache();
     await backfillMerchantTariffLocks();
     startTariffCacheRefreshInterval();
+
+    // Not awaited, unlike the tariff cache above — pricing must be loaded
+    // before any transaction can be priced correctly, but sanctions
+    // screening is a best-effort auxiliary check (fetches two public feeds
+    // over the network) that must never delay or block server startup if
+    // either feed is slow/unreachable. See services/sanctionsListCache.js.
+    loadSanctionsList().catch((err) => console.error('Initial sanctions list load failed:', err));
+    startSanctionsListRefreshInterval();
   } catch (error) {
     // Hard-exiting on a failed initial connection only makes sense for a
     // traditional long-running deploy — killing the process is meaningless
