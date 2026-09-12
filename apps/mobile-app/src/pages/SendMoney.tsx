@@ -244,7 +244,49 @@ export default function SendMoney({ navigation }: any) {
   const selectedDest = DESTINATIONS.find((d) => d.id === destination);
   const isMobileDest = destination === 'mpesa-primary' || destination === 'mobile';
   const isB2bDest = destination === 'till' || destination === 'paybill';
-  const fee = isMobileDest ? estimateB2cFee(Number(amount) || 0) : isB2bDest ? estimateB2bFee(Number(amount) || 0) : destination === 'bank' ? estimateBankFee(bankRail, Number(amount) || 0) : 0;
+  // Instant client-side estimate — shown only while the live fee below is
+  // still loading (or if that request fails), never used to actually gate
+  // Confirm. See SendMoney.jsx's identical clientEstimate for the full
+  // history: this hardcoded table is exactly what caused the original
+  // "UI shows KES 5, backend charges KES 10" bug, since it has no way to
+  // reflect an admin tariff change. `liveFee` below fixes it structurally —
+  // mobile shared the same bug as web until this was ported over.
+  const clientEstimate = isMobileDest ? estimateB2cFee(Number(amount) || 0) : isB2bDest ? estimateB2bFee(Number(amount) || 0) : destination === 'bank' ? estimateBankFee(bankRail, Number(amount) || 0) : 0;
+
+  // Live fee, fetched from the same tariff functions/per-merchant lock the
+  // backend uses to actually charge (GET /api/transactions/fee-preview) —
+  // null until a successful response comes back for the CURRENT amount/
+  // destination/rail, so canContinue() below can block Confirm on it rather
+  // than ever letting the merchant authorize against a guess.
+  const [liveFee, setLiveFee] = useState<number | null>(null);
+  const [feeLoading, setFeeLoading] = useState(false);
+  const [feeRetryToken, setFeeRetryToken] = useState(0);
+
+  useEffect(() => {
+    const numAmount = Number(amount) || 0;
+    const previewType = isMobileDest ? 'mobile' : isB2bDest ? destination : destination === 'bank' ? 'bank' : null;
+    if (!previewType || numAmount <= 0) { setLiveFee(null); setFeeLoading(false); return; }
+
+    let cancelled = false;
+    setLiveFee(null);
+    setFeeLoading(true);
+    const t = setTimeout(async () => {
+      try {
+        const { data } = await api.get('/api/transactions/fee-preview', {
+          params: { type: previewType, amount: numAmount, ...(destination === 'bank' ? { rail: bankRail } : {}) },
+        });
+        if (!cancelled) setLiveFee(Number(data?.totalFee) || 0);
+      } catch {
+        if (!cancelled) setLiveFee(null); // canContinue() keeps Confirm blocked; clientEstimate still shows on screen
+      } finally {
+        if (!cancelled) setFeeLoading(false);
+      }
+    }, 350);
+    return () => { cancelled = true; clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [destination, bankRail, amount, feeRetryToken]);
+
+  const fee = liveFee != null ? liveFee : clientEstimate;
   const totalAmount = Number(amount || 0) + fee;
   // availableBalance (kesBalance minus anything credited in the last 2
   // minutes and still held server-side — see
@@ -281,7 +323,7 @@ export default function SendMoney({ navigation }: any) {
       );
     }
     if (!hasPin && step === 3) return newPin.length === 4 && confirmPin.length === 4;
-    if (step === confirmStep) return pin.length === 4 && (!stepUpRequired || stepUpCode.length === 6);
+    if (step === confirmStep) return pin.length === 4 && liveFee !== null && (!stepUpRequired || stepUpCode.length === 6);
     return true;
   };
 
@@ -806,6 +848,20 @@ export default function SendMoney({ navigation }: any) {
                   <Text className="text-[20px] font-jakarta-extrabold text-[#00351d] flex-1 min-w-0 text-right pl-2" numberOfLines={1} ellipsizeMode="tail">{formatKES(totalAmount)}</Text>
                 </View>
               </View>
+
+              {liveFee === null && !confirmLocked && (
+                <View className="flex-row items-center gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-5">
+                  <Feather name={feeLoading ? 'loader' : 'alert-circle'} size={16} color="#b45309" />
+                  <Text className="text-[12px] font-jakarta-bold text-amber-800 flex-1">
+                    {feeLoading ? 'Verifying the current transaction fee before you can confirm…' : 'Could not verify the current fee.'}
+                  </Text>
+                  {!feeLoading && (
+                    <TouchableOpacity onPress={() => setFeeRetryToken((t) => t + 1)}>
+                      <Text className="text-[11px] font-jakarta-extrabold text-amber-900 uppercase tracking-wider">Retry</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
 
               {confirmLocked ? (
                 <View>
