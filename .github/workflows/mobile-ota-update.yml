@@ -1,0 +1,42 @@
+name: Publish Mobile OTA Update
+
+# Publishes an EAS Update whenever a mobile-app change lands on main — the
+# manual step ("run `eas update` yourself after merging") this replaces.
+# Deliberately separate from ci.yml: this only needs to run for mobile
+# changes, and only ever against main (the branch Brandon merges into for
+# production), never staging.
+#
+# This does NOT touch the native app binary or trigger a Play Store review
+# — `eas update` pushes a JS bundle straight to already-installed apps via
+# Expo's update server, completely independent of `eas build`/`eas submit`.
+# A new permission, a new native dependency, or any app.json change still
+# needs its own manual `eas build` + Play Store submission — this workflow
+# only covers pure JS/TS changes.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/mobile-app/**'
+  workflow_dispatch: {}
+
+jobs:
+  eas-update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Publish EAS Update
+        working-directory: apps/mobile-app
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: npx eas-cli@latest update --branch production --message "${{ github.event.head_commit.message || 'Manual publish' }}" --non-interactive
