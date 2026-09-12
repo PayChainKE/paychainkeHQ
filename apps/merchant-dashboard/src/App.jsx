@@ -1,5 +1,5 @@
 import React, { lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { MerchantAuthProvider, useMerchantAuth } from './context/MerchantAuthContext'
 import { NotificationProvider } from './context/NotificationContext'
 import ScrollToTop from './components/utils/ScrollToTop'
@@ -14,6 +14,7 @@ import { Analytics as VercelAnalytics } from '@vercel/analytics/react'
 // loads its own chunk on first visit to that route instead of upfront.
 const Login = lazy(() => import('./pages/Login'))
 const SetupPassword = lazy(() => import('./pages/SetupPassword'))
+const SetupPin = lazy(() => import('./pages/SetupPin'))
 const KycResubmit = lazy(() => import('./pages/KycResubmit'))
 const Overview = lazy(() => import('./pages/Overview'))
 const Transactions = lazy(() => import('./pages/Transactions'))
@@ -46,10 +47,19 @@ function LoadingScreen() {
 }
 
 function Protected({ children }) {
-  const { isAuthenticated, isLoading } = useMerchantAuth()
+  const { isAuthenticated, isLoading, merchant } = useMerchantAuth()
+  const location = useLocation()
 
   if (isLoading) return <LoadingScreen />
   if (!isAuthenticated) return <Navigate to="/login" replace />
+
+  // Enforced right after first login, from any route — not a one-time
+  // post-login redirect (which a merchant could just route around by
+  // navigating straight to a URL). merchant.hasAppPin already comes back
+  // on every login/session response; no backend change needed for this.
+  if (merchant?.hasAppPin === false && location.pathname !== '/setup-pin') {
+    return <Navigate to="/setup-pin" replace />
+  }
 
   return children
 }
@@ -73,6 +83,7 @@ export default function App(){
             <Routes>
               <Route path="/login" element={<LoginGuard><Login/></LoginGuard>} />
               <Route path="/setup-password" element={<SetupPassword/>} />
+              <Route path="/setup-pin" element={<Protected><SetupPin/></Protected>} />
               <Route path="/kyc-resubmit" element={<KycResubmit/>} />
               <Route path="/pay/account/:account" element={<PayAccountPage />} />
               <Route path="/pay/:linkId" element={<PaymentPage />} />

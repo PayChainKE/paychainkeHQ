@@ -207,7 +207,9 @@ export default function Login() {
   }, [])
 
   // Signup Flow States
-  const [signupName, setSignupName] = useState('')
+  const [signupFirstName, setSignupFirstName] = useState('')
+  const [signupSurname, setSignupSurname] = useState('')
+  const [signupOtherNames, setSignupOtherNames] = useState('')
   const [signupNationalId, setSignupNationalId] = useState('')
   const [signupEmail, setSignupEmail] = useState('')
   const [signupPhone, setSignupPhone] = useState('')
@@ -798,8 +800,16 @@ export default function Login() {
     // rather than only a generic banner.
     setSignupStepTouched(true)
 
-    if (!validators.personName(signupName).valid) {
-      setErr('Please enter a valid name before continuing.')
+    if (!validators.personName(signupFirstName).valid) {
+      setErr('Please enter a valid first name before continuing.')
+      return
+    }
+    if (!validators.personName(signupSurname).valid) {
+      setErr('Please enter a valid surname before continuing.')
+      return
+    }
+    if (signupOtherNames.trim() && !validators.personName(signupOtherNames).valid) {
+      setErr('Please enter valid other names, or leave the field blank.')
       return
     }
     if (!validators.nationalId(signupNationalId).valid) {
@@ -890,7 +900,9 @@ export default function Login() {
       return
     }
     const payload = new FormData()
-    payload.append('name', signupName.trim())
+    payload.append('firstName', signupFirstName.trim())
+    payload.append('surname', signupSurname.trim())
+    if (signupOtherNames.trim()) payload.append('otherNames', signupOtherNames.trim())
     payload.append('nationalId', signupNationalId.trim())
     payload.append('email', signupEmail.trim())
     payload.append('phone', signupPhone.trim())
@@ -1189,15 +1201,27 @@ export default function Login() {
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Your Name *</label>
-                    <ValidatedInput kind="personName" required value={signupName} onChange={e => setSignupName(e.target.value)} placeholder="John Doe" forceTouched={signupStepTouched}
+                    <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">First Name *</label>
+                    <ValidatedInput kind="personName" required value={signupFirstName} onChange={e => setSignupFirstName(e.target.value)} placeholder="John" forceTouched={signupStepTouched}
                       className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Your Email *</label>
-                    <ValidatedInput kind="email" required value={signupEmail} onChange={e => setSignupEmail(e.target.value)} placeholder="john@example.com" forceTouched={signupStepTouched}
+                    <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Surname *</label>
+                    <ValidatedInput kind="personName" required value={signupSurname} onChange={e => setSignupSurname(e.target.value)} placeholder="Doe" forceTouched={signupStepTouched}
                       className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" />
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Other Names</label>
+                  <ValidatedInput kind="personName" optional value={signupOtherNames} onChange={e => setSignupOtherNames(e.target.value)} placeholder="e.g. a middle name" forceTouched={signupStepTouched}
+                    className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Your Email *</label>
+                  <ValidatedInput kind="email" required value={signupEmail} onChange={e => setSignupEmail(e.target.value)} placeholder="john@example.com" forceTouched={signupStepTouched}
+                    className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" />
                 </div>
 
                 <div className="space-y-2">

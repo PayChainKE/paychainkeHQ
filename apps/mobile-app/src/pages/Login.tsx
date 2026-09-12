@@ -64,7 +64,9 @@ export default function Login({ route }: any) {
   }, [logoutReason]);
 
   // Signup Flow States
-  const [signupName, setSignupName] = useState('');
+  const [signupFirstName, setSignupFirstName] = useState('');
+  const [signupSurname, setSignupSurname] = useState('');
+  const [signupOtherNames, setSignupOtherNames] = useState('');
   const [signupNationalId, setSignupNationalId] = useState('');
   const [signupEmail, setSignupEmail] = useState('');
   const [signupPhone, setSignupPhone] = useState('');
@@ -369,8 +371,16 @@ export default function Login({ route }: any) {
     // rather than only a generic banner.
     setSignupStepTouched(true);
 
-    if (!validators.personName(signupName).valid) {
-      setErr('Please enter a valid name before continuing.');
+    if (!validators.personName(signupFirstName).valid) {
+      setErr('Please enter a valid first name before continuing.');
+      return;
+    }
+    if (!validators.personName(signupSurname).valid) {
+      setErr('Please enter a valid surname before continuing.');
+      return;
+    }
+    if (signupOtherNames.trim() && !validators.personName(signupOtherNames).valid) {
+      setErr('Please enter valid other names, or leave the field blank.');
       return;
     }
     if (!validators.nationalId(signupNationalId).valid) {
@@ -455,7 +465,9 @@ export default function Login({ route }: any) {
     }
 
     const payload = new FormData();
-    payload.append('name', signupName);
+    payload.append('firstName', signupFirstName.trim());
+    payload.append('surname', signupSurname.trim());
+    if (signupOtherNames.trim()) payload.append('otherNames', signupOtherNames.trim());
     payload.append('nationalId', signupNationalId.trim());
     payload.append('email', signupEmail);
     payload.append('phone', signupPhone);
@@ -805,8 +817,18 @@ export default function Login({ route }: any) {
 
                 <View className="space-y-4">
                   <View>
-                    <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Your Name *</Text>
-                    <ValidatedTextInput kind="personName" value={signupName} onChangeText={setSignupName} placeholder="John Doe" forceTouched={signupStepTouched}
+                    <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">First Name *</Text>
+                    <ValidatedTextInput kind="personName" value={signupFirstName} onChangeText={setSignupFirstName} placeholder="John" forceTouched={signupStepTouched}
+                      className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-bold text-[#0c2010]" />
+                  </View>
+                  <View>
+                    <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Surname *</Text>
+                    <ValidatedTextInput kind="personName" value={signupSurname} onChangeText={setSignupSurname} placeholder="Doe" forceTouched={signupStepTouched}
+                      className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-bold text-[#0c2010]" />
+                  </View>
+                  <View>
+                    <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Other Names</Text>
+                    <ValidatedTextInput kind="personName" optional value={signupOtherNames} onChangeText={setSignupOtherNames} placeholder="e.g. a middle name" forceTouched={signupStepTouched}
                       className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-bold text-[#0c2010]" />
                   </View>
                   <View>
