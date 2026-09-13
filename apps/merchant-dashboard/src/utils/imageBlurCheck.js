@@ -11,6 +11,31 @@ export function isImageFile(file) {
   return !!file && file.type.startsWith('image/');
 }
 
+// The exact set the backend's own Multer fileFilter accepts
+// (backend/utils/cloudinary.js's uploadMemory) — anything else (most
+// commonly an iPhone's default HEIC camera format, but also WEBP, GIF,
+// TIFF, BMP...) is silently DROPPED by the server rather than erroring:
+// Multer's fileFilter just excludes the file from req.files with no error
+// at all, so a signup would previously fail later with a confusing
+// "upload your document" message even though the merchant did select a
+// file. Checking this here, at the moment of selection, catches it
+// immediately with a reason instead.
+const ALLOWED_DOCUMENT_MIME_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+
+function isHeicFile(file) {
+  return /heic|heif/i.test(file.type || '') || /\.(heic|heif)$/i.test(file.name || '');
+}
+
+// Returns a specific, actionable reason a file was rejected, or null if
+// it's fine — call before ever attempting to preview/upload a document.
+export function unsupportedDocumentTypeReason(file) {
+  if (!file || ALLOWED_DOCUMENT_MIME_TYPES.includes(file.type)) return null;
+  if (isHeicFile(file)) {
+    return "iPhone photos in HEIC format aren't supported. Go to Settings > Camera > Formats and choose \"Most Compatible\", or select \"JPEG\" when sharing/saving the photo, then try again.";
+  }
+  return 'Upload a JPG, PNG or PDF file — that format is not supported.';
+}
+
 export async function estimateImageSharpness(file) {
   const dataUrl = await new Promise((resolve, reject) => {
     const reader = new FileReader();

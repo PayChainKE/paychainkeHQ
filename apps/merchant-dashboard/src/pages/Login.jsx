@@ -9,7 +9,7 @@ import poweredByLogo from '../assets/poweredby-logo.png'
 import { ValidatedInput } from '../components/ValidatedInput'
 import { validators } from '../utils/validators'
 import { BiometricLoginButton } from '../components/BiometricButton'
-import { estimateImageSharpness, isImageFile } from '../utils/imageBlurCheck'
+import { estimateImageSharpness, isImageFile, unsupportedDocumentTypeReason } from '../utils/imageBlurCheck'
 
 // Which KYB document(s) a signup must provide, keyed by business type —
 // mirrors backend/config/kybRequirements.js exactly (including its
@@ -581,8 +581,9 @@ export default function Login() {
     setDocPreviews(prev => ({ ...prev, [docType]: '' }))
     if (!file) return
 
-    if (!isImageFile(file) && file.type !== 'application/pdf') {
-      setDocErrors(prev => ({ ...prev, [docType]: 'Upload a JPG, PNG or PDF file.' }))
+    const typeError = unsupportedDocumentTypeReason(file)
+    if (typeError) {
+      setDocErrors(prev => ({ ...prev, [docType]: typeError }))
       setSignupDocs(prev => ({ ...prev, [docType]: null }))
       clearInput()
       return

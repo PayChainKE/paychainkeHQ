@@ -45,7 +45,7 @@ import {
 } from '../controllers/merchantAuthController.js';
 import { protectMerchant, protectMerchantSSE, protectDeveloper } from '../middleware/authMiddleware.js';
 import { registerMerchantEventClient } from '../utils/merchantEventStream.js';
-import { uploadMemory } from '../utils/cloudinary.js';
+import { uploadMemory, withMulterErrorHandling } from '../utils/cloudinary.js';
 import {
   registerDeveloper,
   verifyDeveloperOtp,
@@ -211,7 +211,7 @@ router.post('/setup-password', adminOtpLimiter, setupPasswordWithToken);
 // hasn't been updated to the new per-business-type multi-document flow yet
 // (deliberately held off during Google Play review — see
 // registerMerchant's own doc comment on the two code paths this enables).
-router.post('/merchant/register', merchantLoginLimiter, uploadMemory.fields([
+router.post('/merchant/register', merchantLoginLimiter, withMulterErrorHandling(uploadMemory.fields([
   { name: 'certificate', maxCount: 1 },
   { name: 'doc_business_registration', maxCount: 1 },
   { name: 'doc_national_id', maxCount: 1 },
@@ -219,7 +219,7 @@ router.post('/merchant/register', merchantLoginLimiter, uploadMemory.fields([
   { name: 'doc_national_id_back', maxCount: 1 },
   { name: 'doc_kra_pin', maxCount: 1 },
   { name: 'doc_business_permit_or_license', maxCount: 1 },
-]), registerMerchant);
+])), registerMerchant);
 // County/Area location pickers and the optional street search on the
 // signup form — public, no session yet at this point in the flow.
 router.get('/merchant/locations', getSignupLocations);
