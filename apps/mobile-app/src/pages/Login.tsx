@@ -1076,6 +1076,8 @@ export default function Login({ route }: any) {
                     </View>
                     {confirmPassword.length > 0 && newPassword !== confirmPassword ? (
                       <Text className="text-red-500 text-[11px] font-jakarta-bold mt-1.5">Passwords do not match</Text>
+                    ) : confirmPassword.length > 0 && newPassword === confirmPassword ? (
+                      <Text className="text-emerald-600 text-[11px] font-jakarta-bold mt-1.5">Passwords match</Text>
                     ) : null}
                  </View>
 

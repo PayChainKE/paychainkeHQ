@@ -1136,13 +1136,21 @@ export default function Login() {
                       {/* Create Account silently stayed disabled on any mismatch
                           with no visible reason — reported as "the button isn't
                           working" since there was nothing telling the merchant
-                          why it wouldn't respond. */}
-                      {confirmPassword && newPassword !== confirmPassword && (
+                          why it wouldn't respond. A positive confirmation once
+                          they DO match closes the loop the other direction —
+                          without it, a merchant who fixed a typo had nothing
+                          telling them it was now fine, just the error vanishing. */}
+                      {confirmPassword && newPassword !== confirmPassword ? (
                         <p className="text-xs font-bold text-red-600 pl-1 flex items-center gap-1.5">
                           <span className="material-symbols-outlined text-sm">error</span>
                           Passwords don't match
                         </p>
-                      )}
+                      ) : confirmPassword && newPassword === confirmPassword ? (
+                        <p className="text-xs font-bold text-emerald-600 pl-1 flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-sm">check_circle</span>
+                          Passwords match
+                        </p>
+                      ) : null}
                     </div>
 
                     <div className="flex items-start gap-3 pt-2">
