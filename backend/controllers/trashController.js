@@ -73,3 +73,38 @@ export const restoreTrashItem = async (req, res) => {
     res.status(500).json({ error: 'Failed to restore this item.' });
   }
 };
+
+// @desc    Permanently erase a trashed record's snapshot — skips the
+//          90-day auto-purge (DeletedRecord's own `expiresAt` TTL index)
+//          for when an admin wants it gone now rather than waiting. Only
+//          removes the DeletedRecord snapshot itself; the live collection
+//          was already hard-deleted the moment this was trashed, so
+//          nothing else changes. Unlike restore, this can never be undone
+//          — there is no second trash behind this one.
+// @route   DELETE /admin/trash/:id
+// @access  Private (Owner/Admin)
+export const permanentlyDeleteTrashItem = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid id.' });
+    }
+    const record = await DeletedRecord.findOne({ _id: id, status: 'trashed' });
+    if (!record) return res.status(404).json({ error: 'Not found, or already restored.' });
+
+    const { collectionName, label, originalId } = record;
+    await record.deleteOne();
+
+    logAudit({
+      action: 'admin.trash.permanently_deleted', category: 'admin', severity: 'critical',
+      message: `Permanently deleted ${collectionName} "${label}" from trash — no longer recoverable`,
+      actor: adminActor(req.admin), req,
+      metadata: { collectionName, originalId: originalId.toString() },
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Permanently Delete Trash Item Error:', error?.message || error);
+    res.status(500).json({ error: 'Failed to permanently delete this item.' });
+  }
+};
