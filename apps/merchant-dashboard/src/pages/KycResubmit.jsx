@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import api from '../api/config'
 import mainLogo from '../assets/signin-logo.png'
+import { unsupportedDocumentTypeReason } from '../utils/imageBlurCheck'
 
 // Public, unauthenticated page the "Request Revision" email links to
 // (backend/controllers/officerController.js#requestRevision builds the link
@@ -28,6 +29,7 @@ export default function KycResubmit() {
   const [businessName, setBusinessName] = useState('')
   const [flagged, setFlagged] = useState([]) // [{ type, note }]
   const [files, setFiles] = useState({}) // { [type]: File }
+  const [fileErrors, setFileErrors] = useState({}) // { [type]: string }
   const [err, setErr] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -51,8 +53,31 @@ export default function KycResubmit() {
 
   const allSelected = flagged.length > 0 && flagged.every((f) => !!files[f.type])
 
+  // Same allow-list the backend's own Multer fileFilter enforces
+  // (backend/utils/cloudinary.js) — anything else (most commonly an
+  // iPhone's default HEIC camera format) is silently dropped server-side
+  // with no error at all, which previously surfaced here as a generic
+  // "No documents were uploaded" after submit even though a file was
+  // picked. Catching it at selection time gives a specific reason instead.
   function handleFile(type, file) {
+    if (!file) {
+      setFiles((f) => ({ ...f, [type]: null }))
+      setFileErrors((e) => ({ ...e, [type]: '' }))
+      return
+    }
+    const typeError = unsupportedDocumentTypeReason(file)
+    if (typeError) {
+      setFiles((f) => ({ ...f, [type]: null }))
+      setFileErrors((e) => ({ ...e, [type]: typeError }))
+      return
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setFiles((f) => ({ ...f, [type]: null }))
+      setFileErrors((e) => ({ ...e, [type]: 'File is too large — the limit is 10MB.' }))
+      return
+    }
     setFiles((f) => ({ ...f, [type]: file }))
+    setFileErrors((e) => ({ ...e, [type]: '' }))
   }
 
   async function handleSubmit(e) {
@@ -139,6 +164,12 @@ export default function KycResubmit() {
                       <p className="mt-1.5 text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
                         <span className="material-symbols-outlined text-[14px]">check_circle</span>
                         {files[f.type].name}
+                      </p>
+                    )}
+                    {fileErrors[f.type] && (
+                      <p className="mt-1.5 text-[11px] text-red-600 font-semibold flex items-start gap-1">
+                        <span className="material-symbols-outlined text-[14px] shrink-0">error</span>
+                        {fileErrors[f.type]}
                       </p>
                     )}
                   </div>

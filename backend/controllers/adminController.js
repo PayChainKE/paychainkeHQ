@@ -2964,6 +2964,88 @@ export const searchTransactionAudit = async (req, res) => {
   }
 };
 
+// @desc    Every currently-live PaymentLink document across every merchant —
+//          links a merchant has generated (Wallet's Request Money, an
+//          Invoice, or a Checkout Page cart) that haven't been paid or
+//          expired yet. Complements Payment Link Audit above, which is
+//          built from Transaction records and so only ever shows links that
+//          actually got paid — a link nobody paid never becomes a
+//          Transaction, so it was previously invisible in admin entirely.
+//          PaymentLink itself is short-lived by design (models/PaymentLink.js:
+//          a MongoDB TTL index physically deletes each doc ~1 minute after
+//          its own expiresAt, and the model's pre-find/pre-findOne hooks
+//          filter out anything already past expiresAt even before that
+//          deletion runs) — so this can only ever be a live snapshot of
+//          what's outstanding right now, never a historical archive of
+//          links that already expired unpaid.
+// @route   GET /api/admin/payment-links
+// @access  Private (Admin)
+export const searchPaymentLinks = async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(5, parseInt(req.query.limit, 10) || 25));
+    const status = req.query.status && req.query.status !== 'all' ? req.query.status : null;
+    const q = (req.query.q || '').trim();
+
+    const excludeDemo = await excludeDemoMerchantsMatch();
+    const filter = { ...excludeDemo };
+    if (status) filter.status = status;
+
+    if (q) {
+      const safeQ = String(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const rx = { $regex: safeQ, $options: 'i' };
+      const matchingMerchants = await Merchant.find({
+        $or: [{ businessName: rx }, { email: rx }, { ncbaMerchantCode: rx }],
+      }).select('_id').lean();
+      const merchantIds = matchingMerchants.map((m) => m._id);
+
+      filter.$or = [
+        { linkId: rx },
+        ...(merchantIds.length ? [{ merchantId: { $in: merchantIds } }] : []),
+      ];
+    }
+
+    const [total, links] = await Promise.all([
+      PaymentLink.countDocuments(filter),
+      PaymentLink.find(filter)
+        .sort('-createdAt')
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .populate('merchantId', 'businessName email ncbaMerchantCode status flagged')
+        .lean(),
+    ]);
+
+    res.json({
+      success: true,
+      data: links.map((l) => ({
+        _id: l._id,
+        linkId: l.linkId,
+        amount: l.amount,
+        currency: l.currency,
+        status: l.status,
+        invoiceId: l.invoiceId,
+        checkoutPageId: l.checkoutPageId,
+        buyerName: l.buyerName,
+        createdAt: l.createdAt,
+        expiresAt: l.expiresAt,
+        merchant: l.merchantId
+          ? {
+              _id: l.merchantId._id,
+              businessName: l.merchantId.businessName,
+              email: l.merchantId.email,
+              status: l.merchantId.status,
+              flagged: l.merchantId.flagged,
+            }
+          : null,
+      })),
+      pagination: { page, limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) },
+    });
+  } catch (error) {
+    console.error('Search Payment Links Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
 // @desc    Payout audit trail as CSV — every payment reference tied to
 //          merchant payouts in the given window/filters, for reconciling
 //          against a real monthly bank statement. Same filters as

@@ -1,6 +1,6 @@
 import express from 'express';
 import rateLimit from 'express-rate-limit';
-import { upload } from '../utils/cloudinary.js';
+import { upload, withMulterErrorHandling } from '../utils/cloudinary.js';
 import { protect, requireRole } from '../middleware/authMiddleware.js';
 import {
   createApplication,
@@ -92,6 +92,6 @@ router.post('/applications/:id/reject', protect, viewOrAct, rejectApplication);
 
 // Public — applicant-facing resubmission of flagged KYC documents.
 router.get('/kyc-resubmit/:token', resubmitLimiter, validateResubmitToken);
-router.post('/kyc-resubmit/:token', resubmitLimiter, upload.fields(docFields), resubmitDocuments);
+router.post('/kyc-resubmit/:token', resubmitLimiter, withMulterErrorHandling(upload.fields(docFields)), resubmitDocuments);
 
 export default router;

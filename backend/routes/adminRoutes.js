@@ -37,6 +37,7 @@ import {
   searchTransactionAudit,
   exportPayoutAuditCsv,
   getTransactionAuditDetail,
+  searchPaymentLinks,
 } from '../controllers/adminController.js';
 import {
   getCommunications,
@@ -303,6 +304,11 @@ router.get('/stk-requests', protect, excludeOfficer, getStkRequests);
 router.get('/transaction-audit', protect, excludeOfficer, searchTransactionAudit);
 router.get('/transaction-audit/export', protect, excludeOfficer, exportPayoutAuditCsv);
 router.get('/transaction-audit/:id', protect, excludeOfficer, getTransactionAuditDetail);
+
+// Currently-live payment links (active/paid, not yet expired) across every
+// merchant — complements Payment Link Audit above, which only shows links
+// that actually got paid. See searchPaymentLinks's own doc comment.
+router.get('/payment-links', protect, excludeOfficer, searchPaymentLinks);
 
 // Global audit log (filterable, paginated).
 router.get('/audit-log', protect, excludeOfficer, getAuditLog);

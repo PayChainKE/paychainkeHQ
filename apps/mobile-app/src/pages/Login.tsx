@@ -15,6 +15,28 @@ import { KYB_REQUIREMENTS_BY_BUSINESS_TYPE, KYB_DOC_LABELS, isDocSelected, resol
 
 type PickedFile = { uri: string; name?: string; mimeType?: string; size?: number };
 
+// The exact set the backend's own Multer fileFilter accepts
+// (backend/utils/cloudinary.js's uploadMemory) — anything else (most
+// commonly an iPhone Photos-library picker returning HEIC, the device's
+// default camera format) is silently DROPPED by the server rather than
+// erroring: Multer's fileFilter just excludes the file from req.files with
+// no error at all, so signup would previously fail later with a confusing
+// "upload your document" message even though a file was picked. Mirrors
+// apps/merchant-dashboard/src/utils/imageBlurCheck.js's
+// unsupportedDocumentTypeReason — keep both in sync if this ever changes.
+// Only blocks when a mimeType was actually reported; if the picker can't
+// tell us (some Android providers omit it), we let the server decide
+// rather than block a possibly-fine file on missing information.
+function unsupportedDocumentTypeReason(file: { mimeType?: string; name?: string }): string | null {
+  if (!file.mimeType) return null;
+  const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+  if (allowed.includes(file.mimeType)) return null;
+  if (/heic|heif/i.test(file.mimeType) || /\.(heic|heif)$/i.test(file.name || '')) {
+    return "iPhone photos in HEIC format aren't supported. Go to Settings > Camera > Formats and choose \"Most Compatible\", then try again.";
+  }
+  return 'That file type is not supported — please choose a JPG, PNG or PDF.';
+}
+
 // The camera-capture option below needs the native CAMERA permission
 // declared in app.json's expo-image-picker plugin config — but that only
 // takes effect once compiled into an actual native build (OTA updates
@@ -329,6 +351,11 @@ export default function Login({ route }: any) {
       });
       if (result.canceled || !result.assets?.[0]) return;
       const asset = result.assets[0];
+      const typeError = unsupportedDocumentTypeReason(asset);
+      if (typeError) {
+        setDocErrors(prev => ({ ...prev, [type]: typeError }));
+        return;
+      }
       if (asset.size && asset.size > 10 * 1024 * 1024) {
         setDocErrors(prev => ({ ...prev, [type]: 'File is too large — the limit is 10MB.' }));
         return;
@@ -1049,6 +1076,8 @@ export default function Login({ route }: any) {
                     </View>
                     {confirmPassword.length > 0 && newPassword !== confirmPassword ? (
                       <Text className="text-red-500 text-[11px] font-jakarta-bold mt-1.5">Passwords do not match</Text>
+                    ) : confirmPassword.length > 0 && newPassword === confirmPassword ? (
+                      <Text className="text-emerald-600 text-[11px] font-jakarta-bold mt-1.5">Passwords match</Text>
                     ) : null}
                  </View>
 
