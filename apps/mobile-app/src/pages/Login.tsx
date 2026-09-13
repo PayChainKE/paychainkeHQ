@@ -38,6 +38,21 @@ const KENYAN_COUNTIES = [
   "Uasin Gishu", "Vihiga", "Wajir", "West Pokot"
 ];
 
+// Groups the signup form into labeled sections (Personal/Business/Location/
+// Documents) instead of one long list of fields — mirrors the same pattern
+// on the web signup form (apps/merchant-dashboard/src/pages/Login.jsx's
+// SignupSectionHeader): an icon, a caps label, and a hairline rule
+// extending to the edge, the way bank account-opening forms are sectioned.
+function SignupSectionHeader({ icon, title }: { icon: any; title: string }) {
+  return (
+    <View className="flex-row items-center gap-2 mt-1 mb-1">
+      <MaterialIcons name={icon} size={16} color="#0c2010" style={{ opacity: 0.4 }} />
+      <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-widest">{title}</Text>
+      <View className="flex-1 h-px bg-[#e5e7eb]" />
+    </View>
+  );
+}
+
 export default function Login({ route }: any) {
   const { login, biometricLogin, signup, verifyOTP, forgotPassword, resetPassword,
           isBiometricsEnabled, hasBiometricToken, logoutReason, clearLogoutReason } = useAuth();
@@ -816,15 +831,19 @@ export default function Login({ route }: any) {
                 <Text className="text-[#5b645c] text-[14px] font-jakarta-bold mb-6">Fill out the form below to create your merchant account and start accepting payments.</Text>
 
                 <View className="space-y-4">
-                  <View>
-                    <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">First Name *</Text>
-                    <ValidatedTextInput kind="personName" value={signupFirstName} onChangeText={setSignupFirstName} placeholder="John" forceTouched={signupStepTouched}
-                      className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-bold text-[#0c2010]" />
-                  </View>
-                  <View>
-                    <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Surname *</Text>
-                    <ValidatedTextInput kind="personName" value={signupSurname} onChangeText={setSignupSurname} placeholder="Doe" forceTouched={signupStepTouched}
-                      className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-bold text-[#0c2010]" />
+                  <SignupSectionHeader icon="person" title="Personal Details" />
+
+                  <View className="flex-row gap-3">
+                    <View className="flex-1">
+                      <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">First Name *</Text>
+                      <ValidatedTextInput kind="personName" value={signupFirstName} onChangeText={setSignupFirstName} placeholder="John" forceTouched={signupStepTouched}
+                        className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-bold text-[#0c2010]" />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Surname *</Text>
+                      <ValidatedTextInput kind="personName" value={signupSurname} onChangeText={setSignupSurname} placeholder="Doe" forceTouched={signupStepTouched}
+                        className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-bold text-[#0c2010]" />
+                    </View>
                   </View>
                   <View>
                     <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Other Names</Text>
@@ -836,28 +855,56 @@ export default function Login({ route }: any) {
                     <ValidatedTextInput kind="nationalId" value={signupNationalId} onChangeText={setSignupNationalId} placeholder="12345678" forceTouched={signupStepTouched}
                       className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-bold text-[#0c2010]" />
                   </View>
-                  <View>
-                    <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Your Email *</Text>
-                    <ValidatedTextInput kind="email" value={signupEmail} onChangeText={setSignupEmail} placeholder="john@example.com" forceTouched={signupStepTouched}
-                      className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-bold text-[#0c2010]" />
+                  <View className="flex-row gap-3">
+                    <View className="flex-1">
+                      <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Your Email *</Text>
+                      <ValidatedTextInput kind="email" value={signupEmail} onChangeText={setSignupEmail} placeholder="john@example.com" forceTouched={signupStepTouched}
+                        className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-bold text-[#0c2010]" />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Your Phone *</Text>
+                      <ValidatedTextInput kind="phoneKE" value={signupPhone} onChangeText={setSignupPhone} placeholder="0712 345 678" forceTouched={signupStepTouched}
+                        className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-bold text-[#0c2010]" />
+                    </View>
+                  </View>
+
+                  <SignupSectionHeader icon="storefront" title="Business Details" />
+
+                  <View className="flex-row gap-3">
+                    <View className="flex-1">
+                      <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Business Name *</Text>
+                      <ValidatedTextInput kind="businessName" value={signupBusinessName} onChangeText={setSignupBusinessName} placeholder="Acme Corp" forceTouched={signupStepTouched}
+                        className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-bold text-[#0c2010]" />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Business Type *</Text>
+                      <TouchableOpacity onPress={() => setShowBusinessModal(true)} className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 flex-row justify-between items-center">
+                        <Text className={`text-[14px] font-jakarta-bold flex-1 min-w-0 pr-2 ${businessType ? 'text-[#0c2010]' : 'text-[#9ca3af]'}`} numberOfLines={1} ellipsizeMode="tail">{businessType || '—Please choose an option—'}</Text>
+                        <Feather name="chevron-down" size={16} color="#9ca3af" style={{ flexShrink: 0 }} />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                   <View>
-                    <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Your Phone *</Text>
-                    <ValidatedTextInput kind="phoneKE" value={signupPhone} onChangeText={setSignupPhone} placeholder="0712 345 678" forceTouched={signupStepTouched}
-                      className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-bold text-[#0c2010]" />
-                  </View>
-                  <View>
-                    <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Business Name *</Text>
-                    <ValidatedTextInput kind="businessName" value={signupBusinessName} onChangeText={setSignupBusinessName} placeholder="Acme Corp" forceTouched={signupStepTouched}
-                      className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 text-[14px] font-jakarta-bold text-[#0c2010]" />
-                  </View>
-                  <View>
-                    <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Business Type *</Text>
-                    <TouchableOpacity onPress={() => setShowBusinessModal(true)} className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 flex-row justify-between items-center">
-                      <Text className={`text-[14px] font-jakarta-bold flex-1 min-w-0 pr-2 ${businessType ? 'text-[#0c2010]' : 'text-[#9ca3af]'}`} numberOfLines={1} ellipsizeMode="tail">{businessType || '—Please choose an option—'}</Text>
+                    <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Employees *</Text>
+                    <TouchableOpacity onPress={() => setShowEmployeesModal(true)} className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 flex-row justify-between items-center">
+                      <Text className={`text-[14px] font-jakarta-bold flex-1 min-w-0 pr-2 ${employees ? 'text-[#0c2010]' : 'text-[#9ca3af]'}`} numberOfLines={1} ellipsizeMode="tail">{employees || '—Please choose an option—'}</Text>
                       <Feather name="chevron-down" size={16} color="#9ca3af" style={{ flexShrink: 0 }} />
                     </TouchableOpacity>
                   </View>
+                  <View>
+                    <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Is this an eCommerce business?</Text>
+                    <View className="flex-row space-x-4">
+                      <TouchableOpacity onPress={() => setSignupEcommerce('yes')} className={`flex-1 py-3 rounded-xl border flex-row items-center justify-center ${signupEcommerce === 'yes' ? 'bg-[#06201b] border-[#06201b]' : 'bg-white border-[#e5e7eb]'}`}>
+                        <Text className={`font-jakarta-bold text-[14px] ${signupEcommerce === 'yes' ? 'text-white' : 'text-[#0c2010]'}`}>Yes</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => setSignupEcommerce('no')} className={`flex-1 py-3 rounded-xl border flex-row items-center justify-center ${signupEcommerce === 'no' ? 'bg-[#06201b] border-[#06201b]' : 'bg-white border-[#e5e7eb]'}`}>
+                        <Text className={`font-jakarta-bold text-[14px] ${signupEcommerce === 'no' ? 'text-white' : 'text-[#0c2010]'}`}>No</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  <SignupSectionHeader icon="location-on" title="Business Location" />
+
                   <View>
                     <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">County *</Text>
                     <TouchableOpacity onPress={() => setShowCountyModal(true)} className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 flex-row justify-between items-center">
@@ -916,31 +963,14 @@ export default function Login({ route }: any) {
                       </View>
                     )}
                   </View>
-                  <View>
-                    <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Employees *</Text>
-                    <TouchableOpacity onPress={() => setShowEmployeesModal(true)} className="w-full bg-white border border-[#e5e7eb] rounded-2xl py-3 px-4 flex-row justify-between items-center">
-                      <Text className={`text-[14px] font-jakarta-bold flex-1 min-w-0 pr-2 ${employees ? 'text-[#0c2010]' : 'text-[#9ca3af]'}`} numberOfLines={1} ellipsizeMode="tail">{employees || '—Please choose an option—'}</Text>
-                      <Feather name="chevron-down" size={16} color="#9ca3af" style={{ flexShrink: 0 }} />
-                    </TouchableOpacity>
-                  </View>
-                  <View className="mb-4">
-                    <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Is this an eCommerce business?</Text>
-                    <View className="flex-row space-x-4">
-                      <TouchableOpacity onPress={() => setSignupEcommerce('yes')} className={`flex-1 py-3 rounded-xl border flex-row items-center justify-center ${signupEcommerce === 'yes' ? 'bg-[#06201b] border-[#06201b]' : 'bg-white border-[#e5e7eb]'}`}>
-                        <Text className={`font-jakarta-bold text-[14px] ${signupEcommerce === 'yes' ? 'text-white' : 'text-[#0c2010]'}`}>Yes</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={() => setSignupEcommerce('no')} className={`flex-1 py-3 rounded-xl border flex-row items-center justify-center ${signupEcommerce === 'no' ? 'bg-[#06201b] border-[#06201b]' : 'bg-white border-[#e5e7eb]'}`}>
-                        <Text className={`font-jakarta-bold text-[14px] ${signupEcommerce === 'no' ? 'text-white' : 'text-[#0c2010]'}`}>No</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
                   {(() => {
                     const requirement = KYB_REQUIREMENTS_BY_BUSINESS_TYPE[businessType];
                     return (
-                      <View className="pt-2 border-t border-[#e5e7eb] mt-2">
-                        <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">
-                          Business Verification Document{(requirement?.mode === 'all' && (requirement.required.length > 1 || requirement.choiceAlso)) ? 's' : ''} *
-                        </Text>
+                      <View>
+                        <SignupSectionHeader
+                          icon="verified-user"
+                          title={`Verification Document${(requirement?.mode === 'all' && (requirement.required.length > 1 || requirement.choiceAlso)) ? 's' : ''}`}
+                        />
                         <Text className="text-[#5b645c] text-[11px] font-jakarta-bold mb-3 opacity-70">
                           {!requirement
                             ? 'Select a business type above to see which document(s) are required.'
