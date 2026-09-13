@@ -1,14 +1,14 @@
 import React from 'react';
 import api from '../../api/api';
 
-// OTP-gated bulk re-sync of every existing merchant's frozen tariffLock to
-// today's live rates — mirrors ConfirmTariffChangeModal.jsx's stage machine
-// (review -> otp -> done), wrapping POST /api/admin/tariffs/request-merchant-
-// resync + confirm-merchant-resync (see controllers/tariffController.js).
-// Needed because a tariff edit alone only reaches merchants signing up
-// afterward (migrations/backfillMerchantTariffLocks.js, 2026-09-03) —
-// everyone who already exists stays on whatever they were last frozen to
-// until this is run.
+// OTP-gated bulk re-sync of every merchant's tariffLock to today's live
+// rates — mirrors ConfirmTariffChangeModal.jsx's stage machine (review ->
+// otp -> done), wrapping POST /api/admin/tariffs/request-merchant-resync +
+// confirm-merchant-resync (see controllers/tariffController.js). As of
+// 2026-09-13, every tariff edit already re-syncs all merchants
+// automatically, so this is no longer the primary path — kept as a manual
+// catch-up for edge cases (e.g. a merchant's lock ever drifts out of sync
+// some other way).
 export default function ResyncMerchantTariffsModal({ onClose }) {
   const [stage, setStage] = React.useState('review'); // review | otp | done
   const [otp, setOtp] = React.useState('');

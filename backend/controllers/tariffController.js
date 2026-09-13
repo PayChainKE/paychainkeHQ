@@ -439,17 +439,30 @@ export const confirmTariffUpdate = async (req, res) => {
 
     await loadTariffCache();
 
+    // Every edit now reaches every merchant immediately — not just new
+    // signups (Brandon, 2026-09-13: reverses the narrower default from the
+    // 2026-09-03 freeze, where an edit alone left existing merchants locked
+    // to their old rate until a separate manual re-sync). Re-locking here,
+    // right after the cache reload above, means snapshotCurrentTariffs()
+    // captures the rates that were just written, not the ones from before
+    // this edit.
+    const snapshot = snapshotCurrentTariffs();
+    const resyncResult = await Merchant.updateMany(
+      {},
+      { $set: { tariffLock: snapshot, tariffLockedAt: new Date() } }
+    );
+
     logAudit({
       action: 'admin.tariffs.updated',
       category: 'admin',
       severity: 'critical',
-      message: `Admin updated ${before.length} tariff value(s) (OTP-verified)`,
+      message: `Admin updated ${before.length} tariff value(s) and re-synced ${resyncResult.modifiedCount} merchant(s) (OTP-verified)`,
       actor: adminActor(admin),
       req,
-      metadata: { changes: before },
+      metadata: { changes: before, merchantsResynced: resyncResult.modifiedCount },
     });
 
-    res.json({ success: true, data: buildTariffPayload() });
+    res.json({ success: true, data: buildTariffPayload(), merchantsResynced: resyncResult.modifiedCount });
   } catch (error) {
     console.error('Confirm Tariff Update Error:', error);
     res.status(500).json({ error: 'Server Error' });
@@ -457,16 +470,13 @@ export const confirmTariffUpdate = async (req, res) => {
 };
 
 // @desc    Mint a 5-minute OTP for re-syncing every existing merchant's
-//          frozen tariffLock to today's live rates. Since
-//          migrations/backfillMerchantTariffLocks.js (2026-09-03), a tariff
-//          edit here only reaches merchants signing up from now on —
-//          everyone who already existed is permanently locked to whatever
-//          was live when they were frozen (or last resynced), by design, so
-//          that repricing a rail never silently repriced an existing
-//          merchant's agreed rate. This is the explicit escape hatch for
-//          when an admin actually does want an edit (or several, made over
-//          time) to catch up every existing merchant at once, rather than
-//          only new signups.
+//          tariffLock to today's live rates. As of 2026-09-13,
+//          confirmTariffUpdate above already does this automatically on
+//          every edit, so this standalone pair is no longer the primary
+//          path — kept as a manual catch-up for edge cases (e.g. a
+//          merchant's lock ever drifts from the live cache some other way,
+//          or re-applying after directly editing a TariffCard document
+//          outside the admin UI).
 // @route   POST /api/admin/tariffs/request-merchant-resync
 // @access  Private (Admin, requireMutator)
 export const requestMerchantTariffResync = async (req, res) => {

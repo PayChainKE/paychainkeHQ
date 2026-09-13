@@ -13,6 +13,7 @@ export default function ConfirmTariffChangeModal({ changes, onClose, onSuccess }
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState('');
   const [updatedCount, setUpdatedCount] = React.useState(0);
+  const [resyncedCount, setResyncedCount] = React.useState(0);
 
   async function requestOtp() {
     setBusy(true);
@@ -41,6 +42,7 @@ export default function ConfirmTariffChangeModal({ changes, onClose, onSuccess }
       const res = await api.post('/api/admin/tariffs/confirm-update', { otp });
       if (res.data?.success) {
         setUpdatedCount(changes.length);
+        setResyncedCount(res.data.merchantsResynced || 0);
         setStage('done');
         onSuccess?.(res.data.data);
       } else {
@@ -62,7 +64,7 @@ export default function ConfirmTariffChangeModal({ changes, onClose, onSuccess }
               <span className="material-symbols-outlined text-3xl">fact_check</span>
             </div>
             <h3 className="text-xl font-bold text-on-surface mb-1">Confirm {changes.length} tariff change{changes.length === 1 ? '' : 's'}</h3>
-            <p className="text-sm text-on-surface-variant mb-4">Once verified, every <strong>new</strong> merchant signing up picks up these rates immediately. Merchants who already exist stay on whatever they're currently frozen to — use "Re-sync Existing Merchants" below if you want them to pick up this change too.</p>
+            <p className="text-sm text-on-surface-variant mb-4">These take effect for <strong>every</strong> merchant — new and already-existing — the moment you verify. Every merchant's fee preview and actual charge on the affected rail(s) reflects the new rate immediately.</p>
             <div className="space-y-1.5 mb-4 max-h-56 overflow-y-auto custom-scrollbar">
               {changes.map((c, i) => (
                 <div key={i} className="flex items-center justify-between bg-surface-container-low/60 rounded-lg px-3 py-2">
@@ -118,7 +120,7 @@ export default function ConfirmTariffChangeModal({ changes, onClose, onSuccess }
               <span className="material-symbols-outlined text-3xl">check_circle</span>
             </div>
             <h3 className="text-xl font-bold text-on-surface mb-1">Tariffs updated</h3>
-            <p className="text-sm text-on-surface-variant mb-5">{updatedCount} change{updatedCount === 1 ? '' : 's'} are live now — every new transaction on these rails prices at the new rate.</p>
+            <p className="text-sm text-on-surface-variant mb-5">{updatedCount} change{updatedCount === 1 ? '' : 's'} are live now — every new transaction on these rails prices at the new rate, and {resyncedCount} existing merchant{resyncedCount === 1 ? '' : 's'} {resyncedCount === 1 ? 'was' : 'were'} re-synced to it too.</p>
             <button onClick={onClose} className="px-5 py-2.5 rounded-lg bg-primary text-white text-sm font-semibold uppercase tracking-widest hover:shadow-lg active:scale-95 transition-all">Done</button>
           </div>
         )}
