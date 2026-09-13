@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import Admin from '../models/Admin.js';
+import Merchant from '../models/Merchant.js';
 import TariffCard from '../models/TariffCard.js';
 import { SAFARICOM_TARIFF } from '../config/revenueRateCard.js';
 import {
@@ -31,7 +32,7 @@ import {
 import { sendAdminActionOTP } from '../utils/resend.js';
 import { logAudit } from '../utils/auditLog.js';
 import { adminActor } from './adminController.js';
-import { loadTariffCache, getCachedTariffDoc } from '../services/tariffCardCache.js';
+import { loadTariffCache, getCachedTariffDoc, snapshotCurrentTariffs } from '../services/tariffCardCache.js';
 
 // Timing-safe 6-digit-OTP-hash compare — identical helper to
 // adminController.js's own safeEqual (kept local here rather than exported/
@@ -438,19 +439,130 @@ export const confirmTariffUpdate = async (req, res) => {
 
     await loadTariffCache();
 
+    // Every edit now reaches every merchant immediately — not just new
+    // signups (Brandon, 2026-09-13: reverses the narrower default from the
+    // 2026-09-03 freeze, where an edit alone left existing merchants locked
+    // to their old rate until a separate manual re-sync). Re-locking here,
+    // right after the cache reload above, means snapshotCurrentTariffs()
+    // captures the rates that were just written, not the ones from before
+    // this edit.
+    const snapshot = snapshotCurrentTariffs();
+    const resyncResult = await Merchant.updateMany(
+      {},
+      { $set: { tariffLock: snapshot, tariffLockedAt: new Date() } }
+    );
+
     logAudit({
       action: 'admin.tariffs.updated',
       category: 'admin',
       severity: 'critical',
-      message: `Admin updated ${before.length} tariff value(s) (OTP-verified)`,
+      message: `Admin updated ${before.length} tariff value(s) and re-synced ${resyncResult.modifiedCount} merchant(s) (OTP-verified)`,
       actor: adminActor(admin),
       req,
-      metadata: { changes: before },
+      metadata: { changes: before, merchantsResynced: resyncResult.modifiedCount },
     });
 
-    res.json({ success: true, data: buildTariffPayload() });
+    res.json({ success: true, data: buildTariffPayload(), merchantsResynced: resyncResult.modifiedCount });
   } catch (error) {
     console.error('Confirm Tariff Update Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Mint a 5-minute OTP for re-syncing every existing merchant's
+//          tariffLock to today's live rates. As of 2026-09-13,
+//          confirmTariffUpdate above already does this automatically on
+//          every edit, so this standalone pair is no longer the primary
+//          path — kept as a manual catch-up for edge cases (e.g. a
+//          merchant's lock ever drifts from the live cache some other way,
+//          or re-applying after directly editing a TariffCard document
+//          outside the admin UI).
+// @route   POST /api/admin/tariffs/request-merchant-resync
+// @access  Private (Admin, requireMutator)
+export const requestMerchantTariffResync = async (req, res) => {
+  try {
+    const admin = await Admin.findById(req.admin._id);
+    if (!admin) return res.status(401).json({ error: 'Admin session invalid.' });
+
+    const merchantCount = await Merchant.countDocuments({});
+
+    const otp = crypto.randomInt(100000, 1000000).toString();
+    admin.pendingAction = {
+      action: 'resync_merchant_tariffs',
+      targetId: null,
+      otpHash: crypto.createHash('sha256').update(otp).digest('hex'),
+      expiresAt: new Date(Date.now() + OTP_EXPIRY_MS),
+      payload: null,
+    };
+    await admin.save();
+
+    sendAdminActionOTP(
+      admin.email,
+      otp,
+      'Re-sync All Merchants to Current Tariffs',
+      `This re-prices ${merchantCount} existing merchant(s) to today's live rates — including anyone frozen to an older tariff.`
+    ).catch((err) => console.error('Merchant tariff resync OTP email failed:', err));
+
+    res.json({ success: true, merchantCount, message: 'Verification code sent to your admin email. It expires in 5 minutes.' });
+  } catch (error) {
+    console.error('Request Merchant Tariff Resync Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Confirm the OTP and overwrite every merchant's tariffLock with a
+//          fresh snapshot of the CURRENT live tariff sheet — the same
+//          snapshot shape/helper the one-time boot freeze
+//          (migrations/backfillMerchantTariffLocks.js) uses, just re-run on
+//          demand instead of exactly once at boot. From this moment, every
+//          existing merchant is re-frozen to today's rates; future tariff
+//          edits again only reach new signups until this is run again.
+// @route   POST /api/admin/tariffs/confirm-merchant-resync
+// @access  Private (Admin, requireMutator)
+export const confirmMerchantTariffResync = async (req, res) => {
+  try {
+    const { otp } = req.body || {};
+    if (!otp || !/^\d{6}$/.test(String(otp))) {
+      return res.status(400).json({ error: 'A 6-digit code is required.' });
+    }
+
+    const admin = await Admin.findById(req.admin._id).select('+pendingAction.otpHash');
+    if (!admin) return res.status(401).json({ error: 'Admin session invalid.' });
+
+    const pa = admin.pendingAction || {};
+    const bindingOk = pa.action === 'resync_merchant_tariffs' && pa.otpHash && pa.expiresAt && new Date() < new Date(pa.expiresAt);
+    const otpHash = crypto.createHash('sha256').update(String(otp)).digest('hex');
+    const otpOk = bindingOk && safeEqual(otpHash, pa.otpHash);
+
+    if (!otpOk) {
+      admin.pendingAction = { action: null, targetId: null, otpHash: null, expiresAt: null, payload: null };
+      await admin.save();
+      return res.status(401).json({ error: 'Verification failed or code expired. Re-request a new code.' });
+    }
+
+    // Single-use — clear regardless of what happens next.
+    admin.pendingAction = { action: null, targetId: null, otpHash: null, expiresAt: null, payload: null };
+    await admin.save();
+
+    const snapshot = snapshotCurrentTariffs();
+    const result = await Merchant.updateMany(
+      {},
+      { $set: { tariffLock: snapshot, tariffLockedAt: new Date() } }
+    );
+
+    logAudit({
+      action: 'admin.tariffs.merchants_resynced',
+      category: 'admin',
+      severity: 'critical',
+      message: `Admin re-synced ${result.modifiedCount} merchant(s) to today's live tariffs (OTP-verified)`,
+      actor: adminActor(admin),
+      req,
+      metadata: { matchedCount: result.matchedCount, modifiedCount: result.modifiedCount },
+    });
+
+    res.json({ success: true, resyncedCount: result.modifiedCount });
+  } catch (error) {
+    console.error('Confirm Merchant Tariff Resync Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };

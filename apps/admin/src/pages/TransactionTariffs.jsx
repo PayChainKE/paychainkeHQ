@@ -3,6 +3,7 @@ import Layout from '../components/layout/Layout';
 import api from '../api/api';
 import { formatKES } from '../utils/formatCurrency';
 import ConfirmTariffChangeModal from '../components/modals/ConfirmTariffChangeModal';
+import ResyncMerchantTariffsModal from '../components/modals/ResyncMerchantTariffsModal';
 import { useAuth } from '../context/AuthContext';
 
 const Th = ({ children, className = '' }) => (
@@ -95,6 +96,7 @@ const TransactionTariffs = () => {
   const [editMode, setEditMode] = useState(false);
   const [changes, setChanges] = useState({}); // id -> { key, max, label, oldFee, newFee }
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showResync, setShowResync] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
   const [prunedCount, setPrunedCount] = useState(0);
 
@@ -253,10 +255,29 @@ const TransactionTariffs = () => {
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
             <span className="material-symbols-outlined text-amber-600 shrink-0">edit_note</span>
             <p className="text-xs text-amber-800 font-medium leading-relaxed">
-              Editing PayChain's own margin/service-fee columns only (highlighted in green) — the real third-party cost columns stay fixed. Every change here applies platform-wide, immediately, once confirmed with a 5-minute email code — no code deploy needed. Your progress is saved automatically as you go, so it's safe to come back to this later.
+              Editing PayChain's own margin/service-fee columns only (highlighted in green) — the real third-party cost columns stay fixed. Confirmed with a 5-minute email code, no code deploy needed — and applies to <strong>every</strong> merchant, new and existing, the instant you verify. Your progress is saved automatically as you go, so it's safe to come back to this later.
             </p>
           </div>
         )}
+
+        <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center gap-4 sm:justify-between">
+          <div className="flex items-start gap-3">
+            <span className="material-symbols-outlined text-primary/50 shrink-0">lock_clock</span>
+            <div>
+              <p className="text-sm font-bold text-on-surface">Manually re-sync merchants to today's rates</p>
+              <p className="text-xs text-on-surface-variant/70 mt-0.5 max-w-xl">
+                Every tariff edit above already re-syncs all merchants automatically — you shouldn't normally need this. Kept as a manual catch-up for edge cases (e.g. a merchant's rate ever drifts out of sync some other way).
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowResync(true)}
+            className="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest border border-primary/30 text-primary hover:bg-primary/5 transition-all"
+          >
+            <span className="material-symbols-outlined text-base">sync</span>
+            Re-sync Existing Merchants
+          </button>
+        </div>
 
         {loading ? (
           <div className="space-y-4">
@@ -415,6 +436,10 @@ const TransactionTariffs = () => {
           onClose={() => setShowConfirm(false)}
           onSuccess={handleConfirmed}
         />
+      )}
+
+      {showResync && (
+        <ResyncMerchantTariffsModal onClose={() => setShowResync(false)} />
       )}
     </Layout>
   );
