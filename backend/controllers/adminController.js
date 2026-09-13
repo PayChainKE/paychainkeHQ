@@ -2838,7 +2838,13 @@ export const getStkRequests = async (req, res) => {
 export const searchTransactionAudit = async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-    const limit = Math.min(100, Math.max(5, parseInt(req.query.limit, 10) || 25));
+    // Capped at 5000 rather than the interactive table's own 25/page — the
+    // Transaction Audit page's "Generate Report" button (professional PDF,
+    // apps/admin/src/pages/TransactionAudit.jsx) reuses this exact endpoint
+    // with a much higher limit so the report always matches whatever's
+    // currently filtered/on screen, same reasoning as exportPayoutAuditCsv's
+    // own (larger) 20,000-row cap below.
+    const limit = Math.min(5000, Math.max(5, parseInt(req.query.limit, 10) || 25));
     // Comma-separated list accepted (not just a single type) — the payout-
     // audit-trail view (Tax & Compliance) scopes to every payout-shaped
     // type (outbound, bulk_pay, mpesa_b2c, ncba_outbound, ...) in one call

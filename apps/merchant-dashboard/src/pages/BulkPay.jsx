@@ -6,6 +6,7 @@ import MerchantLayout from '../components/layout/MerchantLayout'
 import FundAccountModal from '../components/modals/FundAccountModal'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { formatKES } from '../utils/formatCurrency'
+import { formatAccountNumber } from '../utils/formatAccountNumber'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useNotification } from '../context/NotificationContext'
 import { isValidPhoneKE } from '../utils/validators'
@@ -2854,6 +2855,28 @@ export default function BulkPay() {
                                  <p className="font-headline text-xl font-black text-white">{fmtInvoiceCurrency(invoiceTotal)}</p>
                               </div>
                            </div>
+                        </div>
+
+                        {/* Payment Details — printed alongside the QR code below, not
+                            instead of it, since a printed/forwarded copy of this
+                            invoice can't be scanned. Same Paybill/account pairing
+                            shown on every other PayChain merchant document (Account
+                            Statement, Audit Report). */}
+                        <div className="mb-6 p-5 rounded-2xl bg-[#06201B] flex items-center justify-between gap-6 flex-wrap">
+                          <div>
+                            <p className="text-[9px] text-[#5EFEB3] font-black uppercase tracking-widest mb-2">Payment Details</p>
+                            <p className="text-xs text-white/60">Pay via M-Pesa Paybill</p>
+                          </div>
+                          <div className="flex items-center gap-8">
+                            <div>
+                              <p className="text-[9px] text-white/40 font-black uppercase tracking-widest mb-0.5">Paybill</p>
+                              <p className="font-headline text-lg font-black text-white">880100</p>
+                            </div>
+                            <div>
+                              <p className="text-[9px] text-white/40 font-black uppercase tracking-widest mb-0.5">Account Number</p>
+                              <p className="font-headline text-lg font-black text-white">{formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending')}</p>
+                            </div>
+                          </div>
                         </div>
 
                         {/* Footer Notes */}
