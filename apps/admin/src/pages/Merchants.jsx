@@ -1498,6 +1498,7 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
     const acctLines = [
       ['Business Name', m.businessName || '—', 'Contact Name', m.name || '—'],
       ['Email', m.email || '—', 'Phone', m.phone || '—'],
+      ['Paybill', '880100', 'Account Number', formatAccountNumber(m.ncbaVirtualAccountNumber || m.ncbaMerchantCode) || 'Pending'],
       ...optionalLines,
       ['Joined', fmtDate(m.createdAt), 'Registration Source', m.registrationSource === 'mobile' ? 'Mobile App' : 'Web Dashboard'],
     ];
