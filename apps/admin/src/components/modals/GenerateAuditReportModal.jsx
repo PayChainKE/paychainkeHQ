@@ -4,6 +4,8 @@ import autoTable from 'jspdf-autotable';
 import api from '../../api/api';
 import logo from '../../assets/logo.png';
 import { formatAccountNumber } from '../../utils/formatAccountNumber';
+import { formatName } from '../../utils/formatName';
+import { formatPhoneDisplay } from '../../utils/formatPhoneDisplay';
 
 const PRESETS = [
   { key: 'all',   label: 'Since Joining' },
@@ -181,13 +183,32 @@ export default function GenerateAuditReportModal({ merchant, onClose }) {
       const actorLabel = ['admin', 'officer'].includes(r.actor?.type)
         ? (r.actor?.name || r.actor?.email || r.actor.type)
         : (r.actor?.type === 'system' ? 'System' : (r.actor?.name || 'Merchant'));
+
+      // Transaction rows (category 'wallet') carry sender/recipient in
+      // metadata — surface both parties' name + phone under the amount/
+      // reference line so this report doubles as a money-movement trail
+      // for audits/investigations, not just a list of events.
+      let details = r.message || '—';
+      if (r.category === 'wallet') {
+        const partyStr = (p) => {
+          if (!p?.name && !p?.id) return null;
+          const name = formatName(p.name) || '—';
+          const phone = p.id ? formatPhoneDisplay(p.id) : null;
+          return phone ? `${name} (${phone})` : name;
+        };
+        const senderStr = partyStr(r.metadata?.sender);
+        const recipientStr = partyStr(r.metadata?.recipient);
+        const parties = [senderStr && `From: ${senderStr}`, recipientStr && `To: ${recipientStr}`].filter(Boolean).join('   ');
+        if (parties) details += `\n${parties}`;
+      }
+
       return [
         new Date(r.createdAt).toLocaleString('en-KE', { dateStyle: 'medium', timeStyle: 'short' }),
         (r.action || '—').replace(/[._]/g, ' '),
         r.category || '—',
         r.severity || '—',
         actorLabel,
-        r.message || '—',
+        details,
       ];
     });
 
