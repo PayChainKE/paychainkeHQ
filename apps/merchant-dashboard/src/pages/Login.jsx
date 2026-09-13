@@ -169,6 +169,20 @@ const maskIdentifier = (raw) => {
   return value
 }
 
+// Groups the signup form into labeled sections (Personal/Business/Location/
+// Documents) instead of one undifferentiated list of fields — an icon, a
+// caps label, and a hairline rule extending to the edge, the same pattern
+// banks use for multi-part account-opening forms.
+function SignupSectionHeader({ icon, title }) {
+  return (
+    <div className="flex items-center gap-2 pt-3 pb-1 first:pt-0">
+      <span className="material-symbols-outlined text-primary/40 text-base">{icon}</span>
+      <p className="text-[11px] font-black uppercase tracking-[0.2em] text-primary/50 whitespace-nowrap">{title}</p>
+      <div className="flex-1 h-px bg-outline-variant/15" />
+    </div>
+  )
+}
+
 export default function Login() {
   const { login, loginWithPasskey, signup, verifyOTP, resendOTP, forgotPassword, verifyResetOTP, resetPassword, isAuthenticated } = useMerchantAuth()
   const { addNotification } = useNotification()
@@ -1199,6 +1213,8 @@ export default function Login() {
                   </div>
                   <form onSubmit={handleSignup} className="space-y-4 max-h-[55vh] overflow-y-auto pr-2 pb-4 scrollbar-thin scrollbar-thumb-outline-variant/20 scrollbar-track-transparent">
                 
+                <SignupSectionHeader icon="person" title="Personal Details" />
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">First Name *</label>
@@ -1219,59 +1235,95 @@ export default function Login() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Your Email *</label>
-                  <ValidatedInput kind="email" required value={signupEmail} onChange={e => setSignupEmail(e.target.value)} placeholder="john@example.com" forceTouched={signupStepTouched}
-                    className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" />
-                </div>
-
-                <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Your National ID Number *</label>
                   <ValidatedInput kind="nationalId" required value={signupNationalId} onChange={e => setSignupNationalId(e.target.value)} placeholder="12345678" forceTouched={signupStepTouched}
                     className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" />
                   <p className="text-[11px] text-outline-variant/60 pl-1">Used to verify the identity of the person registering this account.</p>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Your Phone *</label>
-                  {/* Icon is absolutely positioned inside the input's own padding, not a
-                      flex sibling of it — ValidatedInput renders <input> and its error
-                      <p> as siblings (a Fragment), so putting it inside a `flex` row
-                      alongside the icon previously made the error paragraph itself a
-                      flex item in that same row (next to the icon/input) instead of
-                      stacking below the field — it visually landed inside/overlapping
-                      the input and could intercept clicks meant for it. */}
-                  <div className="relative group">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center text-primary/40 group-focus-within:text-primary transition-colors pointer-events-none">
-                      <span className="material-symbols-outlined text-sm">smartphone</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Your Email *</label>
+                    <ValidatedInput kind="email" required value={signupEmail} onChange={e => setSignupEmail(e.target.value)} placeholder="john@example.com" forceTouched={signupStepTouched}
+                      className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Your Phone *</label>
+                    {/* Icon is absolutely positioned inside the input's own padding, not a
+                        flex sibling of it — ValidatedInput renders <input> and its error
+                        <p> as siblings (a Fragment), so putting it inside a `flex` row
+                        alongside the icon previously made the error paragraph itself a
+                        flex item in that same row (next to the icon/input) instead of
+                        stacking below the field — it visually landed inside/overlapping
+                        the input and could intercept clicks meant for it. */}
+                    <div className="relative group">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center text-primary/40 group-focus-within:text-primary transition-colors pointer-events-none">
+                        <span className="material-symbols-outlined text-sm">smartphone</span>
+                      </div>
+                      <ValidatedInput kind="phoneKE" value={signupPhone} onChange={e => setSignupPhone(e.target.value)} placeholder="0712 345 678" forceTouched={signupStepTouched}
+                        className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 pl-10 pr-3 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" />
                     </div>
-                    <ValidatedInput kind="phoneKE" value={signupPhone} onChange={e => setSignupPhone(e.target.value)} placeholder="0712 345 678" forceTouched={signupStepTouched}
-                      className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 pl-10 pr-3 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" />
+                  </div>
+                </div>
+
+                <SignupSectionHeader icon="storefront" title="Business Details" />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Business Name *</label>
+                    <ValidatedInput kind="businessName" required value={signupBusinessName} onChange={e => setSignupBusinessName(e.target.value)} placeholder="Acme Corp" forceTouched={signupStepTouched}
+                      className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Business Type *</label>
+                    <div className="relative">
+                      <select
+                        required
+                        value={signupBusinessType}
+                        onChange={e => setSignupBusinessType(e.target.value)}
+                        className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 pl-4 pr-10 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all appearance-none cursor-pointer"
+                      >
+                        <option value="">—Please choose an option—</option>
+                        {BUSINESS_TYPES.map(type => (
+                          <option key={type} value={type}>{type}</option>
+                        ))}
+                      </select>
+                      <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-primary/40 pointer-events-none">expand_more</span>
+                    </div>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Business Name *</label>
-                  <ValidatedInput kind="businessName" required value={signupBusinessName} onChange={e => setSignupBusinessName(e.target.value)} placeholder="Acme Corp" forceTouched={signupStepTouched}
-                    className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 px-4 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40" />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Business Type *</label>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Employees *</label>
                   <div className="relative">
                     <select
                       required
-                      value={signupBusinessType}
-                      onChange={e => setSignupBusinessType(e.target.value)}
+                      value={signupEmployees}
+                      onChange={e => setSignupEmployees(e.target.value)}
                       className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 pl-4 pr-10 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all appearance-none cursor-pointer"
                     >
                       <option value="">—Please choose an option—</option>
-                      {BUSINESS_TYPES.map(type => (
-                        <option key={type} value={type}>{type}</option>
+                      {EMPLOYEE_BANDS.map(band => (
+                        <option key={band} value={band}>{band}</option>
                       ))}
                     </select>
                     <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-primary/40 pointer-events-none">expand_more</span>
                   </div>
                 </div>
+
+                <div className="space-y-3 pt-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Is this an eCommerce business? *</label>
+                  <div className="flex gap-6 pl-1">
+                    <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-primary hover:text-emerald-600 transition-colors">
+                      <input type="radio" name="ecommerce" value="yes" checked={signupEcommerce === 'yes'} onChange={e => setSignupEcommerce(e.target.value)} className="w-4 h-4 text-emerald-600 focus:ring-emerald-500" required /> Yes
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-primary hover:text-emerald-600 transition-colors">
+                      <input type="radio" name="ecommerce" value="no" checked={signupEcommerce === 'no'} onChange={e => setSignupEcommerce(e.target.value)} className="w-4 h-4 text-emerald-600 focus:ring-emerald-500" required /> No
+                    </label>
+                  </div>
+                </div>
+
+                <SignupSectionHeader icon="location_on" title="Business Location" />
 
                 <div className="space-y-3">
                   <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">County *</label>
@@ -1471,46 +1523,16 @@ export default function Login() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Employees *</label>
-                  <div className="relative">
-                    <select
-                      required
-                      value={signupEmployees}
-                      onChange={e => setSignupEmployees(e.target.value)}
-                      className="w-full bg-white border border-outline-variant/15 rounded-xl py-3 pl-4 pr-10 text-sm font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all appearance-none cursor-pointer"
-                    >
-                      <option value="">—Please choose an option—</option>
-                      {EMPLOYEE_BANDS.map(band => (
-                        <option key={band} value={band}>{band}</option>
-                      ))}
-                    </select>
-                    <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-primary/40 pointer-events-none">expand_more</span>
-                  </div>
-                </div>
-
-                <div className="space-y-3 pt-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1">Is this an eCommerce business? *</label>
-                  <div className="flex gap-6 pl-1">
-                    <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-primary hover:text-emerald-600 transition-colors">
-                      <input type="radio" name="ecommerce" value="yes" checked={signupEcommerce === 'yes'} onChange={e => setSignupEcommerce(e.target.value)} className="w-4 h-4 text-emerald-600 focus:ring-emerald-500" required /> Yes
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-primary hover:text-emerald-600 transition-colors">
-                      <input type="radio" name="ecommerce" value="no" checked={signupEcommerce === 'no'} onChange={e => setSignupEcommerce(e.target.value)} className="w-4 h-4 text-emerald-600 focus:ring-emerald-500" required /> No
-                    </label>
-                  </div>
-                </div>
-
-                <div className="space-y-3 pt-2 border-t border-outline-variant/10 mt-2">
+                <div className="space-y-3">
                   {(() => {
                     const requirement = KYB_REQUIREMENTS_BY_BUSINESS_TYPE[signupBusinessType]
                     return (
                       <>
-                        <label className="text-[10px] font-black uppercase tracking-widest text-primary/60 pl-1 flex items-center gap-1.5">
-                          <span className="material-symbols-outlined text-sm">verified_user</span>
-                          Business Verification Document{(requirement?.mode === 'all' && requirement.slots.length > 1) || requirement?.mode === 'all_plus_choice' ? 's' : ''} *
-                        </label>
-                        <p className="text-2xs text-on-surface-variant/60 pl-1 -mt-1">
+                        <SignupSectionHeader
+                          icon="verified_user"
+                          title={`Verification Document${(requirement?.mode === 'all' && requirement.slots.length > 1) || requirement?.mode === 'all_plus_choice' ? 's' : ''}`}
+                        />
+                        <p className="text-2xs text-on-surface-variant/60 pl-1 -mt-2">
                           {!requirement
                             ? 'Select a business type above to see which document(s) are required.'
                             : requirement.mode === 'choice'
