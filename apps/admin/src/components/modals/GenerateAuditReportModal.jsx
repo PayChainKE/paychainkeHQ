@@ -3,6 +3,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import api from '../../api/api';
 import logo from '../../assets/logo.png';
+import { formatAccountNumber } from '../../utils/formatAccountNumber';
 
 const PRESETS = [
   { key: 'all',   label: 'Since Joining' },
@@ -139,6 +140,16 @@ export default function GenerateAuditReportModal({ merchant, onClose }) {
     doc.text('Issued:', col3, y);
     doc.setTextColor(6, 32, 27); doc.setFont('helvetica', 'bold');
     doc.text(now.toLocaleString('en-KE', { dateStyle: 'medium', timeStyle: 'short' }), col3 + 16, y);
+
+    y += 6;
+    doc.setTextColor(100, 110, 105); doc.setFont('helvetica', 'normal');
+    doc.text('Paybill / Account:', L, y);
+    doc.setTextColor(6, 32, 27); doc.setFont('helvetica', 'bold');
+    doc.text(`880100 / ${formatAccountNumber(merchant.ncbaVirtualAccountNumber || merchant.ncbaMerchantCode || 'Pending')}`, L + 27, y);
+    doc.setTextColor(100, 110, 105); doc.setFont('helvetica', 'normal');
+    doc.text('Email:', col2, y);
+    doc.setTextColor(6, 32, 27); doc.setFont('helvetica', 'bold');
+    doc.text(fitText(merchant.email || '—', R - (col2 + 12)), col2 + 12, y);
     y += 8;
 
     // ── SUMMARY STRIP ────────────────────────────────────────────────────

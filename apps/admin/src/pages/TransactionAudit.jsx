@@ -1,10 +1,20 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import Layout from '../components/layout/Layout';
 import api from '../api/api';
 import TablePagination from '../components/ui/TablePagination';
 import { formatKES } from '../utils/formatCurrency';
 import { formatName } from '../utils/formatName';
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay';
+import logo from '../assets/logo.png';
+
+// Row cap for "Generate Report" below — matches the backend's own cap on
+// this endpoint when a higher limit is requested (searchTransactionAudit
+// in adminController.js). A PDF table beyond this size stops being a
+// reviewable report and starts being a data dump; narrow the filters
+// instead of raising this.
+const REPORT_ROW_LIMIT = 5000;
 
 const PAGE_SIZE = 25;
 
@@ -65,6 +75,8 @@ const TransactionAudit = () => {
   const [to, setTo] = useState('');
 
   const [activeId, setActiveId] = useState(null);
+  const [generatingReport, setGeneratingReport] = useState(false);
+  const [reportError, setReportError] = useState('');
 
   const searchTimer = useRef(null);
   useEffect(() => {
@@ -73,15 +85,20 @@ const TransactionAudit = () => {
     return () => searchTimer.current && clearTimeout(searchTimer.current);
   }, [searchInput]);
 
-  const params = useMemo(() => {
-    const p = { page, limit: PAGE_SIZE };
+  // Shared by the interactive table and "Generate Report" below — the
+  // report must always match whatever's currently filtered/on screen, same
+  // reasoning as exportPayoutAuditCsv's own doc comment.
+  const filterParams = useMemo(() => {
+    const p = {};
     if (search.trim()) p.q = search.trim();
     if (type !== 'all') p.type = type;
     if (status !== 'all') p.status = status;
     if (from) p.from = new Date(`${from}T00:00:00`).toISOString();
     if (to) p.to = new Date(`${to}T23:59:59.999`).toISOString();
     return p;
-  }, [page, search, type, status, from, to]);
+  }, [search, type, status, from, to]);
+
+  const params = useMemo(() => ({ ...filterParams, page, limit: PAGE_SIZE }), [filterParams, page]);
 
   const fetchRows = useCallback(async () => {
     setLoading(true);
@@ -106,6 +123,191 @@ const TransactionAudit = () => {
   const filtersActive = !!search || type !== 'all' || status !== 'all' || !!from || !!to;
   function resetFilters() {
     setSearchInput(''); setSearch(''); setType('all'); setStatus('all'); setFrom(''); setTo('');
+  }
+
+  // Fetches up to REPORT_ROW_LIMIT transactions matching whatever's
+  // currently filtered/on screen (same params the table itself uses, minus
+  // pagination) and builds a bank-grade PDF from them — every party's name
+  // and phone, and the transaction reference (PayChain's own bank/M-Pesa
+  // reference), for both sender and recipient, not just a summary line.
+  async function generateReport() {
+    setGeneratingReport(true);
+    setReportError('');
+    try {
+      const res = await api.get('/api/admin/transaction-audit', {
+        params: { ...filterParams, page: 1, limit: REPORT_ROW_LIMIT },
+      });
+      const txns = res.data?.data || [];
+      if (!txns.length) {
+        setReportError('No transactions match the current filters.');
+        return;
+      }
+      buildReportPdf(txns, res.data?.pagination?.total || txns.length);
+    } catch (e) {
+      setReportError(e?.response?.data?.error || 'Could not generate the report.');
+    } finally {
+      setGeneratingReport(false);
+    }
+  }
+
+  function buildReportPdf(txns, totalMatching) {
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const W = doc.internal.pageSize.getWidth();
+    const H = doc.internal.pageSize.getHeight();
+    const L = 14, R = W - 14;
+    const now = new Date();
+    const reportId = `PC-TAR-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+
+    const fitText = (text, maxWidth) => {
+      let str = String(text ?? '');
+      if (doc.getTextWidth(str) <= maxWidth) return str;
+      while (str.length > 1 && doc.getTextWidth(str + '…') > maxWidth) str = str.slice(0, -1);
+      return str + '…';
+    };
+
+    // ── HEADER BAND ───────────────────────────────────────────────────────
+    doc.setFillColor(6, 32, 27);
+    doc.rect(0, 0, W, 32, 'F');
+    const logoW = 28, logoH = logoW * (75 / 338);
+    try { doc.addImage(logo, 'PNG', L, (32 - logoH) / 2, logoW, logoH, undefined, 'FAST'); } catch (_) {}
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text('PayChain Kenya', R, 13, { align: 'right' });
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(94, 254, 179);
+    doc.text('TRANSACTION AUDIT REPORT', R, 20, { align: 'right' });
+    doc.setTextColor(200, 220, 210);
+    doc.text(`Report Ref: ${reportId}`, R, 26, { align: 'right' });
+
+    // ── REPORT DETAILS BLOCK ─────────────────────────────────────────────
+    let y = 40;
+    doc.setTextColor(6, 32, 27);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text('Report Details', L, y);
+    doc.setDrawColor(220, 230, 225);
+    doc.setLineWidth(0.3);
+    doc.line(L, y + 1.5, R, y + 1.5);
+
+    y += 6;
+    const col2 = W / 2 - 10;
+    const col3 = W - 90;
+    const filterSummary = [
+      type !== 'all' && (TYPE_META[type]?.label || type),
+      status !== 'all' && (STATUS_META[status]?.label || status),
+      search.trim() && `"${search.trim()}"`,
+      (from || to) && `${from || 'earliest'} → ${to || 'now'}`,
+    ].filter(Boolean).join('  •  ') || 'All transactions, no filters applied';
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(100, 110, 105);
+    doc.text('Scope:', L, y);
+    doc.setTextColor(6, 32, 27); doc.setFont('helvetica', 'bold');
+    doc.text(fitText(filterSummary, col2 - L - 16), L + 16, y);
+    doc.setTextColor(100, 110, 105); doc.setFont('helvetica', 'normal');
+    doc.text('Issued:', col3, y);
+    doc.setTextColor(6, 32, 27); doc.setFont('helvetica', 'bold');
+    doc.text(now.toLocaleString('en-KE', { dateStyle: 'medium', timeStyle: 'short' }), col3 + 16, y);
+    y += 8;
+
+    // ── SUMMARY STRIP ────────────────────────────────────────────────────
+    const totalAmount = txns.reduce((s, t) => s + Number(t.kesAmount ?? t.amount ?? 0), 0);
+    const totalFees = txns.reduce((s, t) => s + Number(t.paychainFee || 0), 0);
+    const merchantCount = new Set(txns.map((t) => t.merchant?._id).filter(Boolean)).size;
+    const summaryItems = [
+      { label: 'Transactions', value: String(txns.length), color: [6, 32, 27] },
+      { label: 'Merchants Involved', value: String(merchantCount), color: [40, 80, 120] },
+      { label: 'Total Amount', value: formatKES(totalAmount), color: [6, 32, 27] },
+      { label: 'Total PayChain Fees', value: formatKES(totalFees), color: [6, 120, 60] },
+    ];
+    const boxW = (R - L) / summaryItems.length - 2;
+    summaryItems.forEach((item, i) => {
+      const bx = L + i * (boxW + 2);
+      doc.setFillColor(244, 247, 245);
+      doc.roundedRect(bx, y, boxW, 15, 2, 2, 'F');
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(100, 110, 105);
+      doc.text(item.label.toUpperCase(), bx + boxW / 2, y + 5.5, { align: 'center' });
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(...item.color);
+      doc.text(item.value, bx + boxW / 2, y + 11.5, { align: 'center' });
+    });
+    y += 21;
+
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(6, 32, 27);
+    doc.text('Transactions', L, y);
+
+    const body = txns.map((t) => [
+      new Date(t.createdAt).toLocaleString('en-KE', { dateStyle: 'medium', timeStyle: 'short' }),
+      (t.reference || '—').slice(0, 18),
+      t.merchant?.businessName || 'Deleted Merchant',
+      `${formatName(t.sender?.name) || '—'}\n${formatPhoneDisplay(t.sender?.id) || ''}`,
+      `${formatName(t.recipient?.name) || '—'}\n${formatPhoneDisplay(t.recipient?.id) || ''}`,
+      (TYPE_META[t.type]?.label || t.type || '—'),
+      formatKES(t.kesAmount ?? t.amount ?? 0),
+      formatKES(t.paychainFee || 0),
+      (t.status || '—').toUpperCase(),
+    ]);
+
+    autoTable(doc, {
+      startY: y + 3,
+      margin: { left: L, right: L },
+      head: [['DATE/TIME', 'REFERENCE', 'MERCHANT', 'SENDER', 'RECIPIENT', 'TYPE', 'AMOUNT', 'FEE', 'STATUS']],
+      body,
+      theme: 'plain',
+      headStyles: {
+        fillColor: [6, 32, 27], textColor: [255, 255, 255], fontSize: 6.8, fontStyle: 'bold',
+        cellPadding: { top: 3.5, bottom: 3.5, left: 2.5, right: 2.5 }, halign: 'left', lineWidth: 0,
+      },
+      bodyStyles: {
+        fontSize: 6.8, textColor: [30, 40, 35], cellPadding: { top: 2.5, bottom: 2.5, left: 2.5, right: 2.5 },
+        lineColor: [230, 235, 232], lineWidth: 0.2, valign: 'middle', overflow: 'linebreak',
+      },
+      alternateRowStyles: { fillColor: [246, 249, 247] },
+      columnStyles: {
+        0: { cellWidth: 26 },
+        1: { cellWidth: 28, fontSize: 6.2 },
+        2: { cellWidth: 32 },
+        3: { cellWidth: 32 },
+        4: { cellWidth: 32 },
+        5: { cellWidth: 22 },
+        6: { cellWidth: 20, halign: 'right', fontStyle: 'bold' },
+        7: { cellWidth: 16, halign: 'right', textColor: [6, 120, 60] },
+        8: { cellWidth: 18, halign: 'center', fontStyle: 'bold' },
+      },
+      didParseCell(data) {
+        if (data.section === 'body' && data.column.index === 8) {
+          const v = String(data.cell.raw);
+          if (v === 'FAILED') data.cell.styles.textColor = [180, 30, 30];
+          else if (v === 'PENDING') data.cell.styles.textColor = [160, 110, 6];
+          else if (v === 'COMPLETED' || v === 'VERIFIED') data.cell.styles.textColor = [6, 120, 60];
+        }
+      },
+      didDrawPage(data) {
+        if (data.pageNumber > 1) {
+          doc.setFillColor(6, 32, 27);
+          doc.rect(0, 0, W, 10, 'F');
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(255, 255, 255);
+          doc.text(`PayChain — ${reportId} — continued`, L, 6.5);
+          doc.text(`Page ${data.pageNumber}`, R, 6.5, { align: 'right' });
+        }
+      },
+    });
+
+    // ── FOOTER (every page) ──────────────────────────────────────────────
+    const totalPages = doc.internal.getNumberOfPages();
+    for (let p = 1; p <= totalPages; p++) {
+      doc.setPage(p);
+      const footerY = H - 12;
+      doc.setDrawColor(200, 210, 205); doc.setLineWidth(0.3);
+      doc.line(L, footerY - 4, R, footerY - 4);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(6.8); doc.setTextColor(140, 150, 145);
+      const capNote = totalMatching > txns.length
+        ? `Matched ${totalMatching} transactions — only the most recent ${txns.length} shown; narrow the filters for a complete report. `
+        : '';
+      doc.text(`${capNote}Generated by PayChain Admin — internal/audit use.`, W / 2, footerY, { align: 'center' });
+      doc.text(`© ${now.getFullYear()} Paychain Ltd  •  Ref: ${reportId}  •  Page ${p} of ${totalPages}`, W / 2, footerY + 4.5, { align: 'center' });
+    }
+
+    doc.save(`PayChain_Transaction_Audit_Report_${now.toISOString().slice(0, 10)}.pdf`);
   }
 
   return (
@@ -158,7 +360,23 @@ const TransactionAudit = () => {
               Clear
             </button>
           )}
+          <button
+            onClick={generateReport}
+            disabled={generatingReport}
+            className="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest text-white bg-primary hover:opacity-90 disabled:opacity-50 transition-all"
+          >
+            <span className="material-symbols-outlined text-base">{generatingReport ? 'hourglass_top' : 'summarize'}</span>
+            {generatingReport ? 'Generating…' : 'Generate Report'}
+          </button>
         </div>
+
+        {reportError && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-center gap-3">
+            <span className="material-symbols-outlined text-red-600 shrink-0 text-lg">error</span>
+            <p className="text-xs text-red-700 font-medium flex-1">{reportError}</p>
+            <button onClick={() => setReportError('')} className="text-2xs font-bold uppercase tracking-widest text-red-700 hover:text-red-900 shrink-0">Dismiss</button>
+          </div>
+        )}
 
         <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/20 overflow-hidden shadow-editorial">
           <div className="overflow-x-auto custom-scrollbar">
