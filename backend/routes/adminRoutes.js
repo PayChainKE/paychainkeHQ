@@ -89,7 +89,7 @@ import { getApiTransactions, getApiTransactionsSummary } from '../controllers/ap
 import { getTariffs, requestTariffUpdate, confirmTariffUpdate, requestMerchantTariffResync, confirmMerchantTariffResync } from '../controllers/tariffController.js';
 import { adminListStuckOpenBankingPayouts, adminResolveStuckOpenBankingPayout, adminDeleteStuckOpenBankingPayout } from '../controllers/ncbaOpenBankingController.js';
 import { adminManualCreditNcbaCollection, adminListMissedNcbaCollections, adminDismissMissedNcbaCollection } from '../controllers/ncbaAccountNotificationController.js';
-import { getTrash, restoreTrashItem } from '../controllers/trashController.js';
+import { getTrash, restoreTrashItem, permanentlyDeleteTrashItem } from '../controllers/trashController.js';
 import { adminListCashAdvanceRequests, adminUpdateCashAdvanceRequest } from '../controllers/cashAdvanceController.js';
 import {
   listExpenses,
@@ -268,6 +268,7 @@ router.post('/ncba-collections/missed/:id/dismiss', protect, requireMutator, sen
 // Expense), restorable within a 90-day window. See models/DeletedRecord.js.
 router.get('/trash', protect, requireMutator, getTrash);
 router.post('/trash/:id/restore', protect, requireMutator, sensitiveActionLimiter, restoreTrashItem);
+router.delete('/trash/:id', protect, requireMutator, sensitiveActionLimiter, permanentlyDeleteTrashItem);
 
 // Stellar Wallet Audit (live Horizon cross-reference)
 router.get('/wallet-audit', protect, excludeOfficer, runWalletAudit);

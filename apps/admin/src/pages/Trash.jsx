@@ -31,6 +31,8 @@ const Trash = () => {
   const [page, setPage] = useState(1);
   const [restoreTarget, setRestoreTarget] = useState(null);
   const [restoreBusy, setRestoreBusy] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const [toast, setToast] = useState('');
 
   const showToast = useCallback((msg) => { setToast(msg); setTimeout(() => setToast(''), 3200); }, []);
@@ -66,13 +68,28 @@ const Trash = () => {
     }
   }
 
+  async function confirmPermanentDelete() {
+    if (!deleteTarget) return;
+    setDeleteBusy(true);
+    try {
+      await api.delete(`/api/admin/trash/${deleteTarget._id}`);
+      showToast(`Permanently deleted "${deleteTarget.label}".`);
+      setDeleteTarget(null);
+      fetchTrash();
+    } catch (e) {
+      showToast(e?.response?.data?.error || 'Could not permanently delete this item.');
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
+
   return (
     <Layout>
       <div className="space-y-6 pb-16">
         <div>
           <h1 className="text-2xl font-bold text-on-surface tracking-tight font-headline">Trash</h1>
           <p className="text-sm text-on-surface-variant mt-1 max-w-2xl">
-            Everything a significant admin action has deleted — merchant accounts, team/officer removals, expenses, and manually-deleted stuck payouts. Restorable for 90 days.
+            Everything a significant admin action has deleted — merchant accounts, team/officer removals, expenses, and manually-deleted stuck payouts. Restorable for 90 days, or deleted permanently right away.
           </p>
         </div>
 
@@ -109,13 +126,22 @@ const Trash = () => {
                           <td className="px-3 py-2.5 border-b border-outline-variant/5 text-on-surface-variant/70">{item.deletedBy?.name || item.deletedBy?.email || '—'}</td>
                           <td className="px-3 py-2.5 border-b border-outline-variant/5 text-on-surface-variant/60 whitespace-nowrap">{new Date(item.deletedAt).toLocaleString()}</td>
                           <td className="px-3 py-2.5 border-b border-outline-variant/5 text-right">
-                            <button
-                              onClick={() => setRestoreTarget(item)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-white hover:opacity-90 text-2xs font-bold uppercase tracking-widest transition-all"
-                            >
-                              <span className="material-symbols-outlined text-[14px]">restore</span>
-                              Restore
-                            </button>
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => setRestoreTarget(item)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-white hover:opacity-90 text-2xs font-bold uppercase tracking-widest transition-all"
+                              >
+                                <span className="material-symbols-outlined text-[14px]">restore</span>
+                                Restore
+                              </button>
+                              <button
+                                onClick={() => setDeleteTarget(item)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-200 text-red-700 hover:bg-red-50 text-2xs font-bold uppercase tracking-widest transition-all"
+                              >
+                                <span className="material-symbols-outlined text-[14px]">delete_forever</span>
+                                Delete Permanently
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -148,6 +174,28 @@ const Trash = () => {
                   <button onClick={() => setRestoreTarget(null)} disabled={restoreBusy} className="flex-1 py-2.5 rounded-lg border border-outline-variant/40 text-on-surface text-sm font-semibold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40">Cancel</button>
                   <button onClick={confirmRestore} disabled={restoreBusy} className="flex-1 py-2.5 rounded-lg text-sm font-semibold uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50">
                     {restoreBusy ? 'Restoring…' : 'Confirm Restore'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {deleteTarget && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => !deleteBusy && setDeleteTarget(null)}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
+              <div className="p-7">
+                <div className="w-14 h-14 rounded-full flex items-center justify-center mb-4 bg-red-100 text-red-700">
+                  <span className="material-symbols-outlined text-3xl">delete_forever</span>
+                </div>
+                <h3 className="text-xl font-bold text-on-surface mb-1">Permanently delete "{deleteTarget.label}"?</h3>
+                <p className="text-sm text-on-surface-variant mb-5">
+                  This erases the trash snapshot for good — unlike Restore, there is no undo after this. The {COLLECTION_META[deleteTarget.collectionName]?.label.toLowerCase() || deleteTarget.collectionName} is already gone from the live system; this only removes the record that would have let you bring it back.
+                </p>
+                <div className="flex gap-3">
+                  <button onClick={() => setDeleteTarget(null)} disabled={deleteBusy} className="flex-1 py-2.5 rounded-lg border border-outline-variant/40 text-on-surface text-sm font-semibold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40">Cancel</button>
+                  <button onClick={confirmPermanentDelete} disabled={deleteBusy} className="flex-1 py-2.5 rounded-lg text-sm font-semibold uppercase tracking-widest text-white bg-red-600 hover:bg-red-700 disabled:opacity-50">
+                    {deleteBusy ? 'Deleting…' : 'Delete Permanently'}
                   </button>
                 </div>
               </div>
