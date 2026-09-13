@@ -85,7 +85,7 @@ import { getDormantMerchants, sendDormantReminders } from '../controllers/dorman
 import { getEmailLogs, getEmailLogDetail, clearEmailLogs } from '../controllers/emailLogController.js';
 import { getRevenue, getRevenueSweeps, archiveRevenueSweep, unarchiveRevenueSweep, exportRevenueSweeps, triggerRevenueSweep, getReconciliations, submitReconciliation, archiveReconciliation, unarchiveReconciliation, bulkArchiveReconciliations, getExpectedPoolBalance, getLivePoolBalance, getPoolAccountStatement, getBankCharges, recordBankCharge, updateBankCharge, archiveBankCharge, writeOffRevenueDeficit, getRevenueTransactions } from '../controllers/revenueController.js';
 import { getApiTransactions, getApiTransactionsSummary } from '../controllers/apiTransactionsController.js';
-import { getTariffs, requestTariffUpdate, confirmTariffUpdate } from '../controllers/tariffController.js';
+import { getTariffs, requestTariffUpdate, confirmTariffUpdate, requestMerchantTariffResync, confirmMerchantTariffResync } from '../controllers/tariffController.js';
 import { adminListStuckOpenBankingPayouts, adminResolveStuckOpenBankingPayout, adminDeleteStuckOpenBankingPayout } from '../controllers/ncbaOpenBankingController.js';
 import { adminManualCreditNcbaCollection, adminListMissedNcbaCollections, adminDismissMissedNcbaCollection } from '../controllers/ncbaAccountNotificationController.js';
 import { getTrash, restoreTrashItem } from '../controllers/trashController.js';
@@ -224,6 +224,8 @@ router.patch('/revenue/sweeps/:id/unarchive', protect, requireMutator, sensitive
 router.get('/tariffs', protect, excludeOfficer, getTariffs);
 router.post('/tariffs/request-update', protect, requireMutator, sensitiveActionLimiter, requestTariffUpdate);
 router.post('/tariffs/confirm-update', protect, requireMutator, sensitiveActionLimiter, confirmTariffUpdate);
+router.post('/tariffs/request-merchant-resync', protect, requireMutator, sensitiveActionLimiter, requestMerchantTariffResync);
+router.post('/tariffs/confirm-merchant-resync', protect, requireMutator, sensitiveActionLimiter, confirmMerchantTariffResync);
 router.get('/revenue/pool-balance/expected', protect, excludeOfficer, getExpectedPoolBalance);
 router.get('/revenue/pool-balance/live', protect, excludeOfficer, getLivePoolBalance);
 router.get('/revenue/pool-account/statement', protect, excludeOfficer, getPoolAccountStatement);
