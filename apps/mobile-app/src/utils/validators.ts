@@ -33,8 +33,8 @@ export const formatters: Record<FieldKind, (raw: string) => string> = {
   phoneKE: (raw) => raw.replace(/\D/g, '').slice(0, 12),
   // KRA PIN: A123456789Z — letter + 9 digits + letter, 11 chars, uppercase.
   kraPin: (raw) => raw.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 11),
-  // National ID: 6-8 digits.
-  nationalId: (raw) => raw.replace(/\D/g, '').slice(0, 8),
+  // National ID: 6-9 digits.
+  nationalId: (raw) => raw.replace(/\D/g, '').slice(0, 9),
   // M-Pesa Paybill: 5-7 digits.
   paybill: (raw) => raw.replace(/\D/g, '').slice(0, 7),
   // Till / Buy Goods: 5-7 digits.
@@ -101,12 +101,13 @@ export const isValidKraPin = (raw: string): boolean => {
 };
 
 // Mirrors backend/utils/nationalIdValidator.js exactly — same shape check
-// (6-8 digits, historically 7-8 with a shrinking number of older 6-digit
-// IDs) plus the same obviously-fake-pattern rejection (all digits
-// identical, or a strictly ascending/descending run). Keep both in sync if
-// either changes: this only saves a merchant a round trip to the server,
-// the backend validator is still the actual source of truth.
-const NATIONAL_ID_SHAPE_REGEX = /^\d{6,8}$/;
+// (6-9 digits, historically 7-8 with a shrinking number of older 6-digit
+// IDs and newer 9-digit IDs now being issued) plus the same
+// obviously-fake-pattern rejection (all digits identical, or a strictly
+// ascending/descending run). Keep both in sync if either changes: this
+// only saves a merchant a round trip to the server, the backend validator
+// is still the actual source of truth.
+const NATIONAL_ID_SHAPE_REGEX = /^\d{6,9}$/;
 
 const isPlausibleNationalIdDigits = (digits: string): boolean => {
   const d = digits.split('').map(Number);
@@ -144,7 +145,7 @@ export const validators: Record<FieldKind, (v: string) => ValidationResult> = {
   },
   nationalId: (v) => {
     if (!v) return { valid: false, error: 'National ID is required.' };
-    if (!isValidNationalId(v)) return { valid: false, error: 'Enter a valid 6-8 digit Kenyan National ID number, e.g. 12345678.' };
+    if (!isValidNationalId(v)) return { valid: false, error: 'Enter a valid 6-9 digit Kenyan National ID number, e.g. 12345678.' };
     return VALID;
   },
   paybill: (v) => {

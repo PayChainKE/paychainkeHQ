@@ -8,12 +8,13 @@
 // documentReuseDetection.js's photo-hash comparison.
 //
 // Kenyan IDs are purely numeric, historically 7-8 digits (a shrinking
-// number of much older ones are 6). No public checksum algorithm exists,
-// so — same caveat as isValidKraPin — this is a shape + plausibility check,
-// never proof the number is real or belongs to the person who typed it.
-const NATIONAL_ID_SHAPE_REGEX = /^\d{6,8}$/;
+// number of much older ones are 6), with newer IDs now being issued at
+// 9 digits. No public checksum algorithm exists, so — same caveat as
+// isValidKraPin — this is a shape + plausibility check, never proof the
+// number is real or belongs to the person who typed it.
+const NATIONAL_ID_SHAPE_REGEX = /^\d{6,9}$/;
 
-export const NATIONAL_ID_FORMAT_HINT = 'Expected a 6-8 digit Kenyan National ID number, e.g. 12345678.';
+export const NATIONAL_ID_FORMAT_HINT = 'Expected a 6-9 digit Kenyan National ID number, e.g. 12345678.';
 
 export function normalizeNationalId(raw) {
   if (raw === null || raw === undefined) return raw;

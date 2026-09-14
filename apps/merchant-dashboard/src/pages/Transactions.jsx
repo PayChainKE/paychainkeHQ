@@ -9,7 +9,7 @@ import { formatAccountNumber } from '../utils/formatAccountNumber'
 import { formatPhoneDisplay, formatPhoneOrDash } from '../utils/formatPhoneDisplay'
 import { formatName } from '../utils/formatName'
 import { drawBarcodePdf } from '../utils/barcode'
-import { getAmountSign, getAmountColorClass, isCreditTransaction, isDebitTransaction, netBalanceImpact, excludeReversedDuplicates } from '../utils/transactionDirection'
+import { getAmountSign, getAmountColorClass, isCreditTransaction, isDebitTransaction, netBalanceImpact, excludeReversedDuplicates, getCounterparty } from '../utils/transactionDirection'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useNotification } from '../context/NotificationContext'
 import logo from '../assets/logo2.png'
@@ -503,29 +503,59 @@ export default function Transactions() {
     doc.setDrawColor(230, 230, 230)
     doc.line(20, 63, pageWidth - 20, 63)
 
+    // Sender / Recipient boxes — a receipt has to prove BOTH who paid and
+    // who was paid, not just one blended "counterparty" name (this used to
+    // fall back to whichever of sender/recipient was set, which on every
+    // outbound payout picked this merchant's own name first).
+    const fitPartyText = (text, maxWidth, fontSize) => {
+      doc.setFontSize(fontSize)
+      let str = String(text ?? '')
+      if (doc.getTextWidth(str) <= maxWidth) return str
+      while (str.length > 1 && doc.getTextWidth(str + '…') > maxWidth) str = str.slice(0, -1)
+      return str + '…'
+    }
+    const partyBoxY = 73, partyBoxH = 24, partyGap = 6
+    const partyBoxW = (pageWidth - 40 - partyGap) / 2
+    const parties = [
+      { label: 'SENDER', name: formatName(tx.sender?.name) || '—', phone: tx.sender?.id ? formatPhoneOrDash(tx.sender.id) : null, x: 20 },
+      { label: 'RECIPIENT', name: formatName(tx.recipient?.name) || '—', phone: tx.recipient?.id ? formatPhoneOrDash(tx.recipient.id) : null, x: 20 + partyBoxW + partyGap },
+    ]
+    parties.forEach((p) => {
+      doc.setDrawColor(225, 228, 226)
+      doc.setLineWidth(0.3)
+      doc.roundedRect(p.x, partyBoxY, partyBoxW, partyBoxH, 1.5, 1.5)
+      doc.setFontSize(7.5)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(120, 128, 124)
+      doc.text(p.label, p.x + 4, partyBoxY + 6.5)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(22, 39, 35)
+      doc.text(fitPartyText(p.name, partyBoxW - 8, 10.5), p.x + 4, partyBoxY + 14)
+      if (p.phone) {
+        doc.setFontSize(8)
+        doc.setFont('helvetica', 'normal')
+        doc.setTextColor(100, 100, 100)
+        doc.text(p.phone, p.x + 4, partyBoxY + 20)
+      }
+    })
+
     // Grid details
-    const labelY = 73, rowH = 15
-    const sentTo = formatName(tx.sender?.name) || formatName(tx.recipient?.name) || 'Internal Treasury'
-    const counterpartyPhone = formatPhoneOrDash(tx.sender?.id || tx.recipient?.id)
+    const labelY = partyBoxY + partyBoxH + 12, rowH = 15
 
     // Column 1
     doc.setFontSize(9)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(100, 100, 100)
     doc.text('DATE & TIME', 20, labelY)
-    doc.text('SENT TO', 20, labelY + rowH)
-    doc.text('PHONE NUMBER', 20, labelY + rowH * 2)
-    doc.text('PAYMENT TYPE', 20, labelY + rowH * 3)
-    doc.text('STATUS', 20, labelY + rowH * 4)
+    doc.text('PAYMENT TYPE', 20, labelY + rowH)
+    doc.text('STATUS', 20, labelY + rowH * 2)
 
     doc.setFontSize(11)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(22, 39, 35)
     doc.text(formatDateISO(tx.createdAt || tx.timestamp), 20, labelY + 7)
-    doc.text(sentTo, 20, labelY + rowH + 7)
-    doc.text(counterpartyPhone, 20, labelY + rowH * 2 + 7)
-    doc.text(tx.type.replace('_', ' ').toUpperCase(), 20, labelY + rowH * 3 + 7)
-    doc.text(tx.status.toUpperCase(), 20, labelY + rowH * 4 + 7)
+    doc.text(tx.type.replace('_', ' ').toUpperCase(), 20, labelY + rowH + 7)
+    doc.text(tx.status.toUpperCase(), 20, labelY + rowH * 2 + 7)
 
     // Column 2 - Amount Focus
     doc.setFontSize(9)
@@ -541,7 +571,7 @@ export default function Transactions() {
       : formatKES(tx.amount || tx.kesAmount || 0)
     doc.text(amountStr, 85, labelY + 10)
 
-    const gridBottom = labelY + rowH * 4 + 7
+    const gridBottom = labelY + rowH * 2 + 7
     doc.setDrawColor(230, 230, 230)
     doc.line(20, gridBottom + 6, pageWidth - 20, gridBottom + 6)
 
@@ -774,9 +804,9 @@ export default function Transactions() {
                           </span>
                         </td>
                         <td className="px-6 py-2">
-                          <p className="text-[13px] font-semibold text-primary leading-tight">{formatName(tx.sender?.name) || formatName(tx.recipient?.name) || 'PayChain'}</p>
+                          <p className="text-[13px] font-semibold text-primary leading-tight">{formatName(getCounterparty(tx)?.name) || 'PayChain'}</p>
                           <p className="text-[10px] font-mono text-on-surface-variant group-hover:text-primary transition-colors leading-tight tabular-nums">
-                            {[formatPhoneDisplay(tx.sender?.id || tx.recipient?.id), tx.reference].filter(Boolean).join(' · ')}
+                            {[formatPhoneDisplay(getCounterparty(tx)?.id), tx.reference].filter(Boolean).join(' · ')}
                           </p>
                         </td>
                         <td className="px-6 py-2">
@@ -824,10 +854,10 @@ export default function Transactions() {
 
                   {/* Party & Reference */}
                   <p className="text-base font-bold text-primary leading-tight">
-                    {formatName(tx.sender?.name) || formatName(tx.recipient?.name) || 'PayChain'}
+                    {formatName(getCounterparty(tx)?.name) || 'PayChain'}
                   </p>
                   <p className="text-[10px] text-on-surface-variant/40 font-mono tracking-tight mb-2 tabular-nums">
-                    {[formatPhoneDisplay(tx.sender?.id || tx.recipient?.id), tx.reference].filter(Boolean).join(' · ')}
+                    {[formatPhoneDisplay(getCounterparty(tx)?.id), tx.reference].filter(Boolean).join(' · ')}
                   </p>
 
                   {/* Amount */}
@@ -939,8 +969,8 @@ export default function Transactions() {
                   <div className="space-y-3 pt-6 border-t border-outline-variant/5">
                     <p className="text-[10px] text-on-surface-variant/60 font-bold uppercase tracking-[0.2em]">Counterparty</p>
                     <div>
-                      <p className="text-lg font-bold text-primary">{formatName(selectedTx.sender?.name) || formatName(selectedTx.recipient?.name) || 'Internal Treasury'}</p>
-                      <p className="text-[10px] text-on-surface-variant/40 font-bold mt-1 uppercase tracking-widest">{formatPhoneDisplay(selectedTx.sender?.id || selectedTx.recipient?.id) || 'SYSTEM'}</p>
+                      <p className="text-lg font-bold text-primary">{formatName(getCounterparty(selectedTx)?.name) || 'Internal Treasury'}</p>
+                      <p className="text-[10px] text-on-surface-variant/40 font-bold mt-1 uppercase tracking-widest">{formatPhoneDisplay(getCounterparty(selectedTx)?.id) || 'SYSTEM'}</p>
                     </div>
                   </div>
 

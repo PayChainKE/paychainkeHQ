@@ -471,7 +471,9 @@ export default function Transactions({ navigation }: any) {
                 const typeLabel = txTypeLabel(tx.type || 'inbound').toUpperCase();
                 const dateStr = formatTxDate(tx.createdAt || tx.timestamp);
                 const timeStr = formatTxTime(tx.createdAt || tx.timestamp);
-                const phoneStr = formatPhoneDisplay(tx.sender?.id || tx.recipient?.id);
+                const phoneStr = isInbound
+                  ? formatPhoneDisplay(tx.sender?.id)
+                  : formatPhoneDisplay(tx.recipient?.id || tx.sender?.id);
                 return (
                   <TouchableOpacity
                     key={tx._id || index}
@@ -564,7 +566,9 @@ export default function Transactions({ navigation }: any) {
             const counterpartyName = isInbound
               ? (formatName(selectedTx.sender?.name) || 'Unknown')
               : (formatName(selectedTx.recipient?.name) || formatName(selectedTx.sender?.name) || 'Internal Treasury');
-            const counterpartyPhone = formatPhoneDisplay(selectedTx.sender?.id || selectedTx.recipient?.id);
+            const counterpartyPhone = isInbound
+              ? formatPhoneDisplay(selectedTx.sender?.id)
+              : formatPhoneDisplay(selectedTx.recipient?.id || selectedTx.sender?.id);
 
             return (
               <View className="w-full max-w-lg mx-auto bg-[#162723] rounded-t-[36px] px-6 pt-4 pb-8 mt-auto max-h-[85%]">

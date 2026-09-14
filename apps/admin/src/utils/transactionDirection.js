@@ -29,6 +29,22 @@ export function isDebitTransaction(type) {
   return !isCreditTransaction(type) && !isSwapTransaction(type);
 }
 
+// The OTHER party to show for a transaction — never the merchant's own
+// business name. Mirrors the merchant-dashboard original: credit
+// transactions have the merchant as recipient (show sender), debit
+// transactions — every payout/B2C/bulk-pay rail — have the merchant as
+// sender (show recipient). A naive "sender ?? recipient" fallback always
+// picks sender first, which is always populated with the merchant's own
+// name on outbound rows, so admin-side merchant/transaction panels using
+// that fallback silently showed the merchant's own name instead of who was
+// actually paid.
+export function getCounterparty(tx) {
+  const primary = isCreditTransaction(tx.type) ? tx.sender : tx.recipient;
+  const fallback = isCreditTransaction(tx.type) ? tx.recipient : tx.sender;
+  if (primary?.name || primary?.id) return primary;
+  return fallback || null;
+}
+
 export function netBalanceImpact(tx) {
   if (!isSettledStatus(tx.status)) return 0;
   const rawAmt = tx.kesAmount || tx.amount || 0;

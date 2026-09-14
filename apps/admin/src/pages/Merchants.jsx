@@ -13,6 +13,8 @@ import GenerateStatementModal from '../components/modals/GenerateStatementModal'
 import GenerateAuditReportModal from '../components/modals/GenerateAuditReportModal';
 import { formatKES } from '../utils/formatCurrency';
 import { formatName } from '../utils/formatName';
+import { formatPhoneDisplay } from '../utils/formatPhoneDisplay';
+import { getCounterparty } from '../utils/transactionDirection';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import logo from '../assets/logo.png';
@@ -2180,7 +2182,9 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
                       </tr>
                     </thead>
                     <tbody className="text-xs">
-                      {m.recentTransactions.map((t) => (
+                      {m.recentTransactions.map((t) => {
+                        const cp = getCounterparty(t);
+                        return (
                         <tr key={t._id || t.reference} className="hover:bg-secondary-container/5 transition-colors">
                           <td className="px-4 py-2.5 border-b border-outline-variant/5 text-on-surface-variant/70 whitespace-nowrap">{fmtDate(t.createdAt)}</td>
                           <td className="px-4 py-2.5 border-b border-outline-variant/5">
@@ -2189,7 +2193,10 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
                             </span>
                           </td>
                           <td className="px-4 py-2.5 border-b border-outline-variant/5 font-mono text-on-surface-variant/70">{t.reference || '—'}</td>
-                          <td className="px-4 py-2.5 border-b border-outline-variant/5 text-on-surface">{formatName(t.sender?.name) || formatName(t.recipient?.name) || '—'}</td>
+                          <td className="px-4 py-2.5 border-b border-outline-variant/5 text-on-surface">
+                            <p className="truncate max-w-[160px]">{formatName(cp?.name) || '—'}</p>
+                            {cp?.id && <p className="text-[10px] font-mono text-on-surface-variant/60">{formatPhoneDisplay(cp.id)}</p>}
+                          </td>
                           <td className="px-4 py-2.5 border-b border-outline-variant/5 text-right font-semibold text-on-surface whitespace-nowrap">{formatKES(t.kesAmount ?? t.amount)}</td>
                           <td className="px-4 py-2.5 border-b border-outline-variant/5">
                             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-widest ${
@@ -2201,7 +2208,8 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
                             </span>
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
