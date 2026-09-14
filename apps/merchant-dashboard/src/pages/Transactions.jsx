@@ -827,50 +827,42 @@ export default function Transactions() {
               </div>
             </div>
 
-            {/* Mobile Cards View - Vertical Info Sheet Layout */}
-            <div className="lg:hidden divide-y divide-outline-variant/10 border-t border-b border-outline-variant/20">
+            {/* Mobile Cards View - Compact Card Layout */}
+            <div className="lg:hidden flex flex-col gap-2">
               {paginatedRows.map((tx) => (
-                <div 
-                  key={tx.id} 
+                <div
+                  key={tx.id}
                   onClick={() => setSelectedTx(tx)}
-                  className={`bg-white p-4 transition-all active:bg-surface-container-low flex flex-col gap-1 ${
+                  className={`bg-white rounded-xl border border-outline-variant/10 shadow-sm p-3 transition-all active:bg-surface-container-low flex flex-col gap-0.5 ${
                     selectedTx?.id === tx.id ? 'bg-surface-container-low/50 ring-2 ring-inset ring-primary/20' : ''
                   }`}
                 >
-                  {/* Date/Time */}
-                  <p className="text-[10px] text-on-surface-variant/40 font-bold uppercase tracking-[0.2em]">
-                    {formatTxDate(tx.createdAt || tx.timestamp)}
-                  </p>
-                  <p className="text-[9px] text-on-surface-variant/30 font-bold uppercase tracking-widest -mt-1 mb-2 tabular-nums">
-                    {formatTxTime(tx.createdAt || tx.timestamp)}
-                  </p>
-
-                  {/* Type Badge */}
-                  <div className="flex items-center gap-2 mb-1">
+                  {/* Type Badge & Date/Time */}
+                  <div className="flex items-center justify-between mb-1">
                     <span className={`text-[8px] font-black px-1.5 py-0.5 uppercase tracking-tighter rounded ${txColor(tx.type)}`}>
                       {txLabel(tx.type)}
                     </span>
+                    <p className="text-[9px] text-on-surface-variant/40 font-bold uppercase tracking-widest tabular-nums">
+                      {formatTxDate(tx.createdAt || tx.timestamp)} · {formatTxTime(tx.createdAt || tx.timestamp)}
+                    </p>
                   </div>
 
                   {/* Party & Reference */}
-                  <p className="text-base font-bold text-primary leading-tight">
+                  <p className="text-sm font-bold text-primary leading-tight">
                     {formatName(getCounterparty(tx)?.name) || 'PayChain'}
                   </p>
-                  <p className="text-[10px] text-on-surface-variant/40 font-mono tracking-tight mb-2 tabular-nums">
+                  <p className="text-[9px] text-on-surface-variant/40 font-mono tracking-tight tabular-nums">
                     {[formatPhoneDisplay(getCounterparty(tx)?.id), tx.reference].filter(Boolean).join(' · ')}
                   </p>
 
-                  {/* Amount */}
-                  <p className={`text-xl font-headline tracking-tighter tabular-nums ${txAmountColor(tx)}`}>
-                    {txSign(tx)}{txAmount(tx)}
-                  </p>
-
-                  {/* Status */}
-                  <div className="flex items-center justify-between mt-2 pt-2 border-t border-outline-variant/5">
-                    <span className={`text-[9px] font-black uppercase tracking-[0.3em] ${txStatusMeta(tx.status).text}`}>
+                  {/* Amount & Status */}
+                  <div className="flex items-center justify-between mt-1.5 pt-1.5 border-t border-outline-variant/5">
+                    <span className={`text-[9px] font-black uppercase tracking-[0.2em] ${txStatusMeta(tx.status).text}`}>
                       {tx.status === 'failed' ? 'Failed & Refunded' : tx.status}
                     </span>
-                    <span className="material-symbols-outlined text-primary/20 text-lg">arrow_forward</span>
+                    <p className={`text-base font-headline tracking-tighter tabular-nums ${txAmountColor(tx)}`}>
+                      {txSign(tx)}{txAmount(tx)}
+                    </p>
                   </div>
                 </div>
               ))}
