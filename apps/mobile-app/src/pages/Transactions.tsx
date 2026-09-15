@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Modal, Alert, TextInput } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Modal, Alert, TextInput, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
@@ -17,6 +17,7 @@ import { buildStatementHtml } from '../utils/statementHtml';
 import { InlineDatePicker } from '../components/InlineDatePicker';
 import TourTarget from '../components/TourTarget';
 import TransactionsWalkthrough from '../components/TransactionsWalkthrough';
+import FadeSlideIn from '../components/ui/FadeSlideIn';
 
 const EXPORT_PRESETS = [
   { key: '7d', label: 'Last 7 Days' },
@@ -86,6 +87,7 @@ export default function Transactions({ navigation }: any) {
   const [currentPage, setCurrentPage] = useState(1);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedTx, setSelectedTx] = useState<any | null>(null);
   const [isGeneratingReceipt, setIsGeneratingReceipt] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -114,8 +116,14 @@ export default function Transactions({ navigation }: any) {
       console.error('Error fetching transactions', error);
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   }, []);
+
+  const onRefresh = () => {
+    setIsRefreshing(true);
+    fetchTransactions();
+  };
 
   useEffect(() => {
     fetchTransactions();
@@ -316,7 +324,16 @@ export default function Transactions({ navigation }: any) {
         className="flex-1"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 48 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={onRefresh}
+            tintColor="#006c4e"
+            colors={['#006c4e']}
+          />
+        }
       >
+        <FadeSlideIn>
         <View className="w-full max-w-lg mx-auto px-6 pt-6">
 
           {/* ── Premium Summary Cards ──────────────────────────────────────── */}
@@ -547,6 +564,7 @@ export default function Transactions({ navigation }: any) {
           )}
 
         </View>
+        </FadeSlideIn>
       </ScrollView>
 
       {/* ── Transaction Detail (mirrors merchant-dashboard's side-slide drawer) ── */}

@@ -7,6 +7,7 @@ import { usePreventScreenCapture } from 'expo-screen-capture';
 import { useAuth } from '../context/AuthContext';
 import { useBiometrics, biometricLabel } from '../hooks/useBiometrics';
 import { showAlert } from '../utils/alert';
+import { hapticSuccess, hapticError } from '../utils/haptics';
 
 // Give the screen a beat to actually finish mounting/transitioning before
 // invoking the OS biometric sheet — calling authenticateAsync the instant
@@ -147,11 +148,13 @@ export default function PinEntry({ navigation }: any) {
 
   const verifyPin = async (enteredPin: string) => {
     if (enteredPin === appPin) {
+      hapticSuccess();
       await clearLockoutState();
       unlockApp();
       return;
     }
 
+    hapticError();
     const { attempts } = await loadLockoutState();
     const nextAttempts = attempts + 1;
     setPin('');

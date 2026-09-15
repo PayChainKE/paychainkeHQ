@@ -278,6 +278,7 @@ export default function CashAdvance({ navigation }: any) {
   if (isLoading || !trustData) {
     return (
       <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
+        <TopBar title="Cash Advance" showBack={false} />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#00351d" />
         </View>

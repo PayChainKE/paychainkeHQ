@@ -1091,7 +1091,7 @@ export default function BulkPay() {
         className="flex-1"
         contentContainerStyle={{ paddingBottom: selectedIds.length > 0 ? 160 : 40 }}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={() => fetchPayees(true)} tintColor="#00351d" />}
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={() => fetchPayees(true)} tintColor="#006c4e" colors={['#006c4e']} />}
       >
         {activeTab === 'Payees' ? (
           <View className="w-full max-w-lg mx-auto pt-5 px-6">
