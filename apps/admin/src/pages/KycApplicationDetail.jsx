@@ -321,6 +321,7 @@ const KycApplicationDetail = () => {
                     )}
                     <UploadableDocRow
                       url={doc?.url}
+                      purged={!!doc?.purgedAt}
                       label={label}
                       onUpload={async (file) => {
                         const formData = new FormData();

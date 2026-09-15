@@ -109,3 +109,26 @@ export function uploadBufferToCloudinary(buffer, folder) {
     stream.end(buffer);
   });
 }
+
+// Deletes a previously-uploaded asset given its Cloudinary delivery URL.
+// Used wherever a document is replaced (KYC resubmission, admin document
+// replace, expense receipt replace) or purged on a retention schedule — in
+// every case the old file becomes permanently unreferenced the moment the
+// new URL (or a purge marker) is saved, so leaving it in Cloudinary forever
+// is pure storage waste, not a safety margin. Resource type is read off the
+// URL itself (".../image/upload/..." vs ".../raw/upload/...") since that's
+// what `destroy` needs to find the asset; an already-missing asset or an
+// unparseable URL is logged and swallowed, never thrown — deletion is
+// always best-effort cleanup, never something worth failing the caller's
+// actual request over.
+export async function deleteCloudinaryAsset(url) {
+  if (!url) return;
+  try {
+    const match = String(url).match(/\/(image|raw|video)\/upload\/(?:v\d+\/)?(.+?)(?:\.[a-zA-Z0-9]+)?$/);
+    if (!match) return;
+    const [, resourceType, publicId] = match;
+    await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
+  } catch (err) {
+    console.error('Cloudinary asset delete failed (non-fatal):', err?.message || err);
+  }
+}

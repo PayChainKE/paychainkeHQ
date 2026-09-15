@@ -70,6 +70,7 @@ import { loadSanctionsList, startSanctionsListRefreshInterval } from './services
 import { backfillNcbaMerchantCodes } from './migrations/backfillNcbaMerchantCodes.js';
 import { checkAndSendDormancyReminders } from './services/dormancyReminderService.js';
 import { checkAndSendTaxDeadlineReminders } from './services/taxDeadlineReminderService.js';
+import { purgeExpiredRejectedKycDocuments } from './services/kycDocumentRetentionService.js';
 import { reconcileStuckOpenBankingPayouts } from './services/ncbaOpenBankingReconciliationService.js';
 import { reconcileMissedNcbaCollections } from './services/ncbaCollectionReconciliationService.js';
 import { reconcileUnrecordedBankCharges } from './services/bankChargeReconciliationService.js';
@@ -406,6 +407,16 @@ async function bootstrap() {
   // See services/taxDeadlineReminderService.js.
   checkAndSendTaxDeadlineReminders();
   setInterval(checkAndSendTaxDeadlineReminders, 24 * 60 * 60 * 1000);
+
+  // Daily sweep purging Cloudinary files for applications rejected 90+
+  // days ago — see services/kycDocumentRetentionService.js for why this is
+  // safe (the rejection record, notes, and fraud-dedup hash all survive;
+  // only the now-unreviewable file itself is deleted). Same fire-and-catch
+  // shape as the two sweeps above.
+  purgeExpiredRejectedKycDocuments().catch((e) => console.error('KYC document retention sweep failed:', e));
+  setInterval(() => {
+    purgeExpiredRejectedKycDocuments().catch((e) => console.error('KYC document retention sweep failed:', e));
+  }, 24 * 60 * 60 * 1000);
 
   // Weekly PayChain revenue sweep now runs as a standalone Render Cron Job
   // (scripts/run-revenue-sweep-cron.js) on a fixed clock schedule, instead

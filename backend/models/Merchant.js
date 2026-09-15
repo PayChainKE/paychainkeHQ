@@ -580,6 +580,14 @@ const merchantSchema = new mongoose.Schema({
       // still be allowed; only a match against a DIFFERENT merchant is
       // the actual signal.
       contentHash: { type: String, default: null, index: true },
+      // Set by services/kycDocumentRetentionService.js once the underlying
+      // Cloudinary file has been deleted under the 90-day rejected-
+      // application retention policy. `url` is left as the sentinel string
+      // 'purged' rather than cleared (kept `required: true` above, and a
+      // dead placeholder is a clearer signal than an empty string) —
+      // status/note/contentHash and the rejection itself all stay intact
+      // for the fraud-dedup check and the audit trail; only the file goes.
+      purgedAt: { type: Date, default: null },
     }],
     default: [],
   },
@@ -644,6 +652,17 @@ const merchantSchema = new mongoose.Schema({
   resubmissionCount: {
     type: Number,
     default: 0,
+  },
+  // Set once services/kycDocumentRetentionService.js has purged this
+  // rejected application's Cloudinary files (see kybDocuments.purgedAt
+  // above and certificateUrl below) — lets the sweep's query skip
+  // merchants it's already processed instead of rescanning every rejected
+  // application on every run. Purely a sweep bookmark, never shown in the
+  // UI; select: false keeps it out of default merchant responses.
+  kybDocumentsPurgedAt: {
+    type: Date,
+    default: null,
+    select: false,
   },
   // Public resubmission link token (sha256 hex at rest) — same shape as
   // passwordResetToken above. Lets an applicant fix flagged KYC documents

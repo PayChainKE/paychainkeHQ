@@ -7,7 +7,14 @@ import React from 'react';
 //
 // `onUpload(file)` must return a Promise resolving to the new document URL
 // (or reject — its `.response.data.error`, if present, is shown inline).
-export default function UploadableDocRow({ url, onUpload, label = 'Document', accept = 'image/png,image/jpeg,image/jpg,application/pdf' }) {
+//
+// `purged`: true when the retention sweep (services/kycDocumentRetentionService.js)
+// has deleted this document's underlying Cloudinary file (rejected app,
+// 90+ days). `url` is still whatever sentinel the backend left behind at
+// that point, which would otherwise render as a dead "View document" link
+// — show an explanatory label instead. Uploading a fresh file still works
+// normally (replaces the purged placeholder like any other document).
+export default function UploadableDocRow({ url, onUpload, label = 'Document', accept = 'image/png,image/jpeg,image/jpg,application/pdf', purged = false }) {
   const [uploading, setUploading] = React.useState(false);
   const [error, setError] = React.useState('');
 
@@ -27,9 +34,11 @@ export default function UploadableDocRow({ url, onUpload, label = 'Document', ac
   return (
     <div className="flex flex-col gap-1.5 w-full">
       <div className="flex items-center gap-2 flex-wrap">
-        {url
-          ? <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 font-semibold underline text-sm">View document ↗</a>
-          : <span className="text-on-surface-variant/50 text-sm">— not uploaded —</span>}
+        {purged
+          ? <span className="text-on-surface-variant/50 text-sm italic">File purged (rejected 90+ days ago)</span>
+          : url
+            ? <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 font-semibold underline text-sm">View document ↗</a>
+            : <span className="text-on-surface-variant/50 text-sm">— not uploaded —</span>}
         <label className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-widest cursor-pointer transition-all ${uploading ? 'opacity-50 pointer-events-none' : ''} ${url ? 'border border-outline-variant/30 text-on-surface-variant hover:bg-surface-container-low' : 'bg-primary/10 text-primary hover:bg-primary/15'}`}>
           <span className="material-symbols-outlined text-[13px]">upload</span>
           {uploading ? 'Uploading…' : url ? 'Replace' : 'Upload'}

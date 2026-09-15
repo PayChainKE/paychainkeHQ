@@ -1900,9 +1900,11 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
                     badge={statusBadge}
                     value={
                       <div className="flex items-center gap-2 flex-wrap">
-                        {doc
-                          ? <a href={doc.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 font-semibold underline">View document ↗</a>
-                          : <span className="text-on-surface-variant/50">— not uploaded —</span>}
+                        {doc?.purgedAt
+                          ? <span className="text-on-surface-variant/50 italic">File purged (rejected 90+ days ago)</span>
+                          : doc
+                            ? <a href={doc.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 font-semibold underline">View document ↗</a>
+                            : <span className="text-on-surface-variant/50">— not uploaded —</span>}
                         <label className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-widest cursor-pointer transition-all ${busy ? 'opacity-50 pointer-events-none' : ''} ${doc ? 'border border-outline-variant/30 text-on-surface-variant hover:bg-surface-container-low' : 'bg-primary/10 text-primary hover:bg-primary/15'}`}>
                           <span className="material-symbols-outlined text-[13px]">upload</span>
                           {busy ? 'Uploading…' : doc ? 'Replace' : 'Upload'}
