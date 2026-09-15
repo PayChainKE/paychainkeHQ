@@ -531,6 +531,12 @@ export const registerMerchant = async (req, res) => {
       // loginMerchant below). Every merchant created before this change has
       // no kybStatus at all and is completely unaffected.
       kybStatus: 'pending',
+      // Without this, getQueue's `.sort({ submittedAt: 1 })` (KycVerification.jsx)
+      // pushes every self-serve application to the very front of the queue
+      // regardless of when it actually came in — Mongo sorts missing/null
+      // values first ascending — ahead of genuinely older officer-led
+      // applications, which do set this.
+      submittedAt: new Date(),
       registrationSource: registrationSource === 'mobile' ? 'mobile' : 'web',
       businessType,
       county,
