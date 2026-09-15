@@ -387,6 +387,14 @@ export const registerMerchant = async (req, res) => {
         }
         requiredDocTypes = requirement.required.flatMap((t) => resolveDocTypes(t, uploadedDocsByType));
 
+        // Optional documents (e.g. a business permit/license) — collected
+        // and uploaded if the merchant provided one, but never required to
+        // submit. See kybRequirements.js's own doc comment.
+        if (requirement.optional) {
+          const providedOptional = requirement.optional.filter((t) => isDocProvided(t, uploadedDocsByType));
+          requiredDocTypes = [...requiredDocTypes, ...providedOptional.flatMap((t) => resolveDocTypes(t, uploadedDocsByType))];
+        }
+
         // LLC-only, on top of `required` above — see LLC_REQUIREMENT's own
         // doc comment (kybRequirements.js).
         if (requirement.choiceAlso) {

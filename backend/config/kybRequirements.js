@@ -6,41 +6,48 @@
 // exists specifically so someone can't register a PayChain account (and
 // start moving other people's money) on nothing more than a name and an
 // unverifiable claim. Mirrored in apps/merchant-dashboard/src/pages/Login.jsx
-// (web, different naming: mode 'all_plus_choice'/slots/choiceOptions) and
+// (web, different naming: slots/choiceOptions) and
 // apps/mobile-app/src/utils/kybRequirements.ts (mobile, same naming as
 // here) — keep all three in sync.
 //
-// mode: 'choice'  — upload exactly ONE of `options` (self-employed/informal
-//                    businesses have no fixed registration document).
-// mode: 'all'     — upload every type in `required` (formally registered
-//                    entities — nothing here is optional).
-const SOLE_TRADER_CHOICE = { mode: 'choice', options: ['national_id', 'business_permit_or_license'] };
-const REGISTERED_ENTITY_ALL = { mode: 'all', required: ['business_registration', 'business_permit_or_license'] };
-// LLC's directors are its accountable individuals — a business permit/
-// license isn't something every LLC actually holds (many operate without
-// one), unlike CR12 and personal/company identity documents, which every
-// registered LLC and its directors always have. `choiceAlso` layers a
-// choice requirement on top of `required`: CR12 is always mandatory, plus
-// exactly one of Director's ID or the company's own KRA PIN Certificate
-// (2026-09-10, replaces business_permit_or_license for LLC specifically).
-const LLC_REQUIREMENT = { mode: 'all', required: ['business_registration'], choiceAlso: ['national_id', 'kra_pin'] };
+// National ID is a core requirement for every business type (2026-09-15) —
+// no combination of other documents can substitute for it. `optional`
+// documents are collected and stored if the merchant provides them, but
+// never block submission if they don't (2026-09-15: business_permit_or_
+// license moved here for every type that used to require it, and the KRA
+// PIN Certificate document requirement was dropped entirely for LLC/PLC —
+// CR12 + National ID is the compulsory pair for both now). With national_id
+// no longer part of any choice, every requirement below is mode 'all' —
+// mode 'choice'/`choiceAlso` are unused for now but kept as machinery in
+// case a future business type still needs them.
+//
+// mode: 'choice'  — upload exactly ONE of `options`.
+// mode: 'all'     — upload every type in `required`. `optional`, when
+//                    present, is collected if provided but never blocks
+//                    submission.
+const SOLE_TRADER_REQUIREMENT = { mode: 'all', required: ['national_id'], optional: ['business_permit_or_license'] };
+const REGISTERED_ENTITY_ALL = { mode: 'all', required: ['business_registration', 'national_id'], optional: ['business_permit_or_license'] };
+// LLC's directors are its accountable individuals — CR12 (business_
+// registration) and the Director's own National ID are mandatory. No KRA
+// PIN Certificate requirement (removed 2026-09-15) — the separate `kraPin`
+// text field elsewhere on the form is unrelated and stays as-is.
+const LLC_REQUIREMENT = { mode: 'all', required: ['business_registration', 'national_id'] };
 
 export const KYB_REQUIREMENTS_BY_BUSINESS_TYPE = {
-  'Sole Proprietorship': SOLE_TRADER_CHOICE,
-  'Partnership': SOLE_TRADER_CHOICE,
+  'Sole Proprietorship': SOLE_TRADER_REQUIREMENT,
+  'Partnership': SOLE_TRADER_REQUIREMENT,
   // Not one of the enumerated document buckets — falls back to the same
-  // flexible choice as a sole trader, the safer default for an entity type
+  // requirement as a sole trader, the safer default for an entity type
   // this codebase has no dedicated registration-certificate schema for.
-  'NGO/Non-Profit': SOLE_TRADER_CHOICE,
-  'Other': SOLE_TRADER_CHOICE,
+  'NGO/Non-Profit': SOLE_TRADER_REQUIREMENT,
+  'Other': SOLE_TRADER_REQUIREMENT,
   'Limited Liability Company (LLC)': LLC_REQUIREMENT,
   'SACCO': REGISTERED_ENTITY_ALL,
   'Cooperative Society': REGISTERED_ENTITY_ALL,
   // A PLC's directors are its accountable individuals (unlike an LLC's,
-  // which can be another company) — a real KRA certificate is also
-  // realistically obtainable for an entity this formal, unlike a sole
-  // trader who may not have one yet.
-  'Public Limited Company (PLC)': { mode: 'all', required: ['business_registration', 'national_id', 'kra_pin'] },
+  // which can be another company) — same requirement as LLC otherwise: CR12
+  // + National ID compulsory, no KRA PIN Certificate requirement.
+  'Public Limited Company (PLC)': { mode: 'all', required: ['business_registration', 'national_id'] },
 };
 
 // Every document type any requirement above can reference — the full set

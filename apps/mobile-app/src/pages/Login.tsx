@@ -134,6 +134,11 @@ export default function Login({ route }: any) {
   // upload path vs expo-image-picker's camera path use differently-named
   // asset fields — normalized to this on the way in, see pickDoc/captureIdPhoto).
   const [signupDocs, setSignupDocs] = useState<Record<string, PickedFile | null>>({});
+  // Which path the merchant chose for National ID — 'upload' or 'camera'.
+  // Both now collect front+back separately (see renderNationalIdSlot);
+  // this just tracks which one so the right picker (pickDoc vs
+  // captureIdPhoto) is wired to the same two boxes.
+  const [nationalIdMode, setNationalIdMode] = useState<'upload' | 'camera' | null>(null);
   const [docErrors, setDocErrors] = useState<Record<string, string>>({});
   const [showDocTypeModal, setShowDocTypeModal] = useState(false);
   // Flipped true the first time Continue is pressed with an invalid field —
@@ -427,12 +432,13 @@ export default function Login({ route }: any) {
     }
   };
 
-  // Resets both National ID capture slots and the upload slot, so
-  // switching between "Upload File" and "Take Photo" (or retaking after a
-  // mistake) never leaves a stale file from the other mode behind.
+  // Resets both National ID slots, so switching between "Upload Files" and
+  // "Take Photos" (or retaking after a mistake) never leaves a stale file
+  // from the other mode behind.
   const resetNationalId = () => {
-    setSignupDocs(prev => ({ ...prev, national_id: null, national_id_front: null, national_id_back: null }));
-    setDocErrors(prev => ({ ...prev, national_id: '', national_id_front: '', national_id_back: '' }));
+    setSignupDocs(prev => ({ ...prev, national_id_front: null, national_id_back: null }));
+    setDocErrors(prev => ({ ...prev, national_id_front: '', national_id_back: '' }));
+    setNationalIdMode(null);
   };
 
   const handleSignupContinue = async () => {
@@ -523,6 +529,10 @@ export default function Login({ route }: any) {
           }
         }
       }
+    }
+    if (!agreedToTerms) {
+      setErr('Please agree to the Privacy Policy and Terms of Service to continue.');
+      return;
     }
     setErr('');
     setSignupStepTouched(false);
@@ -628,7 +638,11 @@ export default function Login({ route }: any) {
       const types = requirement?.mode === 'choice' ? [signupDocType]
         : requirement?.choiceAlso ? [...requirement.required, signupDocType]
         : (requirement?.required || []);
-      for (const type of types.flatMap(t => resolveDocTypes(t, signupDocs))) {
+      // Optional docs (e.g. business_permit_or_license) ride along too, but
+      // only the ones actually provided — an unfilled optional slot is
+      // never in `types` above, so it's never required to submit.
+      const optionalTypes = (requirement?.mode === 'all' ? requirement.optional : undefined)?.filter(t => isDocSelected(t, signupDocs)) || [];
+      for (const type of [...types, ...optionalTypes].flatMap(t => resolveDocTypes(t, signupDocs))) {
         const file = signupDocs[type];
         if (file) {
           payload.append(`doc_${type}`, {
@@ -705,8 +719,11 @@ export default function Login({ route }: any) {
   // one, and the LLC-only choiceAlso slot. `onPick` defaults to the
   // file/gallery picker (pickDoc); renderNationalIdSlot below overrides it
   // with the camera capture function for the front/back camera-mode tiles,
-  // reusing this same box markup rather than duplicating it.
-  const renderDocBox = (type: string, onPick: () => void = () => pickDoc(type)) => {
+  // reusing this same box markup rather than duplicating it. `optional`
+  // just appends "(Optional)" to the label — an optional slot never blocks
+  // submission if left empty (see handleSignupContinue/KYB_REQUIREMENTS_
+  // BY_BUSINESS_TYPE's `optional` array), this is purely a visual cue.
+  const renderDocBox = (type: string, onPick: () => void = () => pickDoc(type), optional = false) => {
     const file = signupDocs[type];
     const error = docErrors[type];
     return (
@@ -724,7 +741,7 @@ export default function Login({ route }: any) {
           )}
           <View className="ml-3 flex-1 min-w-0">
             <Text className="text-[13px] font-jakarta-bold text-[#0c2010]" numberOfLines={1} ellipsizeMode="middle">
-              {file ? (file.name || 'Document selected') : KYB_DOC_LABELS[type] || 'Choose a file'}
+              {file ? (file.name || 'Document selected') : `${KYB_DOC_LABELS[type] || 'Choose a file'}${optional ? ' (Optional)' : ''}`}
             </Text>
             <Text className="text-[10px] font-jakarta-bold text-[#9ca3af] mt-0.5">JPG, PNG or PDF, up to 10MB. Must be clear and in focus.</Text>
           </View>
@@ -736,49 +753,44 @@ export default function Login({ route }: any) {
     );
   };
 
-  // National ID is the one document type with a camera-capture option
-  // (front, then back) alongside the plain upload-a-file option every
-  // other document type has — the two are mutually exclusive per submission,
-  // matching the dual shape the backend already accepts (a single
-  // national_id file, or a matched national_id_front + national_id_back
-  // pair). "mode" is derived from which slot(s) are actually filled, not
-  // tracked as separate state, so it can never drift out of sync with
-  // signupDocs itself.
+  // National ID always requires both sides, front and back, whether the
+  // merchant uploads existing files or takes photos — an ID's back
+  // (address, signature, sometimes date of birth) is as much a KYC
+  // requirement as its front, and there's no reason to accept it for one
+  // path and not the other. nationalIdMode just tracks which path was
+  // chosen so the same two boxes render with pickDoc (upload) or
+  // captureIdPhoto (camera) wired to them.
   const renderNationalIdSlot = () => {
-    const uploadFile = signupDocs.national_id;
     const front = signupDocs.national_id_front;
     const frontOk = !!front && !docErrors.national_id_front;
-    const back = signupDocs.national_id_back;
-    const mode: 'upload' | 'camera' | null = uploadFile ? 'upload' : (front || back) ? 'camera' : null;
 
-    if (mode === null) {
+    if (nationalIdMode === null) {
       return (
         <View key="national_id" className="mb-3">
           <Text className="text-[11px] font-jakarta-bold text-[#5b645c] mb-2 opacity-70">{KYB_DOC_LABELS.national_id}</Text>
           <View className="flex-row" style={{ gap: 10 }}>
-            <TouchableOpacity onPress={() => pickDoc('national_id')} className="flex-1 border-2 border-dashed border-[#d1d5db] bg-[#f9fafb] rounded-2xl py-5 items-center">
+            <TouchableOpacity onPress={() => setNationalIdMode('upload')} className="flex-1 border-2 border-dashed border-[#d1d5db] bg-[#f9fafb] rounded-2xl py-5 items-center">
               <Feather name="upload" size={20} color="#9ca3af" />
-              <Text className="text-[12px] font-jakarta-bold text-[#0c2010] mt-2">Upload File</Text>
+              <Text className="text-[12px] font-jakarta-bold text-[#0c2010] mt-2">Upload Files</Text>
             </TouchableOpacity>
             {NATIONAL_ID_CAMERA_CAPTURE_ENABLED && (
-              <TouchableOpacity onPress={() => captureIdPhoto('national_id_front')} className="flex-1 border-2 border-dashed border-[#d1d5db] bg-[#f9fafb] rounded-2xl py-5 items-center">
+              <TouchableOpacity onPress={() => setNationalIdMode('camera')} className="flex-1 border-2 border-dashed border-[#d1d5db] bg-[#f9fafb] rounded-2xl py-5 items-center">
                 <Feather name="camera" size={20} color="#9ca3af" />
-                <Text className="text-[12px] font-jakarta-bold text-[#0c2010] mt-2">Take Photo</Text>
+                <Text className="text-[12px] font-jakarta-bold text-[#0c2010] mt-2">Take Photos</Text>
               </TouchableOpacity>
             )}
           </View>
-          {docErrors.national_id_front ? (
-            <Text className="text-red-500 text-[11px] font-jakarta-bold mt-1.5">{docErrors.national_id_front}</Text>
-          ) : null}
         </View>
       );
     }
 
+    const onPick = (side: 'national_id_front' | 'national_id_back') =>
+      nationalIdMode === 'camera' ? () => captureIdPhoto(side) : () => pickDoc(side);
+
     return (
       <View key="national_id">
-        {mode === 'upload' && renderDocBox('national_id')}
-        {mode === 'camera' && renderDocBox('national_id_front', () => captureIdPhoto('national_id_front'))}
-        {mode === 'camera' && frontOk && renderDocBox('national_id_back', () => captureIdPhoto('national_id_back'))}
+        {renderDocBox('national_id_front', onPick('national_id_front'))}
+        {frontOk && renderDocBox('national_id_back', onPick('national_id_back'))}
         <TouchableOpacity onPress={resetNationalId} className="mb-3 -mt-1">
           <Text className="text-[11px] font-jakarta-bold text-[#5b645c] underline">Start over</Text>
         </TouchableOpacity>
@@ -1101,7 +1113,7 @@ export default function Login({ route }: any) {
                       <View>
                         <SignupSectionHeader
                           icon="verified-user"
-                          title={`Verification Document${(requirement?.mode === 'all' && (requirement.required.length > 1 || requirement.choiceAlso)) ? 's' : ''}`}
+                          title={`Verification Document${(requirement?.mode === 'all' && (requirement.required.length + (requirement.optional?.length || 0) > 1 || requirement.choiceAlso)) ? 's' : ''}`}
                         />
                         <Text className="text-[#5b645c] text-[11px] font-jakarta-bold mb-3 opacity-70">
                           {!requirement
@@ -1110,7 +1122,7 @@ export default function Login({ route }: any) {
                               ? 'Upload one of the documents below. Required to create an account.'
                               : requirement.choiceAlso
                                 ? `Required for a ${businessType}: ${requirement.required.map(t => KYB_DOC_LABELS[t]).join(', ')}, plus either ${requirement.choiceAlso.map(t => KYB_DOC_LABELS[t]).join(' or ')}.`
-                                : `Required for a ${businessType}: ${requirement.required.map(t => KYB_DOC_LABELS[t]).join(', ')}.`}
+                                : `Required for a ${businessType}: ${requirement.required.map(t => KYB_DOC_LABELS[t]).join(', ')}.${requirement.optional?.length ? ` ${requirement.optional.map(t => KYB_DOC_LABELS[t]).join(', ')} ${requirement.optional.length > 1 ? 'are' : 'is'} optional.` : ''}`}
                         </Text>
 
                         {requirement?.mode === 'choice' && (
@@ -1129,6 +1141,7 @@ export default function Login({ route }: any) {
                         )}
 
                         {requirement?.mode === 'all' && requirement.required.map(type => type === 'national_id' ? renderNationalIdSlot() : renderDocBox(type))}
+                        {requirement?.mode === 'all' && requirement.optional?.map(type => renderDocBox(type, undefined, true))}
 
                         {requirement?.mode === 'all' && requirement.choiceAlso && (
                           <>
@@ -1148,7 +1161,28 @@ export default function Login({ route }: any) {
                     );
                   })()}
 
-                  <TouchableOpacity onPress={handleSignupContinue} className="w-full bg-[#06201b] py-4 rounded-2xl flex-row justify-center items-center mt-4">
+                  <TouchableOpacity onPress={() => setAgreedToTerms(!agreedToTerms)} activeOpacity={0.7} className="flex-row items-start mt-4 mb-1">
+                    <View className="mr-3 mt-0.5">
+                      <Feather name={agreedToTerms ? "check-square" : "square"} size={20} color={agreedToTerms ? "#047857" : "#9ca3af"} />
+                    </View>
+                    <Text className="flex-1 text-[12px] font-jakarta-bold text-[#5b645c] leading-[18px]">
+                      I confirm that I have read and agree to PayChain's{' '}
+                      <Text className="text-[#047857] font-jakarta-bold" onPress={() => Linking.openURL('https://www.paychain.co.ke/privacy-policy')}>
+                        Privacy Policy
+                      </Text>
+                      {' '}and{' '}
+                      <Text className="text-[#047857] font-jakarta-bold" onPress={() => Linking.openURL('https://www.paychain.co.ke/terms-of-service')}>
+                        Terms of Service
+                      </Text>.
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={handleSignupContinue}
+                    disabled={!agreedToTerms}
+                    style={{ opacity: (!agreedToTerms) ? 0.4 : 1 }}
+                    className="w-full bg-[#06201b] py-4 rounded-2xl flex-row justify-center items-center mt-4"
+                  >
                     <Text className="text-white font-jakarta-bold text-[16px]">Submit Application</Text>
                   </TouchableOpacity>
                 </View>
@@ -1212,26 +1246,13 @@ export default function Login({ route }: any) {
                  account is created pending admin/officer approval and a
                  merchant sets their own password later via the secure link
                  sent once approved (see the Application Submitted screen
-                 below). */
+                 below). The Terms/Privacy checkbox now lives on the main
+                 form, directly after the document upload section — already
+                 agreed to by the time a merchant reaches this step, so it
+                 isn't repeated here. */
               <View>
                 <Text className="text-[#0c2010] text-[24px] font-jakarta-bold mb-2">Review & Submit</Text>
-                <Text className="text-[#5b645c] text-[13px] font-jakarta-bold mb-6">Confirm your agreement below to submit your application for review.</Text>
-
-                 <TouchableOpacity onPress={() => setAgreedToTerms(!agreedToTerms)} activeOpacity={0.7} className="flex-row items-start mb-6">
-                   <View className="mr-3 mt-0.5">
-                     <Feather name={agreedToTerms ? "check-square" : "square"} size={20} color={agreedToTerms ? "#047857" : "#9ca3af"} />
-                   </View>
-                   <Text className="flex-1 text-[12px] font-jakarta-bold text-[#5b645c] leading-[18px]">
-                     I confirm that I have read and agree to PayChain's{' '}
-                     <Text className="text-[#047857] font-jakarta-bold" onPress={() => Linking.openURL('https://www.paychain.co.ke/privacy-policy')}>
-                       Privacy Policy
-                     </Text>
-                     {' '}and{' '}
-                     <Text className="text-[#047857] font-jakarta-bold" onPress={() => Linking.openURL('https://www.paychain.co.ke/terms-of-service')}>
-                       Terms of Service
-                     </Text>.
-                   </Text>
-                 </TouchableOpacity>
+                <Text className="text-[#5b645c] text-[13px] font-jakarta-bold mb-6">Everything looks ready. Submit your application for review.</Text>
 
                  <TouchableOpacity
                    onPress={handleSignupCreateAccount}
