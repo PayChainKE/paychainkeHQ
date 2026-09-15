@@ -184,7 +184,7 @@ function SignupSectionHeader({ icon, title }) {
 }
 
 export default function Login() {
-  const { login, loginWithPasskey, signup, verifyOTP, resendOTP, forgotPassword, verifyResetOTP, resetPassword, isAuthenticated } = useMerchantAuth()
+  const { login, loginWithPasskey, signup, sendSignupPhoneOtp, verifySignupPhoneOtp, verifyOTP, resendOTP, forgotPassword, verifyResetOTP, resetPassword, isAuthenticated } = useMerchantAuth()
   const { addNotification } = useNotification()
   const [phone, setPhone] = useState(() => localStorage.getItem(LAST_IDENTIFIER_KEY) || '')
   const [quickLogin, setQuickLogin] = useState(() => !!localStorage.getItem(LAST_IDENTIFIER_KEY))
@@ -293,6 +293,27 @@ export default function Login() {
   // first-time merchants aren't stuck on the wrong tab by default.
   const [activeTab, setActiveTab] = useState(() => localStorage.getItem(LAST_IDENTIFIER_KEY) ? 'login' : 'signup')
   const [isSignupPasswordStep, setIsSignupPasswordStep] = useState(false)
+  // Shown after a successful application submission, replacing the whole
+  // signup form — the account is pending admin/officer approval and has no
+  // working login yet, so there's nothing to redirect into (see
+  // finishSignup below).
+  const [signupSubmitted, setSignupSubmitted] = useState(false)
+  // Phone verification — inserted between the main signup form and Review &
+  // Submit. Deliberately its own state, not folded into the isOTPMode/otp
+  // machinery further below: that one is coupled to an existing merchant's
+  // email (verifyOTP/resendOTP/verifyResetOTP all key off authEmail), and
+  // this step runs before any Merchant document exists at all.
+  const [isPhoneVerifyStep, setIsPhoneVerifyStep] = useState(false)
+  const [phoneOtp, setPhoneOtp] = useState(['', '', '', '', '', ''])
+  const [phoneOtpMaskedPhone, setPhoneOtpMaskedPhone] = useState('')
+  const [phoneOtpResendTimer, setPhoneOtpResendTimer] = useState(0)
+  const [phoneOtpSending, setPhoneOtpSending] = useState(false)
+  // Proof of verification handed back with the final registerMerchant
+  // submission. verifiedPhoneNumber records exactly which number it's for,
+  // so editing the phone after verifying (by going back a step) can't
+  // silently carry a stale token forward — see handleSignupCreateAccount.
+  const [phoneVerificationToken, setPhoneVerificationToken] = useState('')
+  const [verifiedPhoneNumber, setVerifiedPhoneNumber] = useState('')
   const [otpFlowType, setOtpFlowType] = useState('') // 'login' or 'reset'
   const [authEmail, setAuthEmail] = useState('') // Captured from backend for OTP verification
   const [otpChannel, setOtpChannel] = useState('email') // 'email' or 'sms' — which channel the current OTP went out on
@@ -318,6 +339,15 @@ export default function Login() {
       return () => clearInterval(interval)
     }
   }, [isOTPMode, resendTimer])
+
+  useEffect(() => {
+    if (isPhoneVerifyStep && phoneOtpResendTimer > 0) {
+      const interval = setInterval(() => {
+        setPhoneOtpResendTimer(prev => prev - 1)
+      }, 1000)
+      return () => clearInterval(interval)
+    }
+  }, [isPhoneVerifyStep, phoneOtpResendTimer])
 
   // Ward taxonomy for the (optional) ward picker below Area — fetched once
   // rather than duplicated as another multi-hundred-entry literal in this
@@ -900,18 +930,124 @@ export default function Login() {
     }
     setErr('')
     setSignupStepTouched(false)
-    setIsSignupPasswordStep(true)
+
+    // Already verified this exact number (e.g. came back from Review &
+    // Submit without touching the phone field) — no need to make them
+    // re-enter a code for a number that hasn't changed.
+    if (phoneVerificationToken && verifiedPhoneNumber === signupPhone.trim()) {
+      setIsSignupPasswordStep(true)
+      return
+    }
+    setPhoneVerificationToken('')
+    setVerifiedPhoneNumber('')
+    setPhoneOtp(['', '', '', '', '', ''])
+    setIsPhoneVerifyStep(true)
+    await requestPhoneOtp()
+  }
+
+  async function requestPhoneOtp() {
+    setErr('')
+    setPhoneOtpSending(true)
+    const res = await sendSignupPhoneOtp(signupPhone.trim())
+    setPhoneOtpSending(false)
+    if (res.success) {
+      setPhoneOtpMaskedPhone(res.maskedPhone || '')
+      setPhoneOtpResendTimer(59)
+    } else {
+      setErr(res.error)
+    }
+  }
+
+  async function handleResendPhoneOtp() {
+    if (phoneOtpResendTimer > 0 || phoneOtpSending) return
+    setPhoneOtp(['', '', '', '', '', ''])
+    await requestPhoneOtp()
+  }
+
+  async function handleVerifyPhoneOtp(e) {
+    e.preventDefault()
+    setErr('')
+    const code = phoneOtp.join('')
+    if (code.length < 6) return
+
+    setLoading(true)
+    const res = await verifySignupPhoneOtp(signupPhone.trim(), code)
+    setLoading(false)
+
+    if (res.success) {
+      setPhoneVerificationToken(res.phoneVerificationToken)
+      setVerifiedPhoneNumber(signupPhone.trim())
+      setIsPhoneVerifyStep(false)
+      setIsSignupPasswordStep(true)
+    } else {
+      setErr(res.error)
+    }
+  }
+
+  function handleChangePhoneNumber() {
+    setIsPhoneVerifyStep(false)
+    setErr('')
+    setPhoneOtp(['', '', '', '', '', ''])
+  }
+
+  const phoneOtpRefs = useRef([])
+
+  const handlePhoneOtpChange = (element, index) => {
+    const val = element.value.replace(/\D/g, '')
+    if (element.value !== '' && val === '') return
+    const newOtp = [...phoneOtp]
+    newOtp[index] = val
+    setPhoneOtp(newOtp)
+    if (val && index < 5) phoneOtpRefs.current[index + 1]?.focus()
+  }
+
+  const handlePhoneOtpKeyDown = (e, index) => {
+    if (e.key === 'Backspace') {
+      if (phoneOtp[index]) {
+        const newOtp = [...phoneOtp]
+        newOtp[index] = ''
+        setPhoneOtp(newOtp)
+      } else if (index > 0) {
+        phoneOtpRefs.current[index - 1]?.focus()
+      }
+    } else if (e.key === 'ArrowLeft' && index > 0) {
+      phoneOtpRefs.current[index - 1]?.focus()
+    } else if (e.key === 'ArrowRight' && index < 5) {
+      phoneOtpRefs.current[index + 1]?.focus()
+    }
+  }
+
+  const handlePhoneOtpPaste = (e) => {
+    e.preventDefault()
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
+    if (!pasted) return
+    const newOtp = [...phoneOtp]
+    for (let i = 0; i < 6; i++) newOtp[i] = pasted[i] || ''
+    setPhoneOtp(newOtp)
+    const nextEmpty = newOtp.findIndex(v => !v)
+    phoneOtpRefs.current[nextEmpty === -1 ? 5 : nextEmpty]?.focus()
   }
 
   async function handleSignupCreateAccount(e) {
     e.preventDefault()
     if (signupSubmittingRef.current) return
-    if (!Object.values(strength).every(v => v)) {
-      setErr('Please meet all security requirements.')
+    if (!agreedToTerms) {
+      setErr('Please agree to the Privacy Policy and Terms of Service to continue.')
       return
     }
-    if (newPassword !== confirmPassword) {
-      setErr('Passwords do not match.')
+    // Defense in depth — the backend independently re-checks the token
+    // against whatever phone number is actually in the submission, so this
+    // can't be bypassed by tampering with the request, but catching it here
+    // gives a clear "go re-verify" message instead of a confusing 400 after
+    // the whole form (with file uploads) has already been sent.
+    if (!phoneVerificationToken || verifiedPhoneNumber !== signupPhone.trim()) {
+      setErr('Please verify your phone number again before submitting.')
+      setPhoneVerificationToken('')
+      setVerifiedPhoneNumber('')
+      setPhoneOtp(['', '', '', '', '', ''])
+      setIsSignupPasswordStep(false)
+      setIsPhoneVerifyStep(true)
+      await requestPhoneOtp()
       return
     }
     const payload = new FormData()
@@ -922,7 +1058,6 @@ export default function Login() {
     payload.append('email', signupEmail.trim())
     payload.append('phone', signupPhone.trim())
     payload.append('businessName', signupBusinessName.trim())
-    payload.append('password', newPassword)
     payload.append('businessType', signupBusinessType)
     payload.append('county', signupCounty)
     payload.append('area', signupArea.trim())
@@ -931,6 +1066,7 @@ export default function Login() {
     payload.append('employees', signupEmployees)
     payload.append('ecommerce', signupEcommerce)
     payload.append('agreedToTerms', agreedToTerms)
+    payload.append('phoneVerificationToken', phoneVerificationToken)
     {
       const requirement = KYB_REQUIREMENTS_BY_BUSINESS_TYPE[signupBusinessType]
       const types = requirement?.mode === 'choice' ? [signupDocType]
@@ -956,18 +1092,15 @@ export default function Login() {
   }
 
   function finishSignup() {
-    setActiveTab('login')
-    setPassword('')
     setAgreedToTerms(false)
     setSignupDocType('')
     setSignupDocs({})
     setDocPreviews({})
     setDocErrors({})
-    addNotification({
-      title: 'Account Created',
-      message: 'Log in with your new credentials to access your dashboard.',
-      type: 'success',
-    })
+    setPhoneVerificationToken('')
+    setVerifiedPhoneNumber('')
+    setPhoneOtp(['', '', '', '', '', ''])
+    setSignupSubmitted(true)
   }
 
   // "Not you?" — forgets the remembered device identifier and drops back to
@@ -1038,6 +1171,10 @@ export default function Login() {
                   setIsOTPMode(false)
                   setIsResetMode(false)
                   setIsSignupPasswordStep(false)
+                  setIsPhoneVerifyStep(false)
+                  setPhoneVerificationToken('')
+                  setVerifiedPhoneNumber('')
+                  setPhoneOtp(['', '', '', '', '', ''])
                   setNewPasswordInput('')
                   setConfirmPassword('')
                   setAgreedToTerms(false)
@@ -1060,99 +1197,20 @@ export default function Login() {
             /* SIGN UP FORM */
             <div className="animate-fade-in-up">
               {isSignupPasswordStep ? (
-                /* SIGN UP PASSWORD STEP */
+                /* SIGN UP REVIEW & SUBMIT STEP — password is no longer
+                   collected here; the account is created pending admin/
+                   officer approval and a merchant sets their own password
+                   later via the secure link sent once approved (see
+                   finishSignup's pending screen below). */
                 <div className="animate-fade-in-up">
                   <div className="mb-6 lg:mb-10 flex flex-col items-center text-center">
                      <img src={footerBrandsLogo} alt="PayChain Logo" className="h-10 mb-6 w-auto object-contain" />
-                     <h3 className="font-headline text-2xl lg:text-5xl text-primary tracking-tight font-black">Set Custom Access</h3>
+                     <h3 className="font-headline text-2xl lg:text-5xl text-primary tracking-tight font-black">Review & Submit</h3>
                      <p className="text-on-surface-variant font-medium mt-1.5 text-sm lg:text-base lg:mt-2 opacity-70 leading-relaxed max-w-sm">
-                       To complete onboarding, please create a high-security password.
+                       Confirm your agreement below to submit your application for review.
                      </p>
                   </div>
                   <form onSubmit={handleSignupCreateAccount} className="space-y-6">
-                    <div className="space-y-3">
-                      <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">New Secure Password</label>
-                      <div className="relative">
-                        <input 
-                          type={showPassword ? "text" : "password"} 
-                          className="w-full bg-white border border-outline-variant/15 rounded-2xl py-3 lg:py-4 px-4 lg:px-5 text-lg font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40 pr-14"
-                          value={newPassword} 
-                          onChange={e => setNewPasswordInput(e.target.value)} 
-                          placeholder="••••••••••••"
-                          autoComplete="new-password"
-                          autoFocus
-                        />
-                        <button 
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-4 top-1/2 -translate-y-1/2 text-primary/40 p-1"
-                        >
-                          <span className="material-symbols-outlined text-xl">{showPassword ? 'visibility' : 'visibility_off'}</span>
-                        </button>
-                      </div>
-                      
-                      {/* Strength Meter Bar */}
-                      <div className="flex gap-1 h-1.5 px-1">
-                        {[1, 2, 3, 4].map((step) => {
-                          const score = Object.values(strength).filter(Boolean).length
-                          const colors = ['bg-red-400', 'bg-orange-400', 'bg-amber-400', 'bg-emerald-500']
-                          return (
-                            <div 
-                              key={step} 
-                              className={`flex-1 rounded-full transition-all duration-500 ${step <= score ? colors[score - 1] : 'bg-slate-100'}`}
-                            />
-                          )
-                        })}
-                      </div>
-
-                      {/* Security Indicators Vertical List */}
-                      <div className="flex flex-col gap-3 p-5 bg-[#F0FDF4]/40 rounded-3xl mt-5 border border-emerald-500/5 shadow-inner">
-                        <SecurityRequirement met={strength.length} label="Minimum 8 Characters" />
-                        <SecurityRequirement met={strength.upper} label="Uppercase letters (A, B, C)" />
-                        <SecurityRequirement met={strength.number} label="Numerical digits (1, 2, 3)" />
-                        <SecurityRequirement met={strength.symbol} label="Special Symbols (@, #, $)" />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2 pt-2">
-                      <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Verify Custom Password</label>
-                      <div className="relative">
-                        <input 
-                          type={showConfirmPassword ? "text" : "password"} 
-                          className="w-full bg-white border border-outline-variant/15 rounded-2xl py-3 lg:py-4 px-4 lg:px-5 text-lg font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40 pr-14"
-                          value={confirmPassword} 
-                          onChange={e => setConfirmPassword(e.target.value)} 
-                          placeholder="Verify password"
-                          autoComplete="new-password"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          className="absolute right-4 top-1/2 -translate-y-1/2 text-primary/40 p-1"
-                        >
-                          <span className="material-symbols-outlined text-xl">{showConfirmPassword ? 'visibility' : 'visibility_off'}</span>
-                        </button>
-                      </div>
-                      {/* Create Account silently stayed disabled on any mismatch
-                          with no visible reason — reported as "the button isn't
-                          working" since there was nothing telling the merchant
-                          why it wouldn't respond. A positive confirmation once
-                          they DO match closes the loop the other direction —
-                          without it, a merchant who fixed a typo had nothing
-                          telling them it was now fine, just the error vanishing. */}
-                      {confirmPassword && newPassword !== confirmPassword ? (
-                        <p className="text-xs font-bold text-red-600 pl-1 flex items-center gap-1.5">
-                          <span className="material-symbols-outlined text-sm">error</span>
-                          Passwords don't match
-                        </p>
-                      ) : confirmPassword && newPassword === confirmPassword ? (
-                        <p className="text-xs font-bold text-emerald-600 pl-1 flex items-center gap-1.5">
-                          <span className="material-symbols-outlined text-sm">check_circle</span>
-                          Passwords match
-                        </p>
-                      ) : null}
-                    </div>
-
                     <div className="flex items-start gap-3 pt-2">
                       <input
                         type="checkbox"
@@ -1194,13 +1252,13 @@ export default function Login() {
                       )}
                       <button
                         className="w-full bg-[#06201B] text-white py-4 lg:py-5 rounded-2xl font-black text-lg shadow-2xl hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-3 border border-white/10 disabled:opacity-30 disabled:grayscale"
-                        disabled={loading || !Object.values(strength).every(v=>v) || !confirmPassword || newPassword !== confirmPassword || !agreedToTerms}
+                        disabled={loading || !agreedToTerms}
                       >
                         {loading ? (
                           <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
                         ) : (
                           <>
-                            Create Account
+                            Submit Application
                             <span className="material-symbols-outlined">arrow_forward</span>
                           </>
                         )}
@@ -1211,6 +1269,138 @@ export default function Login() {
                       </p>
                     </div>
                   </form>
+                </div>
+              ) : isPhoneVerifyStep ? (
+                /* PHONE VERIFICATION STEP — proves the applicant controls
+                   this number before the wizard lets them reach Review &
+                   Submit. Same visual language as the login security-code
+                   screen further below, kept as its own JSX/state rather
+                   than shared with it (see isPhoneVerifyStep's own
+                   comment). */
+                <div className="animate-fade-in-up duration-500">
+                  <div className="mb-8 text-center">
+                    <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[#06201B] mb-5 shadow-lg">
+                      <span className="material-symbols-outlined text-emerald-400 text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>smartphone</span>
+                    </div>
+                    <h3 className="font-headline text-3xl lg:text-4xl text-primary tracking-tight font-black">Verify your phone</h3>
+                    <p className="text-on-surface-variant text-sm mt-2 opacity-60 leading-relaxed max-w-xs mx-auto">
+                      6-digit code sent via SMS to <span className="text-primary font-bold opacity-100">{phoneOtpMaskedPhone || 'your phone'}</span>
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleChangePhoneNumber}
+                      className="mt-3 flex items-center gap-1 mx-auto text-[10px] font-black uppercase tracking-[0.2em] text-primary/40 hover:text-emerald-600 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[12px]">arrow_back</span>
+                      Use a different number
+                    </button>
+                  </div>
+
+                  <form onSubmit={handleVerifyPhoneOtp}>
+                    <div className="bg-[#06201B] rounded-3xl p-5 lg:p-6 mb-5 shadow-[0_20px_60px_rgba(6,32,27,0.25)]">
+                      <p className="text-center text-[9px] font-black uppercase tracking-[0.3em] text-emerald-400/60 mb-4">
+                        Verification Code
+                      </p>
+                      <div className="flex items-center justify-center gap-2 lg:gap-3">
+                        {phoneOtp.map((digit, index) => (
+                          <input
+                            key={index}
+                            ref={el => { phoneOtpRefs.current[index] = el }}
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            autoComplete={index === 0 ? 'one-time-code' : 'off'}
+                            maxLength="1"
+                            value={digit}
+                            onChange={e => handlePhoneOtpChange(e.target, index)}
+                            onKeyDown={e => handlePhoneOtpKeyDown(e, index)}
+                            onPaste={index === 0 ? handlePhoneOtpPaste : undefined}
+                            onFocus={e => e.target.select()}
+                            className={`
+                              w-10 h-12 lg:w-12 lg:h-14 rounded-xl text-center font-black text-xl lg:text-2xl
+                              outline-none transition-all duration-200 select-none caret-transparent
+                              ${digit
+                                ? 'bg-emerald-400 text-[#06201B] shadow-[0_0_20px_rgba(52,211,153,0.4)] scale-105'
+                                : 'bg-white/8 text-white/20 border border-white/10 focus:bg-white/15 focus:border-emerald-400/60 focus:shadow-[0_0_0_3px_rgba(52,211,153,0.15)]'
+                              }
+                            `}
+                          />
+                        ))}
+                      </div>
+                      <div className="flex justify-center gap-1.5 mt-4">
+                        {phoneOtp.map((digit, i) => (
+                          <div
+                            key={i}
+                            className={`h-1 rounded-full transition-all duration-300 ${
+                              digit ? 'w-5 bg-emerald-400' : 'w-1.5 bg-white/15'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    {err && (
+                      <div className="flex items-center gap-2.5 bg-red-50 border border-red-200 rounded-2xl px-4 py-3 mb-4 animate-shake">
+                        <span className="material-symbols-outlined text-red-500 text-base shrink-0">error_outline</span>
+                        <p className="text-xs font-bold text-red-700">{err}</p>
+                      </div>
+                    )}
+
+                    <button
+                      className="w-full bg-[#06201B] text-white py-4 lg:py-5 rounded-2xl font-black text-base lg:text-lg shadow-xl hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-3 border border-white/5 disabled:opacity-30 disabled:cursor-not-allowed mb-4"
+                      disabled={loading || phoneOtp.some(v => !v)}
+                    >
+                      {loading ? (
+                        <div className="w-5 h-5 border-[3px] border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        <>
+                          <span className="material-symbols-outlined text-emerald-400 text-lg">verified</span>
+                          Verify Phone Number
+                        </>
+                      )}
+                    </button>
+
+                    <div className="text-center">
+                      <span className="text-[11px] text-primary/40 font-medium">Didn&apos;t receive it? </span>
+                      <button
+                        type="button"
+                        onClick={handleResendPhoneOtp}
+                        disabled={phoneOtpResendTimer > 0 || phoneOtpSending}
+                        className="text-[11px] font-black text-emerald-600 hover:text-emerald-700 transition-colors disabled:text-primary/30 disabled:cursor-not-allowed"
+                      >
+                        {phoneOtpSending ? 'Sending…' : phoneOtpResendTimer > 0 ? `Resend in ${phoneOtpResendTimer}s` : 'Resend code'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              ) : signupSubmitted ? (
+                /* APPLICATION SUBMITTED — pending admin/officer approval,
+                   no account access yet. */
+                <div className="animate-fade-in-up duration-500">
+                  <div className="flex flex-col items-center text-center">
+                    <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center mb-6 border-4 border-emerald-200/40">
+                      <span className="material-symbols-outlined text-emerald-600 text-5xl" style={{ fontVariationSettings: "'FILL' 1" }}>hourglass_top</span>
+                    </div>
+                    <h3 className="font-headline text-3xl lg:text-5xl text-primary tracking-tight font-black">Application Submitted</h3>
+                    <p className="text-on-surface-variant font-medium mt-3 text-sm lg:text-base opacity-70 leading-relaxed max-w-sm">
+                      Your account will now be activated in a few minutes. An SMS will be sent to you with your credentials upon successful Paybill account opening.
+                    </p>
+                    <div className="mt-7 w-full max-w-xs space-y-4">
+                      <button
+                        onClick={() => { setSignupSubmitted(false); setActiveTab('login') }}
+                        className="w-full bg-[#06201B] text-white py-4 rounded-2xl font-black text-base shadow-2xl hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-3 border border-white/5"
+                      >
+                        Back to Log In
+                        <span className="material-symbols-outlined">arrow_forward</span>
+                      </button>
+                      <p className="text-[11px] text-on-surface-variant/60 font-medium leading-relaxed">
+                        For more information, or to follow up on your application, contact us on{' '}
+                        <a href="mailto:support@paychain.co.ke" className="font-bold text-emerald-600 hover:text-emerald-700 underline underline-offset-2">support@paychain.co.ke</a>
+                        {' '}or{' '}
+                        <a href="tel:+254743283782" className="font-bold text-emerald-600 hover:text-emerald-700 underline underline-offset-2">0743 283 782</a>.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <>

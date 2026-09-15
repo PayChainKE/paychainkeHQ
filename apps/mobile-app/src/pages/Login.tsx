@@ -76,7 +76,7 @@ function SignupSectionHeader({ icon, title }: { icon: any; title: string }) {
 }
 
 export default function Login({ route }: any) {
-  const { login, biometricLogin, signup, verifyOTP, forgotPassword, resetPassword,
+  const { login, biometricLogin, signup, sendSignupPhoneOtp, verifySignupPhoneOtp, verifyOTP, forgotPassword, resetPassword,
           isBiometricsEnabled, hasBiometricToken, logoutReason, clearLogoutReason } = useAuth();
   const { authenticate: authenticateBiometric } = useBiometrics();
 
@@ -163,6 +163,27 @@ export default function Login({ route }: any) {
   // Navigation Tabs
   const [activeTab, setActiveTab] = useState(route?.params?.initialTab || 'login');
   const [isSignupPasswordStep, setIsSignupPasswordStep] = useState(false);
+  // Shown after a successful application submission, replacing the signup
+  // form — the account is pending admin/officer approval and has no
+  // working login yet, so there's nothing to auto-sign-in into (see
+  // handleSignupCreateAccount above).
+  const [signupSubmitted, setSignupSubmitted] = useState(false);
+  // Phone verification — inserted between the main signup form and the
+  // Review & Submit step. Deliberately its own state, not folded into the
+  // isOTPMode/otp machinery above: that one is coupled to an existing
+  // merchant's email (verifyOTP/resendOTP key off authEmail), and this step
+  // runs before any Merchant document exists at all.
+  const [isPhoneVerifyStep, setIsPhoneVerifyStep] = useState(false);
+  const [phoneOtp, setPhoneOtp] = useState(['', '', '', '', '', '']);
+  const [phoneOtpMaskedPhone, setPhoneOtpMaskedPhone] = useState('');
+  const [phoneOtpResendTimer, setPhoneOtpResendTimer] = useState(0);
+  const [phoneOtpSending, setPhoneOtpSending] = useState(false);
+  // Proof of verification handed back with the final registerMerchant
+  // submission. verifiedPhoneNumber records exactly which number it's for,
+  // so editing the phone after verifying can't silently carry a stale
+  // token forward — see handleSignupCreateAccount.
+  const [phoneVerificationToken, setPhoneVerificationToken] = useState('');
+  const [verifiedPhoneNumber, setVerifiedPhoneNumber] = useState('');
   const [otpFlowType, setOtpFlowType] = useState('');
   const [authEmail, setAuthEmail] = useState('');
   const [otpChannel, setOtpChannel] = useState('email'); // 'email' or 'sms' — which channel the current OTP went out on
@@ -199,6 +220,15 @@ export default function Login({ route }: any) {
       return () => clearInterval(interval);
     }
   }, [isOTPMode, resendTimer]);
+
+  useEffect(() => {
+    if (isPhoneVerifyStep && phoneOtpResendTimer > 0) {
+      const interval = setInterval(() => {
+        setPhoneOtpResendTimer(prev => prev - 1);
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [isPhoneVerifyStep, phoneOtpResendTimer]);
 
   // Ward taxonomy for the (optional) ward picker below Area — fetched once
   // rather than duplicated as another multi-hundred-entry literal (see
@@ -278,12 +308,15 @@ export default function Login({ route }: any) {
       setIsOTPMode(false);
       if (otpFlowType === 'reset') {
         setIsResetMode(true);
-      } else if (otpFlowType === 'signup' || otpFlowType === 'login') {
+      } else if (otpFlowType === 'login') {
         await AsyncStorage.setItem('hasAccount', 'true');
         setHasAccount(true);
       }
-      // If otpFlowType === 'signup' or 'login', verifyOTP successfully sets the session context,
-      // which will instantly unmount the Login screen and move to PinSetup or Dashboard.
+      // If otpFlowType === 'login', verifyOTP successfully sets the session
+      // context, which will instantly unmount the Login screen and move to
+      // PinSetup or Dashboard. Signup no longer goes through OTP at all —
+      // a submitted application is pending approval, not auto-logged in
+      // (see handleSignupCreateAccount's signupSubmitted screen instead).
       setErr('');
     } else {
       setErr(res.error);
@@ -402,7 +435,7 @@ export default function Login({ route }: any) {
     setDocErrors(prev => ({ ...prev, national_id: '', national_id_front: '', national_id_back: '' }));
   };
 
-  const handleSignupContinue = () => {
+  const handleSignupContinue = async () => {
     // Real validators, not the previous name/phone presence-or-length-only
     // checks — those were weaker than what ValidatedTextInput itself uses to
     // show the inline error on this exact screen (e.g. phone only checked
@@ -493,16 +526,83 @@ export default function Login({ route }: any) {
     }
     setErr('');
     setSignupStepTouched(false);
-    setIsSignupPasswordStep(true);
+
+    // Already verified this exact number (e.g. came back from Review &
+    // Submit without touching the phone field) — no need to make them
+    // re-enter a code for a number that hasn't changed.
+    if (phoneVerificationToken && verifiedPhoneNumber === signupPhone.trim()) {
+      setIsSignupPasswordStep(true);
+      return;
+    }
+    setPhoneVerificationToken('');
+    setVerifiedPhoneNumber('');
+    setPhoneOtp(['', '', '', '', '', '']);
+    setIsPhoneVerifyStep(true);
+    await requestPhoneOtp();
+  };
+
+  const requestPhoneOtp = async () => {
+    setErr('');
+    setPhoneOtpSending(true);
+    const res = await sendSignupPhoneOtp(signupPhone.trim());
+    setPhoneOtpSending(false);
+    if (res.success) {
+      setPhoneOtpMaskedPhone(res.maskedPhone || '');
+      setPhoneOtpResendTimer(59);
+    } else {
+      setErr(res.error);
+    }
+  };
+
+  const handleResendPhoneOtp = async () => {
+    if (phoneOtpResendTimer > 0 || phoneOtpSending) return;
+    setPhoneOtp(['', '', '', '', '', '']);
+    await requestPhoneOtp();
+  };
+
+  const handleVerifyPhoneOtp = async () => {
+    setErr('');
+    const code = phoneOtp.join('');
+    if (code.length < 6) return;
+
+    setLoading(true);
+    const res = await verifySignupPhoneOtp(signupPhone.trim(), code);
+    setLoading(false);
+
+    if (res.success) {
+      setPhoneVerificationToken(res.phoneVerificationToken);
+      setVerifiedPhoneNumber(signupPhone.trim());
+      setIsPhoneVerifyStep(false);
+      setIsSignupPasswordStep(true);
+    } else {
+      setErr(res.error);
+    }
+  };
+
+  const handleChangePhoneNumber = () => {
+    setIsPhoneVerifyStep(false);
+    setErr('');
+    setPhoneOtp(['', '', '', '', '', '']);
   };
 
   const handleSignupCreateAccount = async () => {
-    if (!Object.values(strength).every(v => v)) {
-      setErr('Please meet all security requirements.');
+    if (!agreedToTerms) {
+      setErr('Please agree to the Privacy Policy and Terms of Service to continue.');
       return;
     }
-    if (newPassword !== confirmPassword) {
-      setErr('Passwords do not match.');
+    // Defense in depth — the backend independently re-checks the token
+    // against whatever phone number is actually in the submission, so this
+    // can't be bypassed, but catching it here gives a clear "go re-verify"
+    // message instead of a confusing error after the whole form (with file
+    // uploads) has already been sent.
+    if (!phoneVerificationToken || verifiedPhoneNumber !== signupPhone.trim()) {
+      setErr('Please verify your phone number again before submitting.');
+      setPhoneVerificationToken('');
+      setVerifiedPhoneNumber('');
+      setPhoneOtp(['', '', '', '', '', '']);
+      setIsSignupPasswordStep(false);
+      setIsPhoneVerifyStep(true);
+      await requestPhoneOtp();
       return;
     }
 
@@ -514,7 +614,6 @@ export default function Login({ route }: any) {
     payload.append('email', signupEmail);
     payload.append('phone', signupPhone);
     payload.append('businessName', signupBusinessName);
-    payload.append('password', newPassword);
     payload.append('ecommerce', signupEcommerce);
     payload.append('businessType', businessType);
     payload.append('county', signupCounty);
@@ -523,6 +622,7 @@ export default function Login({ route }: any) {
     if (signupStreet.trim()) payload.append('street', signupStreet.trim());
     payload.append('employees', employees);
     payload.append('agreedToTerms', String(agreedToTerms));
+    payload.append('phoneVerificationToken', phoneVerificationToken);
     {
       const requirement = KYB_REQUIREMENTS_BY_BUSINESS_TYPE[businessType];
       const types = requirement?.mode === 'choice' ? [signupDocType]
@@ -543,13 +643,14 @@ export default function Login({ route }: any) {
     setLoading(true);
     const res = await signup(payload);
     setLoading(false);
-    
+
     if (res.success) {
       setIsSignupPasswordStep(false);
-      setAuthEmail(signupEmail);
-      setOtpFlowType('signup');
-      setIsOTPMode(true);
-      setResendTimer(59);
+      setAgreedToTerms(false);
+      setPhoneVerificationToken('');
+      setVerifiedPhoneNumber('');
+      setPhoneOtp(['', '', '', '', '', '']);
+      setSignupSubmitted(true);
     } else {
       setErr(res.error);
     }
@@ -565,6 +666,10 @@ export default function Login({ route }: any) {
             setIsOTPMode(false);
             setIsResetMode(false);
             setIsSignupPasswordStep(false);
+            setIsPhoneVerifyStep(false);
+            setPhoneVerificationToken('');
+            setVerifiedPhoneNumber('');
+            setPhoneOtp(['', '', '', '', '', '']);
             setNewPasswordInput('');
             setConfirmPassword('');
             setAgreedToTerms(false);
@@ -694,7 +799,7 @@ export default function Login({ route }: any) {
           </View>
 
           <View className="bg-white w-full flex-1 rounded-t-[32px] px-6 pt-10 pb-16 shadow-lg">
-            {!isSignupPasswordStep && !isOTPMode && !isResetMode && renderTabs()}
+            {!isSignupPasswordStep && !isPhoneVerifyStep && !isOTPMode && !isResetMode && !signupSubmitted && renderTabs()}
 
             {err ? (
               <View className="bg-red-50 border border-red-200 p-4 rounded-xl flex-row items-center mb-6">
@@ -852,7 +957,7 @@ export default function Login({ route }: any) {
               </View>
             )}
 
-            {activeTab === 'signup' && !isSignupPasswordStep && (
+            {activeTab === 'signup' && !isSignupPasswordStep && !isPhoneVerifyStep && !signupSubmitted && (
               <View>
                 <Text className="text-[#0c2010] text-[24px] font-jakarta-bold mb-2">Get started with us</Text>
                 <Text className="text-[#5b645c] text-[14px] font-jakarta-bold mb-6">Fill out the form below to create your merchant account and start accepting payments.</Text>
@@ -1050,36 +1155,67 @@ export default function Login({ route }: any) {
               </View>
             )}
 
-            {isSignupPasswordStep && (
+            {isPhoneVerifyStep && (
+              /* PHONE VERIFICATION STEP — proves the applicant controls this
+                 number before the wizard lets them reach Review & Submit.
+                 Deliberately its own state/handlers, not the isOTPMode/otp
+                 machinery above — see isPhoneVerifyStep's own comment. */
               <View>
-                <Text className="text-[#0c2010] text-[24px] font-jakarta-bold mb-6">Set Custom Access</Text>
-                 <View className="mb-4">
-                    <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">New Password</Text>
-                    <View className="flex-row items-center w-full bg-white border border-[#e5e7eb] rounded-2xl pr-4">
-                      <TextInput className="flex-1 py-4 px-5 text-[16px] font-jakarta-bold text-[#0c2010]" placeholder="••••••••" secureTextEntry={!showPassword} value={newPassword} onChangeText={setNewPasswordInput} />
-                      <TouchableOpacity onPress={() => setShowPassword(!showPassword)} className="p-2"><Feather name={showPassword ? "eye-off" : "eye"} size={20} color="#9ca3af" /></TouchableOpacity>
-                    </View>
-                 </View>
-                 
-                 <View className="bg-[#f0fdf4] p-4 rounded-2xl mb-6 border border-[#a7f3d0]">
-                   <SecurityRequirement met={strength.length} label="Minimum 8 Characters" />
-                   <SecurityRequirement met={strength.upper} label="Uppercase letters (A, B, C)" />
-                   <SecurityRequirement met={strength.number} label="Numerical digits (1, 2, 3)" />
-                   <SecurityRequirement met={strength.symbol} label="Special Symbols (@, #, $)" />
-                 </View>
+                <Text className="text-[#0c2010] text-[24px] font-jakarta-bold mb-2">Verify Your Phone</Text>
+                <Text className="text-[#5b645c] text-[14px] font-jakarta-bold mb-6">
+                  Enter the 6-digit code sent via SMS to {phoneOtpMaskedPhone || 'your phone'}
+                </Text>
 
-                 <View className="mb-8">
-                    <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Confirm Password</Text>
-                    <View className="flex-row items-center w-full bg-white border border-[#e5e7eb] rounded-2xl pr-4">
-                      <TextInput className="flex-1 py-4 px-5 text-[16px] font-jakarta-bold text-[#0c2010]" placeholder="••••••••" secureTextEntry={!showConfirmPassword} value={confirmPassword} onChangeText={setConfirmPassword} />
-                      <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} className="p-2"><Feather name={showConfirmPassword ? "eye-off" : "eye"} size={20} color="#9ca3af" /></TouchableOpacity>
-                    </View>
-                    {confirmPassword.length > 0 && newPassword !== confirmPassword ? (
-                      <Text className="text-red-500 text-[11px] font-jakarta-bold mt-1.5">Passwords do not match</Text>
-                    ) : confirmPassword.length > 0 && newPassword === confirmPassword ? (
-                      <Text className="text-emerald-600 text-[11px] font-jakarta-bold mt-1.5">Passwords match</Text>
-                    ) : null}
-                 </View>
+                <View className="flex-row justify-between mb-6">
+                  {phoneOtp.map((digit, index) => (
+                    <TextInput
+                      key={index}
+                      className="w-[45px] h-[55px] bg-[#f9fafb] border border-[#e5e7eb] rounded-xl text-center text-[20px] font-jakarta-bold text-[#0c2010]"
+                      keyboardType="number-pad"
+                      maxLength={1}
+                      value={digit}
+                      onChangeText={(val) => {
+                        const newOtp = [...phoneOtp];
+                        newOtp[index] = val.replace(/\D/g, '');
+                        setPhoneOtp(newOtp);
+                      }}
+                    />
+                  ))}
+                </View>
+
+                <TouchableOpacity
+                  onPress={handleVerifyPhoneOtp}
+                  disabled={loading || phoneOtp.join('').length < 6}
+                  style={{ opacity: (loading || phoneOtp.join('').length < 6) ? 0.4 : 1 }}
+                  className="w-full bg-[#06201b] py-4 rounded-2xl flex-row justify-center items-center mb-4"
+                >
+                  {loading ? <ActivityIndicator color="white" /> : <Text className="text-white font-jakarta-bold text-[16px]">Verify Phone Number</Text>}
+                </TouchableOpacity>
+
+                <View className="flex-row justify-center items-center gap-1 mb-2">
+                  <Text className="text-[#9ca3af] text-[12px] font-jakarta-bold">Didn't receive it? </Text>
+                  <TouchableOpacity onPress={handleResendPhoneOtp} disabled={phoneOtpResendTimer > 0 || phoneOtpSending}>
+                    <Text className={`text-[12px] font-jakarta-bold ${(phoneOtpResendTimer > 0 || phoneOtpSending) ? 'text-[#9ca3af]' : 'text-[#047857]'}`}>
+                      {phoneOtpSending ? 'Sending…' : phoneOtpResendTimer > 0 ? `Resend in ${phoneOtpResendTimer}s` : 'Resend code'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                <TouchableOpacity onPress={handleChangePhoneNumber} className="items-center">
+                  <Text className="text-[#5b645c] text-[12px] font-jakarta-bold underline">Use a different number</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {isSignupPasswordStep && (
+              /* REVIEW & SUBMIT — password is no longer collected here; the
+                 account is created pending admin/officer approval and a
+                 merchant sets their own password later via the secure link
+                 sent once approved (see the Application Submitted screen
+                 below). */
+              <View>
+                <Text className="text-[#0c2010] text-[24px] font-jakarta-bold mb-2">Review & Submit</Text>
+                <Text className="text-[#5b645c] text-[13px] font-jakarta-bold mb-6">Confirm your agreement below to submit your application for review.</Text>
 
                  <TouchableOpacity onPress={() => setAgreedToTerms(!agreedToTerms)} activeOpacity={0.7} className="flex-row items-start mb-6">
                    <View className="mr-3 mt-0.5">
@@ -1099,12 +1235,38 @@ export default function Login({ route }: any) {
 
                  <TouchableOpacity
                    onPress={handleSignupCreateAccount}
-                   disabled={loading || !Object.values(strength).every(v => v) || !confirmPassword || newPassword !== confirmPassword || !agreedToTerms}
-                   style={{ opacity: (!Object.values(strength).every(v => v) || !confirmPassword || newPassword !== confirmPassword || !agreedToTerms) ? 0.4 : 1 }}
+                   disabled={loading || !agreedToTerms}
+                   style={{ opacity: (!agreedToTerms) ? 0.4 : 1 }}
                    className="w-full bg-[#06201b] py-4 rounded-2xl flex-row justify-center items-center"
                  >
-                    {loading ? <ActivityIndicator color="white" /> : <Text className="text-white font-jakarta-bold text-[16px]">Create Account</Text>}
+                    {loading ? <ActivityIndicator color="white" /> : <Text className="text-white font-jakarta-bold text-[16px]">Submit Application</Text>}
                  </TouchableOpacity>
+              </View>
+            )}
+
+            {signupSubmitted && (
+              /* APPLICATION SUBMITTED — pending admin/officer approval, no
+                 account access yet. */
+              <View className="items-center">
+                <View className="w-20 h-20 rounded-full bg-emerald-100 items-center justify-center mb-6 border-4 border-emerald-200">
+                  <Feather name="clock" size={36} color="#047857" />
+                </View>
+                <Text className="text-[#0c2010] text-[24px] font-jakarta-bold text-center mb-3">Application Submitted</Text>
+                <Text className="text-[#5b645c] text-[14px] font-jakarta-bold text-center leading-[21px] mb-8">
+                  Your account will now be activated in a few minutes. An SMS will be sent to you with your credentials upon successful Paybill account opening.
+                </Text>
+                <TouchableOpacity
+                  onPress={() => { setSignupSubmitted(false); setActiveTab('login'); }}
+                  className="w-full bg-[#06201b] py-4 rounded-2xl flex-row justify-center items-center mb-4"
+                >
+                  <Text className="text-white font-jakarta-bold text-[16px]">Back to Log In</Text>
+                </TouchableOpacity>
+                <Text className="text-[#5b645c] text-[12px] font-jakarta-bold text-center leading-[18px]">
+                  For more information, or to follow up on your application, contact us on{' '}
+                  <Text className="text-[#047857] font-jakarta-bold" onPress={() => Linking.openURL('mailto:support@paychain.co.ke')}>support@paychain.co.ke</Text>
+                  {' '}or{' '}
+                  <Text className="text-[#047857] font-jakarta-bold" onPress={() => Linking.openURL('tel:+254743283782')}>0743 283 782</Text>.
+                </Text>
               </View>
             )}
 

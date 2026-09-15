@@ -14,6 +14,8 @@ import {
 } from '../controllers/webauthnController.js';
 import {
   registerMerchant,
+  sendSignupPhoneOtp,
+  verifySignupPhoneOtp,
   verifyMerchantOTP,
   loginMerchant,
   resendMerchantOTP,
@@ -100,6 +102,29 @@ const merchantOtpLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many verification attempts. Restart the login flow.' },
+});
+
+// Signup phone verification — sits ahead of any account existing at all, so
+// it gets its own pair of limiters rather than reusing merchantOtpLimiter
+// above (that one's keyed off an existing merchant's identity, this one
+// isn't). Per-IP stops a single attacker hammering the endpoint; per-phone
+// (same idiom as forgotPasswordAccountLimiter below) stops a distributed/
+// IP-rotating one from spamming SMS spend and harassment at one specific
+// victim's number.
+const signupPhoneOtpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Try again in 15 minutes.' },
+});
+const signupPhoneOtpAccountLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => String(req.body?.phone || '').trim() || 'unknown',
+  message: { error: 'Too many codes requested for this phone number. Try again in an hour.' },
 });
 
 // Debounced client-side typing naturally stays well under this — same
@@ -203,6 +228,12 @@ router.post('/logout', protect, logout);
 // Admin team-member setup (public — validates the time-limited invite token).
 router.get('/setup-password/:token', validateAdminSetupToken);
 router.post('/setup-password', adminOtpLimiter, setupPasswordWithToken);
+
+// Signup phone verification — public, no account exists yet at this point
+// in the flow. Stacked IP + per-phone limiters, see signupPhoneOtpLimiter/
+// signupPhoneOtpAccountLimiter above.
+router.post('/merchant/signup/send-otp', signupPhoneOtpLimiter, signupPhoneOtpAccountLimiter, sendSignupPhoneOtp);
+router.post('/merchant/signup/verify-otp', signupPhoneOtpLimiter, verifySignupPhoneOtp);
 
 // Registration is public and accepts a file upload — same abuse surface as
 // login, so it gets the same per-IP throttle (merchantLoginLimiter was

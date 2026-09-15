@@ -3,10 +3,13 @@ import mongoose from 'mongoose';
 import Merchant from '../models/Merchant.js';
 import { logAudit } from '../utils/auditLog.js';
 import { phoneVariations } from './adminController.js';
-import { getNcbaVirtualAccountNumber, validatePhoneNumber, isValidPhoneInputFormat, NcbaValidationError } from '../utils/ncbaValidators.js';
+import { getNcbaVirtualAccountNumber, formatAccountNumberDisplay, validatePhoneNumber, isValidPhoneInputFormat, NcbaValidationError } from '../utils/ncbaValidators.js';
 import { isValidEmail, EMAIL_FORMAT_HINT } from '../utils/emailValidator.js';
 import { sendMerchantInvite, sendKybRevisionRequest, sendKybRejection } from '../utils/resend.js';
 import { normalizeKraPin, isValidKraPin, KRA_PIN_FORMAT_HINT } from '../utils/kraPinValidator.js';
+import { buildAccountApprovedSms } from '../utils/accountSmsTemplates.js';
+import { safeSendSMS } from '../utils/smsSanitizer.js';
+import { toE164Kenyan } from '../utils/notificationService.js';
 
 // Onboarding-officer application pipeline. Officers originate new merchant
 // applications (business details + KYC documents) and drive them through a
@@ -552,7 +555,7 @@ export const approveApplication = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ error: 'Invalid id.' });
     }
-    const application = await Merchant.findOne({ _id: req.params.id, kybStatus: { $exists: true }, ...scopedToOfficer(req.admin) });
+    const application = await Merchant.findOne({ _id: req.params.id, kybStatus: { $exists: true }, ...scopedToOfficer(req.admin) }).select('+password');
     if (!application) return res.status(404).json({ error: 'Application not found.' });
     if (application.kybStatus === 'approved') return res.status(400).json({ error: 'Application is already approved.' });
 
@@ -570,17 +573,20 @@ export const approveApplication = async (req, res) => {
     // is the NCBA virtual account (ncbaMerchantCode), already auto-assigned
     // by the Merchant model's pre-save hook when the application was created.
     //
-    // An officer-originated application has no password yet (Merchant.create
-    // in createApplication above never sets one) — it genuinely needs the
-    // set-up-password invite link below. A self-serve merchant reviewed via
-    // startReview already has a working password and is already using the
-    // platform (onboardingOfficerId stays unset for that path specifically
-    // so this check can tell the two apart) — sending it a "set up your
-    // password" email would be wrong and confusing, so skip the token/email
-    // entirely and just record the approval.
-    const wasOfficerOriginated = !!application.onboardingOfficerId;
+    // Any application reaching this point without a password yet — every
+    // officer-originated application (createApplication never sets one),
+    // and every self-serve signup now that registerMerchant no longer
+    // collects one either — genuinely needs the set-up-password invite
+    // link below. Checking `!application.password` directly (rather than
+    // the origination flag) means this correctly covers both without
+    // needing to know which pipeline the application came from; a self-
+    // serve merchant reviewed via the legacy `startReview` path may
+    // already have a password from before this gate existed, in which
+    // case sending a "set up your password" link would be wrong, so that
+    // case still correctly skips it.
+    const needsCredentials = !application.password;
     let setupLink = null;
-    if (wasOfficerOriginated) {
+    if (needsCredentials) {
       const rawToken = crypto.randomBytes(32).toString('hex');
       const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
       const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
@@ -595,18 +601,37 @@ export const approveApplication = async (req, res) => {
     application.reviewedBy = req.admin._id;
     await application.save();
 
-    if (wasOfficerOriginated) {
+    if (needsCredentials) {
+      const ncbaVirtualAccountNumber = getNcbaVirtualAccountNumber(application.ncbaMerchantCode);
       sendMerchantInvite(
         application.email, application.name, application.businessName, setupLink,
-        getNcbaVirtualAccountNumber(application.ncbaMerchantCode), application.ncbaMerchantCode
+        ncbaVirtualAccountNumber, application.ncbaMerchantCode
       ).catch((err) => console.error(`📧 Failed to send approval invite to ${application.email}:`, err));
+
+      // SMS companion to the invite email above — a merchant may see the
+      // text before the email (or at all, if the email lands in spam), and
+      // this is the "you're approved, here's how to get in" moment the
+      // account-opening flow promises. Carries the setup link only, never
+      // a password/code, matching sendMerchantInvite's own mechanism.
+      const approvedPhone = toE164Kenyan(application.phone);
+      if (approvedPhone) {
+        safeSendSMS({
+          to: approvedPhone,
+          message: buildAccountApprovedSms({
+            businessName: application.businessName,
+            accountNumber: formatAccountNumberDisplay(ncbaVirtualAccountNumber || application.ncbaMerchantCode),
+            accountIsInterim: !ncbaVirtualAccountNumber,
+            setupLink,
+          }).message,
+        }).catch((err) => console.error(`📱 Failed to send approval SMS to ${approvedPhone}:`, err));
+      }
     }
 
     logAudit({
       action: 'officer.application.approved', category: 'admin', severity: 'success',
-      message: wasOfficerOriginated
-        ? `Approved and activated — invite sent to ${application.email}`
-        : `KYB review approved for self-serve merchant ${application.email} (already active — no invite email sent)`,
+      message: needsCredentials
+        ? `Approved and activated — invite email + SMS sent to ${application.email}`
+        : `KYB review approved for ${application.email} (already has a password — no invite sent)`,
       merchant: application, actor: actorFor(req.admin), req,
       metadata: { riskTier: application.riskTier },
     });
@@ -681,15 +706,8 @@ export const rejectApplication = async (req, res) => {
     const note = String(req.body?.note || '').trim();
     if (!note) return res.status(400).json({ error: 'An internal note is required to reject an application.' });
 
-    const application = await Merchant.findOne({ _id: req.params.id, kybStatus: { $exists: true }, ...scopedToOfficer(req.admin) });
+    const application = await Merchant.findOne({ _id: req.params.id, kybStatus: { $exists: true }, ...scopedToOfficer(req.admin) }).select('+password');
     if (!application) return res.status(404).json({ error: 'Application not found.' });
-
-    // See approveApplication's identical check — a self-serve merchant
-    // reviewed via startReview already has a working account, so "Your
-    // application was not approved" would be actively confusing (and
-    // wrong: this does NOT suspend their existing access, only marks the
-    // KYB review rejected internally).
-    const wasOfficerOriginated = !!application.onboardingOfficerId;
 
     application.kybStatus = 'rejected';
     application.reviewedAt = new Date();
@@ -697,7 +715,15 @@ export const rejectApplication = async (req, res) => {
     application.kybNotes.push({ authorId: req.admin._id, authorName: req.admin.name || req.admin.email, note, createdAt: new Date() });
     await application.save();
 
-    if (wasOfficerOriginated) {
+    // Every application reaching this endpoint is now genuinely gated
+    // pending review (self-serve included, since registerMerchant no
+    // longer grants working access up front) — a rejected applicant has no
+    // other way to find out, so this always notifies them now. The one
+    // exception: a self-serve merchant reviewed via the legacy startReview
+    // path who already had a working account before this gate existed —
+    // rejecting their KYB review doesn't suspend that pre-existing access,
+    // so telling them "your application was not approved" would be wrong.
+    if (!application.password) {
       sendKybRejection(application.email, application.name, application.businessName).catch((err) => {
         console.error(`📧 Failed to send rejection notice to ${application.email}:`, err);
       });
