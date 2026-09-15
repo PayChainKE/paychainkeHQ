@@ -185,6 +185,28 @@ export function MerchantAuthProvider({ children }) {
     }
   }
 
+  // Signup phone verification — proves the applicant controls the phone
+  // number before the wizard lets them submit. Deliberately separate from
+  // signup/verifyOTP/resendOTP above: no merchant/token exists yet at this
+  // point, so there's no session to establish either way.
+  async function sendSignupPhoneOtp(phone) {
+    try {
+      const res = await axios.post(`${API_URL}/api/auth/merchant/signup/send-otp`, { phone });
+      return { success: true, maskedPhone: res.data.maskedPhone };
+    } catch (err) {
+      return { success: false, error: err.response?.data?.error || 'Failed to send verification code.' };
+    }
+  }
+
+  async function verifySignupPhoneOtp(phone, otp) {
+    try {
+      const res = await axios.post(`${API_URL}/api/auth/merchant/signup/verify-otp`, { phone, otp });
+      return { success: true, phoneVerificationToken: res.data.phoneVerificationToken };
+    } catch (err) {
+      return { success: false, error: err.response?.data?.error || 'Code verification failed.' };
+    }
+  }
+
   async function login(email, password) {
     try {
       const res = await axios.post(`${API_URL}/api/auth/merchant/login`, { email, password });
@@ -333,6 +355,8 @@ export function MerchantAuthProvider({ children }) {
       loginWithPasskey,
       updateToken,
       signup,
+      sendSignupPhoneOtp,
+      verifySignupPhoneOtp,
       verifyOTP,
       resendOTP,
       forgotPassword,

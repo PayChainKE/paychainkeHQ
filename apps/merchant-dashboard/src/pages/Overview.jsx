@@ -7,7 +7,7 @@ import { formatAccountNumber } from '../utils/formatAccountNumber'
 import { formatTxDate, formatTxTime } from '../utils/formatDate'
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay'
 import { formatName } from '../utils/formatName'
-import { getAmountSign, getAmountColorClassWithHover, isCreditTransaction, isDebitTransaction, isSwapTransaction, netBalanceImpact, excludeReversedDuplicates } from '../utils/transactionDirection'
+import { getAmountSign, getAmountColorClassWithHover, isCreditTransaction, isDebitTransaction, isSwapTransaction, netBalanceImpact, excludeReversedDuplicates, getCounterparty } from '../utils/transactionDirection'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { useNavigate } from 'react-router-dom'
@@ -555,7 +555,7 @@ export default function Overview() {
               </div>
             ) : (
               recentTx.map(tx => {
-                const party = formatName(tx.sender?.name) || formatName(tx.recipient?.name) || 'PayChain'
+                const party = formatName(getCounterparty(tx)?.name) || 'PayChain'
                 const initials = party.slice(0, 2).toUpperCase()
                 const isIn  = isCreditTransaction(tx.type)
                 const isSwp = isSwapTransaction(tx.type)
@@ -589,7 +589,7 @@ export default function Overview() {
                           </span>
                         </div>
                         <p className="text-[8px] lg:text-[9px] text-on-surface-variant font-mono opacity-40 group-hover:text-white/40 group-hover:opacity-100 transition-colors truncate mt-0.5 tabular-nums">
-                          {[formatPhoneDisplay(tx.sender?.id || tx.recipient?.id), tx.reference].filter(Boolean).join(' · ')}
+                          {[formatPhoneDisplay(getCounterparty(tx)?.id), tx.reference].filter(Boolean).join(' · ')}
                         </p>
                       </div>
                     </div>

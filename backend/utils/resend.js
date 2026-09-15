@@ -82,7 +82,7 @@ export const sendWaitlistConfirmation = async (email, name) => {
             <p style="margin: 10px 0 0; color: #5EFEB3; opacity: 0.95; font-size: 15px; font-weight: 600;">The Future of Payments in Kenya</p>
           </div>
           <div style="padding: 40px 30px;">
-            <h2 style="margin: 0 0 20px; color: #111; font-size: 22px;">Hi ${name},</h2>
+            <h2 style="margin: 0 0 20px; color: #111; font-size: 22px;">Hi ${escapeHtml(name)},</h2>
             <p style="color: #444; line-height: 1.7; font-size: 16px;">You've successfully secured your spot on the PayChain waitlist! We're building a next-generation payment OS for Kenyan merchants, and we're excited to have you join us early.</p>
             <p style="color: #444; line-height: 1.7; font-size: 16px;">Our team is working hard to finalize the first wave of dashboard invitations. You'll be among the first to receive access as we roll out in your region.</p>
             <div style="margin-top: 40px; padding: 25px; background: #f6fbf7; border-radius: 12px; border: 1px solid #d8ecdd;">
@@ -373,7 +373,7 @@ export const sendWelcomeEmail = async (email, name, password, phone, ncbaVirtual
         <p style="margin:0 0 4px;font-size:11px;font-weight:800;letter-spacing:0.25em;text-transform:uppercase;color:#5EFEB3;">PayChain Kenya</p>
         <h1 style="margin:0;font-size:28px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;line-height:1.2;">Your Merchant Account<br>is Now Active</h1>
         <p style="margin:16px 0 0;font-size:14px;color:rgba(255,255,255,0.6);line-height:1.6;">
-          Welcome aboard, <strong style="color:#fff;">${firstName}</strong>. Your PayChain dashboard is provisioned and ready to accept payments.
+          Welcome aboard, <strong style="color:#fff;">${escapeHtml(firstName)}</strong>. Your PayChain dashboard is provisioned and ready to accept payments.
         </p>
       </td></tr>
 
@@ -557,10 +557,10 @@ export const sendSupportReply = async (toEmail, toName, inReplyToSubject, replyB
           <div style="background: #06201B; padding: 28px 30px;">
             <div style="margin: 0 0 16px;">${logoImgWhite(104, 'left')}</div>
             <p style="margin: 0; color: #5EFEB3; font-size: 12px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase;">PayChain Support</p>
-            <h1 style="margin: 6px 0 0; font-size: 22px; color: #fff; font-weight: 700;">${inReplyToSubject || 'Your inquiry'}</h1>
+            <h1 style="margin: 6px 0 0; font-size: 22px; color: #fff; font-weight: 700;">${escapeHtml(inReplyToSubject || 'Your inquiry')}</h1>
           </div>
           <div style="padding: 36px 30px;">
-            <p style="margin: 0 0 18px; color: #111; font-size: 15px;">Hi ${toName || 'there'},</p>
+            <p style="margin: 0 0 18px; color: #111; font-size: 15px;">Hi ${escapeHtml(toName || 'there')},</p>
             <div style="color: #333; font-size: 15px; line-height: 1.7; white-space: pre-wrap;">${replyBody.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
             <p style="margin: 30px 0 0; color: #555; font-size: 14px;">— The PayChain Team</p>
           </div>
@@ -715,18 +715,18 @@ export const sendMerchantInvite = async (email, name, businessName, setupLink, n
     const emailPayload = {
       from: 'PayChain Onboarding <info@paychain.co.ke>',
       to: [email],
-      subject: 'You have been invited to PayChain — Set up your account',
+      subject: 'Your PayChain application has been approved — Set up your account',
       ...(stickerAttachment ? { attachments: [stickerAttachment] } : {}),
       html: `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; border-radius: 16px; overflow: hidden; background: #fff;">
           <div style="background: linear-gradient(135deg, #06201B 0%, #0a3029 100%); padding: 44px 30px 46px; text-align: center; color: #fff;">
             <div style="margin-bottom: 22px;">${logoImgWhite(126)}</div>
-            <h1 style="margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.5px;">Welcome to PayChain</h1>
+            <h1 style="margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.5px;">You're Approved</h1>
             <p style="margin: 10px 0 0; color: #5EFEB3; font-size: 15px; font-weight: 600;">Your merchant account is ready</p>
           </div>
           <div style="padding: 40px 30px;">
-            <h2 style="margin: 0 0 16px; color: #111; font-size: 22px;">Hi ${name},</h2>
-            <p style="color: #444; line-height: 1.7; font-size: 15px;">PayChain has provisioned a merchant account for <strong>${businessName}</strong>. To start collecting payments, please set up your dashboard password using the secure link below.</p>
+            <h2 style="margin: 0 0 16px; color: #111; font-size: 22px;">Hi ${escapeHtml(name)},</h2>
+            <p style="color: #444; line-height: 1.7; font-size: 15px;">Your PayChain merchant account for <strong>${escapeHtml(businessName)}</strong> has been reviewed and approved. To start collecting payments, please set up your dashboard password using the secure link below.</p>
 
             <div style="margin: 30px 0; text-align: center;">
               <a href="${setupLink}" style="background: #00351D; color: #fff; padding: 14px 32px; text-decoration: none; border-radius: 10px; font-weight: 700; font-size: 15px; display: inline-block;">Set Up My Password</a>
@@ -788,8 +788,8 @@ export const sendTeamInvite = async (email, name, role, invitedByName, setupLink
             <p style="margin: 10px 0 0; color: #5EFEB3; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 2px;">PayChain Admin Console</p>
           </div>
           <div style="padding: 40px 30px;">
-            <h2 style="margin: 0 0 16px; color: #111; font-size: 22px;">Hi ${name || email.split('@')[0]},</h2>
-            <p style="color: #444; line-height: 1.7; font-size: 15px;"><strong>${invitedByName}</strong> has invited you to join the PayChain admin console as a <strong>${role}</strong>. Set up your password using the secure link below to activate your account.</p>
+            <h2 style="margin: 0 0 16px; color: #111; font-size: 22px;">Hi ${escapeHtml(name || email.split('@')[0])},</h2>
+            <p style="color: #444; line-height: 1.7; font-size: 15px;"><strong>${escapeHtml(invitedByName)}</strong> has invited you to join the PayChain admin console as a <strong>${escapeHtml(role)}</strong>. Set up your password using the secure link below to activate your account.</p>
             <div style="margin: 30px 0; text-align: center;">
               <a href="${setupLink}" style="background: #00351D; color: #fff; padding: 14px 32px; text-decoration: none; border-radius: 10px; font-weight: 700; font-size: 15px; display: inline-block;">Activate My Account</a>
             </div>
@@ -833,8 +833,8 @@ export const sendOfficerCredentials = async (email, name, password, loginUrl, ad
             <p style="margin: 10px 0 0; color: #5EFEB3; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 2px;">PayChain Onboarding Console</p>
           </div>
           <div style="padding: 40px 30px;">
-            <h2 style="margin: 0 0 16px; color: #111; font-size: 22px;">Hi ${name || email.split('@')[0]},</h2>
-            <p style="color: #444; line-height: 1.7; font-size: 15px;"><strong>${adminName}</strong> created an Onboarding Officer account for you. Use the credentials below to sign in.</p>
+            <h2 style="margin: 0 0 16px; color: #111; font-size: 22px;">Hi ${escapeHtml(name || email.split('@')[0])},</h2>
+            <p style="color: #444; line-height: 1.7; font-size: 15px;"><strong>${escapeHtml(adminName)}</strong> created an Onboarding Officer account for you. Use the credentials below to sign in.</p>
 
             <div style="margin: 24px 0; padding: 22px; background: #f0fdf4; border-radius: 12px; border: 1px solid #bbf7d0;">
               <p style="margin: 0 0 8px; color: #14532d; font-size: 14px;"><strong>Login email:</strong> ${email}</p>
@@ -846,7 +846,7 @@ export const sendOfficerCredentials = async (email, name, password, loginUrl, ad
             </div>
 
             <div style="margin-top: 24px; padding: 16px; background: #fff7ed; border-radius: 10px; border: 1px solid #fed7aa;">
-              <p style="margin: 0; color: #9a3412; font-size: 12px; line-height: 1.6;"><strong>Note:</strong> Only an admin can change this password — you cannot reset it yourself. Contact ${adminName} or your PayChain administrator if you need it changed. Sign-in also requires a one-time code emailed to you at each login.</p>
+              <p style="margin: 0; color: #9a3412; font-size: 12px; line-height: 1.6;"><strong>Note:</strong> Only an admin can change this password — you cannot reset it yourself. Contact ${escapeHtml(adminName)} or your PayChain administrator if you need it changed. Sign-in also requires a one-time code emailed to you at each login.</p>
             </div>
           </div>
           <div style="padding: 28px; background: #fafafa; border-top: 1px solid #eee; text-align: center;">
@@ -888,8 +888,8 @@ export const sendKybRevisionRequest = async (email, name, businessName, docTypes
             <h1 style="margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -0.5px;">A few documents need fixing</h1>
           </div>
           <div style="padding: 40px 30px;">
-            <h2 style="margin: 0 0 16px; color: #111; font-size: 22px;">Hi ${name || email.split('@')[0]},</h2>
-            <p style="color: #444; line-height: 1.7; font-size: 15px;">We're reviewing your PayChain merchant application for <strong>${businessName}</strong>. Before we can continue, please re-upload:</p>
+            <h2 style="margin: 0 0 16px; color: #111; font-size: 22px;">Hi ${escapeHtml(name || email.split('@')[0])},</h2>
+            <p style="color: #444; line-height: 1.7; font-size: 15px;">We're reviewing your PayChain merchant application for <strong>${escapeHtml(businessName)}</strong>. Before we can continue, please re-upload:</p>
             <ul style="color: #444; line-height: 1.8; font-size: 15px;">
               ${(docTypes || []).map((t) => `<li>${KYB_DOC_LABELS[t] || t}</li>`).join('')}
             </ul>
@@ -933,8 +933,8 @@ export const sendKybRejection = async (email, name, businessName) => {
             <h1 style="margin: 0; font-size: 24px; font-weight: 800;">Application update</h1>
           </div>
           <div style="padding: 40px 30px;">
-            <h2 style="margin: 0 0 16px; color: #111; font-size: 20px;">Hi ${name || email.split('@')[0]},</h2>
-            <p style="color: #444; line-height: 1.7; font-size: 15px;">Your PayChain merchant application for <strong>${businessName}</strong> was not approved at this time.</p>
+            <h2 style="margin: 0 0 16px; color: #111; font-size: 20px;">Hi ${escapeHtml(name || email.split('@')[0])},</h2>
+            <p style="color: #444; line-height: 1.7; font-size: 15px;">Your PayChain merchant application for <strong>${escapeHtml(businessName)}</strong> was not approved at this time.</p>
             <p style="color: #444; line-height: 1.7; font-size: 15px;">If you believe this is a mistake or would like more information, contact <a href="mailto:support@paychain.co.ke" style="color: #06201B;">support@paychain.co.ke</a>.</p>
           </div>
           <div style="padding: 28px; background: #fafafa; border-top: 1px solid #eee; text-align: center;">
@@ -1174,8 +1174,8 @@ export const sendBatchReceiptEmail = async (email, businessName, batchRows, tota
   try {
     const rowHTML = batchRows.map((row, index) => `
       <tr style="background-color: ${index % 2 === 0 ? '#f8f9fa' : '#ffffff'}; border-bottom: 1px solid #e9ecef;">
-        <td style="padding: 12px 15px; color: #333; font-size: 13px;">${row.name}</td>
-        <td style="padding: 12px 15px; color: #555; font-size: 13px;">${row.accountReference || 'N/A'}</td>
+        <td style="padding: 12px 15px; color: #333; font-size: 13px;">${escapeHtml(row.name)}</td>
+        <td style="padding: 12px 15px; color: #555; font-size: 13px;">${escapeHtml(row.accountReference || 'N/A')}</td>
         <td style="padding: 12px 15px; color: #555; font-size: 13px;">${row.method || 'Standard'}</td>
         <td style="padding: 12px 15px; color: #111; font-weight: 600; font-size: 13px; text-align: right;">KES ${Number(row.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
       </tr>
@@ -1202,7 +1202,7 @@ export const sendBatchReceiptEmail = async (email, businessName, batchRows, tota
           <div style="padding: 40px;">
             <h1 style="font-size: 20px; font-weight: 700; color: #111; margin: 0 0 10px 0;">Bulk Payout Successful</h1>
             <p style="font-size: 14px; line-height: 1.6; color: #555; margin: 0 0 30px 0;">
-              Hello <strong>${businessName}</strong>,<br>
+              Hello <strong>${escapeHtml(businessName)}</strong>,<br>
               Your recent bulk payment batch has been successfully processed. Below is the detailed breakdown of the transaction.
             </p>
 
@@ -1302,7 +1302,7 @@ export const sendInvoiceEmail = async ({
       const lineDiscountAmt = rate > 0 ? gross * (rate / 100) : 0;
       return `
       <tr style="background-color: ${index % 2 === 0 ? '#f8f9fa' : '#ffffff'}; border-bottom: 1px solid #e9ecef;">
-        <td style="padding: 12px 15px; color: #333; font-size: 13px;">${item.description || '—'}${kraSigned && item.taxTyCd ? ` <span style="color:#94a3b8;font-size:11px;">[${escapeHtml(item.taxTyCd)}]</span>` : ''}
+        <td style="padding: 12px 15px; color: #333; font-size: 13px;">${escapeHtml(item.description || '—')}${kraSigned && item.taxTyCd ? ` <span style="color:#94a3b8;font-size:11px;">[${escapeHtml(item.taxTyCd)}]</span>` : ''}
           ${rate > 0 ? `<div style="color:#94a3b8;font-size:11px;margin-top:2px;">Discount ${rate}% (-${fmt(lineDiscountAmt)})</div>` : ''}
         </td>
         <td style="padding: 12px 15px; color: #555; font-size: 13px; text-align: center;">${item.qty}</td>
@@ -1361,10 +1361,10 @@ export const sendInvoiceEmail = async ({
 
           <!-- Body -->
           <div style="padding: 40px;">
-            <h1 style="font-size: 20px; font-weight: 700; color: #111; margin: 0 0 10px 0;">You have a new invoice from ${businessName}</h1>
+            <h1 style="font-size: 20px; font-weight: 700; color: #111; margin: 0 0 10px 0;">You have a new invoice from ${escapeHtml(businessName)}</h1>
             <p style="font-size: 14px; line-height: 1.6; color: #555; margin: 0 0 12px 0;">
-              Hello <strong>${customerName}</strong>,<br>
-              ${businessName} has sent you an invoice for ${fmt(total)}, due <strong>${dueDateStr}</strong>. You can review the full breakdown below and pay securely online.
+              Hello <strong>${escapeHtml(customerName)}</strong>,<br>
+              ${escapeHtml(businessName)} has sent you an invoice for ${fmt(total)}, due <strong>${dueDateStr}</strong>. You can review the full breakdown below and pay securely online.
             </p>
             ${(trader?.address || trader?.email || trader?.phone) ? `
             <p style="font-size: 12px; line-height: 1.7; color: #94a3b8; margin: 0 0 30px 0;">
@@ -1419,7 +1419,7 @@ export const sendInvoiceEmail = async ({
             ${notes ? `
             <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 20px; margin-bottom: 30px;">
               <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;">Notes</div>
-              <div style="font-size: 13px; color: #475569; white-space: pre-wrap;">${notes}</div>
+              <div style="font-size: 13px; color: #475569; white-space: pre-wrap;">${escapeHtml(notes)}</div>
             </div>` : ''}
 
             ${kraBlockHTML}
@@ -1436,7 +1436,7 @@ export const sendInvoiceEmail = async ({
           <!-- Footer -->
           <div style="background-color: #fafafa; padding: 25px 40px; text-align: center; border-top: 1px solid #e5e7eb;">
             <p style="font-size: 11px; color: #9ca3af; margin: 0 0 8px 0;">
-              This invoice was issued by ${businessName} via PayChain. Do not reply to this email.
+              This invoice was issued by ${escapeHtml(businessName)} via PayChain. Do not reply to this email.
             </p>
             <p style="font-size: 11px; color: #9ca3af; margin: 0;">
               &copy; ${new Date().getFullYear()} PayChainKE. All rights reserved.
@@ -1464,7 +1464,7 @@ export const sendInvoicePaidReceiptEmail = async ({
 
     const rowHTML = (items || []).map((item, index) => `
       <tr style="background-color: ${index % 2 === 0 ? '#f8f9fa' : '#ffffff'}; border-bottom: 1px solid #e9ecef;">
-        <td style="padding: 12px 15px; color: #333; font-size: 13px;">${item.description || '—'}</td>
+        <td style="padding: 12px 15px; color: #333; font-size: 13px;">${escapeHtml(item.description || '—')}</td>
         <td style="padding: 12px 15px; color: #555; font-size: 13px; text-align: center;">${item.qty}</td>
         <td style="padding: 12px 15px; color: #555; font-size: 13px; text-align: right;">${fmt(item.price)}</td>
         <td style="padding: 12px 15px; color: #111; font-weight: 600; font-size: 13px; text-align: right;">${fmt(item.qty * item.price)}</td>
@@ -1493,9 +1493,9 @@ export const sendInvoicePaidReceiptEmail = async ({
 
           <!-- Body -->
           <div style="padding: 40px;">
-            <h1 style="font-size: 20px; font-weight: 700; color: #111; margin: 0 0 10px 0;">You've been paid, ${businessName}</h1>
+            <h1 style="font-size: 20px; font-weight: 700; color: #111; margin: 0 0 10px 0;">You've been paid, ${escapeHtml(businessName)}</h1>
             <p style="font-size: 14px; line-height: 1.6; color: #555; margin: 0 0 30px 0;">
-              <strong>${customerName}</strong> just paid invoice <strong>${invoiceNumber}</strong> in full via M-PESA. The funds have been credited to your PayChain wallet balance.
+              <strong>${escapeHtml(customerName)}</strong> just paid invoice <strong>${invoiceNumber}</strong> in full via M-PESA. The funds have been credited to your PayChain wallet balance.
             </p>
 
             <!-- Summary Cards -->
@@ -1599,7 +1599,7 @@ export const sendStatementEmail = async ({ to, businessName, periodLabel, pdfBas
             </div>
           </div>
           <div style="padding: 40px;">
-            <h1 style="font-size: 20px; font-weight: 700; color: #111; margin: 0 0 10px 0;">Here's your statement, ${businessName}</h1>
+            <h1 style="font-size: 20px; font-weight: 700; color: #111; margin: 0 0 10px 0;">Here's your statement, ${escapeHtml(businessName)}</h1>
             <p style="font-size: 14px; line-height: 1.6; color: #555; margin: 0 0 10px 0;">
               Your official PayChain transaction statement for <strong>${periodLabel}</strong> is attached to this email as a PDF.
             </p>

@@ -34,87 +34,6 @@ const DESTINATIONS = [
   { id: 'paybill',       label: 'Paybill',                  icon: 'receipt_long',      fee: null, hint: 'Pay to a Paybill number', betaOnly: true },
 ]
 
-// Mirrors backend/config/lipaNaMpesaTariffCard.js's LIPA_NA_MPESA_B2B_BANDS
-// (2026-08-12 tiered schedule, baseCost + serviceFee per band) — that
-// backend table is the authoritative charge, recomputed server-side in
-// mpesaController.js#initiateB2B via getLipaNaMpesaTariff regardless of
-// what this estimate shows. This used to be a flat KES 30 mirroring
-// NCBA_LIPA_NA_MPESA_FLAT_FEE_KES, which the backend replaced with this
-// tiered table — the estimate was never updated to match, so it was
-// showing KES 30 for transfers (e.g. KES 50) that actually cost KES 0.
-const B2B_TARIFF_BANDS = [
-  { max: 100,      totalFee: 0   },
-  { max: 500,      totalFee: 10  },
-  { max: 1_000,    totalFee: 15  },
-  { max: 2_500,    totalFee: 23  },
-  { max: 5_000,    totalFee: 27  },
-  { max: 10_000,   totalFee: 35  },
-  { max: 20_000,   totalFee: 57  },
-  { max: 30_000,   totalFee: 64  },
-  { max: 40_000,   totalFee: 72  },
-  { max: 50_000,   totalFee: 79  },
-  { max: 100_000,  totalFee: 86  },
-  { max: 150_000,  totalFee: 104 },
-  { max: 200_000,  totalFee: 122 },
-  { max: 250_000,  totalFee: 140 },
-]
-function estimateB2bFee(amount) {
-  if (!amount || amount <= 0) return 0
-  const band = B2B_TARIFF_BANDS.find(b => amount <= b.max) || B2B_TARIFF_BANDS[B2B_TARIFF_BANDS.length - 1]
-  return band.totalFee
-}
-
-// Mirrors backend/config/mpesaB2cTariffCard.js's combined
-// B2C_REGISTERED_USER_BANDS (Safaricom's real cost) + B2C_SERVICE_FEE_BANDS
-// (PayChain's own tiered markup, 2026-08-12) — getB2cTariff sums both
-// server-side. This used to add a flat KES 10 PayChain markup, which the
-// backend replaced with a tiered schedule (KES 0-200 depending on amount);
-// the estimate was never updated to match, so it understated the real
-// charge at every amount above the lowest band.
-const B2C_TARIFF_BANDS = [
-  { max: 49,      totalFee: 0   },
-  { max: 100,     totalFee: 5   },
-  { max: 500,     totalFee: 11  },
-  { max: 1_000,   totalFee: 17  },
-  { max: 1_500,   totalFee: 24  },
-  { max: 2_500,   totalFee: 29  },
-  { max: 3_500,   totalFee: 34  },
-  { max: 5_000,   totalFee: 37  },
-  { max: 7_500,   totalFee: 57  },
-  { max: 10_000,  totalFee: 67  },
-  { max: 20_000,  totalFee: 84  },
-  { max: 50_000,  totalFee: 113 },
-  { max: 100_000, totalFee: 163 },
-  { max: 250_000, totalFee: 213 },
-]
-
-function estimateB2cFee(amount) {
-  if (!amount || amount <= 0) return 0
-  const band = B2C_TARIFF_BANDS.find(b => amount <= b.max) || B2C_TARIFF_BANDS[B2C_TARIFF_BANDS.length - 1]
-  return band.totalFee
-}
-
-// Mirrors backend/config/bankTransferTariffCard.js — this was previously a
-// flat KES 50 regardless of rail/amount, understating real PesaLink tiers
-// (up to KES 210) and RTGS's flat KES 430, which could let a merchant pass
-// the client-side "sufficient balance" check and enter their PIN only to
-// have the backend charge more than shown.
-const PESALINK_BANDS = [
-  { max: 500,      totalFee: 50  },
-  { max: 3_500,    totalFee: 70  },
-  { max: 7_000,    totalFee: 88  },
-  { max: 10_000,   totalFee: 100 },
-  { max: 250_000,  totalFee: 210 },
-]
-const RTGS_TOTAL_FEE = 400 // baseCost 300 + serviceFee 100, flat any amount
-
-function estimateBankFee(rail, amount) {
-  if (rail === 'rtgs') return RTGS_TOTAL_FEE
-  if (!amount || amount <= 0) return 0
-  const band = PESALINK_BANDS.find(b => amount <= b.max) || PESALINK_BANDS[PESALINK_BANDS.length - 1]
-  return band.totalFee
-}
-
 export default function SendMoney() {
   const navigate = useNavigate()
   const { addNotification } = useNotification()
@@ -183,20 +102,17 @@ export default function SendMoney() {
   const selectedDest = DESTINATIONS.find(d => d.id === destination)
   const isMobileDest = destination === 'mpesa-primary' || destination === 'mobile'
   const isB2bDest     = destination === 'till' || destination === 'paybill'
-  // Instant client-side estimate — shown only while the live fee below is
-  // still loading (or if that request fails), never used to actually gate
-  // Confirm. This is exactly what used to be the only source of the fee:
-  // a hardcoded table that had no way to reflect an admin tariff change and
-  // had already gone stale twice before (see the tables' own comments
-  // above) — the reported bug (UI shows KES 5, backend charges KES 10) is
-  // this same failure a third time. `liveFee` below fixes it structurally.
-  const clientEstimate = isMobileDest ? estimateB2cFee(Number(amount) || 0) : isB2bDest ? estimateB2bFee(Number(amount) || 0) : destination === 'bank' ? estimateBankFee(bankRail, Number(amount) || 0) : (selectedDest?.fee || 0)
-
   // Live fee, fetched from the same tariff functions/per-merchant lock the
   // backend uses to actually charge (GET /api/transactions/fee-preview) —
   // null until a successful response comes back for the CURRENT amount/
   // destination/rail, so canContinue() below can block Confirm on it
-  // rather than ever letting the merchant authorize against a guess.
+  // rather than ever letting the merchant authorize against a guess. A
+  // hardcoded client-side estimate table used to be shown here first and
+  // swapped for this once it resolved — that table had no way to reflect
+  // an admin tariff change and had gone stale multiple times, so a
+  // merchant would see one fee then watch it change to a different one a
+  // moment later. Every fee display below now waits for this instead —
+  // nothing shown at all until the real figure is in, never a guess.
   const [liveFee, setLiveFee] = useState(null)
   const [feeLoading, setFeeLoading] = useState(false)
   const [feeRetryToken, setFeeRetryToken] = useState(0)
@@ -217,7 +133,7 @@ export default function SendMoney() {
         })
         if (!cancelled) setLiveFee(Number(data?.totalFee) || 0)
       } catch {
-        if (!cancelled) setLiveFee(null) // canContinue() keeps Confirm blocked; clientEstimate still shows on screen
+        if (!cancelled) setLiveFee(null) // canContinue() keeps Confirm blocked; fee displays fall back to a "could not verify" state
       } finally {
         if (!cancelled) setFeeLoading(false)
       }
@@ -226,8 +142,7 @@ export default function SendMoney() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [destination, bankRail, amount, feeRetryToken])
 
-  const fee          = liveFee != null ? liveFee : clientEstimate
-  const totalAmount  = Number(amount || 0) + fee
+  const totalAmount  = Number(amount || 0) + (liveFee ?? 0)
   // availableBalance (kesBalance minus anything credited in the last 2
   // minutes and still held server-side — see
   // backend/utils/availableBalance.js) is what the backend will actually
@@ -324,7 +239,6 @@ export default function SendMoney() {
               phone: recipientAccount,
               amount: Number(amount),
               destination: selectedDest.label,
-              fee,
               reference,
               pin,
               provider,
@@ -763,15 +677,21 @@ export default function SendMoney() {
                     {Number(amount) < 50 ? 'Amount must be at least KES 50' : 'Amount cannot exceed KES 250,000 per transaction'}
                   </p>
                 )}
-                {Number(amount) > 0 && fee > 0 && (
+                {Number(amount) > 0 && liveFee != null && liveFee > 0 && (
                   <p className="text-[11px] font-bold text-slate-400">
-                    Transaction cost: {formatKES(fee)}
+                    Transaction cost: {formatKES(liveFee)}
                   </p>
                 )}
-                {Number(amount) > 0 && (
-                  <p className={`text-[11px] font-bold ${Number(amount) + fee > balance ? 'text-red-500' : 'text-emerald-600'}`}>
+                {Number(amount) > 0 && liveFee == null && (
+                  <p className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-sm animate-spin" style={{ animationDuration: '1.2s' }}>progress_activity</span>
+                    Checking transaction cost…
+                  </p>
+                )}
+                {Number(amount) > 0 && liveFee != null && (
+                  <p className={`text-[11px] font-bold ${totalAmount > balance ? 'text-red-500' : 'text-emerald-600'}`}>
                     Total deduction: {formatKES(totalAmount)}
-                    {Number(amount) + fee > balance ? ' — exceeds balance' : ''}
+                    {totalAmount > balance ? ' — exceeds balance' : ''}
                   </p>
                 )}
               </div>
@@ -849,7 +769,7 @@ export default function SendMoney() {
                     ['Recipient',   formatPhoneDisplay(recipientAccount)],
                     ...(isB2bDest && paybillAccountRef ? [['Account Number', paybillAccountRef]] : []),
                     ['Amount',      formatKES(amount || 0)],
-                    ...(fee > 0 ? [['Transaction Cost', formatKES(fee)]] : []),
+                    ...(liveFee != null && liveFee > 0 ? [['Transaction Cost', formatKES(liveFee)]] : []),
                     ...(reference ? [['Reference', reference]] : []),
                   ].map(([k, v]) => (
                     <div key={k} className="flex justify-between items-start gap-4 px-5 py-3">
@@ -859,7 +779,7 @@ export default function SendMoney() {
                   ))}
                   <div className="flex justify-between items-center px-5 py-4 bg-emerald-50">
                     <span className="text-xs font-black text-emerald-800 uppercase tracking-wider">Total Deducted</span>
-                    <span className="text-xl font-headline font-black text-[#00351D]">{formatKES(totalAmount)}</span>
+                    <span className="text-xl font-headline font-black text-[#00351D]">{liveFee != null ? formatKES(totalAmount) : '—'}</span>
                   </div>
                 </div>
               </div>

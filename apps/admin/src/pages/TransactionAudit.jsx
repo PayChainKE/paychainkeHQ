@@ -271,7 +271,7 @@ const TransactionAudit = () => {
         5: { cellWidth: 22 },
         6: { cellWidth: 20, halign: 'right', fontStyle: 'bold' },
         7: { cellWidth: 16, halign: 'right', textColor: [6, 120, 60] },
-        8: { cellWidth: 18, halign: 'center', fontStyle: 'bold' },
+        8: { cellWidth: 24, halign: 'center', fontStyle: 'bold' },
       },
       didParseCell(data) {
         if (data.section === 'body' && data.column.index === 8) {

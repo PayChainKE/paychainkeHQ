@@ -106,6 +106,24 @@ export function isDebitTransaction(type) {
   return !isCreditTransaction(type) && !isSwapTransaction(type)
 }
 
+// The OTHER party to show for a transaction — never this merchant's own
+// business name. Credit transactions (money coming in) have the merchant
+// as recipient, so the sender is the real counterparty; debit transactions
+// (money going out — every payout/B2C/bulk-pay rail) have the merchant as
+// sender, so the recipient is the real counterparty. Without this, a naive
+// "sender ?? recipient" fallback always picks sender first — which is
+// always populated with the merchant's own name on every outbound row, so
+// every payout silently displayed the merchant's own business name instead
+// of who was actually paid. FX swaps are between the merchant's own
+// wallets on both ends (see transactionController.js), so recipient is
+// used the same as any other debit — neither side is a "real" name there.
+export function getCounterparty(tx) {
+  const primary = isCreditTransaction(tx.type) ? tx.sender : tx.recipient
+  const fallback = isCreditTransaction(tx.type) ? tx.recipient : tx.sender
+  if (primary?.name || primary?.id) return primary
+  return fallback || null
+}
+
 export function getAmountSign(type) {
   if (isCreditTransaction(type)) return '+'
   if (isSwapTransaction(type)) return '±'

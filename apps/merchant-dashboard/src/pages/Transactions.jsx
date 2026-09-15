@@ -9,7 +9,7 @@ import { formatAccountNumber } from '../utils/formatAccountNumber'
 import { formatPhoneDisplay, formatPhoneOrDash } from '../utils/formatPhoneDisplay'
 import { formatName } from '../utils/formatName'
 import { drawBarcodePdf } from '../utils/barcode'
-import { getAmountSign, getAmountColorClass, isCreditTransaction, isDebitTransaction, netBalanceImpact, excludeReversedDuplicates } from '../utils/transactionDirection'
+import { getAmountSign, getAmountColorClass, isCreditTransaction, isDebitTransaction, netBalanceImpact, excludeReversedDuplicates, getCounterparty } from '../utils/transactionDirection'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useNotification } from '../context/NotificationContext'
 import logo from '../assets/logo2.png'
@@ -503,29 +503,59 @@ export default function Transactions() {
     doc.setDrawColor(230, 230, 230)
     doc.line(20, 63, pageWidth - 20, 63)
 
+    // Sender / Recipient boxes — a receipt has to prove BOTH who paid and
+    // who was paid, not just one blended "counterparty" name (this used to
+    // fall back to whichever of sender/recipient was set, which on every
+    // outbound payout picked this merchant's own name first).
+    const fitPartyText = (text, maxWidth, fontSize) => {
+      doc.setFontSize(fontSize)
+      let str = String(text ?? '')
+      if (doc.getTextWidth(str) <= maxWidth) return str
+      while (str.length > 1 && doc.getTextWidth(str + '…') > maxWidth) str = str.slice(0, -1)
+      return str + '…'
+    }
+    const partyBoxY = 73, partyBoxH = 24, partyGap = 6
+    const partyBoxW = (pageWidth - 40 - partyGap) / 2
+    const parties = [
+      { label: 'SENDER', name: formatName(tx.sender?.name) || '—', phone: tx.sender?.id ? formatPhoneOrDash(tx.sender.id) : null, x: 20 },
+      { label: 'RECIPIENT', name: formatName(tx.recipient?.name) || '—', phone: tx.recipient?.id ? formatPhoneOrDash(tx.recipient.id) : null, x: 20 + partyBoxW + partyGap },
+    ]
+    parties.forEach((p) => {
+      doc.setDrawColor(225, 228, 226)
+      doc.setLineWidth(0.3)
+      doc.roundedRect(p.x, partyBoxY, partyBoxW, partyBoxH, 1.5, 1.5)
+      doc.setFontSize(7.5)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(120, 128, 124)
+      doc.text(p.label, p.x + 4, partyBoxY + 6.5)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(22, 39, 35)
+      doc.text(fitPartyText(p.name, partyBoxW - 8, 10.5), p.x + 4, partyBoxY + 14)
+      if (p.phone) {
+        doc.setFontSize(8)
+        doc.setFont('helvetica', 'normal')
+        doc.setTextColor(100, 100, 100)
+        doc.text(p.phone, p.x + 4, partyBoxY + 20)
+      }
+    })
+
     // Grid details
-    const labelY = 73, rowH = 15
-    const sentTo = formatName(tx.sender?.name) || formatName(tx.recipient?.name) || 'Internal Treasury'
-    const counterpartyPhone = formatPhoneOrDash(tx.sender?.id || tx.recipient?.id)
+    const labelY = partyBoxY + partyBoxH + 12, rowH = 15
 
     // Column 1
     doc.setFontSize(9)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(100, 100, 100)
     doc.text('DATE & TIME', 20, labelY)
-    doc.text('SENT TO', 20, labelY + rowH)
-    doc.text('PHONE NUMBER', 20, labelY + rowH * 2)
-    doc.text('PAYMENT TYPE', 20, labelY + rowH * 3)
-    doc.text('STATUS', 20, labelY + rowH * 4)
+    doc.text('PAYMENT TYPE', 20, labelY + rowH)
+    doc.text('STATUS', 20, labelY + rowH * 2)
 
     doc.setFontSize(11)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(22, 39, 35)
     doc.text(formatDateISO(tx.createdAt || tx.timestamp), 20, labelY + 7)
-    doc.text(sentTo, 20, labelY + rowH + 7)
-    doc.text(counterpartyPhone, 20, labelY + rowH * 2 + 7)
-    doc.text(tx.type.replace('_', ' ').toUpperCase(), 20, labelY + rowH * 3 + 7)
-    doc.text(tx.status.toUpperCase(), 20, labelY + rowH * 4 + 7)
+    doc.text(tx.type.replace('_', ' ').toUpperCase(), 20, labelY + rowH + 7)
+    doc.text(tx.status.toUpperCase(), 20, labelY + rowH * 2 + 7)
 
     // Column 2 - Amount Focus
     doc.setFontSize(9)
@@ -541,7 +571,7 @@ export default function Transactions() {
       : formatKES(tx.amount || tx.kesAmount || 0)
     doc.text(amountStr, 85, labelY + 10)
 
-    const gridBottom = labelY + rowH * 4 + 7
+    const gridBottom = labelY + rowH * 2 + 7
     doc.setDrawColor(230, 230, 230)
     doc.line(20, gridBottom + 6, pageWidth - 20, gridBottom + 6)
 
@@ -748,46 +778,45 @@ export default function Transactions() {
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-[#0A2540] border-b border-white/10 transition-colors shadow-lg">
-                      <th className="px-6 py-3 text-[11px] font-bold text-blue-100 uppercase tracking-[0.2em] opacity-60">Date/Time</th>
-                      <th className="px-6 py-3 text-[11px] font-bold text-blue-100 uppercase tracking-[0.2em] opacity-60">Type</th>
-                      <th className="px-6 py-3 text-[11px] font-bold text-blue-100 uppercase tracking-[0.2em] opacity-60">Party</th>
-                      <th className="px-6 py-3 text-[11px] font-bold text-blue-100 uppercase tracking-[0.2em] opacity-60">Amount</th>
-                      <th className="px-6 py-3 text-[11px] font-bold text-blue-100 uppercase tracking-[0.2em] opacity-60">Status</th>
+                      <th className="px-5 py-2 text-[10px] font-bold text-blue-100 uppercase tracking-[0.2em] opacity-60">Date/Time</th>
+                      <th className="px-5 py-2 text-[10px] font-bold text-blue-100 uppercase tracking-[0.2em] opacity-60">Type</th>
+                      <th className="px-5 py-2 text-[10px] font-bold text-blue-100 uppercase tracking-[0.2em] opacity-60">Party</th>
+                      <th className="px-5 py-2 text-[10px] font-bold text-blue-100 uppercase tracking-[0.2em] opacity-60">Amount</th>
+                      <th className="px-5 py-2 text-[10px] font-bold text-blue-100 uppercase tracking-[0.2em] opacity-60">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-surface-container text-on-surface">
                     {paginatedRows.map((tx) => (
-                      <tr 
-                        key={tx.id} 
+                      <tr
+                        key={tx.id}
                         onClick={() => setSelectedTx(tx)}
                         className={`hover:bg-surface-container-low transition-colors cursor-pointer group ${
                           selectedTx?.id === tx.id ? 'bg-surface-container-low/50' : 'bg-white'
                         }`}
                       >
-                        <td className="px-6 py-2">
-                          <p className="text-[13px] font-semibold text-primary leading-tight">{formatTxDate(tx.createdAt || tx.timestamp)}</p>
-                          <p className="text-[10px] text-on-surface-variant leading-tight tabular-nums">{formatTxTime(tx.createdAt || tx.timestamp)}</p>
+                        <td className="px-5 py-1.5">
+                          <p className="text-[11px] font-semibold text-primary leading-tight tabular-nums">{formatTxDate(tx.createdAt || tx.timestamp)} · {formatTxTime(tx.createdAt || tx.timestamp)}</p>
                         </td>
-                        <td className="px-6 py-2">
-                          <span className={`px-2 py-1 text-[9px] font-bold rounded-full uppercase tracking-tighter ${txColor(tx.type)}`}>
+                        <td className="px-5 py-1.5">
+                          <span className={`px-1.5 py-0.5 text-[8px] font-bold rounded-full uppercase tracking-tighter ${txColor(tx.type)}`}>
                             {txLabel(tx.type)}
                           </span>
                         </td>
-                        <td className="px-6 py-2">
-                          <p className="text-[13px] font-semibold text-primary leading-tight">{formatName(tx.sender?.name) || formatName(tx.recipient?.name) || 'PayChain'}</p>
-                          <p className="text-[10px] font-mono text-on-surface-variant group-hover:text-primary transition-colors leading-tight tabular-nums">
-                            {[formatPhoneDisplay(tx.sender?.id || tx.recipient?.id), tx.reference].filter(Boolean).join(' · ')}
+                        <td className="px-5 py-1.5">
+                          <p className="text-[12px] font-semibold text-primary leading-tight">{formatName(getCounterparty(tx)?.name) || 'PayChain'}</p>
+                          <p className="text-[9px] font-mono text-on-surface-variant group-hover:text-primary transition-colors leading-tight tabular-nums">
+                            {[formatPhoneDisplay(getCounterparty(tx)?.id), tx.reference].filter(Boolean).join(' · ')}
                           </p>
                         </td>
-                        <td className="px-6 py-2">
-                          <p className={`text-[13px] font-bold tabular-nums transition-all duration-300 ${txAmountColor(tx)}`}>
+                        <td className="px-5 py-1.5">
+                          <p className={`text-[12px] font-bold tabular-nums transition-all duration-300 ${txAmountColor(tx)}`}>
                             {txSign(tx)}{txAmount(tx)}
                           </p>
                         </td>
-                        <td className="px-6 py-2">
+                        <td className="px-5 py-1.5">
                           <div className="flex items-center gap-1.5">
                             <div className={`w-1.5 h-1.5 rounded-full ${txStatusMeta(tx.status).dot}`}></div>
-                            <span className={`text-[11px] font-semibold capitalize ${tx.status === 'failed' ? txStatusMeta(tx.status).text : ''}`}>{tx.status === 'failed' ? 'Failed & Refunded' : tx.status}</span>
+                            <span className={`text-[10px] font-semibold capitalize ${tx.status === 'failed' ? txStatusMeta(tx.status).text : ''}`}>{tx.status === 'failed' ? 'Failed & Refunded' : tx.status}</span>
                           </div>
                         </td>
                       </tr>
@@ -797,50 +826,42 @@ export default function Transactions() {
               </div>
             </div>
 
-            {/* Mobile Cards View - Vertical Info Sheet Layout */}
-            <div className="lg:hidden divide-y divide-outline-variant/10 border-t border-b border-outline-variant/20">
+            {/* Mobile Cards View - Compact Row Layout */}
+            <div className="lg:hidden flex flex-col gap-1.5">
               {paginatedRows.map((tx) => (
-                <div 
-                  key={tx.id} 
+                <div
+                  key={tx.id}
                   onClick={() => setSelectedTx(tx)}
-                  className={`bg-white p-4 transition-all active:bg-surface-container-low flex flex-col gap-1 ${
+                  className={`bg-white rounded-xl border border-outline-variant/10 shadow-sm px-3 py-2 transition-all active:bg-surface-container-low flex flex-col gap-0.5 ${
                     selectedTx?.id === tx.id ? 'bg-surface-container-low/50 ring-2 ring-inset ring-primary/20' : ''
                   }`}
                 >
-                  {/* Date/Time */}
-                  <p className="text-[10px] text-on-surface-variant/40 font-bold uppercase tracking-[0.2em]">
-                    {formatTxDate(tx.createdAt || tx.timestamp)}
-                  </p>
-                  <p className="text-[9px] text-on-surface-variant/30 font-bold uppercase tracking-widest -mt-1 mb-2 tabular-nums">
-                    {formatTxTime(tx.createdAt || tx.timestamp)}
-                  </p>
-
-                  {/* Type Badge */}
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className={`text-[8px] font-black px-1.5 py-0.5 uppercase tracking-tighter rounded ${txColor(tx.type)}`}>
+                  {/* Type Badge & Date/Time */}
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className={`text-[7px] font-black px-1.5 py-0.5 uppercase tracking-tighter rounded ${txColor(tx.type)}`}>
                       {txLabel(tx.type)}
                     </span>
+                    <p className="text-[8px] text-on-surface-variant/40 font-bold uppercase tracking-widest tabular-nums">
+                      {formatTxDate(tx.createdAt || tx.timestamp)} · {formatTxTime(tx.createdAt || tx.timestamp)}
+                    </p>
                   </div>
 
                   {/* Party & Reference */}
-                  <p className="text-base font-bold text-primary leading-tight">
-                    {formatName(tx.sender?.name) || formatName(tx.recipient?.name) || 'PayChain'}
+                  <p className="text-xs font-bold text-primary leading-tight">
+                    {formatName(getCounterparty(tx)?.name) || 'PayChain'}
                   </p>
-                  <p className="text-[10px] text-on-surface-variant/40 font-mono tracking-tight mb-2 tabular-nums">
-                    {[formatPhoneDisplay(tx.sender?.id || tx.recipient?.id), tx.reference].filter(Boolean).join(' · ')}
-                  </p>
-
-                  {/* Amount */}
-                  <p className={`text-xl font-headline tracking-tighter tabular-nums ${txAmountColor(tx)}`}>
-                    {txSign(tx)}{txAmount(tx)}
+                  <p className="text-[8px] text-on-surface-variant/40 font-mono tracking-tight tabular-nums">
+                    {[formatPhoneDisplay(getCounterparty(tx)?.id), tx.reference].filter(Boolean).join(' · ')}
                   </p>
 
-                  {/* Status */}
-                  <div className="flex items-center justify-between mt-2 pt-2 border-t border-outline-variant/5">
-                    <span className={`text-[9px] font-black uppercase tracking-[0.3em] ${txStatusMeta(tx.status).text}`}>
+                  {/* Amount & Status */}
+                  <div className="flex items-center justify-between mt-1 pt-1 border-t border-outline-variant/5">
+                    <span className={`text-[8px] font-black uppercase tracking-[0.2em] ${txStatusMeta(tx.status).text}`}>
                       {tx.status === 'failed' ? 'Failed & Refunded' : tx.status}
                     </span>
-                    <span className="material-symbols-outlined text-primary/20 text-lg">arrow_forward</span>
+                    <p className={`text-sm font-headline tracking-tighter tabular-nums ${txAmountColor(tx)}`}>
+                      {txSign(tx)}{txAmount(tx)}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -939,8 +960,8 @@ export default function Transactions() {
                   <div className="space-y-3 pt-6 border-t border-outline-variant/5">
                     <p className="text-[10px] text-on-surface-variant/60 font-bold uppercase tracking-[0.2em]">Counterparty</p>
                     <div>
-                      <p className="text-lg font-bold text-primary">{formatName(selectedTx.sender?.name) || formatName(selectedTx.recipient?.name) || 'Internal Treasury'}</p>
-                      <p className="text-[10px] text-on-surface-variant/40 font-bold mt-1 uppercase tracking-widest">{formatPhoneDisplay(selectedTx.sender?.id || selectedTx.recipient?.id) || 'SYSTEM'}</p>
+                      <p className="text-lg font-bold text-primary">{formatName(getCounterparty(selectedTx)?.name) || 'Internal Treasury'}</p>
+                      <p className="text-[10px] text-on-surface-variant/40 font-bold mt-1 uppercase tracking-widest">{formatPhoneDisplay(getCounterparty(selectedTx)?.id) || 'SYSTEM'}</p>
                     </div>
                   </div>
 

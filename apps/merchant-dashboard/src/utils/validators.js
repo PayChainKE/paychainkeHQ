@@ -21,7 +21,7 @@ export const formatters = {
     return d.slice(0, 12);
   },
   kraPin:       (raw) => raw.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 11),
-  nationalId:   (raw) => raw.replace(/\D/g, '').slice(0, 8),
+  nationalId:   (raw) => raw.replace(/\D/g, '').slice(0, 9),
   paybill:      (raw) => raw.replace(/\D/g, '').slice(0, 7),
   till:         (raw) => raw.replace(/\D/g, '').slice(0, 7),
   bankAccount:  (raw) => raw.replace(/\D/g, '').slice(0, 16),
@@ -69,7 +69,7 @@ export const validators = {
   },
   nationalId: (v) => {
     if (!v) return { valid: false, error: 'National ID is required.' };
-    if (!/^\d{7,8}$/.test(v)) return { valid: false, error: 'ID must be 7 or 8 digits.' };
+    if (!/^\d{7,9}$/.test(v)) return { valid: false, error: 'ID must be 7-9 digits.' };
     return VALID;
   },
   paybill: (v) => {

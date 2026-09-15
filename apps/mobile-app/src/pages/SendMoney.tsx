@@ -8,6 +8,8 @@ import TopBar from '../components/layout/TopBar';
 import api from '../api/config';
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay';
 import TransactionSuccessCard, { PayeeDraft } from '../components/ui/TransactionSuccessCard';
+import { hapticSuccess, hapticError } from '../utils/haptics';
+import FadeSlideIn from '../components/ui/FadeSlideIn';
 
 // 4-dot loading indicator for the CTA button — a plain spinner read as "stuck"
 // to merchants during the PIN-verify + transfer round trip; this staggered
@@ -113,83 +115,6 @@ const DESTINATIONS: Array<{ id: Destination; label: string; icon: keyof typeof M
   { id: 'paybill', label: 'Paybill', icon: 'receipt-long', hint: 'Pay to a Paybill number', feeLabel: 'Varies', betaOnly: true },
 ];
 
-// Mirrors merchant-dashboard's SendMoney.jsx and backend/config/lipaNaMpesaTariffCard.js's
-// LIPA_NA_MPESA_B2B_BANDS (2026-08-12 tiered schedule) — recomputed server-side in
-// mpesaController.js#initiateB2B via getLipaNaMpesaTariff regardless of what this
-// estimate shows. This used to be a flat KES 30 mirroring the now-removed
-// NCBA_LIPA_NA_MPESA_FLAT_FEE_KES; the estimate was never updated when the backend
-// moved to this tiered table, so it was showing KES 30 for transfers (e.g. KES 50)
-// that actually cost KES 0.
-const B2B_TARIFF_BANDS: Array<{ max: number; totalFee: number }> = [
-  { max: 100,      totalFee: 0   },
-  { max: 500,      totalFee: 10  },
-  { max: 1_000,    totalFee: 15  },
-  { max: 2_500,    totalFee: 23  },
-  { max: 5_000,    totalFee: 27  },
-  { max: 10_000,   totalFee: 35  },
-  { max: 20_000,   totalFee: 57  },
-  { max: 30_000,   totalFee: 64  },
-  { max: 40_000,   totalFee: 72  },
-  { max: 50_000,   totalFee: 79  },
-  { max: 100_000,  totalFee: 86  },
-  { max: 150_000,  totalFee: 104 },
-  { max: 200_000,  totalFee: 122 },
-  { max: 250_000,  totalFee: 140 },
-];
-function estimateB2bFee(amount: number) {
-  if (!amount || amount <= 0) return 0;
-  const band = B2B_TARIFF_BANDS.find((b) => amount <= b.max) || B2B_TARIFF_BANDS[B2B_TARIFF_BANDS.length - 1];
-  return band.totalFee;
-}
-
-// Mirrors backend/config/mpesaB2cTariffCard.js's combined
-// B2C_REGISTERED_USER_BANDS (Safaricom's real cost) + B2C_SERVICE_FEE_BANDS
-// (PayChain's own tiered markup, 2026-08-12) — getB2cTariff sums both
-// server-side. This used to add a flat KES 10 PayChain markup, which the
-// backend replaced with a tiered schedule (KES 0-200 depending on amount);
-// the estimate was never updated to match, so it understated the real
-// charge at every amount above the lowest band.
-const B2C_TARIFF_BANDS: Array<{ max: number; totalFee: number }> = [
-  { max: 49,      totalFee: 0   },
-  { max: 100,     totalFee: 5   },
-  { max: 500,     totalFee: 11  },
-  { max: 1_000,   totalFee: 17  },
-  { max: 1_500,   totalFee: 24  },
-  { max: 2_500,   totalFee: 29  },
-  { max: 3_500,   totalFee: 34  },
-  { max: 5_000,   totalFee: 37  },
-  { max: 7_500,   totalFee: 57  },
-  { max: 10_000,  totalFee: 67  },
-  { max: 20_000,  totalFee: 84  },
-  { max: 50_000,  totalFee: 113 },
-  { max: 100_000, totalFee: 163 },
-  { max: 250_000, totalFee: 213 },
-];
-function estimateB2cFee(amount: number) {
-  if (!amount || amount <= 0) return 0;
-  const band = B2C_TARIFF_BANDS.find((b) => amount <= b.max) || B2C_TARIFF_BANDS[B2C_TARIFF_BANDS.length - 1];
-  return band.totalFee;
-}
-
-// Mirrors backend/config/bankTransferTariffCard.js — see dashboard
-// SendMoney.jsx's equivalent comment for why a flat KES 50 was wrong (real
-// PesaLink tiers run up to KES 210, RTGS is a flat KES 400).
-const PESALINK_BANDS = [
-  { max: 500,      totalFee: 50  },
-  { max: 3_500,    totalFee: 70  },
-  { max: 7_000,    totalFee: 88  },
-  { max: 10_000,   totalFee: 100 },
-  { max: 250_000,  totalFee: 210 },
-];
-const RTGS_TOTAL_FEE = 400;
-
-function estimateBankFee(rail: 'pesalink' | 'rtgs', amount: number) {
-  if (rail === 'rtgs') return RTGS_TOTAL_FEE;
-  if (!amount || amount <= 0) return 0;
-  const band = PESALINK_BANDS.find((b) => amount <= b.max) || PESALINK_BANDS[PESALINK_BANDS.length - 1];
-  return band.totalFee;
-}
-
 export default function SendMoney({ navigation }: any) {
   const { merchant, refreshSession, setAppPin } = useAuth();
 
@@ -244,20 +169,17 @@ export default function SendMoney({ navigation }: any) {
   const selectedDest = DESTINATIONS.find((d) => d.id === destination);
   const isMobileDest = destination === 'mpesa-primary' || destination === 'mobile';
   const isB2bDest = destination === 'till' || destination === 'paybill';
-  // Instant client-side estimate — shown only while the live fee below is
-  // still loading (or if that request fails), never used to actually gate
-  // Confirm. See SendMoney.jsx's identical clientEstimate for the full
-  // history: this hardcoded table is exactly what caused the original
-  // "UI shows KES 5, backend charges KES 10" bug, since it has no way to
-  // reflect an admin tariff change. `liveFee` below fixes it structurally —
-  // mobile shared the same bug as web until this was ported over.
-  const clientEstimate = isMobileDest ? estimateB2cFee(Number(amount) || 0) : isB2bDest ? estimateB2bFee(Number(amount) || 0) : destination === 'bank' ? estimateBankFee(bankRail, Number(amount) || 0) : 0;
-
   // Live fee, fetched from the same tariff functions/per-merchant lock the
   // backend uses to actually charge (GET /api/transactions/fee-preview) —
   // null until a successful response comes back for the CURRENT amount/
   // destination/rail, so canContinue() below can block Confirm on it rather
-  // than ever letting the merchant authorize against a guess.
+  // than ever letting the merchant authorize against a guess. A hardcoded
+  // client-side estimate table used to be shown here first and swapped for
+  // this once it resolved — that table had no way to reflect an admin
+  // tariff change and had gone stale multiple times, so a merchant would
+  // see one fee then watch it change to a different one a moment later.
+  // Every fee display below now waits for this instead — nothing shown at
+  // all until the real figure is in, never a guess.
   const [liveFee, setLiveFee] = useState<number | null>(null);
   const [feeLoading, setFeeLoading] = useState(false);
   const [feeRetryToken, setFeeRetryToken] = useState(0);
@@ -277,7 +199,7 @@ export default function SendMoney({ navigation }: any) {
         });
         if (!cancelled) setLiveFee(Number(data?.totalFee) || 0);
       } catch {
-        if (!cancelled) setLiveFee(null); // canContinue() keeps Confirm blocked; clientEstimate still shows on screen
+        if (!cancelled) setLiveFee(null); // canContinue() keeps Confirm blocked; fee displays fall back to a "could not verify" state
       } finally {
         if (!cancelled) setFeeLoading(false);
       }
@@ -286,8 +208,7 @@ export default function SendMoney({ navigation }: any) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [destination, bankRail, amount, feeRetryToken]);
 
-  const fee = liveFee != null ? liveFee : clientEstimate;
-  const totalAmount = Number(amount || 0) + fee;
+  const totalAmount = Number(amount || 0) + (liveFee ?? 0);
   // availableBalance (kesBalance minus anything credited in the last 2
   // minutes and still held server-side — see
   // backend/utils/availableBalance.js) is what the backend will actually
@@ -365,6 +286,7 @@ export default function SendMoney({ navigation }: any) {
           await api.post('/api/auth/merchant/verify-payment-pin', { pin });
         } catch (pinErr: any) {
           if (pinErr?.response?.status === 401) {
+            hapticError();
             setPinError('Incorrect PIN. Please try again.');
             setPin('');
             return;
@@ -380,7 +302,6 @@ export default function SendMoney({ navigation }: any) {
               phone: recipientAccount,
               amount: Number(amount),
               destination: selectedDest?.label,
-              fee,
               reference,
               pin,
               provider,
@@ -431,7 +352,9 @@ export default function SendMoney({ navigation }: any) {
         await refreshSession();
         setCompletedTx(tx);
         setSuccess(true);
+        hapticSuccess();
       } catch (e: any) {
+        hapticError();
         const msg = e?.response?.data?.error || 'Transfer failed. Please try again.';
         Alert.alert('Transfer Failed', msg);
         setPinError(msg);
@@ -524,6 +447,7 @@ export default function SendMoney({ navigation }: any) {
     <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
       <TopBar title="Send Money" subtitle="Secured with your PayChain payment PIN" onBack={goBack} />
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 140 }}>
+        <FadeSlideIn>
         <View className="w-full max-w-lg mx-auto px-6 pt-6">
 
           {/* Step 1 — Destination */}
@@ -750,12 +674,18 @@ export default function SendMoney({ navigation }: any) {
                   {Number(amount) < 50 ? 'Amount must be at least KES 50' : 'Amount cannot exceed KES 250,000 per transaction'}
                 </Text>
               )}
-              {Number(amount) > 0 && fee > 0 && (
+              {Number(amount) > 0 && liveFee != null && liveFee > 0 && (
                 <Text className="text-[11px] font-jakarta-bold mt-2 text-[#5b645c]">
-                  Transaction cost: {formatKES(fee)}
+                  Transaction cost: {formatKES(liveFee)}
                 </Text>
               )}
-              {Number(amount) > 0 && (
+              {Number(amount) > 0 && liveFee == null && (
+                <View className="flex-row items-center gap-1.5 mt-2">
+                  <Feather name="loader" size={11} color="#a1a1aa" />
+                  <Text className="text-[11px] font-jakarta-bold text-[#5b645c]">Checking transaction cost…</Text>
+                </View>
+              )}
+              {Number(amount) > 0 && liveFee != null && (
                 <Text className={`text-[11px] font-jakarta-bold mt-2 mb-1 ${totalAmount > balance ? 'text-red-500' : 'text-[#006c4e]'}`}>
                   Total deduction: {formatKES(totalAmount)}{totalAmount > balance ? ' — exceeds balance' : ''}
                 </Text>
@@ -835,7 +765,7 @@ export default function SendMoney({ navigation }: any) {
                   ['Recipient', formatPhoneDisplay(recipientAccount)],
                   ...(isB2bDest && paybillAccountRef ? [['Account Number', paybillAccountRef]] : []),
                   ['Amount', formatKES(Number(amount) || 0)],
-                  ...(fee > 0 ? [['Transaction Cost', formatKES(fee)]] : []),
+                  ...(liveFee != null && liveFee > 0 ? [['Transaction Cost', formatKES(liveFee)]] : []),
                   ...(reference ? [['Reference', reference]] : []),
                 ] as [string, string][]).map(([k, v]) => (
                   <View key={k} className="flex-row justify-between items-start gap-4 px-5 py-3 border-b border-[#eff4ef]">
@@ -845,7 +775,7 @@ export default function SendMoney({ navigation }: any) {
                 ))}
                 <View className="flex-row justify-between items-center px-5 py-4 bg-[#e7f8ef]">
                   <Text className="text-[11px] font-jakarta-extrabold text-[#006c4e] uppercase tracking-wider flex-shrink-0">Total Deducted</Text>
-                  <Text className="text-[20px] font-jakarta-extrabold text-[#00351d] flex-1 min-w-0 text-right pl-2" numberOfLines={1} ellipsizeMode="tail">{formatKES(totalAmount)}</Text>
+                  <Text className="text-[20px] font-jakarta-extrabold text-[#00351d] flex-1 min-w-0 text-right pl-2" numberOfLines={1} ellipsizeMode="tail">{liveFee != null ? formatKES(totalAmount) : '—'}</Text>
                 </View>
               </View>
 
@@ -935,6 +865,7 @@ export default function SendMoney({ navigation }: any) {
             </View>
           )}
         </View>
+        </FadeSlideIn>
       </ScrollView>
 
       {/* CTA — hidden once the confirm step is locked; the status card

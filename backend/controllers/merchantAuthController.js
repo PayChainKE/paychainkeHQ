@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { serverError } from '../utils/serverError.js';
 import Merchant from '../models/Merchant.js';
 import AuditLog from '../models/AuditLog.js';
+import PhoneVerification from '../models/PhoneVerification.js';
 import { sendOTP, sendWelcomeEmail, sendPasswordResetConfirmation } from '../utils/resend.js';
 import { logAudit } from '../utils/auditLog.js';
 import generateToken from '../utils/generateToken.js';
@@ -10,7 +11,7 @@ import { encryptKey } from '../utils/cryptoHelper.js';
 import bcrypt from 'bcryptjs';
 import { createNotification } from './notificationController.js';
 import { getNcbaVirtualAccountNumber, formatAccountNumberDisplay, validatePhoneNumber, isValidPhoneInputFormat, NcbaValidationError } from '../utils/ncbaValidators.js';
-import { buildMerchantWelcomeSms } from '../utils/accountSmsTemplates.js';
+import { buildMerchantWelcomeSms, buildSignupPhoneOtpSms } from '../utils/accountSmsTemplates.js';
 import { isValidEmail, EMAIL_FORMAT_HINT } from '../utils/emailValidator.js';
 import { toE164Kenyan } from '../utils/notificationService.js';
 import { safeSendSMS } from '../utils/smsSanitizer.js';
@@ -97,14 +98,126 @@ function resolveDocTypes(type, uploadedDocsByType) {
 // merchant's email.
 const APP_REVIEW_BYPASS_EMAIL = (process.env.APP_REVIEW_BYPASS_EMAIL || '').trim().toLowerCase();
 
+// @desc    Send an SMS OTP to a phone number before it's ever attached to a
+//          Merchant document — the signup wizard's own gate proving the
+//          applicant controls the number they typed before they can reach
+//          the final "Submit Application" step. See
+//          models/PhoneVerification.js for why this is its own collection
+//          rather than piggybacking on Merchant.otp.
+// @route   POST /api/auth/merchant/signup/send-otp
+// @access  Public
+export const sendSignupPhoneOtp = async (req, res) => {
+  try {
+    const rawPhone = String(req.body?.phone || '').replace(/\s+/g, '');
+    if (!isValidPhoneInputFormat(rawPhone)) {
+      return res.status(400).json({ error: 'Enter a valid Kenyan mobile number starting with +254, 07, or 01 (e.g. 0712 345 678).' });
+    }
+    const phone = toE164Kenyan(rawPhone);
+    if (!phone) {
+      return res.status(400).json({ error: 'Enter a valid Kenyan mobile number starting with +254, 07, or 01 (e.g. 0712 345 678).' });
+    }
+
+    let record = await PhoneVerification.findOne({ phone });
+    if (record) {
+      try {
+        await assertOtpNotLocked(PhoneVerification, record._id);
+      } catch (e) {
+        if (e instanceof OtpLockedError) return res.status(429).json({ error: e.message });
+        throw e;
+      }
+    }
+
+    const otp = crypto.randomInt(100000, 1000000).toString();
+    const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+
+    // Reusing an existing record (rather than always creating a fresh one)
+    // keeps failedOtpAttempts/otpLockedUntil intact across a "resend" —
+    // resending must never be a way to quietly reset a lockout clock.
+    if (record) {
+      record.otp = otp;
+      record.otpExpires = otpExpires;
+      record.verified = false;
+      record.verifiedToken = null;
+      record.verifiedTokenExpires = null;
+      await record.save();
+    } else {
+      record = await PhoneVerification.create({ phone, otp, otpExpires });
+    }
+
+    const result = await safeSendSMS({ to: phone, message: buildSignupPhoneOtpSms({ otp }).message });
+    if (!result.success) {
+      console.error(`📱 SMS Error: Failed to send signup verification code to ${phone}:`, result.error);
+      return res.status(502).json({ error: 'Could not send a verification code right now. Please try again in a moment.' });
+    }
+
+    res.json({ success: true, maskedPhone: maskPhone(phone) });
+  } catch (error) {
+    serverError(res, 500, 'Server Error', error, 'Send Signup Phone OTP Error:');
+  }
+};
+
+// @desc    Verify a signup phone OTP and issue a short-lived, single-use
+//          token — presented back with the final registerMerchant
+//          submission as proof this specific phone number was actually
+//          verified. Checking a bearer token here (rather than just a
+//          `verified` boolean re-read by registerMerchant) means editing
+//          the phone number after verifying can't silently ride on an
+//          earlier, different number's verified state.
+// @route   POST /api/auth/merchant/signup/verify-otp
+// @access  Public
+export const verifySignupPhoneOtp = async (req, res) => {
+  try {
+    const rawPhone = String(req.body?.phone || '').replace(/\s+/g, '');
+    const phone = toE164Kenyan(rawPhone);
+    const otp = String(req.body?.otp || '');
+    if (!phone || !otp) {
+      return res.status(400).json({ error: 'Enter the 6-digit code sent to your phone.' });
+    }
+
+    const record = await PhoneVerification.findOne({ phone }).select('+otp +otpExpires');
+    if (!record) {
+      return res.status(400).json({ error: 'Request a new verification code.' });
+    }
+
+    try {
+      await assertOtpNotLocked(PhoneVerification, record._id);
+    } catch (e) {
+      if (e instanceof OtpLockedError) return res.status(429).json({ error: e.message });
+      throw e;
+    }
+
+    if (!record.otp || !timingSafeStringEqual(record.otp, otp)) {
+      await recordFailedOtpAttempt(PhoneVerification, record._id);
+      return res.status(401).json({ error: 'Incorrect code.' });
+    }
+    if (!record.otpExpires || new Date() > record.otpExpires) {
+      return res.status(401).json({ error: 'That code has expired. Request a new one.' });
+    }
+
+    const verifiedToken = crypto.randomBytes(32).toString('hex');
+    record.otp = null;
+    record.otpExpires = null;
+    record.verified = true;
+    record.verifiedToken = verifiedToken;
+    record.verifiedTokenExpires = new Date(Date.now() + 30 * 60 * 1000);
+    await record.save();
+    await resetOtpAttempts(PhoneVerification, record._id);
+
+    res.json({ success: true, phoneVerificationToken: verifiedToken });
+  } catch (error) {
+    serverError(res, 500, 'Server Error', error, 'Verify Signup Phone OTP Error:');
+  }
+};
+
 // @desc    Register a new merchant
 // @route   POST /api/auth/merchant/register
 // @access  Public
 export const registerMerchant = async (req, res) => {
   try {
     let {
-      firstName, surname, otherNames, email, phone, businessName, password, registrationSource, kraPin, businessNumber,
+      firstName, surname, otherNames, email, phone, businessName, registrationSource, kraPin, businessNumber,
       businessType, county, area, ward, street, employees, ecommerce, agreedToTerms, documentType, nationalId,
+      phoneVerificationToken,
     } = req.body || {};
 
     // Two request shapes can hit this same endpoint: the current
@@ -143,8 +256,8 @@ export const registerMerchant = async (req, res) => {
       : ecommerce === false || ecommerce === 'no' ? false
       : null;
 
-    if (!firstName?.trim() || !surname?.trim() || !email || !phone || !businessName?.trim() || !password) {
-      return res.status(400).json({ error: 'First name, surname, email, phone, business name and password are all required.' });
+    if (!firstName?.trim() || !surname?.trim() || !email || !phone || !businessName?.trim()) {
+      return res.status(400).json({ error: 'First name, surname, email, phone and business name are all required.' });
     }
 
     // Other Names is the one optional part — `name` (still the single
@@ -174,6 +287,29 @@ export const registerMerchant = async (req, res) => {
         return res.status(400).json({ error: 'Enter a valid Kenyan mobile number (e.g. 0712 345 678).' });
       }
       throw e;
+    }
+
+    // Confirms the applicant actually controls this phone number — checked
+    // against the PhoneVerification record the signup wizard's own OTP step
+    // (sendSignupPhoneOtp/verifySignupPhoneOtp above) created, not
+    // re-verified here. A verification is single-use and phone-specific:
+    // changing the phone number after verifying, or reusing an old token
+    // against a new number, both fail this exactly like never verifying at
+    // all — see verifySignupPhoneOtp's own comment on why a bearer token is
+    // checked rather than just a `verified` boolean.
+    const e164Phone = toE164Kenyan(phone);
+    const phoneVerification = e164Phone
+      ? await PhoneVerification.findOne({ phone: e164Phone, verified: true }).select('+verifiedToken +verifiedTokenExpires')
+      : null;
+    if (
+      !phoneVerification ||
+      !phoneVerification.verifiedToken ||
+      !phoneVerificationToken ||
+      !timingSafeStringEqual(phoneVerification.verifiedToken, String(phoneVerificationToken)) ||
+      !phoneVerification.verifiedTokenExpires ||
+      phoneVerification.verifiedTokenExpires < new Date()
+    ) {
+      return res.status(400).json({ error: 'Please verify your phone number again before submitting.' });
     }
 
     if (!businessType || !BUSINESS_TYPES.includes(businessType)) {
@@ -296,17 +432,30 @@ export const registerMerchant = async (req, res) => {
     })();
     const phoneVars = Array.from(new Set([phone, phoneBase, `0${phoneBase}`, `254${phoneBase}`, `+254${phoneBase}`]));
 
-    const NO_PASSWORD_MSG = 'An account with these details already exists but has no password set. Use "Reset Password" to create one and gain access.';
+    // A password-less existing account can mean one of two very different
+    // things now that self-serve signups are also password-less pending
+    // approval: a genuinely admin-onboarded merchant who was never invited
+    // (the original case "Reset Password" actually solves), or a duplicate
+    // signup attempt on an application that's simply still pending/under
+    // revision/rejected — for which "Reset Password" would be misleading,
+    // since the kybStatus gate in loginMerchant blocks them regardless of
+    // whether they have a password.
+    const noPasswordMessage = (existing) => {
+      if (existing.kybStatus === 'pending') return 'You already have an application under review with these details. We’ll text and email you once it’s approved.';
+      if (existing.kybStatus === 'requires_revision') return 'Your existing application needs a few things fixed — check your email for the resubmission link.';
+      if (existing.kybStatus === 'rejected') return 'An application with these details was already reviewed and not approved. Contact support@paychain.co.ke if you have questions.';
+      return 'An account with these details already exists but has no password set. Use "Reset Password" to create one and gain access.';
+    };
 
-    const existingByEmail = await Merchant.findOne({ email }).select('+password');
+    const existingByEmail = await Merchant.findOne({ email }).select('+password kybStatus');
     if (existingByEmail) {
-      const msg = !existingByEmail.password ? NO_PASSWORD_MSG : 'A merchant with that email already exists.';
+      const msg = !existingByEmail.password ? noPasswordMessage(existingByEmail) : 'A merchant with that email already exists.';
       return res.status(400).json({ error: msg });
     }
 
-    const existingByPhone = await Merchant.findOne({ phone: { $in: phoneVars } }).select('+password');
+    const existingByPhone = await Merchant.findOne({ phone: { $in: phoneVars } }).select('+password kybStatus');
     if (existingByPhone) {
-      const msg = !existingByPhone.password ? NO_PASSWORD_MSG : 'A merchant with that phone number already exists.';
+      const msg = !existingByPhone.password ? noPasswordMessage(existingByPhone) : 'A merchant with that phone number already exists.';
       return res.status(400).json({ error: msg });
     }
 
@@ -358,7 +507,6 @@ export const registerMerchant = async (req, res) => {
       kraPin: kraPin || null,
       businessNumber: businessNumber || null,
       nationalId: nationalId || null,
-      password,
       certificateUrl,
       certificateDocumentType: legacyCertFile ? documentType : null,
       kybDocuments,
@@ -367,6 +515,14 @@ export const registerMerchant = async (req, res) => {
       kesBalance: 0,
       usdcBalance: 0,
       isVerified: true,
+      // No default anywhere else in the codebase sets this for self-serve —
+      // explicitly pending here is what makes the application immediately
+      // show up as a normal, decidable row in the KYC Verification queue
+      // (apps/admin/src/pages/KycVerification.jsx), gated behind admin/
+      // officer approval before the account can log in at all (see
+      // loginMerchant below). Every merchant created before this change has
+      // no kybStatus at all and is completely unaffected.
+      kybStatus: 'pending',
       registrationSource: registrationSource === 'mobile' ? 'mobile' : 'web',
       businessType,
       county,
@@ -387,6 +543,13 @@ export const registerMerchant = async (req, res) => {
       // Brandon, 2026-09-03).
     });
 
+    // Consume the phone verification now that it's actually been used —
+    // the duplicate-phone check above already stops a second Merchant from
+    // being created against the same number, but this closes the record
+    // out cleanly rather than leaving a spent, still-live token sitting
+    // around until its own TTL expiry.
+    PhoneVerification.deleteOne({ _id: phoneVerification._id }).catch(() => {});
+
     // Free-list name screening (OFAC/UN) — flags for manual review only,
     // never blocks signup (see services/sanctionsListCache.js). Fire-and-
     // forget: matching runs against an in-memory list and is fast, but a
@@ -395,27 +558,12 @@ export const registerMerchant = async (req, res) => {
       console.error('Sanctions screening failed for new signup:', err?.message || err);
     });
 
-    console.log(`📧 Dispatching Welcome Email to: ${merchant.email}`);
-    const ncbaVirtualAccountNumber = getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode);
-    sendWelcomeEmail(merchant.email, merchant.name, password, merchant.phone, ncbaVirtualAccountNumber, merchant.ncbaMerchantCode, merchant.businessName).catch(err => {
-      console.error(`📧 Resend Error: Failed to send Welcome Email to ${merchant.email}:`, err);
-    });
-
-    // Same account-number resolution as the welcome email above — never
-    // let the SMS and email disagree on what the merchant's account number
-    // is. Fire-and-forget, same as the email: a slow/down SMS provider must
-    // never delay the signup response.
-    const welcomePhone = toE164Kenyan(merchant.phone);
-    if (welcomePhone) {
-      safeSendSMS({
-        to: welcomePhone,
-        message: buildMerchantWelcomeSms({
-          businessName: merchant.businessName,
-          accountNumber: formatAccountNumberDisplay(ncbaVirtualAccountNumber || merchant.ncbaMerchantCode),
-          accountIsInterim: !ncbaVirtualAccountNumber,
-        }).message,
-      }).catch((err) => console.error(`📱 SMS Error: Failed to send welcome SMS to ${welcomePhone}:`, err));
-    }
+    // No welcome email/SMS here anymore — this application is pending
+    // review (kybStatus above), so there's no working login to welcome
+    // anyone into yet. The account details + setup-password credentials go
+    // out only once an admin/officer approves it (see
+    // officerController.js#approveApplication's sendMerchantInvite +
+    // buildAccountApprovedSms calls) — never before.
 
     // Wallet provisioning is intentionally NOT done here. The Digital Wallet
     // is opt-in: a merchant activates it whenever they want via
@@ -431,17 +579,16 @@ export const registerMerchant = async (req, res) => {
       metadata: { source: merchant.registrationSource || 'web' },
     });
 
-    // Nothing about self-serve signup was previously reviewed by anyone
-    // before the account could log in and move money — this is the actual
-    // fraud control the multi-document requirement above only sets up:
-    // admins need to know a new KYB submission exists to go verify it, not
-    // stumble onto it later by chance while browsing the merchant list.
+    // The account is gated pending review (kybStatus: 'pending' above) — it
+    // has no password and can't log in until an admin/officer approves it
+    // in the KYC Verification queue, so this notification is now the only
+    // thing that actually starts that review, not just an FYI.
     notifyAdmins({
       type: 'new_merchant_kyb_submission',
       severity: 'info',
-      subject: `New merchant registered: ${merchant.businessName}`,
-      heading: 'New Merchant — KYB Documents Pending Review',
-      details: `<strong>${escapeHtml(merchant.businessName)}</strong> (${escapeHtml(merchant.businessType || 'unknown business type')}) just self-registered and submitted ${kybDocuments.length || 1} document(s) for verification. Review in Merchants &gt; ${escapeHtml(merchant.businessName)} &gt; ${kybDocuments.length ? 'KYC/KYB Documents' : 'Certificate'}.`,
+      subject: `New merchant application: ${merchant.businessName}`,
+      heading: 'New Merchant Application — Pending Approval',
+      details: `<strong>${escapeHtml(merchant.businessName)}</strong> (${escapeHtml(merchant.businessType || 'unknown business type')}) just applied and submitted ${kybDocuments.length || 1} document(s) for verification. The account cannot log in until this is reviewed. Review in KYC Verification &gt; ${escapeHtml(merchant.businessName)}.`,
       metadata: { merchantId: String(merchant._id) },
     });
 
@@ -638,7 +785,31 @@ export const loginMerchant = async (req, res) => {
         { phone: { $in: phoneVariations } }
       ]
     }).select('+password');
-    
+
+    // Gate pending/rejected/revision applications before the generic
+    // no-password branch below, which would otherwise return a misleading
+    // "invalid email/phone or password" for someone who was never given a
+    // password to log in with in the first place. Only applications that
+    // actually went through the kybStatus pipeline are affected — every
+    // merchant created before this gate existed, and every admin-direct-
+    // onboarded merchant, has no kybStatus at all and is untouched. Mirrors
+    // the explicit, non-generic message the `status === 'locked'` check
+    // below already gives for a different blocked-account reason.
+    if (merchant?.kybStatus && merchant.kybStatus !== 'approved') {
+      logAudit({
+        action: 'merchant.login.blocked', category: 'auth', severity: 'warning',
+        message: `Sign-in blocked — application ${merchant.kybStatus}`,
+        merchant, req,
+        metadata: { kybStatus: merchant.kybStatus },
+      });
+      const messages = {
+        pending: 'Your application is still under review. We’ll text and email you once it’s approved.',
+        requires_revision: 'We need a few things fixed on your application — check your email for the resubmission link.',
+        rejected: 'Your application was not approved. Contact support@paychain.co.ke if you have questions.',
+      };
+      return res.status(403).json({ error: messages[merchant.kybStatus] || 'Your application has not been approved yet.' });
+    }
+
     if (!merchant || !merchant.password) {
       // Run a dummy bcrypt compare even on a miss so this branch takes
       // roughly the same time as a real wrong-password rejection below —

@@ -49,6 +49,34 @@ export function buildMerchantWelcomeSms({ businessName, accountNumber, accountIs
 }
 
 /**
+ * Sent once an application clears admin/officer KYB review — the
+ * self-serve/officer-application counterpart to buildMerchantWelcomeSms
+ * above, for merchants who never got a password at signup and are only now
+ * gaining real account access (see officerController.js#approveApplication).
+ * Carries the same Paybill/account details as the email, plus the secure
+ * one-time setup-password link (`/setup-password?token=...`) — no password
+ * or code is ever put in the SMS itself, only the link.
+ *
+ * @param {{ businessName?: string|null, accountNumber: string, accountIsInterim?: boolean, setupLink: string }} params
+ * @returns {{ message: string, truncated: boolean, length: number }}
+ */
+export function buildAccountApprovedSms({ businessName, accountNumber, accountIsInterim = false, setupLink }) {
+  return buildStrictSms(
+    ({ name, paybill, account, interimNote, url }) =>
+      `PayChain: ${name}, your application is approved! Paybill ${paybill}, Account No. ${account}${interimNote}. Set your password to log in: ${url}`,
+    {
+      fixed: {
+        paybill: PAYBILL_NUMBER,
+        account: accountNumber,
+        interimNote: accountIsInterim ? ' (temporary)' : '',
+        url: setupLink,
+      },
+      truncatable: [{ key: 'name', value: businessName || 'valued merchant' }],
+    }
+  );
+}
+
+/**
  * Admin-triggered nudge (Merchants page → "Resend Install Link") for a
  * merchant who hasn't installed the web app (PWA) yet — see
  * Merchant.pwaInstalledAt and apps/merchant-dashboard's useInstallPrompt.js.
@@ -82,5 +110,20 @@ export function buildInstallReminderSms({ businessName, loginUrl }) {
  */
 export function buildNewDeviceLoginSms() {
   const message = "PayChain Security: New sign-in to your account from a device we haven't seen before. Wasn't you? Contact support@paychain.co.ke now.";
+  return { message, truncated: false, length: message.length };
+}
+
+/**
+ * Sent to a phone number entered in the signup wizard, before an
+ * application (or a Merchant document) exists at all — proves the
+ * applicant controls that number. See models/PhoneVerification.js. Fixed
+ * text plus a 6-digit code, no truncatable content, so this skips
+ * buildStrictSms entirely — same reasoning as buildNewDeviceLoginSms above.
+ *
+ * @param {{ otp: string }} params
+ * @returns {{ message: string, truncated: false, length: number }}
+ */
+export function buildSignupPhoneOtpSms({ otp }) {
+  const message = `PayChain: Your verification code is ${otp}. It expires in 10 minutes. Never share this code with anyone.`;
   return { message, truncated: false, length: message.length };
 }

@@ -350,6 +350,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  // Signup phone verification — proves the applicant controls the phone
+  // number before the wizard lets them submit. Deliberately separate from
+  // signup/verifyOTP/resendOTP above: no merchant/token exists yet at this
+  // point, so there's no session to establish either way.
+  async function sendSignupPhoneOtp(phone: string) {
+    try {
+      const res = await api.post('/api/auth/merchant/signup/send-otp', { phone });
+      return { success: true, maskedPhone: res.data.maskedPhone };
+    } catch (err: any) {
+      return { success: false, error: err.response?.data?.error || 'Failed to send verification code.' };
+    }
+  }
+
+  async function verifySignupPhoneOtp(phone: string, otp: string) {
+    try {
+      const res = await api.post('/api/auth/merchant/signup/verify-otp', { phone, otp });
+      return { success: true, phoneVerificationToken: res.data.phoneVerificationToken as string };
+    } catch (err: any) {
+      return { success: false, error: err.response?.data?.error || 'Code verification failed.' };
+    }
+  }
+
   async function verifyOTP(email: string, otp: string) {
     try {
       const res = await api.post('/api/auth/merchant/verify-otp', { email, otp });
@@ -495,6 +517,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       login,
       biometricLogin,
       signup,
+      sendSignupPhoneOtp,
+      verifySignupPhoneOtp,
       verifyOTP,
       resendOTP,
       forgotPassword,

@@ -1201,7 +1201,7 @@ export const initiateB2C = async (req, res) => {
             : null,
           reference: transactionId,
           sender: { name: merchant.businessName, id: merchant.ncbaMerchantCode },
-          recipient: { name: destination, id: phone },
+          recipient: { name: beneficiaryName, id: phone },
           mobileNetwork: provider,
         });
         return res.status(202).json({
@@ -1242,7 +1242,7 @@ export const initiateB2C = async (req, res) => {
       status: 'completed',
       reference: transactionId,
       sender: { name: merchant.businessName, id: merchant.ncbaMerchantCode },
-      recipient: { name: destination, id: phone },
+      recipient: { name: beneficiaryName, id: phone },
       mobileNetwork: provider,
     });
 
@@ -1321,7 +1321,7 @@ export const initiateB2C = async (req, res) => {
               status: 'completed',
               reference: ncbaConfirmedContext.transactionId,
               sender: { name: ncbaConfirmedContext.businessName, id: ncbaConfirmedContext.ncbaMerchantCode },
-              recipient: { name: ncbaConfirmedContext.destination, id: ncbaConfirmedContext.phone },
+              recipient: { name: ncbaConfirmedContext.beneficiaryName, id: ncbaConfirmedContext.phone },
               mobileNetwork: ncbaConfirmedContext.provider,
             },
           },

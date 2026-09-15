@@ -10,6 +10,7 @@ import PrivateValue from '../components/PrivateValue';
 import FundAccountModal from '../components/FundAccountModal';
 import TourTarget from '../components/TourTarget';
 import MerchantWalkthrough from '../components/MerchantWalkthrough';
+import FadeSlideIn from '../components/ui/FadeSlideIn';
 import { isCreditTransaction, isDebitTransaction, netBalanceImpact, excludeReversedDuplicates } from '../utils/transactionDirection';
 import { formatAccountNumber } from '../utils/formatAccountNumber';
 import { formatName } from '../utils/formatName';
@@ -235,9 +236,10 @@ export default function Dashboard({ navigation }: any) {
         contentContainerStyle={{ paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#0b4d2e" colors={['#0b4d2e']} />
+          <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#006c4e" colors={['#006c4e']} />
         }
       >
+        <FadeSlideIn style={{ flex: 1 }}>
         <View className="w-full max-w-lg mx-auto flex-1">
           {/* Greeting backdrop — just page chrome now (avatar, greeting,
               notifications; the eye/visibility toggle now lives on the
@@ -648,11 +650,15 @@ export default function Dashboard({ navigation }: any) {
             <View className="bg-white rounded-[32px] p-2 shadow-sm border border-[#bfc9bf]/10">
               {isLoading ? (
                 <View className="py-10 items-center justify-center">
-                  <ActivityIndicator color="#0b4d2e" />
+                  <ActivityIndicator color="#00351d" />
                 </View>
               ) : transactions.length === 0 ? (
-                <View className="py-10 items-center justify-center">
-                  <Text className="text-[#5b645c] font-jakarta-bold">No recent activity</Text>
+                <View className="items-center justify-center py-12">
+                  <View className="w-16 h-16 rounded-full bg-[#f7faf7] border border-[#eff4ef] items-center justify-center mb-4">
+                    <Feather name="inbox" size={24} color="#b3b9b4" />
+                  </View>
+                  <Text className="text-[14px] text-[#5b645c] font-jakarta-bold">No recent activity</Text>
+                  <Text className="text-[12px] text-[#9ca3af] font-jakarta-bold mt-1">Payments you send or receive will show up here.</Text>
                 </View>
               ) : (
                 transactions.slice(0, 10).map((tx, index) => {
@@ -851,6 +857,7 @@ export default function Dashboard({ navigation }: any) {
           </View>
 
         </View>
+        </FadeSlideIn>
       </ScrollView>
     </SafeAreaView>
   );

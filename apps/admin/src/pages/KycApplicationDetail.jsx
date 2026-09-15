@@ -22,9 +22,14 @@ import ResetContactModal from '../components/modals/ResetContactModal';
 // The "Start Review" button (2026-08-31) lets admin/owner pull one of these
 // into the same pipeline, claimed for themselves in the same step (POST
 // .../start-review) — after that it behaves exactly like an
-// officer-originated application (checklist, risk tier, approve/reject),
-// except approve/reject skip the invite/rejection emails server-side since
-// this merchant already has a working login (see officerController.js).
+// officer-originated application (checklist, risk tier, approve/reject).
+// Self-serve signups only reach this no-kybStatus state now if they predate
+// the registration approval gate (kybStatus: 'pending' is set at signup as
+// of that change) — a new signup already arrives here fully decidable, no
+// Start Review needed. approve/reject still correctly skip the invite/
+// rejection email for the rare case where an application already has a
+// working password (see officerController.js's `!application.password`
+// check).
 const CHECKLIST_ITEMS = [
   { key: 'legalNameMatch', label: 'Legal business name matches registration documents' },
   { key: 'ubosIdentified', label: 'Directors / Ultimate Beneficial Owners (UBOs) identified' },
@@ -180,6 +185,19 @@ const KycApplicationDetail = () => {
             <span className="material-symbols-outlined text-sm">arrow_back</span> KYC / KYB Verification
           </button>
         </div>
+
+        {app.flagged && (
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-start gap-3">
+            <span className="material-symbols-outlined text-red-600 shrink-0" style={{ fontVariationSettings: "'FILL' 1" }}>gpp_maybe</span>
+            <div className="min-w-0">
+              <p className="text-xs font-black uppercase tracking-widest text-red-800 mb-1">Automated Fraud Screening Flagged This Application</p>
+              <p className="text-xs text-red-700 leading-relaxed">{app.flagReason || 'This application was flagged for manual review.'}</p>
+              {app.flaggedAt && (
+                <p className="text-2xs text-red-700/60 font-bold uppercase tracking-widest mt-1">Flagged {new Date(app.flaggedAt).toLocaleString()}</p>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl p-6 shadow-editorial">
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">

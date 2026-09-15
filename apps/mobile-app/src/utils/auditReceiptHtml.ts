@@ -1,4 +1,3 @@
-import { isCreditTransaction as isInboundType } from './transactionDirection';
 import { formatName } from './formatName';
 import { formatPhoneOrBlank } from './formatPhoneDisplay';
 import { barcodeSvg } from './barcode';
@@ -22,31 +21,29 @@ export type ReceiptTx = {
 const PAYCHAIN_PHONE = '+254 743 283 782';
 const PAYCHAIN_SLOGAN = 'Collect, Pay, Protect, Grow';
 
-const counterpartyName = (tx: ReceiptTx): string => {
-  if (isInboundType(tx.type as any)) return formatName(tx.sender?.name) || 'Unknown';
-  return formatName(tx.recipient?.name) || formatName(tx.sender?.name) || 'Treasury';
-};
-
-const counterpartyId = (tx: ReceiptTx): string | undefined => {
-  if (isInboundType(tx.type as any)) return tx.sender?.id;
-  return tx.recipient?.id || tx.sender?.id;
-};
-
 const formatCurrency = (amount: number) =>
   `Ksh ${Number(amount || 0).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const esc = (s: any) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-// `phoneNumber` lets a caller that already knows the real counterparty phone
+// `phoneNumber` lets a caller that already knows the real recipient phone
 // (e.g. TransactionSuccessCard.tsx, right after a Send Money/withdrawal
-// flow) pass it explicitly; otherwise it's derived from sender/recipient.id,
-// the same field Collections.tsx/Transactions.tsx already read for a phone.
+// flow, before the saved Transaction's recipient.id is available to read
+// back) pass it explicitly; otherwise the recipient phone is derived from
+// recipient.id, the same field Collections.tsx/Transactions.tsx already
+// read.
 export function buildAuditReceiptHtml(tx: ReceiptTx, phoneNumber?: string): string {
   const amountStr = formatCurrency(tx.kesAmount || tx.amount || 0);
   const timestamp = new Date(tx.createdAt).toLocaleString('en-KE', {
     day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
   });
-  const phoneStr = formatPhoneOrBlank(phoneNumber ?? counterpartyId(tx));
+  // A receipt has to prove BOTH who paid and who was paid, not just one
+  // blended "counterparty" — previously picked sender-first for outbound
+  // types, which is always this merchant's own name.
+  const senderName = formatName(tx.sender?.name) || '—';
+  const senderPhone = formatPhoneOrBlank(tx.sender?.id);
+  const recipientName = formatName(tx.recipient?.name) || '—';
+  const recipientPhone = formatPhoneOrBlank(phoneNumber ?? tx.recipient?.id);
 
   return `<!doctype html>
 <html>
@@ -63,6 +60,11 @@ export function buildAuditReceiptHtml(tx: ReceiptTx, phoneNumber?: string): stri
   .ref-label { font-size: 9px; color: #5b645c; text-transform: uppercase; letter-spacing: 1.5px; }
   .ref-value { font-size: 14px; font-weight: 700; margin-top: 3px; }
   .divider { border-top: 1px solid #e6e6e6; margin: 14px 0; }
+  .parties { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+  .party { border: 1px solid #e6e6e6; border-radius: 6px; padding: 8px 10px; }
+  .party .label { font-size: 7.5px; color: #78807c; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 4px; font-weight: 700; }
+  .party .value { font-size: 11px; font-weight: 700; }
+  .party .phone { font-size: 9px; color: #5b645c; margin-top: 2px; }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   .grid .item .label { font-size: 8px; color: #5b645c; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 3px; }
   .grid .item .value { font-size: 11px; font-weight: 700; }
@@ -86,6 +88,18 @@ export function buildAuditReceiptHtml(tx: ReceiptTx, phoneNumber?: string): stri
     <div class="ref-label">Reference ID</div>
     <div class="ref-value">${esc(tx.reference || '')}</div>
     <div class="divider"></div>
+    <div class="parties">
+      <div class="party">
+        <div class="label">Sender</div>
+        <div class="value">${esc(senderName)}</div>
+        ${senderPhone ? `<div class="phone">${esc(senderPhone)}</div>` : ''}
+      </div>
+      <div class="party">
+        <div class="label">Recipient</div>
+        <div class="value">${esc(recipientName)}</div>
+        ${recipientPhone ? `<div class="phone">${esc(recipientPhone)}</div>` : ''}
+      </div>
+    </div>
     <div class="grid">
       <div class="item">
         <div class="label">Date &amp; Time</div>
@@ -94,14 +108,6 @@ export function buildAuditReceiptHtml(tx: ReceiptTx, phoneNumber?: string): stri
       <div class="item">
         <div class="label">Status</div>
         <div class="value">${esc((tx.status || '').toUpperCase())}</div>
-      </div>
-      <div class="item">
-        <div class="label">Sent To</div>
-        <div class="value">${esc(counterpartyName(tx))}</div>
-      </div>
-      <div class="item">
-        <div class="label">Phone Number</div>
-        <div class="value">${esc(phoneStr)}</div>
       </div>
       <div class="item">
         <div class="label">Payment Type</div>

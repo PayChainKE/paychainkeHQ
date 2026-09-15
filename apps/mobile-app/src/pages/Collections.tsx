@@ -742,7 +742,7 @@ export default function Collections() {
             <View className="bg-white rounded-[32px] p-2 shadow-sm border border-[#bfc9bf]/10 mb-6">
               {isLoading ? (
                 <View className="py-10 items-center justify-center">
-                  <ActivityIndicator color="#0b4d2e" />
+                  <ActivityIndicator color="#00351d" />
                 </View>
               ) : filteredTransactions.length > 0 ? (
                 paginatedTransactions.map((tx, index, visible) => {
