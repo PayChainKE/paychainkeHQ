@@ -8,6 +8,7 @@ import { isValidEmail, EMAIL_FORMAT_HINT } from '../utils/emailValidator.js';
 import { sendMerchantInvite, sendKybRevisionRequest, sendKybRejection } from '../utils/resend.js';
 import { normalizeKraPin, isValidKraPin, KRA_PIN_FORMAT_HINT } from '../utils/kraPinValidator.js';
 import { buildAccountApprovedSms } from '../utils/accountSmsTemplates.js';
+import { deleteCloudinaryAsset } from '../utils/cloudinary.js';
 import { safeSendSMS } from '../utils/smsSanitizer.js';
 import { toE164Kenyan } from '../utils/notificationService.js';
 
@@ -786,14 +787,17 @@ export const resubmitDocuments = async (req, res) => {
 
     const files = req.files || {};
     let replaced = 0;
+    const replacedUrls = [];
     for (const t of ALL_OFFICER_DOC_TYPES) {
       if (!files[t]?.[0]) continue;
       const existing = application.kybDocuments.find((d) => d.type === t);
       if (existing) {
+        if (existing.url && existing.url !== 'purged') replacedUrls.push(existing.url);
         existing.url = files[t][0].path;
         existing.uploadedAt = new Date();
         existing.status = 'pending';
         existing.note = null;
+        existing.purgedAt = null;
       } else {
         application.kybDocuments.push({ type: t, url: files[t][0].path, uploadedAt: new Date(), status: 'pending' });
       }
@@ -808,6 +812,10 @@ export const resubmitDocuments = async (req, res) => {
     application.kybResubmitToken = null;
     application.kybResubmitTokenExpires = null;
     await application.save();
+
+    // Best-effort — the replaced file is already unreachable from Mongo at
+    // this point regardless of whether this cleanup succeeds.
+    replacedUrls.forEach((url) => deleteCloudinaryAsset(url));
 
     logAudit({
       action: 'merchant.kyc.resubmitted', category: 'admin', severity: 'info',

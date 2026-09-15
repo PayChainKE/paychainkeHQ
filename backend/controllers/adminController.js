@@ -35,7 +35,7 @@ import { getCountyCentroid } from '../config/kenyaCountyCentroids.js';
 import { getOrCreatePlatformSettings } from '../models/PlatformSettings.js';
 import { resolvePeriod } from '../utils/resolvePeriod.js';
 import { buildInstallReminderSms } from '../utils/accountSmsTemplates.js';
-import { uploadBufferToCloudinary } from '../utils/cloudinary.js';
+import { uploadBufferToCloudinary, deleteCloudinaryAsset } from '../utils/cloudinary.js';
 import { hashDocumentBuffer, checkDocumentReuse } from '../utils/documentReuseDetection.js';
 import { searchKenyaPlaces } from '../utils/nominatimSearch.js';
 
@@ -1278,12 +1278,14 @@ export const updateMerchantKycDocument = async (req, res) => {
 
     const existing = merchant.kybDocuments.find((d) => d.type === type);
     const isReplace = !!existing;
+    const previousUrl = existing?.url;
     if (existing) {
       existing.url = uploaded.secure_url;
       existing.contentHash = contentHash;
       existing.uploadedAt = new Date();
       existing.status = 'pending';
       existing.note = null;
+      existing.purgedAt = null;
     } else {
       merchant.kybDocuments.push({
         type,
@@ -1295,6 +1297,9 @@ export const updateMerchantKycDocument = async (req, res) => {
     }
 
     await merchant.save();
+
+    // Best-effort — already unreachable from Mongo regardless of outcome.
+    if (previousUrl && previousUrl !== 'purged') deleteCloudinaryAsset(previousUrl);
 
     logAudit({
       action: 'admin.merchant.kyc_document_updated', category: 'admin', severity: 'info',
@@ -1559,8 +1564,12 @@ export const updateMerchantCertificate = async (req, res) => {
     if (!merchant) return res.status(404).json({ error: 'Merchant not found' });
 
     const isReplace = !!merchant.certificateUrl;
+    const previousUrl = merchant.certificateUrl;
     merchant.certificateUrl = req.file.path;
     await merchant.save();
+
+    // Best-effort — already unreachable from Mongo regardless of outcome.
+    if (previousUrl) deleteCloudinaryAsset(previousUrl);
 
     logAudit({
       action: 'admin.merchant.certificate_updated', category: 'admin', severity: 'info',

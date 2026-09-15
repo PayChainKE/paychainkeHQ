@@ -8,6 +8,7 @@ import { excludeDemoMerchantsMatch } from '../utils/demoMerchantExclusion.js';
 import { reversedTransactionExclusionMatch } from '../utils/reversedTransactions.js';
 import { CORPORATE_TAX_RATE } from '../config/taxRateCard.js';
 import { resolvePeriod } from '../utils/resolvePeriod.js';
+import { deleteCloudinaryAsset } from '../utils/cloudinary.js';
 
 // Same whitelist Revenue's getRevenue uses — top_up/withdrawal and any
 // other type with no revenue stream must never count as "income" here
@@ -182,8 +183,12 @@ export const updateExpenseReceipt = async (req, res) => {
     const expense = await Expense.findById(req.params.id);
     if (!expense) return res.status(404).json({ error: 'Expense not found.' });
 
+    const previousUrl = expense.receiptUrl;
     expense.receiptUrl = req.file.path;
     await expense.save();
+
+    // Best-effort — already unreachable from Mongo regardless of outcome.
+    if (previousUrl) deleteCloudinaryAsset(previousUrl);
 
     logAudit({
       action: 'admin.bookkeeping.expense_receipt_updated', category: 'admin', severity: 'info',
