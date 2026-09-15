@@ -5,13 +5,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
+import { useTransactions } from '../context/TransactionsContext';
 import api from '../api/config';
 import PrivateValue from '../components/PrivateValue';
 import FundAccountModal from '../components/FundAccountModal';
 import TourTarget from '../components/TourTarget';
 import MerchantWalkthrough from '../components/MerchantWalkthrough';
 import FadeSlideIn from '../components/ui/FadeSlideIn';
-import { isCreditTransaction, isDebitTransaction, netBalanceImpact, excludeReversedDuplicates } from '../utils/transactionDirection';
+import { isCreditTransaction, isDebitTransaction, netBalanceImpact } from '../utils/transactionDirection';
 import { formatAccountNumber } from '../utils/formatAccountNumber';
 import { formatName } from '../utils/formatName';
 
@@ -100,9 +101,7 @@ function computeChartData(transactions: any[]) {
 
 export default function Dashboard({ navigation }: any) {
   const { merchant } = useAuth();
-  const [transactions, setTransactions] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const { transactions, isLoading, isRefreshing, refresh: refreshTransactions } = useTransactions();
   const [now, setNow] = useState(new Date());
   const [unreadCount, setUnreadCount] = useState(0);
   const [showAmounts, setShowAmounts] = useState(true);
@@ -128,54 +127,19 @@ export default function Dashboard({ navigation }: any) {
     return () => clearInterval(timer);
   }, []);
 
-  const fetchDashboardData = useCallback(async () => {
-    if (!merchant) return;
-    try {
-      const txRes = await api.get('/api/transactions');
-
-      const txList = Array.isArray(txRes.data)
-        ? txRes.data
-        : Array.isArray(txRes.data?.transactions)
-        ? txRes.data.transactions
-        : [];
-      // Drops any duplicate-credit + its correction entry as a matched pair
-      // at the source, so every downstream stat/chart in this file is
-      // automatically clean — see excludeReversedDuplicates' doc comment.
-      setTransactions(excludeReversedDuplicates(txList));
-    } catch (error) {
-      console.error('Error fetching dashboard data', error);
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  }, [merchant]);
-
-  useEffect(() => {
-    if (merchant) {
-      setIsLoading(true);
-      fetchDashboardData();
-    } else {
-      setIsLoading(false);
-    }
-  }, [merchant, fetchDashboardData]);
-
-  // Keep the balance/chart/transaction data live, matching the merchant
-  // dashboard Overview's 3s poll + refetch-on-focus behavior.
-  useEffect(() => {
-    if (!merchant) return;
-    const interval = setInterval(fetchDashboardData, 3000);
-    return () => clearInterval(interval);
-  }, [merchant, fetchDashboardData]);
-
+  // Transaction data (list, loading/refreshing state) now comes from the
+  // app-wide TransactionsContext — a single shared fetch/poll instead of
+  // this screen running its own on top of Transactions.tsx's and
+  // Collections.tsx's identical ones. Still refreshed on focus so the
+  // numbers are current the moment a merchant lands back on this tab.
   useFocusEffect(
     useCallback(() => {
-      if (merchant) fetchDashboardData();
-    }, [merchant, fetchDashboardData])
+      if (merchant) refreshTransactions();
+    }, [merchant, refreshTransactions])
   );
 
   const onRefresh = () => {
-    setIsRefreshing(true);
-    fetchDashboardData();
+    refreshTransactions();
   };
 
   const handlePromoScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {

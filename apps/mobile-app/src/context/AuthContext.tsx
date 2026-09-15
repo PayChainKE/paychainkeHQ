@@ -22,6 +22,14 @@ const REAUTH_BACKGROUND_MS = 30_000;
 const IDLE_TIMEOUT_MS = 15 * 60 * 1000;
 const IDLE_POLL_MS = 15_000;
 
+// How often refreshSession() polls GET /api/auth/merchant/me while the app
+// is foregrounded (see the effect below — it's paused entirely while
+// backgrounded). Was 5s; slowed down since balance/profile data doesn't
+// need sub-10s freshness and this ran continuously across the entire
+// session — see TransactionsContext.tsx for the same reasoning applied to
+// the transaction list poll.
+const REFRESH_SESSION_POLL_MS = 20_000;
+
 const AuthContext = createContext<any>(null);
 
 const STORAGE_KEY        = 'paychain_merchant_session'; // merchant profile, minus CACHE_STRIP_FIELDS below
@@ -284,10 +292,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // derived from `merchant`) stays live across every screen without each
   // one needing its own refresh loop. Keyed on merchant._id (not the whole
   // object) so the interval isn't torn down and recreated on every tick.
+  //
+  // Paused entirely while backgrounded — a still-running 5s poll of the
+  // merchant's own profile was pure mobile-data waste for a screen nobody
+  // could see, on top of the same problem TransactionsContext had with its
+  // own poll. Picks back up (and refreshes immediately) the moment the app
+  // returns to the foreground rather than waiting out a stale interval.
   useEffect(() => {
-    if (!merchant?._id) return;
-    const interval = setInterval(refreshSession, 5000);
-    return () => clearInterval(interval);
+    if (!merchant?._id) return undefined;
+
+    let interval: ReturnType<typeof setInterval> | null = null;
+    const startPolling = () => {
+      if (interval) return;
+      interval = setInterval(refreshSession, REFRESH_SESSION_POLL_MS);
+    };
+    const stopPolling = () => {
+      if (!interval) return;
+      clearInterval(interval);
+      interval = null;
+    };
+
+    if (AppState.currentState === 'active') startPolling();
+
+    let wasActive = AppState.currentState === 'active';
+    const handlePollAppStateChange = (nextState: AppStateStatus) => {
+      const isActive = nextState === 'active';
+      if (isActive && !wasActive) {
+        refreshSession();
+        startPolling();
+      } else if (!isActive) {
+        stopPolling();
+      }
+      wasActive = isActive;
+    };
+
+    const subscription = AppState.addEventListener('change', handlePollAppStateChange);
+    return () => {
+      stopPolling();
+      subscription.remove();
+    };
   }, [merchant?._id]);
 
   async function login(email: string, password: string) {

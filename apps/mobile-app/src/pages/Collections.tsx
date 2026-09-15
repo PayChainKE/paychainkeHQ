@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Modal, TextInput, ActivityIndicator, Alert, RefreshControl } from 'react-native';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -6,9 +6,9 @@ import { ValidatedTextInput } from '../components/ValidatedTextInput';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { useAuth } from '../context/AuthContext';
-import api from '../api/config';
+import { useTransactions } from '../context/TransactionsContext';
 import TopBar from '../components/layout/TopBar';
-import { isCreditTransaction as isInboundType, isDebitTransaction as isOutboundType, typeLabel as txTypeLabel, netBalanceImpact, excludeReversedDuplicates } from '../utils/transactionDirection';
+import { isCreditTransaction as isInboundType, isDebitTransaction as isOutboundType, typeLabel as txTypeLabel, netBalanceImpact } from '../utils/transactionDirection';
 import { formatAccountNumber } from '../utils/formatAccountNumber';
 import { buildAuditReceiptHtml } from '../utils/auditReceiptHtml';
 import { formatName } from '../utils/formatName';
@@ -103,12 +103,10 @@ const getDateRange = (filter: DateFilter): { start: Date | null; end: Date | nul
 
 export default function Collections() {
   const { merchant } = useAuth();
+  const { transactions, isLoading, isRefreshing, refresh: refreshTransactions } = useTransactions();
   const [showReceipt, setShowReceipt] = useState(false);
   const [selectedTx, setSelectedTx] = useState<any | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [transactions, setTransactions] = useState<Tx[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Filter state
   const [activeQuickFilter, setActiveQuickFilter] = useState<'all' | 'today' | 'week' | 'month' | 'inbound' | 'outbound'>('all');
@@ -129,49 +127,12 @@ export default function Collections() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  const fetchTransactions = useCallback(async () => {
-    try {
-      const res = await api.get('/api/transactions');
-      // Backend returns either a raw array (res.data is the array)
-      // or a wrapped { success, transactions } envelope — handle both.
-      const list: Tx[] = Array.isArray(res.data)
-        ? res.data
-        : Array.isArray(res.data?.transactions)
-        ? res.data.transactions
-        : [];
-      // Drops any duplicate-credit + its correction entry as a matched pair
-      // at the source, so every downstream stat/statement in this file is
-      // automatically clean — see excludeReversedDuplicates' doc comment.
-      setTransactions(excludeReversedDuplicates(list));
-    } catch (error) {
-      console.error('Error fetching collections', error);
-      setTransactions([]);
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (merchant) {
-      setIsLoading(true);
-      fetchTransactions();
-    } else {
-      setTransactions([]);
-      setIsLoading(false);
-    }
-  }, [merchant, fetchTransactions]);
-
-  // Poll every 5s so the collections list stays live without a manual refresh
-  useEffect(() => {
-    if (!merchant) return;
-    const interval = setInterval(fetchTransactions, 5000);
-    return () => clearInterval(interval);
-  }, [merchant, fetchTransactions]);
-
+  // Transaction data (list, loading/refreshing state) now comes from the
+  // app-wide TransactionsContext — a single shared fetch/poll instead of
+  // this screen running its own on top of Dashboard.tsx's and
+  // Transactions.tsx's identical ones.
   const onRefresh = () => {
-    setIsRefreshing(true);
-    fetchTransactions();
+    refreshTransactions();
   };
 
   const initials = merchant?.businessName
