@@ -12,6 +12,7 @@ import FundAccountModal from '../components/FundAccountModal';
 import TourTarget from '../components/TourTarget';
 import MerchantWalkthrough from '../components/MerchantWalkthrough';
 import FadeSlideIn from '../components/ui/FadeSlideIn';
+import NoConnectionState from '../components/ui/NoConnectionState';
 import { isCreditTransaction, isDebitTransaction, netBalanceImpact } from '../utils/transactionDirection';
 import { formatAccountNumber } from '../utils/formatAccountNumber';
 import { formatName } from '../utils/formatName';
@@ -101,7 +102,7 @@ function computeChartData(transactions: any[]) {
 
 export default function Dashboard({ navigation }: any) {
   const { merchant } = useAuth();
-  const { transactions, isLoading, isRefreshing, refresh: refreshTransactions } = useTransactions();
+  const { transactions, isLoading, isRefreshing, hasError, refresh: refreshTransactions } = useTransactions();
   const [now, setNow] = useState(new Date());
   const [unreadCount, setUnreadCount] = useState(0);
   const [showAmounts, setShowAmounts] = useState(true);
@@ -449,69 +450,43 @@ export default function Dashboard({ navigation }: any) {
             </View>
           </View>
 
-          {/* Send / Request Money */}
-          <TourTarget id="send-request-row" className="px-6 flex-row gap-3 mb-8">
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={() => navigation?.navigate('SendMoney')}
-              className="flex-1 bg-white rounded-2xl border border-[#bfc9bf]/10 shadow-sm p-4 flex-row items-center gap-3"
-            >
-              <View className="w-10 h-10 rounded-xl bg-[#eff4ef] items-center justify-center">
-                <MaterialIcons name="north-east" size={18} color="#00351d" />
-              </View>
-              <Text className="text-[12px] font-jakarta-bold text-[#0c2010] uppercase tracking-wide">Send Money</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={() => navigation?.navigate('RequestMoney')}
-              className="flex-1 bg-white rounded-2xl border border-[#bfc9bf]/10 shadow-sm p-4 flex-row items-center gap-3"
-            >
-              <View className="w-10 h-10 rounded-xl bg-[#eff4ef] items-center justify-center">
-                <MaterialIcons name="south-west" size={18} color="#00351d" />
-              </View>
-              <Text className="text-[12px] font-jakarta-bold text-[#0c2010] uppercase tracking-wide">Request Money</Text>
-            </TouchableOpacity>
-          </TourTarget>
-
-          {/* Quick Actions — the two fastest ways to get paid, deep-linking
-              into RequestMoney with the relevant option pre-selected. Back to
-              full size (was briefly shrunk to a compact horizontal layout) —
-              each still keeps its own frame color, mirroring
-              merchant-dashboard's Overview.jsx Quick Action tiles. */}
-          <View className="px-6 mb-8">
+          {/* Quick Actions — a single 3×2 grid card, the same layout
+              convention M-Pesa/bank apps use on their home screen (one
+              uniform icon treatment, short label, no per-tile copy) rather
+              than the previous mix of full-width description cards. Every
+              icon is tinted the same mint accent on the same dark chip so
+              the grid reads as one coherent set rather than six unrelated
+              buttons. */}
+          <TourTarget id="send-request-row" className="px-6 mb-8">
             <Text className="text-[10px] font-jakarta-extrabold uppercase tracking-widest text-[#0c2010]/40 mb-3">Quick Actions</Text>
-            <View className="flex-row gap-3">
-              <TouchableOpacity
-                activeOpacity={0.9}
-                onPress={() => navigation?.navigate('RequestMoney', { preset: 'mpesa' })}
-                className="flex-1 bg-[#00351d] rounded-2xl p-4 border-2 border-amber-400/30 overflow-hidden"
-              >
-                <View className="flex-row items-center justify-between mb-4">
-                  <View className="w-9 h-9 rounded-xl bg-white/10 items-center justify-center">
-                    <Feather name="zap" size={16} color="#5efeb3" />
-                  </View>
-                  <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.3)" />
-                </View>
-                <Text className="text-white text-[12px] font-jakarta-bold uppercase tracking-wide mb-1">Send STK Push</Text>
-                <Text className="text-white/40 text-[10px] font-jakarta-bold leading-snug">Prompt a customer to pay instantly</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                activeOpacity={0.9}
-                onPress={() => navigation?.navigate('RequestMoney', { preset: 'link' })}
-                className="flex-1 bg-[#00351d] rounded-2xl p-4 border-2 border-sky-400/30 overflow-hidden"
-              >
-                <View className="flex-row items-center justify-between mb-4">
-                  <View className="w-9 h-9 rounded-xl bg-white/10 items-center justify-center">
-                    <Feather name="link" size={16} color="#5efeb3" />
-                  </View>
-                  <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.3)" />
-                </View>
-                <Text className="text-white text-[12px] font-jakarta-bold uppercase tracking-wide mb-1">Get Payment Link</Text>
-                <Text className="text-white/40 text-[10px] font-jakarta-bold leading-snug">Share a link for any amount</Text>
-              </TouchableOpacity>
+            <View className="bg-white rounded-[28px] border border-[#eff4ef] shadow-sm shadow-[#00351d]/5 p-5">
+              <View className="flex-row flex-wrap justify-between">
+                {[
+                  { key: 'send', label: 'Send Money', icon: require('../../assets/send money.png'), onPress: () => navigation?.navigate('SendMoney') },
+                  { key: 'request', label: 'Request Money', icon: require('../../assets/receive money.png'), onPress: () => navigation?.navigate('RequestMoney') },
+                  { key: 'stk', label: 'STK Push', icon: require('../../assets/stk push.png'), onPress: () => navigation?.navigate('RequestMoney', { preset: 'mpesa' }) },
+                  { key: 'link', label: 'Payment Link', icon: require('../../assets/payment link.png'), onPress: () => navigation?.navigate('RequestMoney', { preset: 'link' }) },
+                  { key: 'tokens', label: 'Buy Tokens', icon: require('../../assets/buy kplc token.png'), onPress: () => navigation?.navigate('BuyTokens') },
+                  { key: 'statement', label: 'Statement', icon: require('../../assets/statement.png'), onPress: () => navigation?.navigate('Transactions', { openStatement: true }) },
+                ].map((action, i) => (
+                  <TouchableOpacity
+                    key={action.key}
+                    activeOpacity={0.85}
+                    onPress={action.onPress}
+                    style={{ width: '31%' }}
+                    className={`items-center ${i < 3 ? 'mb-5' : ''}`}
+                  >
+                    <View className="w-14 h-14 rounded-2xl bg-[#00351d] items-center justify-center mb-2">
+                      <Image source={action.icon} style={{ width: 24, height: 24, tintColor: '#5efeb3' }} resizeMode="contain" />
+                    </View>
+                    <Text className="text-[10px] font-jakarta-bold text-[#0c2010] text-center leading-tight" numberOfLines={2}>
+                      {action.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
-          </View>
+          </TourTarget>
 
           {/* Growth Tip */}
           <View className="px-6 mb-8">
@@ -616,6 +591,8 @@ export default function Dashboard({ navigation }: any) {
                 <View className="py-10 items-center justify-center">
                   <ActivityIndicator color="#00351d" />
                 </View>
+              ) : hasError && transactions.length === 0 ? (
+                <NoConnectionState onRetry={refreshTransactions} />
               ) : transactions.length === 0 ? (
                 <View className="items-center justify-center py-12">
                   <View className="w-16 h-16 rounded-full bg-[#f7faf7] border border-[#eff4ef] items-center justify-center mb-4">

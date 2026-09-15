@@ -19,6 +19,7 @@ import { InlineDatePicker } from '../components/InlineDatePicker';
 import TourTarget from '../components/TourTarget';
 import TransactionsWalkthrough from '../components/TransactionsWalkthrough';
 import FadeSlideIn from '../components/ui/FadeSlideIn';
+import NoConnectionState from '../components/ui/NoConnectionState';
 
 const EXPORT_PRESETS = [
   { key: '7d', label: 'Last 7 Days' },
@@ -83,9 +84,9 @@ const STAT_CARD_STYLES = [
   },
 ];
 
-export default function Transactions({ navigation }: any) {
+export default function Transactions({ navigation, route }: any) {
   const { merchant } = useAuth();
-  const { transactions, isLoading, isRefreshing, refresh: refreshTransactions } = useTransactions();
+  const { transactions, isLoading, isRefreshing, hasError, refresh: refreshTransactions } = useTransactions();
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedTx, setSelectedTx] = useState<any | null>(null);
   const [isGeneratingReceipt, setIsGeneratingReceipt] = useState(false);
@@ -98,6 +99,14 @@ export default function Transactions({ navigation }: any) {
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
   const [isExporting, setIsExporting] = useState(false);
+
+  // Dashboard's Statement quick action navigates here with
+  // { openStatement: true } to jump straight to the export sheet instead of
+  // landing on the plain transaction list.
+  useEffect(() => {
+    if (route?.params?.openStatement) setShowExportModal(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Transaction data (list, loading/refreshing state) now comes from the
   // app-wide TransactionsContext — a single shared fetch/poll instead of
@@ -428,6 +437,8 @@ export default function Transactions({ navigation }: any) {
                 <ActivityIndicator color="#00351d" size="large" />
                 <Text className="text-[#5b645c] font-jakarta-bold text-[13px] mt-3">Loading…</Text>
               </View>
+            ) : hasError && transactions.length === 0 ? (
+              <NoConnectionState onRetry={refreshTransactions} />
             ) : currentTransactions.length === 0 ? (
               <View className="py-20 items-center justify-center px-8">
                 <View className="w-16 h-16 rounded-full bg-[#eff4ef] items-center justify-center mb-4">

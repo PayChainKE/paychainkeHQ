@@ -11,6 +11,7 @@ import CashAdvance from '../pages/CashAdvance';
 import Profile from '../pages/Profile';
 import SendMoney from '../pages/SendMoney';
 import RequestMoney from '../pages/RequestMoney';
+import BuyTokens from '../pages/BuyTokens';
 import SupportPage from '../pages/SupportPage';
 import Notifications from '../pages/Notifications';
 import Login from '../pages/Login';
@@ -117,6 +118,11 @@ function MainTabs() {
       <Tab.Screen
         name="RequestMoney"
         component={RequestMoney}
+        options={{ tabBarButton: () => null, tabBarItemStyle: { flex: 0, width: 0, padding: 0 } }}
+      />
+      <Tab.Screen
+        name="BuyTokens"
+        component={BuyTokens}
         options={{ tabBarButton: () => null, tabBarItemStyle: { flex: 0, width: 0, padding: 0 } }}
       />
       <Tab.Screen

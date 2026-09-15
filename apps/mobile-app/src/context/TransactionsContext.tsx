@@ -23,6 +23,13 @@ type TransactionsContextType = {
   transactions: any[];
   isLoading: boolean;
   isRefreshing: boolean;
+  // True only when the most recent fetch attempt actually failed (network
+  // down, request timeout, server unreachable) — not simply "no
+  // transactions yet". Screens use this to tell a genuinely empty account
+  // apart from a failed fetch, which previously looked identical (both
+  // just rendered the "No transactions yet" empty state) — see
+  // components/ui/NoConnectionState.tsx.
+  hasError: boolean;
   refresh: () => Promise<void>;
 };
 
@@ -30,6 +37,7 @@ const TransactionsContext = createContext<TransactionsContextType>({
   transactions: [],
   isLoading: true,
   isRefreshing: false,
+  hasError: false,
   refresh: async () => {},
 });
 
@@ -38,6 +46,7 @@ export function TransactionsProvider({ children }: { children: React.ReactNode }
   const [transactions, setTransactions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [hasError, setHasError] = useState(false);
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
 
   const fetchTransactions = useCallback(async (isManualRefresh = false) => {
@@ -53,8 +62,10 @@ export function TransactionsProvider({ children }: { children: React.ReactNode }
       // Applied once here instead of separately in every consuming screen
       // — see excludeReversedDuplicates' own doc comment.
       setTransactions(excludeReversedDuplicates(txList));
+      setHasError(false);
     } catch (error) {
       console.error('Error fetching transactions', error);
+      setHasError(true);
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -112,7 +123,7 @@ export function TransactionsProvider({ children }: { children: React.ReactNode }
   }, [merchant, fetchTransactions]);
 
   return (
-    <TransactionsContext.Provider value={{ transactions, isLoading, isRefreshing, refresh }}>
+    <TransactionsContext.Provider value={{ transactions, isLoading, isRefreshing, hasError, refresh }}>
       {children}
     </TransactionsContext.Provider>
   );
