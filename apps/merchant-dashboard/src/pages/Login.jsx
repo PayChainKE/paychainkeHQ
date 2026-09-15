@@ -12,18 +12,28 @@ import { BiometricLoginButton } from '../components/BiometricButton'
 import { estimateImageSharpness, isImageFile, unsupportedDocumentTypeReason } from '../utils/imageBlurCheck'
 
 // Which KYB document(s) a signup must provide, keyed by business type —
-// mirrors backend/config/kybRequirements.js exactly (including its
-// 'choice' vs 'all' modes: a formally registered entity has a CR12 to
-// prove it, an informal sole trader doesn't). registerMerchant enforces
-// this server-side too — this only drives what the form asks for, so a
-// request bypassing the UI can't skip it. Keep both in sync if this ever
-// changes. apps/mobile-app/src/pages/Login.tsx is NOT on this yet
-// (deliberately held off during Google Play review) — it still uses the
-// old single-document flow, which the backend still accepts from it.
-const SOLE_TRADER_CHOICE = {
-  mode: 'choice',
-  options: [
+// mirrors backend/config/kybRequirements.js exactly. registerMerchant
+// enforces this server-side too — this only drives what the form asks
+// for, so a request bypassing the UI can't skip it. Keep both in sync if
+// this ever changes. apps/mobile-app/src/pages/Login.tsx has its own copy
+// at apps/mobile-app/src/utils/kybRequirements.ts, kept in sync too.
+//
+// National ID is a core requirement for every business type (2026-09-15)
+// — no combination of other documents can substitute for it. `optionalSlots`
+// documents are collected and stored if the merchant provides them, but
+// never block submission if they don't (2026-09-15: business_permit_or_
+// license moved here for every type that used to require it, and the KRA
+// PIN Certificate document requirement was dropped entirely for LLC/PLC —
+// CR12 + National ID is the compulsory pair for both now). With national_id
+// no longer part of any choice, every requirement below is mode 'all' —
+// mode 'choice'/'all_plus_choice' are unused for now but kept as
+// machinery in case a future business type still needs them.
+const SOLE_TRADER_REQUIREMENT = {
+  mode: 'all',
+  slots: [
     { type: 'national_id', label: 'National ID / Passport' },
+  ],
+  optionalSlots: [
     { type: 'business_permit_or_license', label: 'Business Permit or License' },
   ],
 }
@@ -31,37 +41,39 @@ const REGISTERED_ENTITY_ALL = {
   mode: 'all',
   slots: [
     { type: 'business_registration', label: 'Business Registration (CR12)' },
+    { type: 'national_id', label: 'National ID / Passport' },
+  ],
+  optionalSlots: [
     { type: 'business_permit_or_license', label: 'Business Permit or License' },
   ],
 }
-// LLC's directors are its accountable individuals — CR12 is always
-// mandatory (slots), plus exactly one of Director's ID or the company's
-// own KRA PIN Certificate (choiceOptions), replacing Business Permit or
-// License for LLC specifically.
+// LLC's directors are its accountable individuals — CR12 and the
+// Director's own National ID are mandatory. No KRA PIN Certificate
+// requirement (removed 2026-09-15) — the separate KRA PIN text field
+// elsewhere on the form is unrelated and stays as-is.
 const LLC_REQUIREMENT = {
-  mode: 'all_plus_choice',
+  mode: 'all',
   slots: [
     { type: 'business_registration', label: 'Business Registration (CR12)' },
-  ],
-  choiceOptions: [
     { type: 'national_id', label: "Director's ID (National ID / Passport)" },
-    { type: 'kra_pin', label: 'KRA PIN Certificate (Company)' },
   ],
 }
 const KYB_REQUIREMENTS_BY_BUSINESS_TYPE = {
-  'Sole Proprietorship': SOLE_TRADER_CHOICE,
-  'Partnership': SOLE_TRADER_CHOICE,
-  'NGO/Non-Profit': SOLE_TRADER_CHOICE,
-  'Other': SOLE_TRADER_CHOICE,
+  'Sole Proprietorship': SOLE_TRADER_REQUIREMENT,
+  'Partnership': SOLE_TRADER_REQUIREMENT,
+  'NGO/Non-Profit': SOLE_TRADER_REQUIREMENT,
+  'Other': SOLE_TRADER_REQUIREMENT,
   'Limited Liability Company (LLC)': LLC_REQUIREMENT,
   'SACCO': REGISTERED_ENTITY_ALL,
   'Cooperative Society': REGISTERED_ENTITY_ALL,
+  // A PLC's directors are its accountable individuals (unlike an LLC's,
+  // which can be another company) — same requirement as LLC otherwise: CR12
+  // + National ID compulsory, no KRA PIN Certificate requirement.
   'Public Limited Company (PLC)': {
     mode: 'all',
     slots: [
       { type: 'business_registration', label: 'Business Registration (CR12)' },
       { type: 'national_id', label: 'National ID / Passport (Company Director)' },
-      { type: 'kra_pin', label: 'KRA PIN Certificate (Company)' },
     ],
   },
 }
@@ -254,6 +266,11 @@ export default function Login() {
   // three (see KYB_REQUIREMENTS_BY_BUSINESS_TYPE).
   const [signupDocType, setSignupDocType] = useState('')
   const [signupDocs, setSignupDocs] = useState({})
+  // Which path the merchant chose for National ID — 'upload' or 'camera'.
+  // Both now collect front+back separately (see renderNationalIdSlot);
+  // this just tracks which one so the same two boxes can be rendered with
+  // (camera) or without (upload) the `capture` attribute.
+  const [nationalIdMode, setNationalIdMode] = useState(null)
   const [docPreviews, setDocPreviews] = useState({})
   const [docChecking, setDocChecking] = useState({})
   const [docErrors, setDocErrors] = useState({})
@@ -584,21 +601,21 @@ export default function Login() {
     otpRefs.current[nextEmpty === -1 ? 5 : nextEmpty]?.focus()
   }
 
-  // national_id is the one document type with two valid shapes — a single
-  // uploaded file, or a front+back camera-captured pair (see
-  // renderNationalIdSlot below). Mirrors
-  // backend/controllers/merchantAuthController.js's isDocProvided/
-  // resolveDocTypes exactly, so what this form considers "done" always
-  // matches what the server will actually accept.
+  // national_id always resolves to a front+back pair now (see
+  // renderNationalIdSlot below) — whether the merchant chose to upload
+  // existing files or take photos, both sides are required either way.
+  // The backend still separately accepts a single combined `national_id`
+  // file for any caller that isn't this form (e.g. an older app build),
+  // so this is a frontend-only tightening, not a backend requirement change.
   function isDocSelected(type) {
     if (type === 'national_id') {
-      return !!(signupDocs.national_id || (signupDocs.national_id_front && signupDocs.national_id_back))
+      return !!(signupDocs.national_id_front && signupDocs.national_id_back)
     }
     return !!signupDocs[type]
   }
   function resolveDocTypes(type) {
-    if (type === 'national_id' && !signupDocs.national_id && signupDocs.national_id_front && signupDocs.national_id_back) {
-      return ['national_id_front', 'national_id_back']
+    if (type === 'national_id') {
+      return (signupDocs.national_id_front && signupDocs.national_id_back) ? ['national_id_front', 'national_id_back'] : []
     }
     return signupDocs[type] ? [type] : []
   }
@@ -704,123 +721,97 @@ export default function Login() {
     )
   }
 
-  // National ID is the one document where a camera capture is split into
-  // two required shots (front, then back) instead of one — an ID's back
-  // (address, signature, sometimes date of birth) is as much a KYC
-  // requirement as its front, and a merchant taking their own photos
-  // otherwise has no reason to think to include it. Uploading an existing
-  // file instead (e.g. an already-scanned copy) stays single-file, same
-  // as every other document type — the two-photo requirement is
-  // specifically a camera-capture thing, not blanket-applied to uploads.
-  // Each shot gets the same per-file blur check as any other upload
-  // (handleDocFileChange, reused as-is) — a blurry front or back is
-  // rejected and must be retaken before continuing, exactly like a
-  // blurry single-file upload already is.
+  // National ID always requires both sides, front and back, whether the
+  // merchant uploads existing scans or takes photos with their camera — an
+  // ID's back (address, signature, sometimes date of birth) is as much a
+  // KYC requirement as its front, and there's no reason to accept it for
+  // one path and not the other. `nationalIdMode` just tracks which path
+  // was chosen, so the exact same two boxes below can render with
+  // (camera) or without (upload) the `capture` attribute. Each shot gets
+  // the same per-file blur check as any other upload (handleDocFileChange,
+  // reused as-is) — a blurry front or back is rejected and must be
+  // retaken/re-selected before continuing.
   function renderNationalIdSlot(label) {
-    const uploadFile = signupDocs.national_id
     const front = signupDocs.national_id_front
     const frontOk = front && !docErrors.national_id_front
     const back = signupDocs.national_id_back
-    const mode = uploadFile ? 'upload' : (front || back) ? 'camera' : null
 
     function resetNationalId() {
-      setSignupDocs(prev => ({ ...prev, national_id: null, national_id_front: null, national_id_back: null }))
-      setDocErrors(prev => ({ ...prev, national_id: '', national_id_front: '', national_id_back: '' }))
-      setDocPreviews(prev => ({ ...prev, national_id: '', national_id_front: '', national_id_back: '' }))
+      setSignupDocs(prev => ({ ...prev, national_id_front: null, national_id_back: null }))
+      setDocErrors(prev => ({ ...prev, national_id_front: '', national_id_back: '' }))
+      setDocPreviews(prev => ({ ...prev, national_id_front: '', national_id_back: '' }))
+      setNationalIdMode(null)
     }
 
-    if (mode === null) {
+    if (nationalIdMode === null) {
       return (
         <div className="space-y-2">
           <div className="flex items-center gap-3 w-full border-2 border-dashed border-outline-variant/25 bg-slate-50 rounded-xl px-4 py-4">
             <span className="material-symbols-outlined text-2xl shrink-0 text-primary/30">badge</span>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-bold text-primary">{label}</p>
-              <p className="text-2xs text-on-surface-variant/50">Upload an existing scan, or take photos of both sides with your camera.</p>
+              <p className="text-2xs text-on-surface-variant/50">Upload or photograph both the front and back of your ID.</p>
             </div>
           </div>
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => docInputRefs.current.national_id?.click()}
+              onClick={() => setNationalIdMode('upload')}
               className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-primary/10 text-primary text-2xs font-bold uppercase tracking-widest hover:bg-primary/20 transition-all"
             >
               <span className="material-symbols-outlined text-sm">upload_file</span>
-              Upload File
+              Upload Files
             </button>
             <button
               type="button"
-              onClick={() => docInputRefs.current.national_id_front?.click()}
+              onClick={() => setNationalIdMode('camera')}
               className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-primary/10 text-primary text-2xs font-bold uppercase tracking-widest hover:bg-primary/20 transition-all"
             >
               <span className="material-symbols-outlined text-sm">photo_camera</span>
-              Take Photo
+              Take Photos
             </button>
           </div>
-          {/* Hidden triggers only — the two-button choice above is the
-              actual UI; once either is used, mode becomes 'upload' or
-              'camera' and the boxes below take over. */}
-          <input
-            ref={el => { docInputRefs.current.national_id = el }}
-            type="file"
-            accept="image/*,application/pdf"
-            onChange={e => handleDocFileChange('national_id', e)}
-            className="hidden"
-          />
-          <input
-            ref={el => { docInputRefs.current.national_id_front = el }}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={e => handleDocFileChange('national_id_front', e)}
-            className="hidden"
-          />
         </div>
       )
     }
 
+    const capture = nationalIdMode === 'camera'
+    const sideLabel = capture ? 'Take Photo' : 'Upload File'
     return (
       <div className="space-y-2">
-        {mode === 'upload' && renderGenericDocBox('national_id', label, { capture: false })}
-        {mode === 'camera' && (
-          <>
-            {renderGenericDocBox('national_id_front', `${label} — Front of ID`, { capture: true })}
-            {frontOk && (
-              back
-                ? renderGenericDocBox('national_id_back', `${label} — Back of ID`, { capture: true })
-                : (
-                  <div className="space-y-2">
-                    <button
-                      type="button"
-                      onClick={() => docInputRefs.current.national_id_back?.click()}
-                      className="w-full flex items-center justify-center gap-1.5 py-3 rounded-xl border-2 border-dashed border-outline-variant/25 bg-slate-50 hover:border-primary/40 text-primary text-xs font-bold transition-all"
-                    >
-                      <span className="material-symbols-outlined text-sm">{docChecking.national_id_back ? 'hourglass_top' : 'photo_camera'}</span>
-                      {docChecking.national_id_back ? 'Checking image quality…' : 'Take Photo — Back of ID'}
-                    </button>
-                    {docErrors.national_id_back && (
-                      <p className="text-2xs font-bold text-red-600 pl-1 flex items-center gap-1.5">
-                        <span className="material-symbols-outlined text-sm">error</span>
-                        {docErrors.national_id_back}
-                      </p>
-                    )}
-                  </div>
-                )
-            )}
-            {/* Hidden back-camera input — rendered once so the "Take
-                Photo — Back of ID" button above (and renderGenericDocBox
-                once `back` is set) both have a ref to click. */}
-            {!back && (
-              <input
-                ref={el => { docInputRefs.current.national_id_back = el }}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={e => handleDocFileChange('national_id_back', e)}
-                className="hidden"
-              />
-            )}
-          </>
+        {renderGenericDocBox('national_id_front', `${label} — Front of ID`, { capture })}
+        {frontOk && (
+          back
+            ? renderGenericDocBox('national_id_back', `${label} — Back of ID`, { capture })
+            : (
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => docInputRefs.current.national_id_back?.click()}
+                  className="w-full flex items-center justify-center gap-1.5 py-3 rounded-xl border-2 border-dashed border-outline-variant/25 bg-slate-50 hover:border-primary/40 text-primary text-xs font-bold transition-all"
+                >
+                  <span className="material-symbols-outlined text-sm">{docChecking.national_id_back ? 'hourglass_top' : capture ? 'photo_camera' : 'upload_file'}</span>
+                  {docChecking.national_id_back ? 'Checking image quality…' : `${sideLabel} — Back of ID`}
+                </button>
+                {docErrors.national_id_back && (
+                  <p className="text-2xs font-bold text-red-600 pl-1 flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-sm">error</span>
+                    {docErrors.national_id_back}
+                  </p>
+                )}
+                {/* Hidden input for the "back" button above — rendered
+                    once here since renderGenericDocBox (which owns the
+                    input once `back` is set) isn't mounted yet. */}
+                <input
+                  ref={el => { docInputRefs.current.national_id_back = el }}
+                  type="file"
+                  accept="image/*,application/pdf"
+                  {...(capture ? { capture: 'environment' } : {})}
+                  onChange={e => handleDocFileChange('national_id_back', e)}
+                  className="hidden"
+                />
+              </div>
+            )
         )}
         <button
           type="button"
@@ -927,6 +918,10 @@ export default function Login() {
           return
         }
       }
+    }
+    if (!agreedToTerms) {
+      setErr('Please agree to the Privacy Policy and Terms of Service to continue.')
+      return
     }
     setErr('')
     setSignupStepTouched(false)
@@ -1072,7 +1067,12 @@ export default function Login() {
       const types = requirement?.mode === 'choice' ? [signupDocType]
         : requirement?.mode === 'all_plus_choice' ? [...requirement.slots.map(s => s.type), signupDocType]
         : (requirement?.slots.map(s => s.type) || [])
-      for (const type of types.flatMap(resolveDocTypes)) {
+      // Optional docs (e.g. business_permit_or_license) ride along too, but
+      // only the ones actually provided — resolveDocTypes/isDocSelected
+      // already treat an unfilled optional slot as "nothing to send", not
+      // an error, since it's never in the required `types` list above.
+      const optionalTypes = (requirement?.optionalSlots || []).map(s => s.type).filter(type => isDocSelected(type))
+      for (const type of [...types, ...optionalTypes].flatMap(resolveDocTypes)) {
         payload.append(`doc_${type}`, signupDocs[type])
       }
     }
@@ -1201,48 +1201,19 @@ export default function Login() {
                    collected here; the account is created pending admin/
                    officer approval and a merchant sets their own password
                    later via the secure link sent once approved (see
-                   finishSignup's pending screen below). */
+                   finishSignup's pending screen below). The Terms/Privacy
+                   checkbox now lives on the main form, directly after the
+                   document upload section — already agreed to by the time
+                   a merchant reaches this step, so it isn't repeated here. */
                 <div className="animate-fade-in-up">
                   <div className="mb-6 lg:mb-10 flex flex-col items-center text-center">
                      <img src={footerBrandsLogo} alt="PayChain Logo" className="h-10 mb-6 w-auto object-contain" />
                      <h3 className="font-headline text-2xl lg:text-5xl text-primary tracking-tight font-black">Review & Submit</h3>
                      <p className="text-on-surface-variant font-medium mt-1.5 text-sm lg:text-base lg:mt-2 opacity-70 leading-relaxed max-w-sm">
-                       Confirm your agreement below to submit your application for review.
+                       Everything looks ready. Submit your application for review.
                      </p>
                   </div>
                   <form onSubmit={handleSignupCreateAccount} className="space-y-6">
-                    <div className="flex items-start gap-3 pt-2">
-                      <input
-                        type="checkbox"
-                        id="agreeTermsMerchant"
-                        checked={agreedToTerms}
-                        onChange={e => setAgreedToTerms(e.target.checked)}
-                        className="mt-0.5 w-4 h-4 shrink-0 rounded border-outline-variant/30 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                      />
-                      <label htmlFor="agreeTermsMerchant" className="text-xs text-on-surface-variant leading-relaxed cursor-pointer">
-                        I confirm that I have read and agree to PayChain's{' '}
-                        <a
-                          href="https://www.paychain.co.ke/privacy-policy"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={e => e.stopPropagation()}
-                          className="font-bold text-emerald-600 hover:text-emerald-700 underline underline-offset-2"
-                        >
-                          Privacy Policy
-                        </a>{' '}
-                        and{' '}
-                        <a
-                          href="https://www.paychain.co.ke/terms-of-service"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={e => e.stopPropagation()}
-                          className="font-bold text-emerald-600 hover:text-emerald-700 underline underline-offset-2"
-                        >
-                          Terms of Service
-                        </a>.
-                      </label>
-                    </div>
-
                     <div className="pt-4">
                       {err && (
                         <div className="bg-red-50 border border-red-200 p-4 rounded-xl flex items-center gap-3 text-red-700 animate-shake mb-4">
@@ -1729,7 +1700,7 @@ export default function Login() {
                       <>
                         <SignupSectionHeader
                           icon="verified_user"
-                          title={`Verification Document${(requirement?.mode === 'all' && requirement.slots.length > 1) || requirement?.mode === 'all_plus_choice' ? 's' : ''}`}
+                          title={`Verification Document${(requirement?.mode === 'all' && (requirement.slots.length + (requirement.optionalSlots?.length || 0)) > 1) || requirement?.mode === 'all_plus_choice' ? 's' : ''}`}
                         />
                         <p className="text-2xs text-on-surface-variant/60 pl-1 -mt-2">
                           {!requirement
@@ -1738,7 +1709,7 @@ export default function Login() {
                               ? 'Upload one of the documents below. Required to create an account.'
                               : requirement.mode === 'all_plus_choice'
                                 ? `Required for a ${signupBusinessType}: ${requirement.slots.map(s => s.label).join(', ')}, plus either ${requirement.choiceOptions.map(o => o.label).join(' or ')}.`
-                                : `Required for a ${signupBusinessType}: ${requirement.slots.map(s => s.label).join(', ')}.`}
+                                : `Required for a ${signupBusinessType}: ${requirement.slots.map(s => s.label).join(', ')}.${requirement.optionalSlots?.length ? ` ${requirement.optionalSlots.map(s => s.label).join(', ')} ${requirement.optionalSlots.length > 1 ? 'are' : 'is'} optional.` : ''}`}
                         </p>
 
                         {requirement?.mode === 'choice' && (
@@ -1765,6 +1736,7 @@ export default function Login() {
                         )}
 
                         {requirement?.mode === 'all' && requirement.slots.map(slot => renderDocUploadSlot(slot.type, slot.label))}
+                        {requirement?.mode === 'all' && requirement.optionalSlots?.map(slot => renderDocUploadSlot(slot.type, `${slot.label} (Optional)`))}
 
                         {requirement?.mode === 'all_plus_choice' && (
                           <>
@@ -1794,8 +1766,40 @@ export default function Login() {
                   })()}
                 </div>
 
+                <div className="flex items-start gap-3 pt-2">
+                  <input
+                    type="checkbox"
+                    id="agreeTermsMerchant"
+                    checked={agreedToTerms}
+                    onChange={e => setAgreedToTerms(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 shrink-0 rounded border-outline-variant/30 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                  />
+                  <label htmlFor="agreeTermsMerchant" className="text-xs text-on-surface-variant leading-relaxed cursor-pointer">
+                    I confirm that I have read and agree to PayChain's{' '}
+                    <a
+                      href="https://www.paychain.co.ke/privacy-policy"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={e => e.stopPropagation()}
+                      className="font-bold text-emerald-600 hover:text-emerald-700 underline underline-offset-2"
+                    >
+                      Privacy Policy
+                    </a>{' '}
+                    and{' '}
+                    <a
+                      href="https://www.paychain.co.ke/terms-of-service"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={e => e.stopPropagation()}
+                      className="font-bold text-emerald-600 hover:text-emerald-700 underline underline-offset-2"
+                    >
+                      Terms of Service
+                    </a>.
+                  </label>
+                </div>
+
                 <div className="sticky bottom-0 bg-white pt-2 pb-1 z-10">
-                  <button disabled={loading || Object.values(docChecking).some(Boolean)} className="w-full bg-[#06201B] text-white py-4 rounded-xl font-black text-sm shadow-xl hover:bg-[#0a3029] active:scale-[0.98] transition-all flex items-center justify-center gap-2 group border border-white/5 disabled:opacity-50">
+                  <button disabled={loading || !agreedToTerms || Object.values(docChecking).some(Boolean)} className="w-full bg-[#06201B] text-white py-4 rounded-xl font-black text-sm shadow-xl hover:bg-[#0a3029] active:scale-[0.98] transition-all flex items-center justify-center gap-2 group border border-white/5 disabled:opacity-50">
                     {loading ? (
                       <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                     ) : (
