@@ -8,7 +8,8 @@ import * as Sharing from 'expo-sharing';
 import api from '../api/config';
 import TopBar from '../components/layout/TopBar';
 import { useAuth } from '../context/AuthContext';
-import { isCreditTransaction, isDebitTransaction, typeLabel as txTypeLabel, netBalanceImpact, excludeReversedDuplicates } from '../utils/transactionDirection';
+import { useTransactions } from '../context/TransactionsContext';
+import { isCreditTransaction, isDebitTransaction, typeLabel as txTypeLabel, netBalanceImpact } from '../utils/transactionDirection';
 import { formatTxDate, formatTxTime } from '../utils/formatDate';
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay';
 import { buildAuditReceiptHtml } from '../utils/auditReceiptHtml';
@@ -84,10 +85,8 @@ const STAT_CARD_STYLES = [
 
 export default function Transactions({ navigation }: any) {
   const { merchant } = useAuth();
+  const { transactions, isLoading, isRefreshing, refresh: refreshTransactions } = useTransactions();
   const [currentPage, setCurrentPage] = useState(1);
-  const [transactions, setTransactions] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedTx, setSelectedTx] = useState<any | null>(null);
   const [isGeneratingReceipt, setIsGeneratingReceipt] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -100,45 +99,15 @@ export default function Transactions({ navigation }: any) {
   const [customTo, setCustomTo] = useState('');
   const [isExporting, setIsExporting] = useState(false);
 
-  const fetchTransactions = useCallback(async () => {
-    try {
-      const res = await api.get('/api/transactions');
-      // Drops any duplicate-credit + its correction entry as a matched pair
-      // at the source, so every downstream stat in this file is
-      // automatically clean — see excludeReversedDuplicates' doc comment.
-      if (res.data.success) {
-        setTransactions(excludeReversedDuplicates(res.data.transactions || []));
-      } else if (Array.isArray(res.data)) {
-        // Fallback: some endpoints return array directly
-        setTransactions(excludeReversedDuplicates(res.data));
-      }
-    } catch (error) {
-      console.error('Error fetching transactions', error);
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  }, []);
-
+  // Transaction data (list, loading/refreshing state) now comes from the
+  // app-wide TransactionsContext — a single shared fetch/poll instead of
+  // this screen running its own on top of Dashboard.tsx's and
+  // Collections.tsx's identical ones.
   const onRefresh = () => {
-    setIsRefreshing(true);
-    fetchTransactions();
+    refreshTransactions();
   };
 
-  useEffect(() => {
-    fetchTransactions();
-  }, [fetchTransactions]);
-
-  // Keep the list live, matching the dashboard's identical 5s poll
-  // (Transactions.jsx) — previously this only ever fetched once on mount,
-  // so a new payment never appeared until the merchant left and re-entered
-  // the screen.
-  useEffect(() => {
-    const interval = setInterval(fetchTransactions, 3000);
-    return () => clearInterval(interval);
-  }, [fetchTransactions]);
-
-  useFocusEffect(useCallback(() => { fetchTransactions(); }, [fetchTransactions]));
+  useFocusEffect(useCallback(() => { refreshTransactions(); }, [refreshTransactions]));
 
   // ─── Stats calculation (mirroring merchant dashboard) ─────────────────────
   const inboundTxs = transactions.filter(t => isCreditTransaction(t.type));

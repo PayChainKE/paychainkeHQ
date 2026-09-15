@@ -8,6 +8,7 @@ import { Text, TextInput } from 'react-native';
 import MobileLayout from './src/components/layout/MobileLayout';
 import AppNavigator from './src/navigation/AppNavigator';
 import { AuthProvider } from './src/context/AuthContext';
+import { TransactionsProvider } from './src/context/TransactionsContext';
 import BrandedLoadingScreen from './src/components/BrandedLoadingScreen';
 import Sentry from './src/lib/sentry';
 
@@ -40,12 +41,14 @@ function App() {
 
   return (
     <AuthProvider>
-      <SafeAreaProvider>
-        <StatusBar style="dark" />
-        <MobileLayout>
-          <AppNavigator />
-        </MobileLayout>
-      </SafeAreaProvider>
+      <TransactionsProvider>
+        <SafeAreaProvider>
+          <StatusBar style="dark" />
+          <MobileLayout>
+            <AppNavigator />
+          </MobileLayout>
+        </SafeAreaProvider>
+      </TransactionsProvider>
     </AuthProvider>
   );
 }
