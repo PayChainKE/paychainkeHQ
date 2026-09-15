@@ -13,6 +13,10 @@ import { isValidPhoneKE } from '../utils/validators'
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay'
 import paychainLogo from '../assets/paychain-logo-dark.png'
 import paychainLogoWhite from '../assets/paychain-logo-white.png'
+import employeesIcon from '../assets/employees-icon.png'
+import suppliersIcon from '../assets/suppliers-icon.png'
+import utilitiesIcon from '../assets/utilities-icon.png'
+import contractorsIcon from '../assets/contractors-icon.png'
 import axios from 'axios'
 
 export default function BulkPay() {
@@ -1092,10 +1096,10 @@ export default function BulkPay() {
                 {addStep === 1 ? (
                   <div className="flex flex-col gap-3">
                     {[
-                      { id: 'employee', label: 'Employee', icon: 'badge', desc: 'Payroll & Salaries' },
-                      { id: 'supplier', label: 'Supplier', icon: 'inventory_2', desc: 'Logistics & Stock' },
-                      { id: 'utility', label: 'Utility', icon: 'account_balance', desc: 'Rent, Power, Water' },
-                      { id: 'contractor', label: 'Contractor', icon: 'engineering', desc: 'One-off Services' }
+                      { id: 'employee', label: 'Employee', icon: employeesIcon, desc: 'Payroll & Salaries' },
+                      { id: 'supplier', label: 'Supplier', icon: suppliersIcon, desc: 'Logistics & Stock' },
+                      { id: 'utility', label: 'Utility', icon: utilitiesIcon, desc: 'Rent, Power, Water' },
+                      { id: 'contractor', label: 'Contractor', icon: contractorsIcon, desc: 'One-off Services' }
                     ].map((cat) => (
                       <button
                         key={cat.id}
@@ -1117,9 +1121,15 @@ export default function BulkPay() {
                           </div>
 
                           <div className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all shrink-0 ${
-                            newPayee.type === cat.label ? 'bg-[#00351D] text-white' : 'bg-surface-container-low text-primary group-hover:bg-[#00351D] group-hover:text-white'
+                            newPayee.type === cat.label ? 'bg-[#00351D]' : 'bg-surface-container-low group-hover:bg-[#00351D]'
                           }`}>
-                            <span className="material-symbols-outlined text-lg" style={{fontVariationSettings: "'FILL' 1"}}>{cat.icon}</span>
+                            <img
+                              src={cat.icon}
+                              alt=""
+                              className={`w-5 h-5 object-contain transition-all ${
+                                newPayee.type === cat.label ? 'brightness-0 invert' : 'group-hover:brightness-0 group-hover:invert'
+                              }`}
+                            />
                           </div>
 
                           <div>
