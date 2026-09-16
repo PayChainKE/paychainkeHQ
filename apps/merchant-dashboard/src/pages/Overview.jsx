@@ -18,6 +18,7 @@ import sendMoneyIcon from '../assets/send-money-icon.png'
 import receiveMoneyIcon from '../assets/receive-money-icon.png'
 import stkPushIcon from '../assets/stk-push-icon.png'
 import paymentLinkIcon from '../assets/payment-link-icon.png'
+import cashAdvanceIcon from '../assets/cash-advance-icon.png'
 
 export default function Overview() {
   const navigate = useNavigate()
@@ -635,7 +636,7 @@ export default function Overview() {
         <div className="space-y-6">
           <section className="bg-white p-8 rounded-[16px] border border-[#E5E7EB] border-t-4 border-t-[#00351D] shadow-sm editorial-shadow text-center">
             <div className="w-16 h-16 bg-surface-container-low rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="material-symbols-outlined text-3xl text-emerald-600/50">account_balance_wallet</span>
+              <img src={cashAdvanceIcon} alt="" className="w-8 h-8 object-contain opacity-60" />
             </div>
             <h4 className="font-headline text-xl font-bold text-primary mb-2">
               {trustData?.eligibleForAdvance ? 'Cash Advance Available' : 'Unlock Cash Advances'}
