@@ -1,123 +1,123 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://paychain.co.ke/</loc>
+    <loc>https://www.paychain.co.ke/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://paychain.co.ke/how-it-works</loc>
+    <loc>https://www.paychain.co.ke/how-it-works</loc>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://paychain.co.ke/products</loc>
+    <loc>https://www.paychain.co.ke/products</loc>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://paychain.co.ke/products/virtual-account</loc>
+    <loc>https://www.paychain.co.ke/products/virtual-account</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://paychain.co.ke/products/bulk-pay</loc>
+    <loc>https://www.paychain.co.ke/products/bulk-pay</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://paychain.co.ke/products/cash-advance</loc>
+    <loc>https://www.paychain.co.ke/products/cash-advance</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://paychain.co.ke/products/operations-tools</loc>
+    <loc>https://www.paychain.co.ke/products/operations-tools</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://paychain.co.ke/products/inflation-shield</loc>
+    <loc>https://www.paychain.co.ke/products/inflation-shield</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://paychain.co.ke/integrations</loc>
+    <loc>https://www.paychain.co.ke/integrations</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://paychain.co.ke/docs</loc>
+    <loc>https://www.paychain.co.ke/docs</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://paychain.co.ke/faq</loc>
+    <loc>https://www.paychain.co.ke/faq</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://paychain.co.ke/about</loc>
+    <loc>https://www.paychain.co.ke/about</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://paychain.co.ke/contact</loc>
+    <loc>https://www.paychain.co.ke/contact</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://paychain.co.ke/book-demo</loc>
+    <loc>https://www.paychain.co.ke/book-demo</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://paychain.co.ke/blog</loc>
+    <loc>https://www.paychain.co.ke/blog</loc>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://paychain.co.ke/blog/paychain-data-controller-registration</loc>
+    <loc>https://www.paychain.co.ke/blog/paychain-data-controller-registration</loc>
     <lastmod>2026-07-14</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://paychain.co.ke/blog/inflation-shield-stablecoins</loc>
+    <loc>https://www.paychain.co.ke/blog/inflation-shield-stablecoins</loc>
     <lastmod>2026-10-10</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://paychain.co.ke/blog/future-of-payments-africa</loc>
+    <loc>https://www.paychain.co.ke/blog/future-of-payments-africa</loc>
     <lastmod>2026-10-15</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://paychain.co.ke/blog/offline-first-pos</loc>
+    <loc>https://www.paychain.co.ke/blog/offline-first-pos</loc>
     <lastmod>2026-10-05</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://paychain.co.ke/blog/bulk-pay-payroll</loc>
+    <loc>https://www.paychain.co.ke/blog/bulk-pay-payroll</loc>
     <lastmod>2026-09-28</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://paychain.co.ke/blog/paychain-official-registration</loc>
+    <loc>https://www.paychain.co.ke/blog/paychain-official-registration</loc>
     <lastmod>2026-05-28</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://paychain.co.ke/terms-of-service</loc>
+    <loc>https://www.paychain.co.ke/terms-of-service</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://paychain.co.ke/privacy-policy</loc>
+    <loc>https://www.paychain.co.ke/privacy-policy</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>

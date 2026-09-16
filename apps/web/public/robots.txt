@@ -19,4 +19,4 @@ Disallow: /forgot-password
 Disallow: /kyc/
 Disallow: /overview
 
-Sitemap: https://paychain.co.ke/sitemap.xml
+Sitemap: https://www.paychain.co.ke/sitemap.xml
