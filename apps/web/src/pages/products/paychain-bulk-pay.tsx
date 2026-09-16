@@ -1,4 +1,5 @@
 import React from 'react';
+import Seo from '@/components/Seo';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { motion } from 'framer-motion';
@@ -44,6 +45,11 @@ const batch = [
 const PaychainBulkPay: React.FC = () => {
   return (
     <div className="min-h-screen bg-white">
+      <Seo
+        title="PayChain Bulk Pay | Pay Everyone in One Click"
+        description="Pay employees, suppliers, and contractors, and settle KPLC electricity tokens (prepaid or postpaid), water, internet, and other utilities — all from one batch payout."
+        path="/products/bulk-pay"
+      />
       <Navbar />
 
       {/* Breadcrumb strip */}

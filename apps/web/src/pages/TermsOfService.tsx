@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, Phone, MapPin, FileText, ChevronRight } from 'lucide-react';
+import Seo from '@/components/Seo';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
@@ -34,6 +35,11 @@ const TermsOfService: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-white">
+      <Seo
+        title="Terms of Service | PayChain"
+        description="PayChain's Terms of Service: eligibility, fees, merchant obligations, data protection, and dispute resolution for merchants using the platform."
+        path="/terms-of-service"
+      />
       <Navbar />
 
       {/* Hero */}

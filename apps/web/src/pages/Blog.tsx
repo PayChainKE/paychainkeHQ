@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Calendar, Clock, ChevronRight } from 'lucide-react';
+import Seo from '../components/Seo';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { motion } from 'framer-motion';
@@ -75,8 +76,13 @@ const Blog = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
+      <Seo
+        title="Blog | PayChain"
+        description="Company news, compliance updates, and industry insights from PayChain — building the financial infrastructure for Kenyan merchants."
+        path="/blog"
+      />
       <Navbar />
-      
+
       <main className="flex-grow p-0 m-0">
         {/* Professional Dark Hero Section */}
         <section className="relative w-full overflow-hidden min-h-[450px] flex items-center text-white pt-32 pb-20 bg-[#0a0a0a]">

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { LinkIcon, ClipboardCopy, PartyPopper, Code2 } from 'lucide-react';
+import Seo from '@/components/Seo';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
@@ -40,6 +41,11 @@ const snippet = `<script src="https://app.paychain.co.ke/paychain-button.js" def
 const Integrations: React.FC = () => {
   return (
     <div className="min-h-screen bg-white">
+      <Seo
+        title="Add PayChain Checkout to Your Website | No Code Required"
+        description="Add a working 'Pay with PayChain' button to Wix, Shopify, WordPress, Squarespace, or any site in minutes — copy one embed snippet, no developer needed."
+        path="/integrations"
+      />
       <Navbar />
       <main className="pt-32 pb-24 px-6">
         <div className="max-w-3xl mx-auto text-center">

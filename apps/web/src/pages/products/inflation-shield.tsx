@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import Seo from '@/components/Seo';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Link } from 'react-router-dom';
@@ -44,6 +45,11 @@ const InflationShield: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
+      <Seo
+        title="The Inflation Shield | Hedge Shilling Depreciation with USDC"
+        description="Convert KES to USDC instantly, pay international suppliers without SWIFT fees, and auto-hedge surplus balances against shilling depreciation. Currently in development at PayChain."
+        path="/products/inflation-shield"
+      />
       <Navbar />
 
       {/* Breadcrumb strip */}

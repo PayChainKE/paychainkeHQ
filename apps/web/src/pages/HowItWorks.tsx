@@ -1,5 +1,6 @@
 
 import React, { useEffect } from 'react';
+import Seo from '@/components/Seo';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import '@/pages/how-it-works.css';
@@ -139,6 +140,11 @@ const HowItWorks: React.FC = () => {
 
   return (
     <div className="howitworks-root min-h-screen bg-background text-foreground">
+      <Seo
+        title="How PayChain Works | Collect, Pay & Grow in One Dashboard"
+        description="See how PayChain works end to end: get KYC-verified and receive your own Paybill and virtual account, collect payments across every channel, then pay suppliers and staff in bulk — all from one dashboard."
+        path="/how-it-works"
+      />
       <Navbar />
       <main className="howitworks-main mx-auto max-w-[1200px] px-4 sm:px-8">
         {/* HERO SECTION */}

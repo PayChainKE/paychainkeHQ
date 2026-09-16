@@ -3,6 +3,7 @@ import { AxiosError } from "axios";
 import api from "@/lib/api";
 import { trackEvent } from "@/lib/analytics";
 import styles from "./ContactUs.module.css";
+import Seo from "@/components/Seo";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import {
@@ -238,26 +239,13 @@ export default function ContactUs() {
     setCharCount(0);
   };
 
-  // Add OG meta tags (SPA-friendly approach)
-  useEffect(() => {
-    const metas = [
-      { property: "og:title", content: "Contact PayChain: Get in Touch" },
-      { property: "og:description", content: "Reach the PayChain team directly. Phone: +254 743 283 782. Based in Nairobi, Kenya." },
-      { property: "og:url", content: "https://www.paychain.co.ke/contact" },
-      { name: "twitter:card", content: "summary" },
-    ];
-    metas.forEach((m) => {
-      const selector = m.property ? `meta[property="${m.property}"]` : `meta[name="${m.name}"]`;
-      if (!document.querySelector(selector)) {
-        const meta = document.createElement("meta");
-        Object.keys(m).forEach((k) => (meta.setAttribute(k, (m as Record<string, string>)[k])));
-        document.head.appendChild(meta);
-      }
-    });
-  }, []);
-
   return (
     <>
+      <Seo
+        title="Contact Us | PayChain"
+        description="Get in touch with PayChain — support, partnerships, integrations, or general enquiries. Call +254 743 283 782 or email support@paychain.co.ke."
+        path="/contact"
+      />
       <Navbar />
       <main className={`${styles.page} p-0 m-0`}>
       {/* HERO */}

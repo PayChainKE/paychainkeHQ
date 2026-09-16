@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react'
+import Seo from '@/components/Seo'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
 import TrustBar from '@/components/TrustBar'
@@ -10,7 +11,7 @@ import AboutProblemSolution from '@/components/AboutProblemSolution'
   About.tsx
   - Production-ready About page component for PayChain
   - Semantic HTML, accessibility-focused, imports BEM CSS and animation JS
-  - Injects Open Graph meta and Organization JSON-LD on mount
+  - Injects Organization JSON-LD on mount (OG/meta handled by <Seo>)
 */
 
 export default function About(): JSX.Element {
@@ -19,30 +20,22 @@ export default function About(): JSX.Element {
     // about.js respects prefers-reduced-motion and cleans up observers/listeners on return
     const cleanup = initAbout()
 
-    // Inject OG meta tags and JSON-LD for Organization (idempotent)
-    if (!document.querySelector('meta[property="og:title"][content="About PayChain: Built in Kenya for Kenya\'s Merchants"]')) {
-      const ogs: { rel?: string; prop?: string; content: string }[] = [
-        { prop: 'og:title', content: "About PayChain: Built in Kenya's Merchants" },
-        { prop: 'og:description', content: 'PayChain is a Nairobi-born fintech company building Kenya\'s most trusted merchant OS: verified payments, payment links, bulk pay, and data-driven cash advances.' },
-        { prop: 'og:url', content: 'https://www.paychain.co.ke/about' },
-        { prop: 'og:image', content: '/assets/og-about.jpg' }
-      ]
-      ogs.forEach(o => {
-        const m = document.createElement('meta')
-        if (o.prop) m.setAttribute('property', o.prop)
-        m.setAttribute('content', o.content)
-        document.head.appendChild(m)
-      })
-
-      // Schema.org Organization structured data
+    // Schema.org Organization structured data — og:title/description/url/
+    // image are handled centrally by <Seo> below now, so this only injects
+    // the JSON-LD block, keyed by its own data attribute (rather than the
+    // old og:title text match, which broke the moment <Seo> started setting
+    // a different og:title first and made this re-inject a duplicate
+    // <script> tag on every mount).
+    if (!document.querySelector('script[data-paychain-org-ld]')) {
       const ld = document.createElement('script')
       ld.type = 'application/ld+json'
+      ld.setAttribute('data-paychain-org-ld', '1')
       ld.text = JSON.stringify({
         '@context': 'https://schema.org',
         '@type': 'Organization',
         name: 'PayChain',
-        url: 'https://www.paychain.co.ke',
-        logo: 'https://www.paychain.co.ke/assets/logo.png',
+        url: 'https://paychain.co.ke',
+        logo: 'https://paychain.co.ke/logo.png',
         sameAs: ['https://twitter.com/paychainke']
       })
       document.head.appendChild(ld)
@@ -76,6 +69,11 @@ export default function About(): JSX.Element {
 
   return (
     <div className="about">
+      <Seo
+        title="About PayChain | A Kenyan Fintech Startup Fixing Merchant Payments"
+        description="Why PayChain exists: we're a Nairobi-based fintech startup that saw what the old system was doing to Kenya's merchants — fake screenshots, SMS fraud, slow settlement — and built an NCBA Bank-backed Paybill platform to fix it."
+        path="/about"
+      />
       <Navbar />
 
       {/* HERO SECTION: immersive, full-bleed */}

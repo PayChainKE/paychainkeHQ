@@ -12,3 +12,11 @@ Allow: /
 
 User-agent: *
 Allow: /
+Disallow: /paychain-dashboard/
+Disallow: /signin
+Disallow: /signup
+Disallow: /forgot-password
+Disallow: /kyc/
+Disallow: /overview
+
+Sitemap: https://paychain.co.ke/sitemap.xml

@@ -20,6 +20,7 @@ import {
   Clock,
   MessageSquare,
 } from 'lucide-react';
+import Seo from '@/components/Seo';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -52,6 +53,10 @@ function highlight(text: string, query: string) {
   const q = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const re = new RegExp(`(${q})`, 'ig');
   return text.split(re).map((part, i) => (re.test(part) ? `<mark class="search-highlight">${part}</mark>` : part)).join('');
+}
+
+function stripHtml(html: string) {
+  return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 export default function FAQPage(): JSX.Element {
@@ -98,6 +103,28 @@ export default function FAQPage(): JSX.Element {
       setOpenItems({});
     }
   }, [searchMode]);
+
+  // FAQPage structured data — lets Google surface these Q&As as rich
+  // results directly in search, not just as a ranked link.
+  useEffect(() => {
+    const ld = document.createElement('script');
+    ld.type = 'application/ld+json';
+    ld.setAttribute('data-paychain-faq-ld', '1');
+    ld.text = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: flatQuestions.map(item => ({
+        '@type': 'Question',
+        name: item.q,
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: stripHtml(item.a),
+        },
+      })),
+    });
+    document.head.appendChild(ld);
+    return () => { ld.remove(); };
+  }, [flatQuestions]);
 
   const onSearch = debounce((val: string) => {
     setQuery(val);
@@ -166,6 +193,11 @@ export default function FAQPage(): JSX.Element {
 
   return (
     <div className="faqs-page">
+      <Seo
+        title="FAQs | PayChain"
+        description="Answers to common questions about PayChain: getting verified, collecting payments, Bulk Pay, Cash Advance eligibility, fees, and account security."
+        path="/faq"
+      />
       <Navbar />
 
       <header className="faqs-hero">
