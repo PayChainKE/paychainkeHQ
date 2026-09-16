@@ -94,7 +94,7 @@ const AboutProblemSolution: React.FC = () => {
                 PayChain solves all four in one place.
               </h2>
               <p className="text-base sm:text-lg text-emerald-100/70 leading-relaxed">
-                Consolidate your financial stack. Everything your business needs to operate securely and grow effortlessly, built into a single dashboard.
+                Bring all your money tools into one place. Everything your business needs to run safely and grow, built into a single dashboard.
               </p>
             </motion.div>
 
@@ -120,7 +120,7 @@ const AboutProblemSolution: React.FC = () => {
                   <TrendingUp className="w-6 h-6" />
                 </div>
                 <p className="text-base sm:text-lg leading-relaxed font-medium text-white/90">
-                  From the same dashboard you can pay all your staff, suppliers, and utility bills in one click, and after 3 months of using PayChain your transaction history automatically qualifies you for working capital/cash advance:<span className="font-bold text-emerald-400 block mt-3">no collateral, no bank queue, no title deed.</span>
+                  From the same dashboard you can pay all your staff, suppliers, and utility bills in one click, and after 3 months of using PayChain your own sales history automatically qualifies you for a Cash Advance:<span className="font-bold text-emerald-400 block mt-3">no land or property, no bank queue, no title deed.</span>
                 </p>
               </motion.div>
             </div>

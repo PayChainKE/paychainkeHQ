@@ -19,18 +19,18 @@ const data = [
 
 const features = [
   { title: 'Instant KES → USDC Swaps', icon: Repeat, desc: 'Convert your KES balance to USDC in seconds from your dashboard. No queues, no negotiation.' },
-  { title: 'Transparent 0.5% FX Rate', icon: Percent, desc: 'Flat 0.5% spread on all conversions. You see the exact rate before you confirm, no hidden fees.' },
-  { title: 'Pay International Suppliers', icon: Send, desc: 'Send USDC directly to international suppliers. No wire transfers, no SWIFT fees, no bank delays.' },
-  { title: 'Auto-Hedge Thresholds', icon: Shield, desc: 'Set a KES threshold: PayChain automatically converts surplus to USDC, protecting your purchasing power.' },
-  { title: 'Hybrid KES + USDC Balance', icon: Wallet, desc: 'See and manage both currencies on one dashboard. Switch between them instantly as needs change.' },
-  { title: 'Blockchain-Settled Transfers', icon: Zap, desc: 'All USDC transfers settle on Base Network: fast, cheap, and traceable under 10 seconds.' },
+  { title: 'A Clear, Flat Fee', icon: Percent, desc: 'Just 0.5% on every conversion, always. You see the exact fee before you confirm — nothing hidden.' },
+  { title: 'Pay Suppliers Abroad', icon: Send, desc: 'Send USDC straight to suppliers outside Kenya. No wire transfers, no extra bank fees, no waiting days for it to arrive.' },
+  { title: 'Automatic Protection', icon: Shield, desc: 'Set an amount of KES you want to keep: anything above it gets automatically turned into USDC, so it doesn\'t lose value.' },
+  { title: 'Both Currencies, One Dashboard', icon: Wallet, desc: 'See and manage your KES and USDC in the same place. Switch between them instantly whenever you need to.' },
+  { title: 'Fast, Secure Transfers', icon: Zap, desc: 'All USDC moves on a secure digital payment network called Base — fast, cheap, and done in under 10 seconds.' },
 ];
 
 const stats = [
-  { value: '30%', label: 'KES depreciation vs USD (2021 to 2024)' },
-  { value: 'KES 150K', label: 'Purchasing power lost on KES 500K held in cash' },
-  { value: '0.5%', label: 'PayChain flat FX spread' },
-  { value: '< 10s', label: 'USDC transfer time on Base Network' },
+  { value: '30%', label: 'How much the shilling lost against the dollar (2021 to 2024)' },
+  { value: 'KES 150K', label: 'Value lost on KES 500K just held as cash over that time' },
+  { value: '0.5%', label: 'PayChain\'s flat conversion fee' },
+  { value: '< 10s', label: 'How fast a USDC transfer arrives' },
 ];
 
 const useCases = [
@@ -46,8 +46,8 @@ const InflationShield: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <Seo
-        title="The Inflation Shield | Hedge Shilling Depreciation with USDC"
-        description="Convert KES to USDC instantly, pay international suppliers without SWIFT fees, and auto-hedge surplus balances against shilling depreciation. Currently in development at PayChain."
+        title="The Inflation Shield | Protect Your Money from the Shilling Losing Value"
+        description="Turn your KES into USDC (a digital dollar) instantly, pay suppliers abroad without extra bank fees, and automatically protect extra cash from losing value as the shilling weakens. Currently in development at PayChain."
         path="/products/inflation-shield"
       />
       <Navbar />
@@ -82,7 +82,7 @@ const InflationShield: React.FC = () => {
                   Stop Watching Your Profits <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-red-500">Disappear</span>.
                 </h1>
                 <p className="text-lg text-gray-400 mb-8 max-w-xl leading-relaxed">
-                  We're building the PayChain Inflation Shield: a way to swap KES to USDC in seconds, protecting your purchasing power and hedging shilling depreciation without ever visiting a forex bureau. It's currently in development on Base Network; join the waitlist to be first in line when it opens up.
+                  We're building the PayChain Inflation Shield: a way to change your shillings to USDC (a digital dollar) in seconds, so your money doesn't lose value when the shilling weakens — without ever visiting a forex bureau. It's still being built; join the waitlist to be first in line when it opens up.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4">
                   <a href="https://app.paychain.co.ke" className="inline-flex items-center justify-center px-8 py-4 text-base font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_20px_rgba(0,191,99,0.3)]">
@@ -159,7 +159,7 @@ const InflationShield: React.FC = () => {
               >
                 <h3 className="text-3xl font-bold text-gray-900 mb-6">Your Purchasing Power, Protected.</h3>
                 <p className="text-lg text-gray-600 mb-8 leading-relaxed">
-                  The PayChain Inflation Shield is a built-in KES-to-USDC conversion engine that lets you swap your KES balance to USDC stablecoin directly from your dashboard, at a transparent 0.5% rate with no forex bureau, no bank minimum, no waiting.
+                  The PayChain Inflation Shield lets you change your shillings into USDC (a digital dollar that always keeps its value) right from your dashboard, for a clear 0.5% fee — no forex bureau, no minimum amount, no waiting.
                 </p>
                 
                 <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm overflow-hidden transition-all duration-300">
@@ -254,7 +254,7 @@ const InflationShield: React.FC = () => {
         <section className="py-20 bg-[#0a0a0a] text-white">
           <div className="container mx-auto px-6 lg:px-8">
             <div className="text-center mb-16">
-              <h2 className="text-3xl md:text-4xl font-bold mb-4">The Cost of Not Hedging</h2>
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">The Cost of Not Protecting Your Money</h2>
               <p className="text-gray-400">Numbers that speak for themselves.</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">

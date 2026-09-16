@@ -34,8 +34,8 @@ export default function About(): JSX.Element {
         '@context': 'https://schema.org',
         '@type': 'Organization',
         name: 'PayChain',
-        url: 'https://paychain.co.ke',
-        logo: 'https://paychain.co.ke/logo.png',
+        url: 'https://www.paychain.co.ke',
+        logo: 'https://www.paychain.co.ke/logo.png',
         sameAs: ['https://twitter.com/paychainke']
       })
       document.head.appendChild(ld)
@@ -112,8 +112,8 @@ export default function About(): JSX.Element {
           <ul className="about__stats-grid force-accent" role="list">
             <li className="about__stat" data-count="7400000">
               <div className="about__stat-value" style={{ color: 'var(--accent)' }}>7,400,000</div>
-              <div className="about__stat-label" style={{ color: 'var(--accent)' }}>Registered SMEs in Kenya</div>
-              <div className="about__stat-desc">The largest untapped merchant fintech market on the continent.</div>
+              <div className="about__stat-label" style={{ color: 'var(--accent)' }}>Registered small businesses in Kenya</div>
+              <div className="about__stat-desc">The biggest group of merchants in Africa that fintech hasn't properly reached yet.</div>
             </li>
             {/* Shilling depreciation stat removed per request */}
             {/* Removed per request: M-PESA SMS fraud stat */}
@@ -128,8 +128,8 @@ export default function About(): JSX.Element {
 
             <li className="about__stat" data-count="70" data-suffix="%">
               <div className="about__stat-value" style={{ color: 'var(--accent)' }}>70%</div>
-              <div className="about__stat-label" style={{ color: 'var(--accent)' }}>of Kenyan SMEs lack access to formal credit</div>
-              <div className="about__stat-desc">A widespread access gap constraining business growth.</div>
+              <div className="about__stat-label" style={{ color: 'var(--accent)' }}>of Kenyan small businesses can't get a loan from a bank</div>
+              <div className="about__stat-desc">A gap that's holding back business growth across the country.</div>
             </li>
 
             <li className="about__stat" data-count="20" data-suffix="%">
@@ -140,8 +140,8 @@ export default function About(): JSX.Element {
 
             <li className="about__stat" data-count="5" data-prefix="<" data-suffix="%">
               <div className="about__stat-value" style={{ color: 'var(--accent)' }}>&lt;5%</div>
-              <div className="about__stat-label" style={{ color: 'var(--accent)' }}>Less than 5% of SMEs use more than one financial tool</div>
-              <div className="about__stat-desc">Most merchants remain locked into a single, fragmented workflow.</div>
+              <div className="about__stat-label" style={{ color: 'var(--accent)' }}>Less than 5% of small businesses use more than one money app</div>
+              <div className="about__stat-desc">Most merchants are still stuck juggling separate tools that don't talk to each other.</div>
             </li>
 
             <li className="about__stat" data-count="5000">
@@ -187,7 +187,7 @@ export default function About(): JSX.Element {
           <div className="about__mv-grid">
             <div className="about__mv-card about__mv-card--mission">
               <div className="about__eyebrow-small">Our Mission</div>
-              <p>To eliminate financial fragmentation and the digital trust deficit holding Kenyan SMEs back, by building the most trusted, most intelligent, and most accessible merchant operating system in Kenya.</p>
+              <p>To end the scattered tools and lack of trust holding Kenyan small businesses back, by building the most trusted, smartest, and easiest-to-use money system for merchants in Kenya.</p>
             </div>
             <div className="about__mv-card about__mv-card--vision">
               <div className="about__eyebrow-small">Our Vision</div>

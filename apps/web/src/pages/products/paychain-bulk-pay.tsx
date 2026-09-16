@@ -11,8 +11,8 @@ const features = [
   { title: 'Suppliers & Contractors', icon: Package, desc: 'Save supplier and contractor details once: bank account, mobile money, Paybill, or Till. Pay them all simultaneously when invoices are due. No manual transfers, no errors, no delays.' },
   { title: 'Utility Bill Settlement', icon: Zap, desc: 'Settle KPLC tokens (prepaid or postpaid), water, internet, and other utilities from one dashboard. Never miss a bill again.' },
   { title: 'Scheduled & Recurring Payments', icon: Calendar, desc: 'Set payments to run automatically: weekly wages, monthly rent, recurring orders. PayChain executes on time, every time.' },
-  { title: 'Full Audit Trail', icon: FileText, desc: 'Every payment logged with amount, recipient, timestamp, and reference. Download full reports for accounting.' },
-  { title: 'Payment Approval Workflow', icon: CheckCircle, desc: 'Require a second sign-off before large payments are released. Protect your business from unauthorized transfers.' },
+  { title: 'A Record of Every Payment', icon: FileText, desc: 'Every payment is saved with the amount, who received it, and when. Download the full list any time for your books.' },
+  { title: 'A Second Check Before Big Payments', icon: CheckCircle, desc: 'Ask for someone else\'s okay before large payments go out. Keeps your business safe from mistakes or unauthorized transfers.' },
 ];
 
 const steps = [
@@ -31,9 +31,9 @@ const useCases = [
 const comparisonRows = [
   ['Time to pay 20 staff', '40 to 60 minutes', 'Under 2 minutes'],
   ['Error risk', 'High (manual entry)', 'Zero (saved lists)'],
-  ['Audit trail', 'None', 'Full downloadable report'],
-  ['Scheduling', 'Manual every time', 'Automated recurring'],
-  ['Approval controls', 'None', 'Multi-level authorization'],
+  ['Record of payments', 'None', 'Full downloadable report'],
+  ['Scheduling', 'Manual every time', 'Set it and forget it'],
+  ['Second-check before paying', 'None', 'You choose who approves'],
 ];
 
 const batch = [
@@ -148,7 +148,7 @@ const PaychainBulkPay: React.FC = () => {
             <motion.div initial={{ opacity: 0, x: -20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ duration: 0.6 }}>
               <h3 className="text-3xl font-bold text-gray-900 mb-6">All Your Outbound Payments. One Dashboard. Zero Chaos.</h3>
               <p className="text-lg text-gray-600 leading-relaxed">
-                PayChain Bulk Pay is a centralized outbound payment engine built into your merchant dashboard. Upload your payroll list, add supplier accounts, schedule utility bills, and execute all of them simultaneously with a single confirmation. Every payment is logged, timestamped, and receipted automatically.
+PayChain Bulk Pay lets you pay everyone you owe money to — staff, suppliers, utility bills — straight from your dashboard. Add your payroll list, add your suppliers, add your bills, and send them all at once with a single confirmation. Every payment is saved automatically with a receipt.
               </p>
             </motion.div>
 

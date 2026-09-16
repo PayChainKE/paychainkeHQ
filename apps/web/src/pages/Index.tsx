@@ -15,7 +15,7 @@ const Index: React.FC = () => {
     <div className="min-h-screen bg-background pt-16">
       <Seo
         title="PayChain | Paybill, Bulk Pay & Cash Advance for Kenyan Merchants"
-        description="PayChain is a Kenyan fintech platform giving merchants a dedicated, NCBA Bank-backed Paybill, bulk payroll and supplier payouts, and revenue-based cash advances — no hardware, no hidden fees."
+        description="PayChain is a Kenyan fintech platform giving merchants a dedicated, NCBA Bank-backed Paybill, bulk payroll and supplier payouts, and cash advances based on your own sales — no hardware, no hidden fees."
         path="/"
       />
       <Navbar />

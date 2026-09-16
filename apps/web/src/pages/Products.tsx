@@ -33,15 +33,15 @@ const products = [
     path: '/products/cash-advance',
     icon: Wallet,
     name: 'Cash Advance',
-    tagline: 'Working capital, no collateral.',
+    tagline: 'Money for your business, no land or property needed.',
     desc: 'Access capital based on your verified PayChain transaction history, not land titles, guarantors, or bank relationships.',
   },
   {
     path: '/products/operations-tools',
     icon: Settings,
     name: 'Operations Tools',
-    tagline: 'Reconciliation, disputes, and dashboards.',
-    desc: 'Real-time visibility, financial controls, and compliance automation, everything you need to run a modern Kenyan business.',
+    tagline: 'Track your money, handle disputes, see it all.',
+    desc: 'See everything happening in your business as it happens, control who can spend what, and stay on the right side of tax rules automatically.',
   },
 ]
 
@@ -50,7 +50,7 @@ export default function Products() {
     <div className="min-h-screen bg-white text-[#0A192F]">
       <Seo
         title="Fintech Products for Kenyan Merchants | PayChain"
-        description="Everything a Kenyan merchant needs to run their business: a verified Paybill and virtual account, one-click bulk payroll and utility payments, revenue-based cash advances, and real-time operations tools."
+        description="Everything a Kenyan merchant needs to run their business: a verified Paybill and virtual account, one-click bulk payroll and utility payments, cash advances based on your own sales, and real-time operations tools."
         path="/products"
       />
       <Navbar />

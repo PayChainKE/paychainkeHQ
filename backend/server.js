@@ -61,6 +61,8 @@ import developerRoutes from './routes/developerRoutes.js';
 import developerPublicRoutes from './routes/developerPublicRoutes.js';
 import publicCheckoutRoutes from './routes/publicCheckoutRoutes.js';
 import etimsRoutes from './routes/etimsRoutes.js';
+import blogRoutes from './routes/blogRoutes.js';
+import { generateSitemap } from './controllers/sitemapController.js';
 import { ensurePrimaryOwner } from './migrations/ensurePrimaryOwner.js';
 import { backfillTransactionFees } from './migrations/backfillTransactionFees.js';
 import { seedTariffCards } from './migrations/seedTariffCards.js';
@@ -256,6 +258,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/officer', officerRoutes);
 app.use('/api/waitlist', waitlistRoutes);
 app.use('/api/newsletter', newsletterRoutes);
+app.use('/api/blog', blogRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/bulkpay', bulkPayRoutes);
 app.use('/api/transactions', transactionRoutes);
@@ -284,6 +287,12 @@ app.use('/api/v1', ncbaRoutes);
 // same handlers — just reachable at a second, shorter mount point.
 app.use('/v1', requireDb);
 app.use('/v1', ncbaRoutes);
+
+// Root-level, outside the /api prefix (and its requireDb gate — see
+// sitemapController.js's own try/catch fallback) so it's reachable at
+// exactly /sitemap.xml. apps/web/vercel.json rewrites
+// paychain.co.ke/sitemap.xml here via the api.paychain.co.ke subdomain.
+app.get('/sitemap.xml', generateSitemap);
 
 app.use((err, req, res, next) => {
   console.error('Unhandled Error:', err);

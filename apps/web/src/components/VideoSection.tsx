@@ -29,13 +29,13 @@ const VideoSection: React.FC = () => {
 
   const features = [
     {
-      title: "Verified Collections",
-      description: "Registered PayChain Virtual Accounts for secure, fraud-proof inbound payments.",
+      title: "Safe Payments In",
+      description: "Your own PayChain account number for customers to pay into safely, no fake screenshots, ever.",
       icon: ShieldCheck,
     },
     {
       title: "Bulk Pay",
-      description: "Pay staff, suppliers & utilities in one place effortlessly.",
+      description: "Pay staff, suppliers, and bills all in one place, in one click.",
       icon: Zap,
     },
     {
@@ -45,7 +45,7 @@ const VideoSection: React.FC = () => {
     },
     {
       title: "Cash Advance",
-      description: "Unlock working capital based on your transaction history, no collateral needed.",
+      description: "Get money for your business based on your sales history, no land or property needed.",
       icon: Wallet,
     },
   ];
@@ -69,7 +69,7 @@ const VideoSection: React.FC = () => {
             </motion.h2>
             
             <motion.p variants={itemVariants} className="text-lg text-gray-600 mb-10 leading-relaxed">
-              PayChain is a financial operating system built for Kenyan merchants: one verified dashboard that replaces the fragmented, manual tools most businesses run on today. Collect payments through your own PayChain Paybill and virtual account, a payment link sent even over WhatsApp, an STK push straight to your customer's phone, or a professional invoice. Every payment is verified and settled instantly, with zero fake-screenshot fraud. Pay your staff, suppliers, contractors, and utility bills in one click with Bulk Pay. And as your verified transaction history builds, unlock working capital with Cash Advance, with no collateral and no bank queues.
+              PayChain is a single, verified dashboard built for Kenyan merchants that replaces the scattered, manual tools most businesses run on today. Collect payments through your own PayChain Paybill and virtual account, a payment link sent even over WhatsApp, an STK push straight to your customer's phone, or a professional invoice. Every payment is verified and paid out instantly, with zero fake-screenshot fraud. Pay your staff, suppliers, contractors, and utility bills in one click with Bulk Pay. And as your sales history builds, unlock money for your business with Cash Advance, with no land or property needed and no bank queues.
             </motion.p>
 
             <div className="grid grid-cols-2 gap-3 sm:gap-6">

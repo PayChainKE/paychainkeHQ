@@ -12,7 +12,7 @@ import { UserCheck, ShieldCheck, CreditCard, Zap, Users, Send, BarChart3, Star }
 const steps = [
   {
     title: 'Sign Up & Get Verified',
-    desc: 'Create your PayChain merchant account and complete a simple KYC verification. Once approved, you receive your own PayChain Paybill and a registered virtual account, a dedicated, aggregator-backed M-PESA channel that is fully secure and verified. No queues. No paperwork. Verification is digital, fast, and done entirely on your dashboard.',
+    desc: 'Create your PayChain merchant account and verify who you are with a simple ID check. Once approved, you receive your own PayChain Paybill and virtual account, a dedicated, secure M-PESA channel registered through our banking partner. No queues. No paperwork. Verification is digital, fast, and done entirely on your dashboard.',
     Icon: UserCheck,
   },
   {
@@ -27,7 +27,7 @@ const steps = [
   },
   {
     title: 'Unlock Your Cash Advance',
-    desc: 'After 3 months of verified PayChain transaction history, your business automatically qualifies for a PayChain Cash Advance. We use your real transaction data, not collateral, not land titles, to determine your working capital limit.',
+    desc: 'After 3 months of verified PayChain sales history, your business automatically qualifies for a PayChain Cash Advance. We use your real sales data, not collateral, not land titles, to work out how much money you can get.',
     Icon: Zap,
   },
 ];
@@ -35,7 +35,7 @@ const steps = [
 const features = [
   {
     title: 'Paybill & Virtual Account',
-    desc: 'Fraud-proof M-PESA collections, every time',
+    desc: 'No more fake M-PESA screenshots, ever',
     Icon: ShieldCheck,
   },
   {
@@ -60,13 +60,13 @@ const features = [
   },
   {
     title: 'Cash Advance',
-    desc: 'Working capital without collateral',
+    desc: 'Money for your business, no land or property needed',
     Icon: Zap,
   },
 ];
 
 const timeline = [
-  { label: 'Day 1', desc: 'Verified Collections + Payment Links + Bulk Pay unlocked' },
+  { label: 'Day 1', desc: 'Safe Payments In + Payment Links + Bulk Pay unlocked' },
   { label: 'Month 3', desc: 'Cash Advance eligibility unlocked' },
   { label: 'Ongoing', desc: 'Trust Score grows, credit limits increase' },
 ];
@@ -142,7 +142,7 @@ const HowItWorks: React.FC = () => {
     <div className="howitworks-root min-h-screen bg-background text-foreground">
       <Seo
         title="How PayChain Works | Collect, Pay & Grow in One Dashboard"
-        description="See how PayChain works end to end: get KYC-verified and receive your own Paybill and virtual account, collect payments across every channel, then pay suppliers and staff in bulk — all from one dashboard."
+        description="See how PayChain works end to end: verify who you are and receive your own Paybill and virtual account, collect payments across every channel, then pay suppliers and staff in bulk — all from one dashboard."
         path="/how-it-works"
       />
       <Navbar />
@@ -188,7 +188,7 @@ const HowItWorks: React.FC = () => {
         <section className="howitworks-trustscore py-24 bg-secondary text-secondary-foreground text-center fadein-up">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">Every Transaction Builds Your Trust Score</h2>
           <p className="text-lg max-w-2xl mx-auto mb-10">
-            PayChain converts your verified payment history into a proprietary Trust Score, a real-time measure of your business's financial health and creditworthiness. The longer you use PayChain, the more working capital you can unlock. This is credit built on truth, not collateral.
+            PayChain turns your verified payment history into your own Trust Score — a live measure of how healthy your business is and how trustworthy you are. The longer you use PayChain, the more money you can unlock for your business. This is credit built on the truth of your sales, not on land or property.
           </p>
           <div className="howitworks-trustscore-meter mx-auto my-8" aria-label="Trust Score Meter">
             <div className="trustscore-meter-bg">

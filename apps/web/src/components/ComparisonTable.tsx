@@ -30,7 +30,7 @@ const ComparisonTable: React.FC = () => (
             .
           </h2>
           <p className="text-white/60 text-base sm:text-lg leading-relaxed mb-8 max-w-lg">
-            Legacy tills leave you fighting SMS fraud, slow settlement, and payroll chaos. PayChain gives you a verified Paybill and virtual account, instant settlement on every payment link and STK push, one-click Bulk Pay for staff and suppliers, and collateral-free credit based on your real transaction history.
+            Old-fashioned tills leave you fighting fake M-PESA screenshots, slow payouts, and payroll chaos. PayChain gives you a verified Paybill and virtual account, money that arrives instantly on every payment link and STK push, one-click Bulk Pay for staff and suppliers, and money for your business based on your real sales — no land or property needed.
           </p>
           <a 
             href="/about#the-problem"
