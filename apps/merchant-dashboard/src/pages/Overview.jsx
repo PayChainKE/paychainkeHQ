@@ -12,6 +12,7 @@ import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { useNavigate } from 'react-router-dom'
 import FundAccountModal from '../components/modals/FundAccountModal'
+import NoConnectionState from '../components/ui/NoConnectionState'
 import walletCardBg from '../assets/wallet-card-bg.png'
 import sendMoneyIcon from '../assets/send-money-icon.png'
 import receiveMoneyIcon from '../assets/receive-money-icon.png'
@@ -25,6 +26,7 @@ export default function Overview() {
   
   const [liveTransactions, setLiveTransactions] = useState([])
   const [isLoading, setIsLoading] = useState(true)
+  const [hasError, setHasError] = useState(false)
   const [trustData, setTrustData] = useState(null)
   const [activeTimeframe, setActiveTimeframe] = useState('7D')
   const [showMoveMoney, setShowMoveMoney] = useState(false)
@@ -51,8 +53,10 @@ export default function Overview() {
       // of just a harmlessly stale dashboard.
       setLiveTransactions(Array.isArray(txRes.data) ? txRes.data : [])
       setTrustData(trustRes.data)
+      setHasError(false)
     } catch (err) {
       console.error('Failed to fetch dashboard data', err)
+      setHasError(true)
     } finally {
       setIsLoading(false)
     }
@@ -553,7 +557,9 @@ export default function Overview() {
             </button>
           </div>
           <div className="flex flex-col">
-            {recentTx.length === 0 ? (
+            {hasError && recentTx.length === 0 ? (
+              <NoConnectionState onRetry={fetchData} />
+            ) : recentTx.length === 0 ? (
               <div className="p-8 text-center text-on-surface-variant font-medium">
                 No recent transactions yet.
               </div>
