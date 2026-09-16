@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import Seo from '@/components/Seo';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { motion } from 'framer-motion';
@@ -118,24 +119,13 @@ function FaqItem({ q, a }: { q: string; a: string }) {
 }
 
 const CashAdvance: React.FC = () => {
-  useEffect(() => {
-    document.title = 'PayChain Cash Advance: Working Capital for Kenyan Merchants';
-    const setMeta = (prop: string, content: string) => {
-      let el = document.querySelector(`meta[property="${prop}"]`);
-      if (!el) {
-        el = document.createElement('meta');
-        el.setAttribute('property', prop);
-        document.head.appendChild(el);
-      }
-      el.setAttribute('content', content);
-    };
-    setMeta('og:title', 'PayChain Cash Advance: Working Capital for Kenyan Merchants');
-    setMeta('og:description', 'Access working capital based on your real M-PESA transaction history, no collateral, no bank queues, no credit history needed. Join the PayChain beta.');
-    setMeta('og:url', 'https://www.paychain.co.ke/products/cash-advance');
-  }, []);
-
   return (
     <div className="min-h-screen bg-white">
+      <Seo
+        title="Cash Advance | Working Capital, No Collateral | PayChain"
+        description="Get a cash advance against your verified PayChain transaction history — no collateral, guarantors, or credit bureaus. Instant disbursement, revenue-based repayment, zero hidden fees."
+        path="/products/cash-advance"
+      />
       <Navbar />
 
       {/* Breadcrumb strip */}

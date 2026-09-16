@@ -1,5 +1,6 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
+import Seo from '../components/Seo';
 
 // Embeds the dashboard app running on localhost:8081 under /paychain-dashboard/*
 export default function PaychainDashboardProxy(){
@@ -10,6 +11,7 @@ export default function PaychainDashboardProxy(){
 
   return (
     <div className="min-h-screen">
+      <Seo title="PayChain" description="PayChain merchant portal." path={loc.pathname} noindex />
       <iframe title="Paychain Dashboard" src={src} className="w-full h-screen border-0" />
     </div>
   );

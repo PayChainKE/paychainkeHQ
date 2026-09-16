@@ -2,6 +2,7 @@ import React from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowRight, FileText, Shield, Send, Wallet, Settings } from 'lucide-react'
+import Seo from '@/components/Seo'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
 import Breadcrumbs from '@/components/Breadcrumbs'
@@ -47,6 +48,11 @@ const products = [
 export default function Products() {
   return (
     <div className="min-h-screen bg-white text-[#0A192F]">
+      <Seo
+        title="Fintech Products for Kenyan Merchants | PayChain"
+        description="Everything a Kenyan merchant needs to run their business: a verified Paybill and virtual account, one-click bulk payroll and utility payments, revenue-based cash advances, and real-time operations tools."
+        path="/products"
+      />
       <Navbar />
 
       <main className="max-w-6xl mx-auto px-6 pt-28 pb-24">

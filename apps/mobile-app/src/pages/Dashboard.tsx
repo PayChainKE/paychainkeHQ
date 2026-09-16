@@ -400,7 +400,7 @@ export default function Dashboard({ navigation }: any) {
                     (same issue as LinearGradient's overflow className
                     elsewhere), leaving the plus icon off-center. */}
                 <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#1d9e75', alignItems: 'center', justifyContent: 'center' }}>
-                  <Feather name="plus" size={21} color="#ffffff" />
+                  <Image source={require('../../assets/fund.png')} style={{ width: 21, height: 21, tintColor: '#ffffff' }} resizeMode="contain" />
                 </View>
               </View>
               <Text className="text-[11px] font-jakarta-bold text-[#0c2010] uppercase tracking-widest">Fund</Text>
@@ -409,7 +409,7 @@ export default function Dashboard({ navigation }: any) {
             <TouchableOpacity className="items-center" activeOpacity={0.8} onPress={() => navigation?.navigate('Collections')}>
               <View className="w-16 h-16 rounded-full bg-white shadow-lg shadow-black/15 items-center justify-center mb-2.5">
                 <View className="w-11 h-11 rounded-full bg-[#5efeb3] items-center justify-center">
-                  <Feather name="plus-circle" size={21} color="#00351d" />
+                  <Image source={require('../../assets/collect.png')} style={{ width: 21, height: 21, tintColor: '#00351d' }} resizeMode="contain" />
                 </View>
               </View>
               <Text className="text-[11px] font-jakarta-bold text-[#0c2010] uppercase tracking-widest">Collect</Text>
@@ -428,7 +428,7 @@ export default function Dashboard({ navigation }: any) {
               <TouchableOpacity className="items-center" activeOpacity={0.8} onPress={() => navigation?.navigate('Advance')}>
                 <View className="w-16 h-16 rounded-full bg-white shadow-lg shadow-black/15 items-center justify-center mb-2.5">
                   <View className="w-11 h-11 rounded-full bg-[#0b4d2e] items-center justify-center">
-                    <Feather name="trending-up" size={21} color="#5efeb3" />
+                    <Image source={require('../../assets/cash advance.png')} style={{ width: 21, height: 21, tintColor: '#5efeb3' }} resizeMode="contain" />
                   </View>
                 </View>
                 <Text className="text-[11px] font-jakarta-bold text-[#0c2010] uppercase tracking-widest">Advance</Text>
@@ -736,7 +736,7 @@ export default function Dashboard({ navigation }: any) {
                 >
                   <View className="flex-row items-start justify-between mb-5">
                     <View className="w-14 h-14 rounded-full bg-[#f0fdf4] items-center justify-center">
-                      <Feather name="trending-up" size={22} color="#006c4e" />
+                      <Image source={require('../../assets/cash advance.png')} style={{ width: 22, height: 22, tintColor: '#006c4e' }} resizeMode="contain" />
                     </View>
                     <View className="w-9 h-9 rounded-full bg-[#eff4ef] items-center justify-center">
                       <Feather name="chevron-right" size={16} color="#0c2010" />

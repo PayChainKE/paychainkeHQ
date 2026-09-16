@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import api from '../api/config';
@@ -16,9 +16,9 @@ type NotificationItem = {
   createdAt: string;
 };
 
-const KIND_META: Record<NotificationKind, { icon: keyof typeof MaterialIcons.glyphMap; color: string; bg: string }> = {
+const KIND_META: Record<NotificationKind, { icon: keyof typeof MaterialIcons.glyphMap; image?: ReturnType<typeof require>; color: string; bg: string }> = {
   payment: { icon: 'payments', color: '#006c4e', bg: '#e7f8ef' },
-  advance: { icon: 'trending-up', color: '#1d9e75', bg: '#dcf5da' },
+  advance: { icon: 'trending-up', image: require('../../assets/cash advance.png'), color: '#1d9e75', bg: '#dcf5da' },
   security: { icon: 'shield', color: '#ba1a1a', bg: '#fff1f1' },
   wallet: { icon: 'account-balance-wallet', color: '#00351d', bg: '#f0fdf4' },
   system: { icon: 'info-outline', color: '#5b645c', bg: '#f7faf7' },
@@ -193,7 +193,11 @@ export default function Notifications({ navigation }: any) {
                           className={`flex-row items-start gap-3 p-5 ${index !== group.items.length - 1 ? 'border-b border-[#eff4ef]' : ''}`}
                         >
                           <View style={{ backgroundColor: meta.bg }} className="w-11 h-11 rounded-2xl items-center justify-center">
-                            <MaterialIcons name={meta.icon} size={20} color={meta.color} />
+                            {meta.image ? (
+                              <Image source={meta.image} style={{ width: 20, height: 20, tintColor: meta.color }} resizeMode="contain" />
+                            ) : (
+                              <MaterialIcons name={meta.icon} size={20} color={meta.color} />
+                            )}
                           </View>
                           <View className="flex-1">
                             <View className="flex-row items-center justify-between mb-1">

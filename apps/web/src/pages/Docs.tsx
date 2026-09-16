@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Webhook, CreditCard, Link2, Receipt, ArrowRight, CheckCircle2 } from 'lucide-react';
+import Seo from '@/components/Seo';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
@@ -27,6 +28,11 @@ const codePreview = `curl -X POST https://api.paychain.co.ke/payments/collect \\
 const Docs: React.FC = () => {
   return (
     <div className="min-h-screen bg-white">
+      <Seo
+        title="Developer API | PayChain"
+        description="A payments API built for Kenya — programmatic collections and payouts, real-time webhooks, hosted checkout, and electronic invoicing. Coming soon; explore the live no-code checkout embed today."
+        path="/docs"
+      />
       <Navbar />
       <main className="pt-32 pb-28 px-6">
         <div className="max-w-3xl mx-auto text-center">

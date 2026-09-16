@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Calendar, Clock, Share2, Twitter, Linkedin, Facebook } from 'lucide-react';
+import Seo from '../components/Seo';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 
@@ -109,19 +110,76 @@ const allArticlesData: Record<string, ArticleData> = {
   }
 };
 
+// Derives a meta description from the article's own HTML content rather
+// than requiring every post to also maintain a separate plain-text excerpt
+// — strips tags, collapses whitespace, and truncates to a length search
+// engines won't cut off mid-word.
+function excerptFromHtml(html: string, maxLength = 160): string {
+  const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength).replace(/\s+\S*$/, '')}…`;
+}
+
+// Converts the article's human-readable date ("Oct 15, 2026") to an
+// ISO calendar date using local date components, since toISOString()
+// alone shifts the date backward for timezones behind UTC.
+function toIsoDate(dateStr: string): string {
+  const d = new Date(dateStr);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 const BlogPost = () => {
   const { id } = useParams();
-  
+
   const articleData = id && allArticlesData[id] ? allArticlesData[id] : allArticlesData['paychain-official-registration'];
 
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [id]);
 
+  // BlogPosting structured data — qualifies the post for Google's Article
+  // rich results (byline, date, image) instead of a plain blue link.
+  useEffect(() => {
+    const image = articleData.image.startsWith('http')
+      ? articleData.image
+      : `https://paychain.co.ke${articleData.image}`;
+    const url = `https://paychain.co.ke/blog/${articleData.id}`;
+
+    const ld = document.createElement('script');
+    ld.type = 'application/ld+json';
+    ld.setAttribute('data-paychain-article-ld', '1');
+    ld.text = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'BlogPosting',
+      headline: articleData.title,
+      description: excerptFromHtml(articleData.content),
+      image: [image],
+      datePublished: toIsoDate(articleData.date),
+      author: { '@type': 'Person', name: articleData.author.name },
+      publisher: {
+        '@type': 'Organization',
+        name: 'PayChain',
+        logo: { '@type': 'ImageObject', url: 'https://paychain.co.ke/logo.png' },
+      },
+      mainEntityOfPage: { '@type': 'WebPage', '@id': url },
+    });
+    document.head.appendChild(ld);
+    return () => { ld.remove(); };
+  }, [articleData]);
+
   return (
     <div className="min-h-screen bg-white flex flex-col">
+      <Seo
+        title={`${articleData.title} | PayChain Blog`}
+        description={excerptFromHtml(articleData.content)}
+        path={`/blog/${articleData.id}`}
+        image={articleData.image.startsWith('http') ? articleData.image : `https://paychain.co.ke${articleData.image}`}
+      />
       <Navbar />
-      
+
       <main className="flex-grow pt-24 pb-20">
         <article>
           {/* Header */}
