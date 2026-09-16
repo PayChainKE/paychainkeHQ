@@ -49,9 +49,9 @@ const features = [
     iconColor: 'text-purple-600',
     learnColor: 'text-[#00bf63]',
     borderColor: 'border-purple-100',
-    title: 'Quick financing to grow your business',
+    title: 'Quick money to grow your business',
     description:
-      "Access capital when you need it. Whether it's working capital or funds to expand, PayChain Business Advance uses your transaction history to get you credit fast, no paperwork.",
+      "Get money for your business when you need it — to buy stock, cover bills, or expand. PayChain Business Advance looks at your own sales history to get you money fast, no paperwork.",
   },
   {
     icon: 'pay',
@@ -92,8 +92,8 @@ const Features: React.FC = () => (
           <p className="text-base sm:text-lg text-gray-500 leading-relaxed mb-8 max-w-xl">
             A PayChain Paybill and virtual account to collect payments, invoicing and STK push to
             get paid faster, Bulk Pay to settle staff, suppliers, and utilities in one click, and
-            data-driven credit when you need working capital. Everything a growing Kenyan business
-            needs, in one dashboard.
+            money for your business based on your own sales when you need it. Everything a growing
+            Kenyan business needs, in one dashboard.
           </p>
           <a
             href="/how-it-works"

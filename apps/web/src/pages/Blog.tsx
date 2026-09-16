@@ -5,71 +5,35 @@ import Seo from '../components/Seo';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { motion } from 'framer-motion';
+import api from '@/lib/api';
 
-const articles = [
-  {
-    id: 'paychain-official-registration',
-    title: 'PayChain Financial Services Ltd Officially Registered in Kenya',
-    excerpt: 'Marking a significant milestone in East African fintech, PayChain announces its official incorporation as a registered entity in Kenya, paving the way for next-generation merchant solutions.',
-    category: 'Company News',
-    date: 'May 28, 2026',
-    readTime: '3 min read',
-    image: '/merchant-dashboard-teaser.png',
-    featured: false,
-  },
-  {
-    id: 'future-of-payments-africa',
-    title: 'The Future of Digital Payments in East Africa',
-    excerpt: 'How mobile money and smart POS systems are transforming the retail landscape across Kenya and beyond.',
-    category: 'Industry Insights',
-    date: 'Oct 15, 2026',
-    readTime: '5 min read',
-    image: '/happy_kenyan_merchant.png',
-    featured: false,
-  },
-  {
-    id: 'paychain-data-controller-registration',
-    title: 'PayChain Registers as a Data Controller with the ODPC',
-    excerpt: 'PayChain Financial Services Ltd is now a registered Data Controller with Kenya\'s Office of the Data Protection Commissioner, formalizing how merchant and customer data is protected under the Data Protection Act 2019.',
-    category: 'Compliance',
-    date: 'Jul 14, 2026',
-    readTime: '3 min read',
-    image: '/happy_kenyan_merchant.png',
-  },
-  {
-    id: 'inflation-shield-stablecoins',
-    title: 'The Inflation Shield: What We\'re Building and Why',
-    excerpt: 'A look at the stablecoin protection feature currently in development, and how it will help merchants hedge shilling depreciation once it launches.',
-    category: 'Product Updates',
-    date: 'Oct 10, 2026',
-    readTime: '4 min read',
-    image: '/Home page/merchant 3.png',
-  },
-  {
-    id: 'offline-first-pos',
-    title: 'Why Offline-First Architecture is Critical for Retail',
-    excerpt: 'Network drops shouldn\'t mean lost sales. Discover the technology behind continuous operations.',
-    category: 'Technology',
-    date: 'Oct 5, 2026',
-    readTime: '6 min read',
-    image: '/happy_kenyan_merchant.png',
-  },
-  {
-    id: 'bulk-pay-payroll',
-    title: 'Streamlining Mass Payouts for Gig Workers',
-    excerpt: 'The operational efficiency of instant, automated bulk disbursements.',
-    category: 'Case Studies',
-    date: 'Sep 28, 2026',
-    readTime: '3 min read',
-    image: '/hero-bg.png',
-  }
-];
+type Article = {
+  slug: string;
+  title: string;
+  excerpt: string;
+  category: string;
+  image: string;
+  readTime: string;
+  featured: boolean;
+};
 
-const categories = ['All', 'Company News', 'Compliance', 'Industry Insights', 'Product Updates', 'Technology'];
+const categories = ['All', 'Company News', 'Compliance', 'Industry Insights', 'Product Updates', 'Technology', 'Case Studies'];
 
 const Blog = () => {
   const [activeCategory, setActiveCategory] = React.useState('All');
-  
+  const [articles, setArticles] = React.useState<Article[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [loadError, setLoadError] = React.useState(false);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    api.get('/api/blog/posts')
+      .then((res) => { if (!cancelled) setArticles(res.data?.data || []); })
+      .catch(() => { if (!cancelled) setLoadError(true); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
   const filteredArticles = articles.filter(a => activeCategory === 'All' || a.category === activeCategory);
   const featuredArticle = articles.find(a => a.featured);
   const gridArticles = filteredArticles.filter(a => !a.featured || activeCategory !== 'All');
@@ -160,7 +124,7 @@ const Blog = () => {
           {/* Featured Article */}
           {activeCategory === 'All' && featuredArticle && (
             <div className="mb-16">
-              <Link to={`/blog/${featuredArticle.id}`} className="group block">
+              <Link to={`/blog/${featuredArticle.slug}`} className="group block">
                 <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 flex flex-col md:flex-row transition-all duration-300 hover:shadow-md">
                   <div className="md:w-1/2 relative overflow-hidden">
                     <img 
@@ -250,7 +214,7 @@ const Blog = () => {
                 <div className="p-6">
                   <h3 className="text-lg font-bold text-gray-900 mb-3 group-hover:text-[#00bf63] transition-colors">Kenya's merchant financial operating system built for serious business owners.</h3>
                   <p className="text-gray-600 text-sm leading-relaxed">
-                    From Verified Collections to Payment Links, STK Push, Bulk Pay, and Cash Advances, PayChain gives your business the financial infrastructure it deserves.
+                    From safe payments in to Payment Links, STK Push, Bulk Pay, and Cash Advances, PayChain gives your business everything it needs to run smoothly.
                   </p>
                 </div>
               </div>
@@ -258,15 +222,22 @@ const Blog = () => {
           </div>
 
           {/* Articles Grid */}
+          {loading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="h-96 bg-white rounded-2xl border border-gray-100 animate-pulse" />
+              ))}
+            </div>
+          ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {gridArticles.map((article, index) => (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
-                key={article.id}
+                key={article.slug}
               >
-                <Link to={`/blog/${article.id}`} className="group h-full flex flex-col bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300">
+                <Link to={`/blog/${article.slug}`} className="group h-full flex flex-col bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300">
                   <div className="relative h-48 overflow-hidden">
                     <img 
                       src={article.image} 
@@ -293,8 +264,15 @@ const Blog = () => {
               </motion.div>
             ))}
           </div>
-          
-          {filteredArticles.length === 0 && (
+          )}
+
+          {!loading && loadError && (
+            <div className="text-center py-20">
+              <p className="text-gray-500">Couldn't load articles right now. Please try again shortly.</p>
+            </div>
+          )}
+
+          {!loading && !loadError && filteredArticles.length === 0 && (
             <div className="text-center py-20">
               <p className="text-gray-500">No articles found in this category.</p>
             </div>

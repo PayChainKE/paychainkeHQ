@@ -17,19 +17,19 @@ import 'chart.js/auto';
 import Breadcrumbs from '@/components/Breadcrumbs';
 
 const features = [
-  { icon: LayoutDashboard, title: 'Real-Time Merchant Dashboard', body: 'Every transaction (collections, payments, FX swaps, cash advance activity) updated in real time. Your full financial picture, always current.' },
-  { icon: TrendingUp, title: 'Trust Score Monitor', body: 'Track your Trust Score in real time: see exactly how close you are to unlocking your next Cash Advance tier.' },
-  { icon: Users, title: 'Team Access & Spending Controls', body: 'Add team members with defined roles, set spending limits, require approval for large transactions, without giving up full account access.' },
-  { icon: BarChart2, title: 'Business Analytics & Insights', body: 'Revenue trends, peak payment periods, top customers by volume, month-on-month growth, all visualized clearly. Decisions based on data, not guesswork.' },
-  { icon: Download, title: 'Downloadable Financial Reports', body: 'Export transaction histories, payroll records, FX logs, and tax summaries, formatted for your accountant, investors, or your own records.' },
-  { icon: Bell, title: 'Smart Notifications & Alerts', body: 'Custom alerts for large inflows, low balances, upcoming payments, and Trust Score milestones. Stay in control without watching the dashboard all day.' },
-  { icon: Layers, title: 'Multi-Account Management', body: 'Multiple business locations or entities? Manage separate dashboards with consolidated reporting and shared team access under one login.' },
+  { icon: LayoutDashboard, title: 'See Everything as It Happens', body: 'Every payment in and out — money collected, bills paid, USDC swaps, cash advance activity — updates the moment it happens. Your full financial picture, always current.' },
+  { icon: TrendingUp, title: 'Watch Your Trust Score Grow', body: 'See your Trust Score update in real time, and exactly how close you are to your next Cash Advance offer.' },
+  { icon: Users, title: 'Control Who Can Spend What', body: 'Add staff with their own roles, set spending limits, and require your okay before large payments go out — without giving them full access to your account.' },
+  { icon: BarChart2, title: 'Know How Your Business Is Doing', body: 'See your sales trends, your busiest times, your best customers, and how much you\'ve grown month to month — all in simple charts, not guesswork.' },
+  { icon: Download, title: 'Download Your Records Anytime', body: 'Download your payment history, payroll records, and tax summaries — ready to hand to your accountant, an investor, or keep for yourself.' },
+  { icon: Bell, title: 'Get Alerted to What Matters', body: 'Get notified about large payments received, low balances, upcoming bills, and Trust Score milestones — without having to check the dashboard all day.' },
+  { icon: Layers, title: 'Manage More Than One Business', body: 'Running more than one shop or business? Manage separate dashboards with one combined view and one login for your whole team.' },
 ];
 
 const useCases = [
-  { title: 'Retail & Hospitality', desc: 'Monitor daily revenue in real time, track peak hours, and run end-of-day reconciliation automatically.' },
+  { title: 'Retail & Hospitality', desc: 'Watch your daily sales as they happen, see your busiest hours, and let your books balance themselves automatically at the end of each day.' },
   { title: 'Service Agencies', desc: 'Generate records, track payments, run payroll, and download clean tax records, all from one place.' },
-  { title: 'Import/Export Traders', desc: 'Monitor collections in real time, reconcile Paybill and invoice payments, manage supplier payment schedules.' },
+  { title: 'Import/Export Traders', desc: 'Watch payments come in as they happen, match up your Paybill and invoice payments automatically, and manage when suppliers get paid.' },
   { title: 'Multi-Location Businesses', desc: 'Manage multiple merchant accounts under one login with consolidated reporting across all locations.' },
 ];
 
@@ -63,7 +63,7 @@ const OperationsTools = () => {
     <div className="min-h-screen bg-white">
       <Seo
         title="Operations Tools | Run Your Business from One Dashboard"
-        description="Real-time reconciliation, dispute handling, financial controls, and compliance automation — everything you need to run a modern Kenyan business from one intelligent dashboard."
+        description="See your money matching up automatically, handle disputes, control who can spend what, and stay on the right side of tax rules — everything you need to run a modern Kenyan business from one dashboard."
         path="/products/operations-tools"
       />
       <Navbar />
@@ -93,7 +93,7 @@ const OperationsTools = () => {
                 Run Your Business from <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00bf63] to-emerald-300">One Intelligent Dashboard.</span>
               </h1>
               <p className="text-lg text-gray-400 mb-8 max-w-xl leading-relaxed">
-                PayChain Operations Tools gives you real-time visibility, financial controls, compliance automation, and team management: everything you need to run a modern Kenyan business, without the complexity.
+                PayChain Operations Tools lets you see everything happening in your business, control who can spend what, stay on the right side of tax rules automatically, and manage your team: everything you need to run a modern Kenyan business, without the complexity.
               </p>
               <a href="https://app.paychain.co.ke" className="inline-flex items-center justify-center px-8 py-4 text-base font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_20px_rgba(0,191,99,0.3)]">
                 See It in Action
@@ -183,7 +183,7 @@ const OperationsTools = () => {
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.6 }}>
             <h3 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4">The Control Center Your Business Has Always Needed.</h3>
             <p className="text-lg text-gray-600 leading-relaxed">
-              PayChain Operations Tools is the intelligence layer across all four PayChain products, a unified command center giving you real-time data, automated compliance, team controls, and business insights on one dashboard built for Kenyan SMEs.
+              PayChain Operations Tools ties every PayChain product together in one place, giving you up-to-the-minute data, automatic help staying compliant, control over your team, and a clear picture of how your business is doing — all on one dashboard built for Kenyan small businesses.
             </p>
           </motion.div>
         </div>

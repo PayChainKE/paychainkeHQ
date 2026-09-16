@@ -29,15 +29,15 @@ const features = [
   { title: 'Verified Inbound Payments', icon: ShieldCheck, desc: 'Every payment verified through our NCBA Bank integration before confirmation. Fake screenshots are impossible.' },
   { title: 'Real-Time Dashboard Confirmation', icon: Activity, desc: 'The moment a customer pays, it appears on your dashboard with amount, timestamp, phone number, and reference.' },
   { title: 'Immutable Transaction Ledger', icon: Database, desc: 'Every payment logged on blockchain rails, a permanent, tamper-proof record that builds your Trust Score.' },
-  { title: 'Aggregator-Backed Virtual Account', icon: Building2, desc: 'Registered through a licensed payment aggregator, institutional credibility behind every transaction.' },
+  { title: 'Backed by a Licensed Banking Partner', icon: Building2, desc: 'Registered through a licensed payment partner, real institutional backing behind every transaction.' },
   { title: 'Hybrid M-PESA + Blockchain Rails', icon: GitMerge, desc: 'M-PESA reach. Blockchain security. You get both without needing to understand either.' },
   { title: 'Automatic Trust Score Building', icon: TrendingUp, desc: 'Every verified collection builds your credit profile. 3 months unlocks your Cash Advance eligibility.' },
 ];
 
 const steps = [
-  { title: 'Get Verified', desc: 'Complete KYC and receive your dedicated PayChain Virtual Account, backed by a licensed aggregator.' },
+  { title: 'Get Verified', desc: 'Verify who you are and receive your dedicated PayChain Virtual Account, backed by a licensed banking partner.' },
   { title: 'Share & Collect', desc: 'Customers pay via M-PESA as normal. You see confirmed payment on your dashboard instantly, no SMS needed.' },
-  { title: 'Build & Grow', desc: 'Every transaction builds your Trust Score and working capital eligibility automatically.' },
+  { title: 'Build & Grow', desc: 'Every payment builds your Trust Score and gets you closer to your first Cash Advance, automatically.' },
 ];
 
 const comparisonRows = [
@@ -46,7 +46,7 @@ const comparisonRows = [
   ['Transaction records', 'SMS inbox', 'Immutable digital ledger'],
   ['Business credit building', 'No', 'Yes (automatic Trust Score)'],
   ['Dashboard visibility', 'No', 'Real-time, full history'],
-  ['Regulatory backing', 'Basic', 'Licensed aggregator'],
+  ['Regulatory backing', 'Basic', 'Licensed banking partner'],
 ];
 
 const VirtualAccount: React.FC = () => {
@@ -84,7 +84,7 @@ const VirtualAccount: React.FC = () => {
                 Your Paybill. <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00bf63] to-emerald-300">Verified.</span>
               </h1>
               <p className="text-lg text-gray-400 mb-8 max-w-xl leading-relaxed">
-                Every PayChain merchant gets a dedicated PayChain Paybill and virtual account, a registered, aggregator-backed payment channel that replaces your basic M-PESA till, kills SMS fraud, logs every shilling, and builds your business credit automatically.
+                Every PayChain merchant gets a dedicated PayChain Paybill and virtual account, registered through our licensed banking partner, that replaces your basic M-PESA till, kills SMS fraud, logs every shilling, and builds your business credit automatically.
               </p>
               <a href="https://app.paychain.co.ke" className="inline-flex items-center justify-center px-8 py-4 text-base font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_20px_rgba(0,191,99,0.3)]">
                 Get Your Paybill & Account

@@ -1,16 +1,17 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Calendar, Clock, Share2, Twitter, Linkedin, Facebook } from 'lucide-react';
 import Seo from '../components/Seo';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import api from '@/lib/api';
 
 interface ArticleData {
-  id: string;
+  slug: string;
   title: string;
   category: string;
-  date: string;
   readTime: string;
+  publishedAt: string;
   author: {
     name: string;
     role: string;
@@ -19,96 +20,6 @@ interface ArticleData {
   image: string;
   content: string;
 }
-
-const allArticlesData: Record<string, ArticleData> = {
-  'future-of-payments-africa': {
-    id: 'future-of-payments-africa',
-    title: 'The Future of Digital Payments in East Africa',
-    category: 'Industry Insights',
-    date: 'Oct 15, 2026',
-    readTime: '5 min read',
-    author: {
-      name: 'Sarah Kimani',
-      role: 'Head of Product Strategy',
-      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
-    },
-    image: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&q=80&w=1200',
-    content: `
-      <p class="lead">The retail landscape in East Africa is undergoing a profound transformation. As internet penetration deepens and mobile-first populations mature, the expectation for seamless, instant transactions is no longer a luxury. It's the baseline.</p>
-      
-      <h2>The Evolution of Point of Sale</h2>
-      <p>Historically, merchants relied on fragmented systems: a traditional cash register, a separate card terminal, and a personal phone for mobile money transfers. This fragmentation led to reconciliation nightmares at the end of every business day.</p>
-      <p>Today, we're seeing the convergence of these tools into unified platforms. The modern smart till isn't just a payment acceptor; it's a comprehensive business management tool that handles inventory, payroll, and tax compliance automatically.</p>
-
-      <blockquote>
-        "The next wave of fintech innovation isn't about creating new ways to pay. It's about unifying the ways we already pay into a single, cohesive experience for the merchant."
-      </blockquote>
-
-      <h2>Addressing Infrastructure Challenges</h2>
-      <p>Despite rapid digitization, infrastructure reliability remains a challenge. Power outages and internet connectivity drops can halt business operations instantly. This is why <strong>offline-first architecture</strong> has become the critical differentiator for payment solutions in emerging markets.</p>
-      <p>When a system can securely queue transactions locally and sync automatically when connectivity is restored, merchants never have to turn away a customer. It provides the reliability of cash with the security of digital rails.</p>
-
-      <h2>Looking Ahead: What Comes After Verified Collections</h2>
-      <p>Once a merchant has verified, instantly-settled collections, the next frontier is protecting the value of that revenue. Stablecoin-backed settlement, still early and largely in development across the industry, is one option being explored to hedge against currency depreciation without requiring merchants to understand crypto.</p>
-      <p>As we move towards 2027, the focus will shift from consumer adoption to merchant empowerment. The platforms that win will be those that abstract the complexity of money movement and simply give business owners their time back.</p>
-    `,
-  },
-  'paychain-data-controller-registration': {
-    id: 'paychain-data-controller-registration',
-    title: 'PayChain Registers as a Data Controller with the ODPC',
-    category: 'Compliance',
-    date: 'Jul 14, 2026',
-    readTime: '3 min read',
-    author: {
-      name: 'Corporate Communications',
-      role: 'PayChain KE',
-      avatar: '/avator.png',
-    },
-    image: '/happy_kenyan_merchant.png',
-    content: `
-      <p class="lead"><strong>NAIROBI, KENYA, July 14, 2026</strong>: PayChain Financial Services Ltd has officially registered as a Data Controller with Kenya's Office of the Data Protection Commissioner (ODPC), formalizing the company's obligations under the Data Protection Act 2019 for every merchant and customer whose data passes through the platform.</p>
-
-      <h2>Why Data Controller Registration Matters</h2>
-      <p>Every PayChain merchant handles sensitive information: customer phone numbers, transaction histories, KYC documents, and revenue data. Registering as a Data Controller with the ODPC means PayChain has formally committed to the Act's core principles: lawful and transparent processing, purpose limitation, data minimization, and appropriate technical and organizational security measures.</p>
-      <p>In practice, this means merchant and customer data on PayChain is processed only for the purposes disclosed at signup, protected with 256-bit AES encryption, and never transferred outside Kenya without a clear legal basis.</p>
-
-      <blockquote>
-        "Merchants trust us with the financial lifeblood of their business. Registering as a Data Controller with the ODPC is a formal, verifiable commitment to protect that trust, not just a compliance checkbox."
-      </blockquote>
-
-      <h2>What This Means for Merchants</h2>
-      <p>PayChain merchants don't need to do anything differently. This registration sits behind the scenes, alongside PayChain's existing NCBA Bank-backed verification, as part of a broader commitment to operating as a fully compliant financial infrastructure provider in Kenya.</p>
-      <p>Merchants can request a full export of their data at any time, and PayChain does not sell or share merchant or customer data with advertisers or third parties.</p>
-    `,
-  },
-  'paychain-official-registration': {
-    id: 'paychain-official-registration',
-    title: 'PayChain Financial Services Ltd Officially Registered in Kenya',
-    category: 'Company News',
-    date: 'May 28, 2026',
-    readTime: '3 min read',
-    author: {
-      name: 'Corporate Communications',
-      role: 'PayChain KE',
-      avatar: '/avator.png',
-    },
-    image: '/merchant-dashboard-teaser.png',
-    content: `
-      <p class="lead"><strong>NAIROBI, KENYA, May 28, 2026</strong>: PayChain Financial Services Ltd today announced its official registration and incorporation in Kenya, marking a pivotal moment in the company's mission to revolutionize the financial infrastructure for merchants across East Africa.</p>
-      
-      <h2>A New Era for Merchant Services</h2>
-      <p>The official registration solidifies PayChain's position as a compliant and forward-thinking financial technology provider. This milestone empowers the company to accelerate the deployment of its unified merchant operating system, designed to seamlessly integrate payments, point-of-sale management, and capital advancement.</p>
-      
-      <blockquote>
-        "Our registration in Kenya is a testament to our commitment to regulatory compliance and our dedication to the local market. We are building the rails that will power the next generation of African commerce."
-      </blockquote>
-
-      <h2>Commitment to the Kenyan Market</h2>
-      <p>Kenya remains one of the most dynamic and innovative fintech markets globally. By establishing a formalized presence, PayChain Financial Services Ltd is uniquely positioned to address the complex challenges faced by modern merchants, including high transaction costs, currency volatility, and lack of access to working capital.</p>
-      <p>With this regulatory milestone achieved, PayChain will begin scaling its flagship products, including the PayChain Virtual Account, Payment Links, STK Push, and Bulk Pay, providing Kenyan businesses with the secure, verified tools they need to thrive, with the Inflation Shield currently in development.</p>
-    `,
-  }
-};
 
 // Derives a meta description from the article's own HTML content rather
 // than requiring every post to also maintain a separate plain-text excerpt
@@ -120,33 +31,33 @@ function excerptFromHtml(html: string, maxLength = 160): string {
   return `${text.slice(0, maxLength).replace(/\s+\S*$/, '')}…`;
 }
 
-// Converts the article's human-readable date ("Oct 15, 2026") to an
-// ISO calendar date using local date components, since toISOString()
-// alone shifts the date backward for timezones behind UTC.
-function toIsoDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
 const BlogPost = () => {
   const { id } = useParams();
-
-  const articleData = id && allArticlesData[id] ? allArticlesData[id] : allArticlesData['paychain-official-registration'];
+  const [articleData, setArticleData] = useState<ArticleData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {
     window.scrollTo(0, 0);
+    if (!id) return;
+    let cancelled = false;
+    setLoading(true);
+    setNotFound(false);
+    api.get(`/api/blog/posts/${id}`)
+      .then((res) => { if (!cancelled) setArticleData(res.data?.data || null); })
+      .catch(() => { if (!cancelled) setNotFound(true); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [id]);
 
   // BlogPosting structured data — qualifies the post for Google's Article
   // rich results (byline, date, image) instead of a plain blue link.
   useEffect(() => {
+    if (!articleData) return;
     const image = articleData.image.startsWith('http')
       ? articleData.image
-      : `https://paychain.co.ke${articleData.image}`;
-    const url = `https://paychain.co.ke/blog/${articleData.id}`;
+      : `https://www.paychain.co.ke${articleData.image}`;
+    const url = `https://www.paychain.co.ke/blog/${articleData.slug}`;
 
     const ld = document.createElement('script');
     ld.type = 'application/ld+json';
@@ -157,12 +68,15 @@ const BlogPost = () => {
       headline: articleData.title,
       description: excerptFromHtml(articleData.content),
       image: [image],
-      datePublished: toIsoDate(articleData.date),
+      // Mongoose serializes Date fields as full ISO strings — slicing the
+      // date portion avoids re-parsing through the browser's local
+      // timezone, which previously shifted the calendar date backward.
+      datePublished: articleData.publishedAt ? articleData.publishedAt.slice(0, 10) : undefined,
       author: { '@type': 'Person', name: articleData.author.name },
       publisher: {
         '@type': 'Organization',
         name: 'PayChain',
-        logo: { '@type': 'ImageObject', url: 'https://paychain.co.ke/logo.png' },
+        logo: { '@type': 'ImageObject', url: 'https://www.paychain.co.ke/logo.png' },
       },
       mainEntityOfPage: { '@type': 'WebPage', '@id': url },
     });
@@ -170,13 +84,46 @@ const BlogPost = () => {
     return () => { ld.remove(); };
   }, [articleData]);
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white flex flex-col">
+        <Navbar />
+        <main className="flex-grow pt-24 pb-20 container mx-auto px-6 lg:px-8 max-w-3xl">
+          <div className="h-8 w-2/3 bg-gray-100 rounded animate-pulse mb-6" />
+          <div className="h-64 bg-gray-100 rounded-2xl animate-pulse mb-8" />
+          <div className="space-y-3">
+            {[...Array(4)].map((_, i) => <div key={i} className="h-4 bg-gray-100 rounded animate-pulse" />)}
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (notFound || !articleData) {
+    return (
+      <div className="min-h-screen bg-white flex flex-col">
+        <Seo title="Post Not Found | PayChain Blog" description="This article could not be found." path={`/blog/${id || ''}`} noindex />
+        <Navbar />
+        <main className="flex-grow pt-32 pb-20 container mx-auto px-6 lg:px-8 text-center">
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">Article not found</h1>
+          <p className="text-gray-600 mb-8">This post may have been moved or unpublished.</p>
+          <Link to="/blog" className="inline-flex items-center text-[#00bf63] font-semibold">
+            <ArrowLeft className="w-4 h-4 mr-2" /> Back to Blog
+          </Link>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-white flex flex-col">
       <Seo
         title={`${articleData.title} | PayChain Blog`}
         description={excerptFromHtml(articleData.content)}
-        path={`/blog/${articleData.id}`}
-        image={articleData.image.startsWith('http') ? articleData.image : `https://paychain.co.ke${articleData.image}`}
+        path={`/blog/${articleData.slug}`}
+        image={articleData.image.startsWith('http') ? articleData.image : `https://www.paychain.co.ke${articleData.image}`}
       />
       <Navbar />
 
@@ -187,7 +134,7 @@ const BlogPost = () => {
             <Link to="/blog" className="inline-flex items-center text-gray-500 hover:text-[#00bf63] mb-8 transition-colors text-sm font-medium">
               <ArrowLeft className="w-4 h-4 mr-2" /> Back to Blog
             </Link>
-            
+
             <div className="flex items-center gap-4 text-sm mb-6">
               <span className="text-[#00bf63] font-semibold tracking-wide uppercase">{articleData.category}</span>
               <span className="text-gray-300">|</span>
@@ -208,7 +155,7 @@ const BlogPost = () => {
                   <div className="text-sm text-gray-500">{articleData.author.role}</div>
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-3">
                 <button className="p-2 text-gray-400 hover:text-[#1DA1F2] bg-gray-50 hover:bg-blue-50 rounded-full transition-colors">
                   <Twitter className="w-4 h-4" />
@@ -226,9 +173,9 @@ const BlogPost = () => {
           {/* Featured Image */}
           <div className="container mx-auto px-6 lg:px-8 max-w-5xl mb-16">
             <div className="rounded-2xl overflow-hidden shadow-sm bg-gray-100">
-              <img 
-                src={articleData.image} 
-                alt="Featured" 
+              <img
+                src={articleData.image}
+                alt="Featured"
                 className="w-full h-auto max-h-[600px] object-cover"
               />
             </div>
@@ -236,9 +183,9 @@ const BlogPost = () => {
 
           {/* Content */}
           <div className="container mx-auto px-6 lg:px-8 max-w-3xl">
-            <div 
-              className="prose prose-lg prose-gray max-w-none 
-                prose-headings:font-bold prose-headings:text-gray-900 
+            <div
+              className="prose prose-lg prose-gray max-w-none
+                prose-headings:font-bold prose-headings:text-gray-900
                 prose-h2:text-3xl prose-h2:mt-12 prose-h2:mb-6
                 prose-p:text-gray-700 prose-p:leading-relaxed prose-p:mb-6
                 prose-a:text-[#00bf63] prose-a:no-underline hover:prose-a:underline
@@ -246,7 +193,7 @@ const BlogPost = () => {
                 prose-strong:text-gray-900"
               dangerouslySetInnerHTML={{ __html: articleData.content }}
             />
-            
+
             {/* Tags / Bottom Footer */}
             <div className="mt-16 pt-8 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="flex gap-2">
@@ -258,7 +205,7 @@ const BlogPost = () => {
           </div>
         </article>
       </main>
-      
+
       <Footer />
     </div>
   );
