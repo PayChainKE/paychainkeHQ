@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, Alert, ActivityIndicator, Image } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
@@ -136,11 +136,17 @@ export default function TransactionSuccessCard({
   return (
     <View className="bg-white rounded-[28px] border border-[#00351d]/5 shadow-xl overflow-hidden">
       <View className="px-7 pt-8 pb-6 items-center">
-        <View className={`w-20 h-20 rounded-full items-center justify-center mb-5 border-4 ${
-          isPending ? 'bg-amber-50 border-amber-200' : 'bg-[#e7f8ef] border-[#d5f3e4]'
-        }`}>
-          <Feather name={isPending ? 'clock' : 'check-circle'} size={40} color={isPending ? '#b45309' : '#006c4e'} />
-        </View>
+        {isPending ? (
+          <View className="w-20 h-20 rounded-full items-center justify-center mb-5 border-4 bg-amber-50 border-amber-200">
+            <Feather name="clock" size={40} color="#b45309" />
+          </View>
+        ) : (
+          <Image
+            source={require('../../../assets/vectors/payment sent.png')}
+            style={{ width: 160, height: 107, marginBottom: 12 }}
+            resizeMode="contain"
+          />
+        )}
         <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[24px] text-[#00351d] mb-1 text-center">
           {isPending ? 'Payment Processing' : 'Transaction Successful'}
         </Text>

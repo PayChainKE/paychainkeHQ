@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, Linking } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, Linking, Image } from 'react-native';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import api from '../api/config';
@@ -297,7 +297,7 @@ export default function CashAdvance({ navigation }: any) {
             <PageHeader />
             <View className="bg-white rounded-2xl shadow-sm border border-[#eff4ef] p-12 items-center">
               <View className="w-24 h-24 rounded-full bg-[#f7faf7] items-center justify-center mb-6 border border-[#eff4ef]">
-                <MaterialIcons name="lock" size={36} color="#5b645c" />
+                <Image source={require('../../assets/application closed.png')} style={{ width: 44, height: 44 }} resizeMode="contain" />
               </View>
               <Text className="text-[22px] font-jakarta-extrabold text-[#00351d] mb-3 text-center">Applications Are Currently Paused</Text>
               <Text className="text-[15px] text-[#5b645c] font-jakarta-bold text-center leading-relaxed max-w-[280px] opacity-80 mb-6">

@@ -32,6 +32,16 @@ const RISK_META = {
   high:   'bg-red-50 text-red-700 border-red-200',
 };
 
+// Actual registration date/time — same dateStyle/timeStyle convention as
+// Merchants.jsx (e.g. "16 Sep 2026, 2:34 PM"), so an admin reviewing the
+// queue sees exactly when the application came in, not just a vague "3d
+// ago" (still shown alongside it via ageLabel below — useful for a
+// how-stale-is-this-application glance the exact date doesn't give you).
+function submittedAtLabel(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString('en-KE', { dateStyle: 'medium', timeStyle: 'short' });
+}
+
 function ageLabel(iso) {
   if (!iso) return '—';
   const ms = Date.now() - new Date(iso).getTime();
@@ -256,7 +266,10 @@ const QueueRow = ({ app, onOpen }) => {
       <td className="px-3 py-2 border-b border-outline-variant/5">
         {app.riskTier ? <span className={`inline-flex px-2 py-0.5 rounded-full text-2xs font-bold uppercase tracking-widest border ${RISK_META[app.riskTier]}`}>{app.riskTier}</span> : <span className="text-on-surface-variant/40">—</span>}
       </td>
-      <td className="px-3 py-2 border-b border-outline-variant/5 text-2xs text-on-surface-variant/50">{ageLabel(app.submittedAt)}</td>
+      <td className="px-3 py-2 border-b border-outline-variant/5">
+        <p className="text-xs text-on-surface">{submittedAtLabel(app.submittedAt)}</p>
+        <p className="text-2xs text-on-surface-variant/50">{ageLabel(app.submittedAt)}</p>
+      </td>
       <td className="px-3 py-2 border-b border-outline-variant/5 text-2xs text-on-surface-variant/50">
         {app.claimedBy ? (app.claimedBy.name || app.claimedBy.email || 'Claimed') : 'Unclaimed'}
       </td>
@@ -280,7 +293,7 @@ const QueueCard = ({ app, onOpen }) => {
           <p className="text-2xs text-on-surface-variant/60 truncate">{app.name} · {app.phone}</p>
           <div className="mt-2 flex items-center gap-1.5 flex-wrap">
             <span className={`inline-flex px-2 py-0.5 rounded-full text-2xs font-bold uppercase tracking-widest border ${statusStyle.pill}`}>{statusStyle.label}</span>
-            <span className="text-2xs text-on-surface-variant/50">{ageLabel(app.submittedAt)}</span>
+            <span className="text-2xs text-on-surface-variant/50">{submittedAtLabel(app.submittedAt)} · {ageLabel(app.submittedAt)}</span>
           </div>
         </div>
         <span className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 whitespace-nowrap">

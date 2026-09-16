@@ -14,6 +14,7 @@ import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useNotification } from '../context/NotificationContext'
 import logo from '../assets/logo2.png'
 import statementLogo from '../assets/paychain-logo-white.png'
+import NoConnectionState from '../components/ui/NoConnectionState'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
@@ -29,6 +30,7 @@ export default function Transactions() {
   const [selectedTx, setSelectedTx] = useState(null)
   const [liveTransactions, setLiveTransactions] = useState([])
   const [isLoading, setIsLoading] = useState(true)
+  const [hasError, setHasError] = useState(false)
 
   const fetchTransactions = React.useCallback(async () => {
     if (!merchant) return;
@@ -43,9 +45,11 @@ export default function Transactions() {
       // file is automatically clean — see excludeReversedDuplicates' doc
       // comment (utils/transactionDirection.js).
       setLiveTransactions(excludeReversedDuplicates(res.data));
+      setHasError(false);
     } catch (err) {
       console.error('Failed to load transactions', err);
       setLiveTransactions([]);
+      setHasError(true);
     } finally {
       setIsLoading(false);
     }
@@ -703,7 +707,11 @@ export default function Transactions() {
           <p className="text-on-surface-variant text-[11px] lg:text-sm font-medium mt-1.5 opacity-80">All money movements — payments in, withdrawals, swaps and bulk pays for account {formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'Pending')}</p>
         </div>
 
-        {liveTransactions.length === 0 ? (
+        {hasError && liveTransactions.length === 0 ? (
+          <div className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/10 editorial-shadow mt-8">
+            <NoConnectionState onRetry={fetchTransactions} />
+          </div>
+        ) : liveTransactions.length === 0 ? (
           <div className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/10 editorial-shadow p-12 lg:p-20 flex flex-col items-center justify-center text-center animate-fade-in-up mt-8">
             <div className="w-24 h-24 bg-surface-container-low rounded-full flex items-center justify-center mb-6 border border-slate-200">
               <span className="material-symbols-outlined text-5xl text-emerald-600/50">receipt_long</span>

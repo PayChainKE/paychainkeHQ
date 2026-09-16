@@ -7,6 +7,7 @@ import { formatPhoneOrDash } from '../../utils/formatPhoneDisplay'
 import { barcodeSvg, drawBarcodePdf } from '../../utils/barcode'
 import { useNotification } from '../../context/NotificationContext'
 import statementLogo from '../../assets/paychain-logo-white.png'
+import paymentSentIllustration from '../../assets/payment-sent.png'
 
 const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
 
@@ -164,13 +165,13 @@ export default function TransactionSuccessCard({
   return (
     <div className="bg-white rounded-[28px] border border-slate-100 shadow-[0_20px_60px_rgba(0,0,0,0.08)] overflow-hidden animate-fade-in-up">
       <div className="p-7 lg:p-9 text-center">
-        <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-5 shadow-lg border-4 ${
-          isPending ? 'bg-amber-100 border-amber-200/40' : 'bg-emerald-100 border-emerald-200/40'
-        }`}>
-          <span className={`material-symbols-outlined text-4xl ${isPending ? 'text-amber-600' : 'text-emerald-600'}`} style={{ fontVariationSettings: "'FILL' 1" }}>
-            {isPending ? 'schedule' : 'check_circle'}
-          </span>
-        </div>
+        {isPending ? (
+          <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-5 shadow-lg border-4 bg-amber-100 border-amber-200/40">
+            <span className="material-symbols-outlined text-4xl text-amber-600" style={{ fontVariationSettings: "'FILL' 1" }}>schedule</span>
+          </div>
+        ) : (
+          <img src={paymentSentIllustration} alt="" className="w-40 h-auto mx-auto mb-3" />
+        )}
         <h2 className="font-headline text-3xl font-bold text-primary tracking-tight mb-1">{isPending ? 'Payment Processing' : 'Transaction Successful'}</h2>
         {isPending && (
           <p className="text-xs text-amber-700/80 max-w-xs mx-auto -mt-1 mb-1">

@@ -76,7 +76,7 @@ function SignupSectionHeader({ icon, title }: { icon: any; title: string }) {
 }
 
 export default function Login({ route }: any) {
-  const { login, biometricLogin, signup, sendSignupPhoneOtp, verifySignupPhoneOtp, verifyOTP, forgotPassword, resetPassword,
+  const { login, biometricLogin, signup, sendSignupPhoneOtp, verifySignupPhoneOtp, verifyOTP, resendOTP, forgotPassword, resetPassword,
           isBiometricsEnabled, hasBiometricToken, logoutReason, clearLogoutReason } = useAuth();
   const { authenticate: authenticateBiometric } = useBiometrics();
 
@@ -323,6 +323,25 @@ export default function Login({ route }: any) {
       // a submitted application is pending approval, not auto-logged in
       // (see handleSignupCreateAccount's signupSubmitted screen instead).
       setErr('');
+    } else {
+      setErr(res.error);
+    }
+  };
+
+  // Mirrors web Login.jsx's handleResendOTP exactly — same resendOTP(authEmail)
+  // call, flow-agnostic (works for both otpFlowType 'login' and 'reset'
+  // since it's keyed only on authEmail, not which flow started it). This
+  // was previously missing here entirely: resendTimer counted down with
+  // nothing wired to trigger a resend once it hit zero.
+  const handleResendOTP = async () => {
+    if (resendTimer > 0) return;
+    setLoading(true);
+    const res = await resendOTP(authEmail);
+    setLoading(false);
+    if (res.success) {
+      setResendTimer(59);
+      setOtpChannel(res.channel || otpChannel);
+      setOtpMaskedPhone(res.maskedPhone || otpMaskedPhone);
     } else {
       setErr(res.error);
     }
@@ -935,6 +954,15 @@ export default function Login({ route }: any) {
                 <TouchableOpacity onPress={handleVerifyOTP} disabled={loading || otp.join('').length < 6} className="w-full bg-[#06201b] py-4 rounded-2xl flex-row justify-center items-center mb-4 opacity-100">
                   {loading ? <ActivityIndicator color="white" /> : <Text className="text-white font-jakarta-bold text-[16px]">Verify Code</Text>}
                 </TouchableOpacity>
+
+                <View className="flex-row justify-center items-center gap-1 mb-2">
+                  <Text className="text-[#9ca3af] text-[12px] font-jakarta-bold">Didn't receive it? </Text>
+                  <TouchableOpacity onPress={handleResendOTP} disabled={resendTimer > 0 || loading}>
+                    <Text className={`text-[12px] font-jakarta-bold ${(resendTimer > 0 || loading) ? 'text-[#9ca3af]' : 'text-[#047857]'}`}>
+                      {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend code'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             )}
 

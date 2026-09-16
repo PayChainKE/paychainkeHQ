@@ -6,6 +6,7 @@ import { formatKES } from '../utils/formatCurrency'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { useNotification } from '../context/NotificationContext'
 import { ShieldCheck, X, ArrowRight, ArrowLeft, CheckCircle2, Clock, XCircle, Sparkles } from 'lucide-react'
+import applicationClosedIcon from '../assets/application-closed-icon.png'
 
 const CASH_ADVANCE_LEARN_MORE_URL = 'https://www.paychain.co.ke/products/cash-advance'
 const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
@@ -171,7 +172,7 @@ function DisabledState({ global = false }) {
         <PageHeader />
         <div className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/10 editorial-shadow p-12 lg:p-20 flex flex-col items-center justify-center text-center">
           <div className="w-24 h-24 rounded-full bg-surface-container-low flex items-center justify-center mb-6 border border-outline-variant/20 shadow-sm">
-            <span className="material-symbols-outlined text-4xl text-on-surface-variant/50">lock</span>
+            <img src={applicationClosedIcon} alt="" className="w-11 h-11 object-contain" />
           </div>
           <h3 className="text-2xl font-headline font-bold text-primary mb-3">Applications Are Currently Paused</h3>
           <p className="text-[15px] text-on-surface-variant font-medium max-w-md mx-auto leading-relaxed opacity-80 mb-6">

@@ -8,6 +8,7 @@ import * as Sharing from 'expo-sharing';
 import { useAuth } from '../context/AuthContext';
 import { useTransactions } from '../context/TransactionsContext';
 import TopBar from '../components/layout/TopBar';
+import NoConnectionState from '../components/ui/NoConnectionState';
 import { isCreditTransaction as isInboundType, isDebitTransaction as isOutboundType, typeLabel as txTypeLabel, netBalanceImpact } from '../utils/transactionDirection';
 import { formatAccountNumber } from '../utils/formatAccountNumber';
 import { buildAuditReceiptHtml } from '../utils/auditReceiptHtml';
@@ -103,7 +104,7 @@ const getDateRange = (filter: DateFilter): { start: Date | null; end: Date | nul
 
 export default function Collections() {
   const { merchant } = useAuth();
-  const { transactions, isLoading, isRefreshing, refresh: refreshTransactions } = useTransactions();
+  const { transactions, isLoading, isRefreshing, hasError, refresh: refreshTransactions } = useTransactions();
   const [showReceipt, setShowReceipt] = useState(false);
   const [selectedTx, setSelectedTx] = useState<any | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -705,6 +706,8 @@ export default function Collections() {
                 <View className="py-10 items-center justify-center">
                   <ActivityIndicator color="#00351d" />
                 </View>
+              ) : hasError && transactions.length === 0 ? (
+                <NoConnectionState onRetry={refreshTransactions} />
               ) : filteredTransactions.length > 0 ? (
                 paginatedTransactions.map((tx, index, visible) => {
                   const name = counterpartyName(tx);

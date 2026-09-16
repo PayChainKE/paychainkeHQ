@@ -12,7 +12,12 @@ import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { useNavigate } from 'react-router-dom'
 import FundAccountModal from '../components/modals/FundAccountModal'
+import NoConnectionState from '../components/ui/NoConnectionState'
 import walletCardBg from '../assets/wallet-card-bg.png'
+import sendMoneyIcon from '../assets/send-money-icon.png'
+import receiveMoneyIcon from '../assets/receive-money-icon.png'
+import stkPushIcon from '../assets/stk-push-icon.png'
+import paymentLinkIcon from '../assets/payment-link-icon.png'
 
 export default function Overview() {
   const navigate = useNavigate()
@@ -21,6 +26,7 @@ export default function Overview() {
   
   const [liveTransactions, setLiveTransactions] = useState([])
   const [isLoading, setIsLoading] = useState(true)
+  const [hasError, setHasError] = useState(false)
   const [trustData, setTrustData] = useState(null)
   const [activeTimeframe, setActiveTimeframe] = useState('7D')
   const [showMoveMoney, setShowMoveMoney] = useState(false)
@@ -47,8 +53,10 @@ export default function Overview() {
       // of just a harmlessly stale dashboard.
       setLiveTransactions(Array.isArray(txRes.data) ? txRes.data : [])
       setTrustData(trustRes.data)
+      setHasError(false)
     } catch (err) {
       console.error('Failed to fetch dashboard data', err)
+      setHasError(true)
     } finally {
       setIsLoading(false)
     }
@@ -398,7 +406,7 @@ export default function Overview() {
                       <button onClick={() => navigate('/send-money')} className="w-full text-left p-3 hover:bg-emerald-50/50 rounded-xl transition-all group relative overflow-hidden">
                         <div className="flex items-center gap-3 relative z-10">
                           <div className="w-10 h-10 rounded-xl bg-[#00351D] text-[#5EFEB3] flex items-center justify-center shrink-0 shadow-lg group-hover:scale-105 transition-transform">
-                            <span className="material-symbols-outlined text-lg">send_money</span>
+                            <img src={sendMoneyIcon} alt="" className="w-5 h-5 object-contain" />
                           </div>
                           <div className="flex-1">
                             <div className="flex items-center justify-between mb-0.5">
@@ -413,7 +421,7 @@ export default function Overview() {
                       <button onClick={() => navigate('/request-money')} className="w-full text-left p-3 hover:bg-emerald-50/50 rounded-xl transition-all group relative overflow-hidden">
                         <div className="flex items-center gap-3 relative z-10">
                           <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 shadow-lg group-hover:scale-105 transition-transform">
-                            <span className="material-symbols-outlined text-lg">request_quote</span>
+                            <img src={receiveMoneyIcon} alt="" className="w-5 h-5 object-contain" />
                           </div>
                           <div className="flex-1">
                             <div className="flex items-center justify-between mb-0.5">
@@ -456,8 +464,8 @@ export default function Overview() {
             the stat cards beside them) — the frame border color is still
             per-action so the two read as distinct at a glance. */}
         {[
-          { label: 'Send STK Push', description: 'Prompt a customer to pay instantly', icon: 'bolt', preset: 'mpesa', frame: 'border-amber-400/30 hover:border-amber-400/60', glow: 'bg-amber-400/10' },
-          { label: 'Get Payment Link', description: 'Share a link for any amount', icon: 'link', preset: 'link', frame: 'border-sky-400/30 hover:border-sky-400/60', glow: 'bg-sky-400/10' },
+          { label: 'Send STK Push', description: 'Prompt a customer to pay instantly', icon: stkPushIcon, preset: 'mpesa', frame: 'border-amber-400/30 hover:border-amber-400/60', glow: 'bg-amber-400/10' },
+          { label: 'Get Payment Link', description: 'Share a link for any amount', icon: paymentLinkIcon, preset: 'link', frame: 'border-sky-400/30 hover:border-sky-400/60', glow: 'bg-sky-400/10' },
         ].map((action) => (
           <button
             key={action.preset}
@@ -471,7 +479,7 @@ export default function Overview() {
             <div className="relative z-10 flex flex-col h-full">
               <div className="flex justify-between items-center mb-4 lg:mb-6">
                 <div className="w-9 h-9 lg:w-10 lg:h-10 rounded-xl bg-white/10 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-emerald-400 text-lg leading-none">{action.icon}</span>
+                  <img src={action.icon} alt="" className="w-5 h-5 object-contain" />
                 </div>
                 <span className="material-symbols-outlined text-white/30 text-base group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all">arrow_outward</span>
               </div>
@@ -549,7 +557,9 @@ export default function Overview() {
             </button>
           </div>
           <div className="flex flex-col">
-            {recentTx.length === 0 ? (
+            {hasError && recentTx.length === 0 ? (
+              <NoConnectionState onRetry={fetchData} />
+            ) : recentTx.length === 0 ? (
               <div className="p-8 text-center text-on-surface-variant font-medium">
                 No recent transactions yet.
               </div>
