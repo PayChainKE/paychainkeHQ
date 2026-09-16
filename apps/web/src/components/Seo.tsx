@@ -1,11 +1,13 @@
 import { useEffect } from 'react';
 
-// The site's actual live domain — index.html's own default og:image
-// previously pointed at paychainke.com, which doesn't resolve at all (no
-// DNS record); paychain.co.ke is the domain used everywhere else in this
-// app (Navbar/Footer/Docs links, contact emails, PrivacyPolicy's own
-// self-reference).
-const SITE_URL = 'https://paychain.co.ke';
+// The site's actual live domain. Vercel's own dashboard-level domain
+// config redirects paychain.co.ke -> www.paychain.co.ke (a 307, set at the
+// platform level, not in this repo's vercel.json) — www is the real
+// canonical domain that actually serves content. An earlier version of
+// this file used the bare (non-www) domain, which briefly created a
+// redirect loop when apps/web/vercel.json also tried to redirect the
+// opposite direction (www -> non-www) — removed; see that file's history.
+const SITE_URL = 'https://www.paychain.co.ke';
 // No dedicated opengraph-image.png exists in public/ (index.html's own tags
 // pointed at one that 404s) — reusing an existing real screenshot instead of
 // linking a broken image on every social share until a proper 1200x630

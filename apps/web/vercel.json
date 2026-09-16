@@ -1,13 +1,6 @@
 {
-  "redirects": [
-    {
-      "source": "/:path*",
-      "has": [{ "type": "host", "value": "www.paychain.co.ke" }],
-      "destination": "https://paychain.co.ke/:path*",
-      "permanent": true
-    }
-  ],
   "rewrites": [
+    { "source": "/sitemap.xml", "destination": "https://api.paychain.co.ke/sitemap.xml" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "headers": [
