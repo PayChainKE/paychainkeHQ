@@ -1,4 +1,5 @@
 import React from 'react';
+import Seo from '@/components/Seo';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { motion } from 'framer-motion';
@@ -51,6 +52,11 @@ const comparisonRows = [
 const VirtualAccount: React.FC = () => {
   return (
     <div className="min-h-screen bg-white">
+      <Seo
+        title="PayChain Virtual Account | A Verified Paybill for Your Business"
+        description="A dedicated PayChain Paybill and virtual account for your business — collect in person, via payment link (even over WhatsApp), STK push, or invoice, all verified and settled instantly."
+        path="/products/virtual-account"
+      />
       <Navbar />
 
       {/* Breadcrumb strip */}

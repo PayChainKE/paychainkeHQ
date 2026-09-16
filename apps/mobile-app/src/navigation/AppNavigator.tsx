@@ -2,6 +2,7 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { NavigationContainer } from '@react-navigation/native';
+import { Image } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
 import Dashboard from '../pages/Dashboard';
@@ -96,7 +97,9 @@ function MainTabs() {
             ? { tabBarButton: () => null, tabBarItemStyle: { flex: 0, width: 0, padding: 0 } }
             : {
                 tabBarIcon: ({ color }) => (
-                  <TourTarget id="tab-advance"><Feather name="trending-up" size={22} color={color} /></TourTarget>
+                  <TourTarget id="tab-advance">
+                    <Image source={require('../../assets/cash advance.png')} style={{ width: 22, height: 22, tintColor: color }} resizeMode="contain" />
+                  </TourTarget>
                 )
               }
         }

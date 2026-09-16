@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import Seo from '@/components/Seo';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { trackEvent } from '@/lib/analytics';
@@ -65,8 +66,13 @@ const BookDemo: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
+      <Seo
+        title="Book a Demo | PayChain"
+        description="See PayChain in action — book a live walkthrough of collections, Bulk Pay, and Cash Advance for your business."
+        path="/book-demo"
+      />
       <Navbar />
-      
+
       <main className="flex-grow flex flex-col items-center justify-center pt-32 pb-16 px-4 sm:px-6 lg:px-8 w-full relative">
         {/* Professional Background */}
         <div className="absolute inset-0 bg-[url('/hero-bg.png')] bg-cover bg-center bg-no-repeat z-0 opacity-70" />

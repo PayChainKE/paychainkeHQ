@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, Phone, MapPin, ShieldCheck, ChevronRight } from 'lucide-react';
+import Seo from '@/components/Seo';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
@@ -35,6 +36,11 @@ const PrivacyPolicy: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-white">
+      <Seo
+        title="Privacy Policy | PayChain"
+        description="How PayChain, a registered Data Controller under Kenya's Data Protection Act 2019, collects, uses, and protects merchant and customer personal data."
+        path="/privacy-policy"
+      />
       <Navbar />
 
       {/* Hero */}

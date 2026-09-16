@@ -7,6 +7,7 @@ import { formatKES } from '../../utils/formatCurrency'
 import { formatAccountNumber } from '../../utils/formatAccountNumber'
 import userIcon from '../../assets/user-icon.png'
 import logo from '../../assets/logo2.png'
+import cashAdvanceIcon from '../../assets/cash-advance-icon.png'
 
 const baseNavItems = [
   { name: 'Overview', icon: 'dashboard', path: '/overview' },
@@ -22,6 +23,7 @@ const baseNavItems = [
   {
     name: 'Cash Advance',
     icon: 'payments',
+    image: cashAdvanceIcon,
     path: '/cash-advance',
     showOverview: false,
   },
@@ -130,9 +132,18 @@ function NavItem({ item, depth = 0 }) {
     >
       {({ isActive }) => (
         <>
-          <span className={`material-symbols-outlined transition-colors text-xl ${isActive ? 'text-[#5EFEB3]' : 'text-inherit opacity-60 group-hover:opacity-100'}`}>
-            {item.icon}
-          </span>
+          {item.image ? (
+            <img
+              src={item.image}
+              alt=""
+              className={`w-4.5 h-4.5 object-contain transition-opacity ${isActive ? 'opacity-100' : 'opacity-60 group-hover:opacity-100'}`}
+              style={{ filter: 'invert(1)' }}
+            />
+          ) : (
+            <span className={`material-symbols-outlined transition-colors text-xl ${isActive ? 'text-[#5EFEB3]' : 'text-inherit opacity-60 group-hover:opacity-100'}`}>
+              {item.icon}
+            </span>
+          )}
           <span className="font-bold text-xs tracking-wide">{item.name}</span>
         </>
       )}

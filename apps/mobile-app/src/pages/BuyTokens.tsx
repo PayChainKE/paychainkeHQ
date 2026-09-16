@@ -9,16 +9,15 @@ import { formatPhoneDisplay } from '../utils/formatPhoneDisplay';
 import { hapticSuccess, hapticError } from '../utils/haptics';
 import TransactionSuccessCard from '../components/ui/TransactionSuccessCard';
 
-// Only Electricity (KPLC) genuinely sells a "token" today — Water/Rent/
-// Internet/Other are shown for the same reason BulkPay's own Utility Type
-// selector shows them (a merchant scanning the list shouldn't wonder if
-// they were forgotten), but stay disabled since no other biller on NCBA's
-// dedicated rails is a prepaid-token product yet. Mirrors
-// apps/mobile-app/src/pages/BulkPay.tsx's DEDICATED_RAIL_UTILITIES exactly.
+// Electricity (KPLC) is the only utility on a dedicated NCBA rail today —
+// see apps/mobile-app/src/pages/BulkPay.tsx's DEDICATED_RAIL_UTILITIES.
 const TOKEN_TYPES = [
   { id: 'electricity', label: 'Electricity', sub: 'Kenya Power (KPLC)', enabled: true },
-  { id: 'water', label: 'Water', sub: 'Coming soon', enabled: false },
-  { id: 'other', label: 'Other', sub: 'Coming soon', enabled: false },
+];
+
+const ACCOUNT_TYPES = [
+  { id: 'KPLC_PREPAID' as const, label: 'Prepaid', desc: 'Buy an electricity token' },
+  { id: 'KPLC' as const, label: 'Postpaid', desc: 'Pay down your existing bill' },
 ];
 
 type CheckState = {
@@ -29,9 +28,11 @@ type CheckState = {
 
 export default function BuyTokens({ navigation }: any) {
   const { merchant, refreshSession } = useAuth();
+  const [accountType, setAccountType] = useState<'KPLC' | 'KPLC_PREPAID'>('KPLC_PREPAID');
   const [meterNumber, setMeterNumber] = useState('');
   const [amount, setAmount] = useState('');
   const [check, setCheck] = useState<CheckState>({ status: 'idle', customerName: '', error: '' });
+  const isPrepaid = accountType === 'KPLC_PREPAID';
   const [showPin, setShowPin] = useState(false);
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState('');
@@ -48,12 +49,13 @@ export default function BuyTokens({ navigation }: any) {
       return;
     }
     if (!merchantPhone) {
-      setCheck({ status: 'error', customerName: '', error: 'Your account has no registered phone number to send the token to.' });
+      setCheck({ status: 'error', customerName: '', error: 'Your account has no registered phone number to notify.' });
       return;
     }
     setCheck({ status: 'loading', customerName: '', error: '' });
     try {
-      const res = await api.post('/api/bulkpay/validate-kplc-prepaid-meter', {
+      const endpoint = isPrepaid ? 'validate-kplc-prepaid-meter' : 'validate-kplc-meter';
+      const res = await api.post(`/api/bulkpay/${endpoint}`, {
         meterNumber: meterNumber.trim(),
         msisdn: merchantPhone,
       });
@@ -83,10 +85,10 @@ export default function BuyTokens({ navigation }: any) {
       // as a generic Mobile Money payee server-side and would silently skip
       // the dedicated KPLC rail. See bulkPayController.js#authorizeBatch.
       const payeeRes = await api.post('/api/bulkpay/payees', {
-        name: `KPLC Token · ${meterNumber.trim()}`,
+        name: `KPLC ${isPrepaid ? 'Token' : 'Bill'} · ${meterNumber.trim()}`,
         type: 'utility',
         utilityType: 'Electricity',
-        utilityProvider: 'KPLC_PREPAID',
+        utilityProvider: accountType,
         accountNumber: meterNumber.trim(),
         phone: merchantPhone,
         defaultAmount: numericAmount,
@@ -111,7 +113,7 @@ export default function BuyTokens({ navigation }: any) {
         reference: tx?.receiptNumber || res.data?.batch?.batchReference,
         createdAt: new Date().toISOString(),
         status: tx?.status || 'pending',
-        type: 'ncba_kplc_prepaid',
+        type: isPrepaid ? 'ncba_kplc_prepaid' : 'ncba_kplc',
         amount: numericAmount,
       });
       hapticSuccess();
@@ -120,7 +122,7 @@ export default function BuyTokens({ navigation }: any) {
       refreshSession();
     } catch (e: any) {
       hapticError();
-      const message = e?.response?.data?.message || 'Could not buy this token. Please try again.';
+      const message = e?.response?.data?.message || `Could not ${isPrepaid ? 'buy this token' : 'pay this bill'}. Please try again.`;
       if (e?.response?.status === 401) {
         setPin('');
       } else {
@@ -140,7 +142,7 @@ export default function BuyTokens({ navigation }: any) {
           <View className="w-full max-w-lg mx-auto px-6 pt-6">
             <TransactionSuccessCard
               amount={numericAmount}
-              methodLabel="KPLC Prepaid Token"
+              methodLabel={isPrepaid ? 'KPLC Prepaid Token' : 'KPLC Postpaid Bill'}
               recipientDisplay={`Meter ${meterNumber.trim()}`}
               phoneNumber={merchantPhone}
               transaction={completedTx}
@@ -155,26 +157,34 @@ export default function BuyTokens({ navigation }: any) {
 
   return (
     <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
-      <TopBar title="Buy Tokens" subtitle="Kenya Power prepaid electricity" />
+      <TopBar title="Buy Tokens" subtitle="Kenya Power electricity payments" />
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 140 }}>
         <View className="w-full max-w-lg mx-auto px-6 pt-6">
           <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-2">Token Type</Text>
           <View className="flex-row gap-2 mb-6">
             {TOKEN_TYPES.map((t) => (
-              <View
-                key={t.id}
-                className={`flex-1 px-3 py-3 rounded-xl border items-center justify-center ${
-                  t.enabled ? 'bg-[#00351d] border-[#00351d]' : 'bg-white border-[#e7ece7] opacity-50'
-                }`}
-              >
-                <Text className={`text-[11px] font-jakarta-extrabold uppercase tracking-wide text-center ${t.enabled ? 'text-white' : 'text-[#707971]'}`}>
-                  {t.label}
-                </Text>
-                <Text className={`text-[9px] font-jakarta-medium mt-0.5 text-center ${t.enabled ? 'text-[#5efeb3]' : 'text-[#a1a1aa]'}`}>
-                  {t.sub}
-                </Text>
+              <View key={t.id} className="flex-1 px-3 py-3 rounded-xl border items-center justify-center bg-[#00351d] border-[#00351d]">
+                <Text className="text-[11px] font-jakarta-extrabold uppercase tracking-wide text-center text-white">{t.label}</Text>
+                <Text className="text-[9px] font-jakarta-medium mt-0.5 text-center text-[#5efeb3]">{t.sub}</Text>
               </View>
             ))}
+          </View>
+
+          <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-2">Account Type</Text>
+          <View className="flex-row gap-2 p-1.5 bg-white rounded-2xl border border-[#e7ece7] mb-6">
+            {ACCOUNT_TYPES.map((opt) => {
+              const isActive = accountType === opt.id;
+              return (
+                <TouchableOpacity
+                  key={opt.id}
+                  onPress={() => { resetCheck(); setAccountType(opt.id); }}
+                  className={`flex-1 py-2.5 rounded-xl items-center ${isActive ? 'bg-[#00351d]' : ''}`}
+                >
+                  <Text className={`text-[11px] font-jakarta-bold uppercase tracking-wider ${isActive ? 'text-white' : 'text-[#9ca3af]'}`}>{opt.label}</Text>
+                  <Text className={`text-[9px] font-jakarta-medium mt-0.5 text-center ${isActive ? 'text-[#5efeb3]' : 'text-[#9ca3af]'}`}>{opt.desc}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
           <View className="bg-white rounded-[28px] border border-[#eff4ef] shadow-sm p-5 mb-6">
@@ -183,8 +193,10 @@ export default function BuyTokens({ navigation }: any) {
                 <Image source={require('../../assets/kplc icon.png')} style={{ width: 32, height: 32 }} resizeMode="contain" />
               </View>
               <View className="flex-1">
-                <Text className="text-[13px] font-jakarta-extrabold text-[#00351d]">Kenya Power Prepaid</Text>
-                <Text className="text-[10.5px] text-[#707971] font-jakarta-medium mt-0.5">Buy an electricity token for any meter</Text>
+                <Text className="text-[13px] font-jakarta-extrabold text-[#00351d]">{isPrepaid ? 'Kenya Power Prepaid' : 'Kenya Power Postpaid'}</Text>
+                <Text className="text-[10.5px] text-[#707971] font-jakarta-medium mt-0.5">
+                  {isPrepaid ? 'Buy an electricity token for any meter' : "Pay down the balance on an existing bill"}
+                </Text>
               </View>
             </View>
 
@@ -224,7 +236,9 @@ export default function BuyTokens({ navigation }: any) {
                 <Feather name="check-circle" size={16} color="#059669" />
                 <View className="flex-1">
                   <Text className="text-[13px] font-jakarta-bold text-[#0c2010]">{check.customerName || 'Meter verified'}</Text>
-                  <Text className="text-[11px] text-[#707971] font-jakarta-medium mt-0.5">This meter is ready for a token purchase.</Text>
+                  <Text className="text-[11px] text-[#707971] font-jakarta-medium mt-0.5">
+                    {isPrepaid ? 'This meter is ready for a token purchase.' : 'This meter is ready for a bill payment.'}
+                  </Text>
                 </View>
               </View>
             )}
@@ -236,20 +250,20 @@ export default function BuyTokens({ navigation }: any) {
             )}
 
             {/* Notification number is fixed to the merchant's own registered
-                phone, never editable here — the token SMS from KPLC always
-                lands on the account's primary number, not an arbitrary one
-                typed into a form. */}
+                phone, never editable here — KPLC's SMS always lands on the
+                account's primary number, not an arbitrary one typed into a
+                form. */}
             <View className="flex-row items-center gap-2 mt-4 pt-4 border-t border-dashed border-[#eff4ef]">
               <Feather name="message-circle" size={13} color="#5b645c" />
               <Text className="text-[11px] text-[#5b645c] font-jakarta-medium flex-1">
-                Token sent via SMS to your registered number{merchantPhone ? ` · ${formatPhoneDisplay(merchantPhone)}` : ''}
+                {isPrepaid ? 'Token' : 'Payment confirmation'} sent via SMS to your registered number{merchantPhone ? ` · ${formatPhoneDisplay(merchantPhone)}` : ''}
               </Text>
             </View>
           </View>
         </View>
       </ScrollView>
 
-      {/* Floating Buy Token bar */}
+      {/* Floating CTA bar */}
       <View className="absolute bottom-0 left-0 right-0 bg-white/95 border-t border-[#eff4ef] px-6 pt-3 pb-7">
         <View className="w-full max-w-lg mx-auto">
           <TouchableOpacity
@@ -259,7 +273,9 @@ export default function BuyTokens({ navigation }: any) {
             className="w-full bg-[#00351d] h-[56px] rounded-full items-center justify-center"
           >
             <Text className="text-white font-jakarta-bold text-[15px]">
-              {numericAmount > 0 ? `Buy Token · KES ${numericAmount.toLocaleString()}` : 'Buy Token'}
+              {numericAmount > 0
+                ? `${isPrepaid ? 'Buy Token' : 'Pay Bill'} · KES ${numericAmount.toLocaleString()}`
+                : isPrepaid ? 'Buy Token' : 'Pay Bill'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -276,8 +292,12 @@ export default function BuyTokens({ navigation }: any) {
                 <View className="w-16 h-16 rounded-full bg-[#00351d] items-center justify-center mb-4">
                   <Feather name="lock" size={24} color="#5efeb3" />
                 </View>
-                <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[20px] text-[#0c2010] mb-1">Confirm Purchase</Text>
-                <Text className="text-[#707971] font-jakarta-medium text-[12px] text-center">Enter your Payment PIN to buy this token</Text>
+                <Text style={{ fontFamily: 'DMSerifDisplay_400Regular' }} className="text-[20px] text-[#0c2010] mb-1">
+                  {isPrepaid ? 'Confirm Purchase' : 'Confirm Payment'}
+                </Text>
+                <Text className="text-[#707971] font-jakarta-medium text-[12px] text-center">
+                  Enter your Payment PIN to {isPrepaid ? 'buy this token' : 'pay this bill'}
+                </Text>
               </View>
               <TextInput
                 value={pin}
@@ -301,7 +321,7 @@ export default function BuyTokens({ navigation }: any) {
                 style={{ opacity: pin.length !== 4 || isPaying ? 0.7 : 1 }}
               >
                 {isPaying ? <ActivityIndicator color="#fff" /> : (
-                  <Text className="text-white font-jakarta-bold text-[15px]">Confirm & Buy</Text>
+                  <Text className="text-white font-jakarta-bold text-[15px]">{isPrepaid ? 'Confirm & Buy' : 'Confirm & Pay'}</Text>
                 )}
               </TouchableOpacity>
             </View>

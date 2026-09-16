@@ -1,4 +1,5 @@
 import React from 'react';
+import Seo from '@/components/Seo';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { motion } from 'framer-motion';
@@ -60,6 +61,11 @@ const chartOptions = {
 const OperationsTools = () => {
   return (
     <div className="min-h-screen bg-white">
+      <Seo
+        title="Operations Tools | Run Your Business from One Dashboard"
+        description="Real-time reconciliation, dispute handling, financial controls, and compliance automation — everything you need to run a modern Kenyan business from one intelligent dashboard."
+        path="/products/operations-tools"
+      />
       <Navbar />
 
       {/* Breadcrumb strip */}
