@@ -936,15 +936,29 @@ export default function Login({ route }: any) {
                 
                 <View className="flex-row justify-between mb-8">
                   {otp.map((digit, index) => (
-                    <TextInput 
+                    <TextInput
                       key={index}
                       className="w-[45px] h-[55px] bg-[#f9fafb] border border-[#e5e7eb] rounded-xl text-center text-[20px] font-jakarta-bold text-[#0c2010]"
                       keyboardType="number-pad"
-                      maxLength={1}
+                      textContentType="oneTimeCode"
+                      autoComplete="sms-otp"
                       value={digit}
                       onChangeText={(val) => {
+                        // No maxLength here — it would truncate a pasted or
+                        // autofilled code down to a single character before
+                        // this handler ever sees it. A paste or SMS autofill
+                        // lands as one multi-digit string (on whichever box
+                        // it happened to focus) — spread it across every box
+                        // at once instead of the old one-digit-at-a-time-only
+                        // behavior.
+                        const digitsOnly = val.replace(/\D/g, '');
+                        if (digitsOnly.length > 1) {
+                          const chars = digitsOnly.slice(0, 6).split('');
+                          setOtp((prev) => prev.map((d, i) => chars[i] ?? d));
+                          return;
+                        }
                         const newOtp = [...otp];
-                        newOtp[index] = val;
+                        newOtp[index] = digitsOnly;
                         setOtp(newOtp);
                       }}
                     />
@@ -1234,11 +1248,21 @@ export default function Login({ route }: any) {
                       key={index}
                       className="w-[45px] h-[55px] bg-[#f9fafb] border border-[#e5e7eb] rounded-xl text-center text-[20px] font-jakarta-bold text-[#0c2010]"
                       keyboardType="number-pad"
-                      maxLength={1}
+                      textContentType="oneTimeCode"
+                      autoComplete="sms-otp"
                       value={digit}
                       onChangeText={(val) => {
+                        // See the login OTP boxes above for why there's no
+                        // maxLength and why a multi-digit value (paste or
+                        // SMS autofill) spreads across every box at once.
+                        const digitsOnly = val.replace(/\D/g, '');
+                        if (digitsOnly.length > 1) {
+                          const chars = digitsOnly.slice(0, 6).split('');
+                          setPhoneOtp((prev) => prev.map((d, i) => chars[i] ?? d));
+                          return;
+                        }
                         const newOtp = [...phoneOtp];
-                        newOtp[index] = val.replace(/\D/g, '');
+                        newOtp[index] = digitsOnly;
                         setPhoneOtp(newOtp);
                       }}
                     />

@@ -2,7 +2,10 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, Image, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Dimensions, NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { setStatusBarStyle } from 'expo-status-bar';
+import { preventScreenCaptureAsync, allowScreenCaptureAsync } from 'expo-screen-capture';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useScrollTopOnFocus } from '../hooks/useScrollTopOnFocus';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { useTransactions } from '../context/TransactionsContext';
@@ -100,6 +103,113 @@ function computeChartData(transactions: any[]) {
   };
 }
 
+// ─── PromoCard ───────────────────────────────────────────────────────────────
+// The 3 ad-unit cards in the home page carousel below. Dark, premium-ad-unit
+// background (near-black green gradient) with the illustration and copy
+// split into two columns like a real print/digital ad banner, alternating
+// which side the image sits on from card to card so the carousel doesn't
+// read as three copies of one template. A soft accent-colored "podium" blob
+// behind the illustration and a large dim glow in the corresponding corner
+// are what sell the depth on flat vector art against a dark field.
+type PromoCardProps = {
+  illustration: any;
+  accentColor: string;
+  blobColor: string;
+  label: string;
+  headline: string;
+  description: string;
+  ctaLabel: string;
+  onPress: () => void;
+  width: number;
+  imageSide: 'left' | 'right';
+};
+
+function PromoCard({ illustration, accentColor, blobColor, label, headline, description, ctaLabel, onPress, width, imageSide }: PromoCardProps) {
+  const imageBlock = (
+    <View style={{ width: 104, height: 112, alignItems: 'center', justifyContent: 'center' }}>
+      <View
+        style={{
+          position: 'absolute',
+          width: 80,
+          height: 80,
+          borderRadius: 40,
+          backgroundColor: blobColor,
+        }}
+      />
+      <Image source={illustration} style={{ width: 102, height: 102, resizeMode: 'contain' }} />
+    </View>
+  );
+
+  const textBlock = (
+    <View className="flex-1" style={{ paddingHorizontal: 6 }}>
+      <Text style={{ color: accentColor }} className="text-[10.5px] font-jakarta-bold uppercase tracking-[0.12em] mb-1.5">
+        {label}
+      </Text>
+      <Text className="text-white text-[18px] font-jakarta-bold tracking-tight leading-[22px] mb-2">{headline}</Text>
+      <Text className="text-white/55 text-[11.5px] font-jakarta-bold leading-[16px] mb-4" numberOfLines={3}>
+        {description}
+      </Text>
+      <View className="self-start flex-row items-center gap-1.5 rounded-full px-4 py-2" style={{ backgroundColor: accentColor }}>
+        <Text className="text-[#00120a] text-[10px] font-jakarta-extrabold uppercase tracking-wider">{ctaLabel}</Text>
+        <Feather name="arrow-right" size={12} color="#00120a" />
+      </View>
+    </View>
+  );
+
+  return (
+    // Shadow lives on this outer wrapper, not the LinearGradient below — a
+    // shadow and overflow:'hidden' on the same view don't render together
+    // (the clip suppresses the shadow, most visibly on iOS), so the
+    // gradient keeps the clip/radius/border and this view keeps the shadow.
+    <TouchableOpacity
+      activeOpacity={0.88}
+      onPress={onPress}
+      style={{
+        width,
+        borderRadius: 32,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 16 },
+        shadowOpacity: 0.32,
+        shadowRadius: 24,
+        elevation: 10,
+      }}
+    >
+      <LinearGradient
+        colors={['#0e2018', '#00110a']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{
+          borderRadius: 32,
+          padding: 20,
+          overflow: 'hidden',
+          minHeight: 168,
+        }}
+      >
+        {/* Ambient glow — sits in the corner nearest the illustration, a
+            dim wash of the card's own accent color so a flat-black card
+            doesn't read as an empty void. */}
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            top: -50,
+            [imageSide === 'left' ? 'left' : 'right']: -50,
+            width: 160,
+            height: 160,
+            borderRadius: 80,
+            backgroundColor: accentColor,
+            opacity: 0.14,
+          }}
+        />
+        <View className={`items-center ${imageSide === 'left' ? 'flex-row' : 'flex-row-reverse'}`}>
+          {imageBlock}
+          {textBlock}
+        </View>
+      </LinearGradient>
+    </TouchableOpacity>
+  );
+}
+
 export default function Dashboard({ navigation }: any) {
   const { merchant } = useAuth();
   const { transactions, isLoading, isRefreshing, hasError, refresh: refreshTransactions } = useTransactions();
@@ -109,9 +219,17 @@ export default function Dashboard({ navigation }: any) {
   const [activeTimeframe, setActiveTimeframe] = useState<Timeframe>('7D');
   const [showFundAccount, setShowFundAccount] = useState(false);
   const [activePromoSlide, setActivePromoSlide] = useState(0);
+  // Tracks the ScrollView's own card index, 0..PROMO_SLIDE_COUNT — index
+  // PROMO_SLIDE_COUNT is a trailing clone of card 0 appended to the
+  // carousel's content (see below) so advancing past the last real card
+  // scrolls forward into an identical-looking card instead of animating
+  // backward to card 0. activePromoSlide (for the dots) is always this
+  // value modulo PROMO_SLIDE_COUNT, since the clone IS card 0 visually.
+  const [promoScrollIndex, setPromoScrollIndex] = useState(0);
   const [promoContainerWidth, setPromoContainerWidth] = useState(0);
   const promoScrollRef = useRef<ScrollView>(null);
   const promoCardWidth = Math.max(0, promoContainerWidth - 48);
+  const scrollRef = useScrollTopOnFocus();
 
   useFocusEffect(
     useCallback(() => {
@@ -120,6 +238,37 @@ export default function Dashboard({ navigation }: any) {
           if (res.data?.success) setUnreadCount(res.data.count);
         })
         .catch(() => {});
+    }, [])
+  );
+
+  // Imperative (not the <StatusBar> component) because this screen, like
+  // every tab, never actually unmounts once visited — React Navigation's
+  // bottom-tab navigator keeps all visited tabs mounted, so a declarative
+  // <StatusBar style="light" /> here would never unmount to hand control
+  // back to the app-wide default, leaving light (white) status bar icons
+  // stuck on every other screen's light header once this tab had been
+  // opened once. Explicitly restoring 'dark' (App.tsx's own default) on
+  // blur keeps this screen's dark-header override scoped to only when
+  // it's actually the visible screen.
+  useFocusEffect(
+    useCallback(() => {
+      setStatusBarStyle('light');
+      return () => setStatusBarStyle('dark');
+    }, [])
+  );
+
+  // Wallet balance card lives on this screen, so block screenshots/screen
+  // recording while it's the visible screen — same imperative, focus-scoped
+  // pattern as the status bar above (usePreventScreenCapture()'s own
+  // mount/unmount lifecycle doesn't fire here, since this tab screen never
+  // actually unmounts once visited). Keyed distinctly from the PIN screens'
+  // own (keyless) usePreventScreenCapture() calls so they don't clash.
+  useFocusEffect(
+    useCallback(() => {
+      preventScreenCaptureAsync('dashboard-balance').catch(() => {});
+      return () => {
+        allowScreenCaptureAsync('dashboard-balance').catch(() => {});
+      };
     }, [])
   );
 
@@ -143,25 +292,49 @@ export default function Dashboard({ navigation }: any) {
     refreshTransactions();
   };
 
+  // A manual swipe landing on the trailing clone (index PROMO_SLIDE_COUNT)
+  // gets the same silent snap-back as the autoplay path below, so dragging
+  // past the last real card doesn't leave the carousel sitting on the
+  // clone (which would make a *second* manual swipe re-show card 0 as if
+  // nothing happened).
   const handlePromoScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const slide = Math.round(e.nativeEvent.contentOffset.x / (promoCardWidth + PROMO_CARD_GAP));
-    setActivePromoSlide(slide);
+    const index = Math.round(e.nativeEvent.contentOffset.x / (promoCardWidth + PROMO_CARD_GAP));
+    setActivePromoSlide(index % PROMO_SLIDE_COUNT);
+    if (index >= PROMO_SLIDE_COUNT) {
+      setPromoScrollIndex(0);
+      setTimeout(() => promoScrollRef.current?.scrollTo({ x: 0, animated: false }), 50);
+    } else {
+      setPromoScrollIndex(index);
+    }
   };
 
-  // Auto-advance the promo carousel like an ad slideshow, looping back to
-  // the first card after the last. Re-armed on every activePromoSlide
-  // change (including a manual swipe) so a manual swipe resets the timer
-  // instead of fighting it. Waits for a real measured width so it doesn't
-  // scroll by 0px before the container has laid out.
+  // Auto-advance the promo carousel like an ad slideshow. Loops forward
+  // continuously instead of animating backward to card 0 at the end: the
+  // carousel's content has a trailing clone of card 0 (index
+  // PROMO_SLIDE_COUNT), so the last step of the loop animates forward onto
+  // that clone, then — once the animation has landed — silently snaps
+  // (unanimated) back to the real card 0 underneath it. Since the clone is
+  // pixel-identical to card 0, that snap is invisible to the merchant.
+  // Re-armed on every promoScrollIndex change (including a manual swipe)
+  // so a manual swipe resets the timer instead of fighting it. Waits for a
+  // real measured width so it doesn't scroll by 0px before layout.
   useEffect(() => {
     if (promoCardWidth <= 0) return;
     const timer = setTimeout(() => {
-      const next = (activePromoSlide + 1) % PROMO_SLIDE_COUNT;
+      const next = promoScrollIndex + 1;
       promoScrollRef.current?.scrollTo({ x: next * (promoCardWidth + PROMO_CARD_GAP), animated: true });
-      setActivePromoSlide(next);
+      setActivePromoSlide(next % PROMO_SLIDE_COUNT);
+      if (next >= PROMO_SLIDE_COUNT) {
+        setTimeout(() => {
+          promoScrollRef.current?.scrollTo({ x: 0, animated: false });
+          setPromoScrollIndex(0);
+        }, 400);
+      } else {
+        setPromoScrollIndex(next);
+      }
     }, PROMO_AUTOPLAY_MS);
     return () => clearTimeout(timer);
-  }, [activePromoSlide, promoCardWidth]);
+  }, [promoScrollIndex, promoCardWidth]);
 
   const initials = merchant?.businessName
     ? merchant.businessName.substring(0, 2).toUpperCase()
@@ -194,10 +367,23 @@ export default function Dashboard({ navigation }: any) {
   const periodOutboundTotal = activeChart.outbound.reduce((s, v) => s + v, 0);
 
   return (
-    <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
+    // Matches the header gradient's own top-left color (below) — the safe
+    // area inset (status bar height) is this view's own background, painted
+    // before the gradient header renders beneath it. Using the page's light
+    // body color here left a bright strip above the dark green header on
+    // every device with a status bar/notch. Status bar icon color (light
+    // while focused here, dark everywhere else) is handled imperatively
+    // above via setStatusBarStyle, not a <StatusBar> component here — see
+    // that useFocusEffect's comment.
+    <SafeAreaView className="flex-1 bg-[#0b4d2e]" edges={['top', 'left', 'right']}>
       <MerchantWalkthrough />
       <ScrollView
+        ref={scrollRef}
         className="flex-1"
+        // Own background matches the light body, not the SafeAreaView's dark
+        // green — otherwise iOS's overscroll bounce reveals the SafeAreaView
+        // behind it, flashing dark green at the bottom of the page.
+        style={{ backgroundColor: '#f0fdf4' }}
         contentContainerStyle={{ paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -476,7 +662,7 @@ export default function Dashboard({ navigation }: any) {
                     style={{ width: '31%' }}
                     className={`items-center ${i < 3 ? 'mb-5' : ''}`}
                   >
-                    <View className="w-14 h-14 rounded-2xl bg-[#00351d] items-center justify-center mb-2">
+                    <View className="w-14 h-14 rounded-2xl bg-[#00351d] shadow-lg shadow-black/20 items-center justify-center mb-2">
                       <Image source={action.icon} style={{ width: 24, height: 24, tintColor: '#5efeb3' }} resizeMode="contain" />
                     </View>
                     <Text className="text-[10px] font-jakarta-bold text-[#0c2010] text-center leading-tight" numberOfLines={2}>
@@ -488,18 +674,109 @@ export default function Dashboard({ navigation }: any) {
             </View>
           </TourTarget>
 
-          {/* Growth Tip */}
-          <View className="px-6 mb-8">
-            <View className="bg-[#e6fffa] p-5 rounded-[24px] border border-emerald-100 flex-row items-start gap-4">
-              <View className="w-10 h-10 rounded-full bg-white items-center justify-center border border-emerald-100">
-                <MaterialIcons name="lightbulb" size={18} color="#059669" />
-              </View>
-              <View className="flex-1">
-                <Text className="text-[10px] font-jakarta-extrabold text-emerald-800 uppercase tracking-[0.2em] mb-1">Growth Tip</Text>
-                <Text className="text-[11px] text-emerald-900 font-jakarta-bold leading-relaxed opacity-80">
-                  Instruct your customers to pay via M-Pesa Paybill 880100, Account Number {formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || '...')}, to increase your daily volume.
-                </Text>
-              </View>
+          {/* Promo carousel — Bulk Payouts, Business Advance, Payment Links,
+              swiped horizontally like a slideshow ad unit. Snaps one card
+              per swipe (snapToInterval = card width + gap) rather than
+              react-native's pagingEnabled, since pagingEnabled snaps to the
+              full ScrollView width, not each card's width. */}
+          <View className="mb-8" onLayout={(e) => setPromoContainerWidth(e.nativeEvent.layout.width)}>
+            {promoCardWidth > 0 && (
+            <ScrollView
+              ref={promoScrollRef}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              decelerationRate="fast"
+              snapToInterval={promoCardWidth + PROMO_CARD_GAP}
+              snapToAlignment="start"
+              contentContainerStyle={{ paddingHorizontal: 24, gap: PROMO_CARD_GAP }}
+              onMomentumScrollEnd={handlePromoScroll}
+            >
+              <PromoCard
+                illustration={require('../../assets/vectors/bulk payout.png')}
+                accentColor="#5efeb3"
+                blobColor="rgba(94,254,179,0.22)"
+                label="Bulk Payouts"
+                headline="Pay suppliers & staff at once"
+                description="Upload a list or pick recipients, then settle an entire batch of payouts in a single click."
+                ctaLabel="Start a Bulk Payout"
+                onPress={() => navigation?.navigate('Pay')}
+                width={promoCardWidth}
+                imageSide="left"
+              />
+
+              {merchant?.isAppReviewAccount ? (
+                // Swapped in place of the Business Advance card for the
+                // app-store reviewer account — keeps the carousel's card
+                // count/dot indices (PROMO_SLIDE_COUNT, [0,1,2] below)
+                // unchanged rather than removing a slide outright. Reuses
+                // grow.png (its bar chart fits "sales tracking" just as
+                // well as "business advance") — safe since the two cards
+                // never render for the same merchant.
+                <PromoCard
+                  illustration={require('../../assets/vectors/grow.png')}
+                  accentColor="#7ec8ff"
+                  blobColor="rgba(126,200,255,0.22)"
+                  label="Sales Tracking"
+                  headline="Every sale, tracked automatically"
+                  description="PayChain confirms every customer payment and counts your daily sales for you."
+                  ctaLabel="View Transactions"
+                  onPress={() => navigation?.navigate('Collections')}
+                  width={promoCardWidth}
+                  imageSide="right"
+                />
+              ) : (
+                <PromoCard
+                  illustration={require('../../assets/vectors/grow.png')}
+                  accentColor="#ffd166"
+                  blobColor="rgba(255,209,102,0.22)"
+                  label="Business Advance"
+                  headline="Unlock cash flow instantly"
+                  description="Get an advance against your revenue and repay it automatically as you get paid."
+                  ctaLabel="Check Eligibility"
+                  onPress={() => navigation?.navigate('Advance')}
+                  width={promoCardWidth}
+                  imageSide="right"
+                />
+              )}
+
+              <PromoCard
+                illustration={require('../../assets/vectors/collect.png')}
+                accentColor="#c9b8ff"
+                blobColor="rgba(201,184,255,0.22)"
+                label="Payment Links"
+                headline="Get paid without an invoice"
+                description="Share a link for any amount and get paid instantly from anywhere — no paperwork."
+                ctaLabel="Create a Link"
+                onPress={() => navigation?.navigate('RequestMoney', { preset: 'link' })}
+                width={promoCardWidth}
+                imageSide="left"
+              />
+
+              {/* Trailing clone of card 0 — see the promoScrollIndex/autoplay
+                  comments above. Lets the carousel scroll forward past the
+                  last real card instead of animating backward to loop. */}
+              <PromoCard
+                illustration={require('../../assets/vectors/bulk payout.png')}
+                accentColor="#5efeb3"
+                blobColor="rgba(94,254,179,0.22)"
+                label="Bulk Payouts"
+                headline="Pay suppliers & staff at once"
+                description="Upload a list or pick recipients, then settle an entire batch of payouts in a single click."
+                ctaLabel="Start a Bulk Payout"
+                onPress={() => navigation?.navigate('Pay')}
+                width={promoCardWidth}
+                imageSide="left"
+              />
+            </ScrollView>
+            )}
+
+            <View className="flex-row justify-center gap-1.5 mt-4">
+              {[0, 1, 2].map((i) => (
+                <View
+                  key={i}
+                  className={`h-1.5 rounded-full ${activePromoSlide === i ? 'w-5 bg-[#006c4e]' : 'w-1.5 bg-[#d8e4dd]'}`}
+                />
+              ))}
             </View>
           </View>
 
@@ -650,150 +927,18 @@ export default function Dashboard({ navigation }: any) {
             </View>
           </View>
 
-          {/* Promo carousel — Bulk Payouts, Business Advance, Payment Links,
-              swiped horizontally like a slideshow ad unit. Snaps one card
-              per swipe (snapToInterval = card width + gap) rather than
-              react-native's pagingEnabled, since pagingEnabled snaps to the
-              full ScrollView width, not each card's width. */}
-          <View className="mb-8" onLayout={(e) => setPromoContainerWidth(e.nativeEvent.layout.width)}>
-            {promoCardWidth > 0 && (
-            <ScrollView
-              ref={promoScrollRef}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              decelerationRate="fast"
-              snapToInterval={promoCardWidth + PROMO_CARD_GAP}
-              snapToAlignment="start"
-              contentContainerStyle={{ paddingHorizontal: 24, gap: PROMO_CARD_GAP }}
-              onMomentumScrollEnd={handlePromoScroll}
-            >
-              <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={() => navigation?.navigate('Pay')}
-                style={{ width: promoCardWidth }}
-                className="bg-white rounded-[40px] p-6 shadow-sm border-2 border-[#eff4ef]"
-              >
-                <View className="flex-row items-start justify-between mb-5">
-                  <View className="w-14 h-14 rounded-full bg-[#f0fdf4] items-center justify-center">
-                    <Feather name="users" size={22} color="#006c4e" />
-                  </View>
-                  <View className="w-9 h-9 rounded-full bg-[#eff4ef] items-center justify-center">
-                    <Feather name="chevron-right" size={16} color="#0c2010" />
-                  </View>
-                </View>
-
-                <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-[0.1em] mb-1">Bulk Payouts</Text>
-                <Text className="text-2xl font-jakarta-bold tracking-tight text-[#0c2010] mb-2">
-                  Pay suppliers & staff at once
+          {/* Growth Tip */}
+          <View className="px-6 mb-8">
+            <View className="bg-[#e6fffa] p-5 rounded-[24px] border border-emerald-100 flex-row items-start gap-4">
+              <View className="w-10 h-10 rounded-full bg-white items-center justify-center border border-emerald-100">
+                <MaterialIcons name="lightbulb" size={18} color="#059669" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-[10px] font-jakarta-extrabold text-emerald-800 uppercase tracking-[0.2em] mb-1">Growth Tip</Text>
+                <Text className="text-[11px] text-emerald-900 font-jakarta-bold leading-relaxed opacity-80">
+                  Instruct your customers to pay via M-Pesa Paybill 880100, Account Number {formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || '...')}, to increase your daily volume.
                 </Text>
-                <Text className="text-[#5b645c] text-[13px] font-jakarta-bold leading-[18px] mb-6">
-                  Upload a list or pick recipients, then settle an entire batch of payouts in a single click.
-                </Text>
-
-                <View className="self-start bg-[#002110] px-5 py-2.5 rounded-full">
-                  <Text className="text-white text-[11px] font-jakarta-bold uppercase tracking-wider">Start a Bulk Payout</Text>
-                </View>
-              </TouchableOpacity>
-
-              {merchant?.isAppReviewAccount ? (
-                // Swapped in place of the Business Advance card for the
-                // app-store reviewer account — keeps the carousel's card
-                // count/dot indices (PROMO_SLIDE_COUNT, [0,1,2] below)
-                // unchanged rather than removing a slide outright.
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  onPress={() => navigation?.navigate('Collections')}
-                  style={{ width: promoCardWidth }}
-                  className="bg-white rounded-[40px] p-6 shadow-sm border-2 border-[#eff4ef]"
-                >
-                  <View className="flex-row items-start justify-between mb-5">
-                    <View className="w-14 h-14 rounded-full bg-[#f0fdf4] items-center justify-center">
-                      <Feather name="bar-chart-2" size={22} color="#006c4e" />
-                    </View>
-                    <View className="w-9 h-9 rounded-full bg-[#eff4ef] items-center justify-center">
-                      <Feather name="chevron-right" size={16} color="#0c2010" />
-                    </View>
-                  </View>
-
-                  <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-[0.1em] mb-1">Sales Tracking</Text>
-                  <Text className="text-2xl font-jakarta-bold tracking-tight text-[#0c2010] mb-2">
-                    Every sale, tracked automatically
-                  </Text>
-                  <Text className="text-[#5b645c] text-[13px] font-jakarta-bold leading-[18px] mb-6">
-                    PayChain confirms every customer payment and counts your daily sales for you.
-                  </Text>
-
-                  <View className="self-start bg-[#002110] px-5 py-2.5 rounded-full">
-                    <Text className="text-white text-[11px] font-jakarta-bold uppercase tracking-wider">View Transactions</Text>
-                  </View>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  onPress={() => navigation?.navigate('Advance')}
-                  style={{ width: promoCardWidth }}
-                  className="bg-white rounded-[40px] p-6 shadow-sm border-2 border-[#eff4ef]"
-                >
-                  <View className="flex-row items-start justify-between mb-5">
-                    <View className="w-14 h-14 rounded-full bg-[#f0fdf4] items-center justify-center">
-                      <Image source={require('../../assets/cash advance.png')} style={{ width: 22, height: 22, tintColor: '#006c4e' }} resizeMode="contain" />
-                    </View>
-                    <View className="w-9 h-9 rounded-full bg-[#eff4ef] items-center justify-center">
-                      <Feather name="chevron-right" size={16} color="#0c2010" />
-                    </View>
-                  </View>
-
-                  <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-[0.1em] mb-1">Business Advance</Text>
-                  <Text className="text-2xl font-jakarta-bold tracking-tight text-[#0c2010] mb-2">
-                    Unlock cash flow instantly
-                  </Text>
-                  <Text className="text-[#5b645c] text-[13px] font-jakarta-bold leading-[18px] mb-6">
-                    Get an advance against your revenue and repay it automatically as you get paid.
-                  </Text>
-
-                  <View className="self-start bg-[#002110] px-5 py-2.5 rounded-full">
-                    <Text className="text-white text-[11px] font-jakarta-bold uppercase tracking-wider">Check Eligibility</Text>
-                  </View>
-                </TouchableOpacity>
-              )}
-
-              <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={() => navigation?.navigate('RequestMoney', { preset: 'link' })}
-                style={{ width: promoCardWidth }}
-                className="bg-white rounded-[40px] p-6 shadow-sm border-2 border-[#eff4ef]"
-              >
-                <View className="flex-row items-start justify-between mb-5">
-                  <View className="w-14 h-14 rounded-full bg-[#f0fdf4] items-center justify-center">
-                    <Feather name="link" size={22} color="#006c4e" />
-                  </View>
-                  <View className="w-9 h-9 rounded-full bg-[#eff4ef] items-center justify-center">
-                    <Feather name="chevron-right" size={16} color="#0c2010" />
-                  </View>
-                </View>
-
-                <Text className="text-[#5b645c] text-[11px] font-jakarta-bold uppercase tracking-[0.1em] mb-1">Payment Links</Text>
-                <Text className="text-2xl font-jakarta-bold tracking-tight text-[#0c2010] mb-2">
-                  Get paid without an invoice
-                </Text>
-                <Text className="text-[#5b645c] text-[13px] font-jakarta-bold leading-[18px] mb-6">
-                  Share a link for any amount and get paid instantly from anywhere — no paperwork.
-                </Text>
-
-                <View className="self-start bg-[#002110] px-5 py-2.5 rounded-full">
-                  <Text className="text-white text-[11px] font-jakarta-bold uppercase tracking-wider">Create a Link</Text>
-                </View>
-              </TouchableOpacity>
-            </ScrollView>
-            )}
-
-            <View className="flex-row justify-center gap-1.5 mt-4">
-              {[0, 1, 2].map((i) => (
-                <View
-                  key={i}
-                  className={`h-1.5 rounded-full ${activePromoSlide === i ? 'w-5 bg-[#006c4e]' : 'w-1.5 bg-[#d8e4dd]'}`}
-                />
-              ))}
+              </View>
             </View>
           </View>
 

@@ -12,18 +12,28 @@ import { TransactionsProvider } from './src/context/TransactionsContext';
 import BrandedLoadingScreen from './src/components/BrandedLoadingScreen';
 import Sentry from './src/lib/sentry';
 
-// Prevent system text scaling and default font overrides across the entire application
+// Default font override across the entire application. Text now scales with
+// the device's own OS text-size setting (accessibility -> larger/smaller
+// text) instead of being frozen at a fixed size regardless of it — matching
+// how a standard, well-behaved mobile app is expected to respond to that
+// setting. Capped at 1.3x rather than left uncapped: a lot of this app's
+// labels/badges are set very small (8-11px) for tight card layouts, and an
+// uncapped multiplier (a phone set to the largest accessibility text size
+// can ask for ~2-3x) would overflow those before the scaling itself became
+// useful. 1.3x still gives real headroom for anyone who bumped their
+// system text size up a notch or two, without blowing out the tightest
+// layouts.
 // @ts-ignore
 if (Text.defaultProps == null) Text.defaultProps = {};
 // @ts-ignore
-Text.defaultProps.allowFontScaling = false;
+Text.defaultProps.maxFontSizeMultiplier = 1.3;
 // @ts-ignore
 Text.defaultProps.style = { fontFamily: 'PlusJakartaSans_400Regular' };
 
 // @ts-ignore
 if (TextInput.defaultProps == null) TextInput.defaultProps = {};
 // @ts-ignore
-TextInput.defaultProps.allowFontScaling = false;
+TextInput.defaultProps.maxFontSizeMultiplier = 1.3;
 
 function App() {
   const [fontsLoaded] = useFonts({

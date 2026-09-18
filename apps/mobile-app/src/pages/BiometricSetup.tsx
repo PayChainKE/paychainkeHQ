@@ -169,7 +169,7 @@ export default function BiometricSetup() {
           {[
             { icon: 'bolt',    text: 'Instant login without typing your password' },
             { icon: 'lock',    text: 'Private key never leaves your device' },
-            { icon: 'devices', text: 'Works with Face ID, Touch ID & Fingerprint' },
+            { icon: 'devices', text: 'Works with your device\'s fingerprint sensor' },
           ].map(f => (
             <View key={f.icon} style={styles.featureRow}>
               <View style={styles.featureIcon}>

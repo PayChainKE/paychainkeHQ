@@ -98,7 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [hasSetBiometrics,       setHasSetBiometrics]       = useState(false);
 
   // isBiometricsEnabled = the SERVER'S mobileBiometricUnlockEnabled flag,
-  // synced on every login. This is mobile's own local Face ID/Touch ID
+  // synced on every login. This is mobile's own local fingerprint
   // device-unlock state — deliberately independent of the web dashboard's
   // biometricsEnabled (which means "has a registered WebAuthn passkey", a
   // completely different credential this app never touches).

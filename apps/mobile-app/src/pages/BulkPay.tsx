@@ -14,6 +14,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../api/config';
 import TopBar from '../components/layout/TopBar';
 import { formatAccountNumber } from '../utils/formatAccountNumber';
+import { useScrollTopOnFocus } from '../hooks/useScrollTopOnFocus';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type PayeeType = 'employee' | 'supplier' | 'utility' | 'contractor';
@@ -137,6 +138,7 @@ const BATCH_STATUS_META: Record<string, { bg: string; text: string }> = {
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function BulkPay() {
   const { merchant, refreshSession } = useAuth();
+  const scrollRef = useScrollTopOnFocus();
 
   const [activeTab, setActiveTab] = useState<'Payees' | 'Batches' | 'Invoices'>('Payees');
   const [activeFilter, setActiveFilter] = useState<Filter>('All');
@@ -270,9 +272,15 @@ export default function BulkPay() {
     }
   }, []);
 
+  // Keyed on merchant._id (not the whole `merchant` object) — AuthContext
+  // replaces `merchant` with a new object reference on every session-refresh
+  // poll (every 20s) even when nothing changed, and depending on the object
+  // itself re-ran this effect on every one of those ticks, flashing the
+  // full-screen "Loading payees…" state every ~20s. The id is stable across
+  // refreshes and still changes on a real login/logout.
   useEffect(() => {
     if (merchant) fetchPayees();
-  }, [merchant, fetchPayees]);
+  }, [merchant?._id, fetchPayees]);
 
   // ── Fetch batch history ──
   const fetchBatches = useCallback(async () => {
@@ -686,9 +694,6 @@ export default function BulkPay() {
     if (newPayee.type === 'employee' && !newPayee.idNumber) {
       return 'ID Number is required for employees.';
     }
-    if (newPayee.type === 'supplier' && (!newPayee.kraPin || !newPayee.etimsInvoiceNumber || !newPayee.cuNumber)) {
-      return 'KRA PIN, eTIMS Invoice, and CU Number are required for suppliers.';
-    }
     // accountNumber/phone here mean meter number/notification msisdn for a
     // dedicated-rail utility payee — validated against the same shape the
     // backend's authorizeBatch will actually pay against, and skipping the
@@ -1044,6 +1049,7 @@ export default function BulkPay() {
       </View>
 
       <ScrollView
+        ref={scrollRef}
         className="flex-1"
         contentContainerStyle={{ paddingBottom: selectedIds.length > 0 ? 160 : 40 }}
         showsVerticalScrollIndicator={false}
@@ -2085,38 +2091,6 @@ export default function BulkPay() {
                           onChangeText={(t) => setNewPayee({ ...newPayee, idNumber: t.replace(/\D/g, '') })}
                           keyboardType="numeric"
                           placeholder="12345678"
-                          placeholderTextColor="#a1a1aa"
-                          className="bg-white border border-[#e7ece7] rounded-xl px-4 py-3 text-[#0c2010] font-jakarta-bold text-[14px]"
-                        />
-                      </View>
-                    )}
-
-                    {/* KRA Supplier fields */}
-                    {newPayee.type === 'supplier' && (
-                      <View className="bg-[#eef2ff] rounded-2xl p-4 mb-4 border border-[#c7d2fe]">
-                        <Text className="text-[10px] font-jakarta-bold text-[#3730a3] uppercase tracking-wider mb-3">KRA eTIMS Details</Text>
-                        <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">Supplier KRA PIN *</Text>
-                        <TextInput
-                          value={newPayee.kraPin}
-                          onChangeText={(t) => setNewPayee({ ...newPayee, kraPin: t.toUpperCase() })}
-                          autoCapitalize="characters"
-                          placeholder="P000000000A"
-                          placeholderTextColor="#a1a1aa"
-                          className="bg-white border border-[#e7ece7] rounded-xl px-4 py-3 text-[#0c2010] font-jakarta-bold text-[14px] mb-3"
-                        />
-                        <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">eTIMS Invoice *</Text>
-                        <TextInput
-                          value={newPayee.etimsInvoiceNumber}
-                          onChangeText={(t) => setNewPayee({ ...newPayee, etimsInvoiceNumber: t })}
-                          placeholder="INV-123"
-                          placeholderTextColor="#a1a1aa"
-                          className="bg-white border border-[#e7ece7] rounded-xl px-4 py-3 text-[#0c2010] font-jakarta-bold text-[14px] mb-3"
-                        />
-                        <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-wider mb-1.5">Control Unit (CU) *</Text>
-                        <TextInput
-                          value={newPayee.cuNumber}
-                          onChangeText={(t) => setNewPayee({ ...newPayee, cuNumber: t })}
-                          placeholder="123456789"
                           placeholderTextColor="#a1a1aa"
                           className="bg-white border border-[#e7ece7] rounded-xl px-4 py-3 text-[#0c2010] font-jakarta-bold text-[14px]"
                         />

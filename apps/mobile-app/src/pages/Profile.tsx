@@ -9,6 +9,7 @@ import { ValidatedTextInput } from '../components/ValidatedTextInput';
 import api from '../api/config';
 import TopBar from '../components/layout/TopBar';
 import { getAppUrl } from '../utils/appUrl';
+import { useScrollTopOnFocus } from '../hooks/useScrollTopOnFocus';
 
 import MyAccountsTab from '../components/tabs/MyAccountsTab';
 import SupportTab from '../components/tabs/SupportTab';
@@ -60,6 +61,7 @@ function MenuButton({
 }
 
 function PaymentLinkPanel() {
+  const scrollRef = useScrollTopOnFocus();
   const [amount, setAmount] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -145,7 +147,7 @@ function PaymentLinkPanel() {
   };
 
   return (
-    <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+    <ScrollView ref={scrollRef} className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
       <View className="w-full max-w-lg mx-auto px-6 pt-2 pb-12">
         <View className="mb-6">
           <Text className="font-jakarta-extrabold text-[28px] text-[#00351d] tracking-tight leading-tight mb-2">Payment Link</Text>
@@ -287,8 +289,9 @@ function PaymentLinkPanel() {
 }
 
 function AccountStatementPanel({ navigation, merchant }: { navigation: any; merchant: any }) {
+  const scrollRef = useScrollTopOnFocus();
   return (
-    <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+    <ScrollView ref={scrollRef} className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
       <View className="w-full max-w-lg mx-auto px-6 pt-2 pb-12">
         <View className="mb-6">
           <Text className="font-jakarta-extrabold text-[28px] text-[#00351d] tracking-tight leading-tight mb-2">Account Statement</Text>
@@ -316,6 +319,7 @@ function AccountStatementPanel({ navigation, merchant }: { navigation: any; merc
 
 function BusinessProfilePanel({ merchant }: { merchant: any }) {
   const { refreshSession } = useAuth();
+  const scrollRef = useScrollTopOnFocus();
   const [kraPin, setKraPin] = useState(merchant?.kraPin || '');
   const [businessNumber, setBusinessNumber] = useState(merchant?.businessNumber || '');
   const [isSavingKraPin, setIsSavingKraPin] = useState(false);
@@ -350,7 +354,7 @@ function BusinessProfilePanel({ merchant }: { merchant: any }) {
   };
 
   return (
-    <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+    <ScrollView ref={scrollRef} className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
       <ProfileWalkthrough />
       <View className="w-full max-w-lg mx-auto px-6 pt-2 pb-12">
         <View className="mb-6">

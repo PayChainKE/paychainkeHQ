@@ -5,6 +5,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import { preventScreenCaptureAsync, allowScreenCaptureAsync } from 'expo-screen-capture';
 import api from '../api/config';
 import TopBar from '../components/layout/TopBar';
 import { useAuth } from '../context/AuthContext';
@@ -20,6 +21,7 @@ import TourTarget from '../components/TourTarget';
 import TransactionsWalkthrough from '../components/TransactionsWalkthrough';
 import FadeSlideIn from '../components/ui/FadeSlideIn';
 import NoConnectionState from '../components/ui/NoConnectionState';
+import { useScrollTopOnFocus } from '../hooks/useScrollTopOnFocus';
 
 const EXPORT_PRESETS = [
   { key: '7d', label: 'Last 7 Days' },
@@ -87,6 +89,7 @@ const STAT_CARD_STYLES = [
 export default function Transactions({ navigation, route }: any) {
   const { merchant } = useAuth();
   const { transactions, isLoading, isRefreshing, hasError, refresh: refreshTransactions } = useTransactions();
+  const scrollRef = useScrollTopOnFocus();
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedTx, setSelectedTx] = useState<any | null>(null);
   const [isGeneratingReceipt, setIsGeneratingReceipt] = useState(false);
@@ -117,6 +120,20 @@ export default function Transactions({ navigation, route }: any) {
   };
 
   useFocusEffect(useCallback(() => { refreshTransactions(); }, [refreshTransactions]));
+
+  // Full transaction/payer history is financial data too — block
+  // screenshots/recording while this screen is focused, same focus-scoped
+  // imperative pattern used for Dashboard's balance card (this is also a
+  // tab screen that never unmounts once visited, so the declarative
+  // usePreventScreenCapture() hook's own cleanup would never fire).
+  useFocusEffect(
+    useCallback(() => {
+      preventScreenCaptureAsync('transactions-list').catch(() => {});
+      return () => {
+        allowScreenCaptureAsync('transactions-list').catch(() => {});
+      };
+    }, [])
+  );
 
   // ─── Stats calculation (mirroring merchant dashboard) ─────────────────────
   const inboundTxs = transactions.filter(t => isCreditTransaction(t.type));
@@ -299,6 +316,7 @@ export default function Transactions({ navigation, route }: any) {
       <TopBar title="Transactions" subtitle="Full payment history" />
 
       <ScrollView
+        ref={scrollRef}
         className="flex-1"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 48 }}

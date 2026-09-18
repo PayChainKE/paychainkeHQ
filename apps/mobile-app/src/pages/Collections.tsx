@@ -13,6 +13,7 @@ import { isCreditTransaction as isInboundType, isDebitTransaction as isOutboundT
 import { formatAccountNumber } from '../utils/formatAccountNumber';
 import { buildAuditReceiptHtml } from '../utils/auditReceiptHtml';
 import { formatName } from '../utils/formatName';
+import { useScrollTopOnFocus } from '../hooks/useScrollTopOnFocus';
 
 type DateFilter = 'all' | 'today' | 'yesterday' | 'week' | 'last7' | 'month' | 'last30' | 'year' | 'custom';
 // Backend type enum includes the legacy 'inbound'/'outbound'/'bulk_pay'/
@@ -108,6 +109,7 @@ export default function Collections() {
   const [showReceipt, setShowReceipt] = useState(false);
   const [selectedTx, setSelectedTx] = useState<any | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const scrollRef = useScrollTopOnFocus();
 
   // Filter state
   const [activeQuickFilter, setActiveQuickFilter] = useState<'all' | 'today' | 'week' | 'month' | 'inbound' | 'outbound'>('all');
@@ -554,6 +556,7 @@ export default function Collections() {
       <TopBar title="Transaction Summary" subtitle={`Account ${formatAccountNumber(merchant?.ncbaVirtualAccountNumber || merchant?.ncbaMerchantCode || 'PENDING')}`} showBack={false} />
 
       <ScrollView
+        ref={scrollRef}
         className="flex-1 z-10"
         contentContainerStyle={{ paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}

@@ -26,7 +26,7 @@ function FingerprintIcon({ size = 48, className = '' }) {
 // across sessions, even if the merchant logs out and back in.
 //
 // Conditions to show:
-//   1. Device supports platform authenticator (Touch ID / Face ID / Windows Hello)
+//   1. Device supports platform authenticator (Touch ID / Windows Hello / Android fingerprint)
 //   2. localStorage does not have PROMPTED_KEY
 //   3. merchant.biometricsEnabled is false (not already set up on another device)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -93,7 +93,7 @@ export default function BiometricOnboardingModal() {
               </div>
               <h3 className="font-headline text-2xl text-primary font-black tracking-tight mb-2">All set!</h3>
               <p className="text-sm text-on-surface-variant/70 font-medium leading-relaxed">
-                Fingerprint / Face ID is now active. You can sign in instantly next time.
+                Fingerprint login is now active. You can sign in instantly next time.
               </p>
             </div>
           ) : (

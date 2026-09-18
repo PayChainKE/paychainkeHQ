@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TextInput, TouchableOpacity, Linking, Alert, Ac
 import { MaterialIcons, Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import api from '../../api/config';
+import { useScrollTopOnFocus } from '../../hooks/useScrollTopOnFocus';
 
 // Same real contact details as the merchant dashboard's Support page
 // (apps/merchant-dashboard/src/pages/Support.jsx) — single source of truth
@@ -12,6 +13,7 @@ const SUPPORT_EMAIL = 'support@paychain.co.ke';
 
 export default function SupportTab() {
   const [search, setSearch] = useState('');
+  const scrollRef = useScrollTopOnFocus();
 
   const solutions = [
     { title: 'Payments failing', icon: 'error-outline', desc: 'Common issues with M-Pesa', color: '#e6f4ea', iconColor: '#006c4e' },
@@ -71,7 +73,7 @@ export default function SupportTab() {
   };
 
   return (
-    <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+    <ScrollView ref={scrollRef} className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
       <View className="w-full max-w-lg mx-auto px-6 pt-2 pb-12">
         
         {/* Hero Section */}

@@ -35,7 +35,7 @@ function ScanRing() {
 
 // ─── BiometricLoginButton ────────────────────────────────────────────────────
 // Placed on the Login page. Visible only when the device supports platform
-// authenticators (Touch ID, Face ID, Windows Hello, Android fingerprint).
+// authenticators (Touch ID, Windows Hello, Android fingerprint).
 //
 // Props:
 //   email       — the value from the "Email or phone" field
@@ -79,7 +79,7 @@ export function BiometricLoginButton({ email, onSuccess, onError }) {
         onClick={handleLogin}
         disabled={loading}
         className="w-full flex items-center justify-center gap-3 py-4 lg:py-[18px] rounded-2xl border-2 border-emerald-200 bg-emerald-50 text-emerald-800 font-black text-[13px] lg:text-sm uppercase tracking-widest hover:bg-[#06201B] hover:text-white hover:border-[#06201B] active:scale-[0.98] transition-all duration-200 group disabled:opacity-50 disabled:cursor-not-allowed"
-        aria-label="Sign in with fingerprint or Face ID"
+        aria-label="Sign in with fingerprint"
       >
         {scanPhase ? (
           <>
@@ -91,7 +91,7 @@ export function BiometricLoginButton({ email, onSuccess, onError }) {
         ) : (
           <>
             <FingerprintIcon className="shrink-0 group-hover:text-white" />
-            <span>Sign in with Fingerprint / Face ID</span>
+            <span>Sign in with Fingerprint</span>
           </>
         )}
       </button>
@@ -169,7 +169,7 @@ export function BiometricRegisterButton({ token, onSuccess, onError }) {
         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="text-emerald-600 shrink-0">
           <path d="M9 12l2 2 4-4M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
         </svg>
-        <p className="text-xs font-bold text-emerald-800">Passkey registered! You can now sign in with your fingerprint or Face ID.</p>
+        <p className="text-xs font-bold text-emerald-800">Passkey registered! You can now sign in with your fingerprint.</p>
       </div>
     )
   }
@@ -191,7 +191,7 @@ export function BiometricRegisterButton({ token, onSuccess, onError }) {
       ) : (
         <>
           <FingerprintIcon />
-          <span>Register Fingerprint / Face ID</span>
+          <span>Register Fingerprint</span>
         </>
       )}
     </button>

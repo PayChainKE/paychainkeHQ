@@ -10,6 +10,7 @@ import { formatPhoneDisplay } from '../utils/formatPhoneDisplay';
 import TransactionSuccessCard, { PayeeDraft } from '../components/ui/TransactionSuccessCard';
 import { hapticSuccess, hapticError } from '../utils/haptics';
 import FadeSlideIn from '../components/ui/FadeSlideIn';
+import { useScrollTopOnFocus } from '../hooks/useScrollTopOnFocus';
 
 // 4-dot loading indicator for the CTA button — a plain spinner read as "stuck"
 // to merchants during the PIN-verify + transfer round trip; this staggered
@@ -117,6 +118,7 @@ const DESTINATIONS: Array<{ id: Destination; label: string; icon: keyof typeof M
 
 export default function SendMoney({ navigation }: any) {
   const { merchant, refreshSession, setAppPin } = useAuth();
+  const scrollRef = useScrollTopOnFocus();
 
   // Snapshotted once at mount, not derived live from `merchant` — see the
   // matching fix/comment in apps/merchant-dashboard/src/pages/SendMoney.jsx.
@@ -427,7 +429,7 @@ export default function SendMoney({ navigation }: any) {
     return (
       <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
         <TopBar title="Send Money" showBack={false} />
-        <ScrollView className="flex-1" contentContainerStyle={{ padding: 24, paddingTop: 16 }}>
+        <ScrollView ref={scrollRef} className="flex-1" contentContainerStyle={{ padding: 24, paddingTop: 16 }}>
           <TransactionSuccessCard
             amount={Number(amount)}
             methodLabel={methodLabel}
@@ -446,7 +448,7 @@ export default function SendMoney({ navigation }: any) {
   return (
     <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
       <TopBar title="Send Money" subtitle="Secured with your PayChain payment PIN" onBack={goBack} />
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 140 }}>
+      <ScrollView ref={scrollRef} className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 140 }}>
         <FadeSlideIn>
         <View className="w-full max-w-lg mx-auto px-6 pt-6">
 

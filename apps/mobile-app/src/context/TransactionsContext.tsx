@@ -70,10 +70,19 @@ export function TransactionsProvider({ children }: { children: React.ReactNode }
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [merchant]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [merchant?._id]);
 
   const refresh = useCallback(() => fetchTransactions(true), [fetchTransactions]);
 
+  // Keyed on merchant._id, not the whole `merchant` object — AuthContext
+  // hands out a new `merchant` object reference on every session-refresh
+  // poll (every 20s) even when nothing actually changed. Depending on the
+  // object itself re-ran this effect on every one of those ticks, calling
+  // setIsLoading(true) and flashing every screen reading this context
+  // (Dashboard, Transactions, Collections) back to its loading state every
+  // ~20s. The id is stable across refreshes and still changes on a real
+  // login/logout.
   useEffect(() => {
     if (merchant) {
       setIsLoading(true);
@@ -82,7 +91,8 @@ export function TransactionsProvider({ children }: { children: React.ReactNode }
       setTransactions([]);
       setIsLoading(false);
     }
-  }, [merchant, fetchTransactions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [merchant?._id, fetchTransactions]);
 
   // Poll only while the merchant is actually looking at the app — paused
   // entirely in the background instead of continuing to burn data for a
@@ -120,7 +130,8 @@ export function TransactionsProvider({ children }: { children: React.ReactNode }
       stopPolling();
       subscription.remove();
     };
-  }, [merchant, fetchTransactions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [merchant?._id, fetchTransactions]);
 
   return (
     <TransactionsContext.Provider value={{ transactions, isLoading, isRefreshing, hasError, refresh }}>
