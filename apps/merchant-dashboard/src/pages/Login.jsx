@@ -1854,7 +1854,7 @@ export default function Login() {
                    {quickLogin ? 'Welcome back' : 'Log in'}
                  </h3>
                  <p className="text-on-surface-variant font-medium mt-2 opacity-70">
-                   {quickLogin ? 'Use your fingerprint or Face ID to continue instantly.' : 'Enter credentials provided during onboarding.'}
+                   {quickLogin ? 'Use your fingerprint to continue instantly.' : 'Enter credentials provided during onboarding.'}
                  </p>
               </div>
 

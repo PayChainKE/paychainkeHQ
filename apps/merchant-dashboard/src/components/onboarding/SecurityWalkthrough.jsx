@@ -11,7 +11,7 @@ const STEPS = [
   {
     icon: 'fingerprint',
     title: 'Enable Biometrics',
-    body: 'Register a passkey for Face ID, Touch ID, or Windows Hello — sign in instantly next time, no password needed.',
+    body: 'Register a passkey using your fingerprint or Windows Hello — sign in instantly next time, no password needed.',
     target: 'biometrics-register',
   },
   {

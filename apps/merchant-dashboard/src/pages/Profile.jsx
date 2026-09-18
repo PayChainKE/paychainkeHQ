@@ -908,7 +908,7 @@ export default function Profile() {
                     </div>
                     <p className="text-[13px] text-on-surface font-bold">No devices registered yet</p>
                     <p className="text-[11px] text-on-surface-variant/60 font-medium mt-1 max-w-[220px] mx-auto leading-relaxed">
-                      Add Face ID, Touch ID, or Windows Hello for faster, passwordless sign-in on this device.
+                      Add your fingerprint or Windows Hello for faster, passwordless sign-in on this device.
                     </p>
                   </div>
                 ) : (

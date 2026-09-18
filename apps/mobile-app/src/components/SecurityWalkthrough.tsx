@@ -11,7 +11,7 @@ const STEPS = [
   {
     icon: 'unlock' as const,
     title: 'Enable Biometrics',
-    body: 'Turn on Face ID or Touch ID for instant, secure sign-in — no password needed.',
+    body: 'Turn on fingerprint unlock for instant, secure sign-in — no password needed.',
     targetId: 'biometrics-register',
   },
   {
