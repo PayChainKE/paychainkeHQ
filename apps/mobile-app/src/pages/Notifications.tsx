@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import api from '../api/config';
 import TopBar from '../components/layout/TopBar';
+import { useScrollTopOnFocus } from '../hooks/useScrollTopOnFocus';
 
 type NotificationKind = 'payment' | 'advance' | 'security' | 'wallet' | 'system';
 
@@ -36,6 +37,7 @@ const formatTimestamp = (iso: string) => {
 type FilterTab = 'all' | 'unread';
 
 export default function Notifications({ navigation }: any) {
+  const scrollRef = useScrollTopOnFocus();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -146,6 +148,7 @@ export default function Notifications({ navigation }: any) {
       </View>
 
       <ScrollView
+        ref={scrollRef}
         className="flex-1"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 120 }}

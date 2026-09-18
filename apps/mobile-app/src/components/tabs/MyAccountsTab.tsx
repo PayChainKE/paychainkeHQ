@@ -12,9 +12,11 @@ import SettlementQrCard from '../ui/SettlementQrCard';
 import TourTarget from '../TourTarget';
 import MyAccountsWalkthrough from '../MyAccountsWalkthrough';
 import api from '../../api/config';
+import { useScrollTopOnFocus } from '../../hooks/useScrollTopOnFocus';
 
 export default function MyAccountsTab() {
   const { merchant } = useAuth();
+  const scrollRef = useScrollTopOnFocus();
   const [searchTerm, setSearchTerm] = useState('');
   const [qrAccount, setQrAccount] = useState<{ name: string; accountNumber: string } | null>(null);
   const [qrCodeDataUri, setQrCodeDataUri] = useState('');
@@ -97,7 +99,7 @@ export default function MyAccountsTab() {
   ];
 
   return (
-    <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+    <ScrollView ref={scrollRef} className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
       <MyAccountsWalkthrough />
       <View className="w-full max-w-lg mx-auto px-6 pt-2 pb-12">
 

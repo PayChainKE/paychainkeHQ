@@ -8,6 +8,7 @@ import { ValidatedTextInput } from '../components/ValidatedTextInput';
 import TopBar from '../components/layout/TopBar';
 import api from '../api/config';
 import { getAppUrl } from '../utils/appUrl';
+import { useScrollTopOnFocus } from '../hooks/useScrollTopOnFocus';
 
 type OptionId = 'mpesa' | 'link';
 
@@ -47,6 +48,7 @@ function classifyStkFailure(reason: string) {
 
 export default function RequestMoney({ navigation, route }: any) {
   const { merchant, refreshSession } = useAuth();
+  const scrollRef = useScrollTopOnFocus();
   const [step, setStep] = useState(1);
   const [selectedOption, setSelectedOption] = useState<OptionId | null>(null);
 
@@ -232,7 +234,7 @@ export default function RequestMoney({ navigation, route }: any) {
   return (
     <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
       <TopBar title="Request Money" subtitle={step === 1 ? 'Get paid, your way' : selected?.title} onBack={goBack} />
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+      <ScrollView ref={scrollRef} className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
         <View className="w-full max-w-lg mx-auto px-6 pt-6">
 
           {/* Step 1 — Option selection */}

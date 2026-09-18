@@ -8,6 +8,7 @@ import api from '../api/config';
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay';
 import { hapticSuccess, hapticError } from '../utils/haptics';
 import TransactionSuccessCard from '../components/ui/TransactionSuccessCard';
+import { useScrollTopOnFocus } from '../hooks/useScrollTopOnFocus';
 
 // Electricity (KPLC) is the only utility on a dedicated NCBA rail today —
 // see apps/mobile-app/src/pages/BulkPay.tsx's DEDICATED_RAIL_UTILITIES.
@@ -28,6 +29,7 @@ type CheckState = {
 
 export default function BuyTokens({ navigation }: any) {
   const { merchant, refreshSession } = useAuth();
+  const scrollRef = useScrollTopOnFocus();
   const [accountType, setAccountType] = useState<'KPLC' | 'KPLC_PREPAID'>('KPLC_PREPAID');
   const [meterNumber, setMeterNumber] = useState('');
   const [amount, setAmount] = useState('');
@@ -138,7 +140,7 @@ export default function BuyTokens({ navigation }: any) {
     return (
       <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
         <TopBar title="Buy Tokens" showBack={false} />
-        <ScrollView contentContainerStyle={{ paddingBottom: 60 }}>
+        <ScrollView ref={scrollRef} contentContainerStyle={{ paddingBottom: 60 }}>
           <View className="w-full max-w-lg mx-auto px-6 pt-6">
             <TransactionSuccessCard
               amount={numericAmount}
@@ -158,7 +160,7 @@ export default function BuyTokens({ navigation }: any) {
   return (
     <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
       <TopBar title="Buy Tokens" subtitle="Kenya Power electricity payments" />
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 140 }}>
+      <ScrollView ref={scrollRef} className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 140 }}>
         <View className="w-full max-w-lg mx-auto px-6 pt-6">
           <Text className="text-[10px] font-jakarta-bold text-[#707971] uppercase tracking-[0.12em] mb-2">Token Type</Text>
           <View className="flex-row gap-2 mb-6">

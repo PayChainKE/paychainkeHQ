@@ -6,6 +6,7 @@ import api from '../api/config';
 import { useAuth } from '../context/AuthContext';
 import { ValidatedTextInput } from '../components/ValidatedTextInput';
 import TopBar from '../components/layout/TopBar';
+import { useScrollTopOnFocus } from '../hooks/useScrollTopOnFocus';
 
 const CASH_ADVANCE_LEARN_MORE_URL = 'https://www.paychain.co.ke/products/cash-advance';
 const TENOR_OPTIONS = [7, 14, 21, 30, 45, 60];
@@ -161,6 +162,7 @@ function SummaryRow({ label, value, isLast }: { label: string; value: string; is
 
 export default function CashAdvance({ navigation }: any) {
   const { merchant } = useAuth();
+  const scrollRef = useScrollTopOnFocus();
 
   const [trustData, setTrustData] = useState<any>(null);
   const [applications, setApplications] = useState<any[]>([]);
@@ -291,7 +293,7 @@ export default function CashAdvance({ navigation }: any) {
     return (
       <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
         <TopBar title="Cash Advance" showBack={false} />
-        <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 120 }}>
+        <ScrollView ref={scrollRef} className="flex-1" contentContainerStyle={{ paddingBottom: 120 }}>
           <View className="w-full max-w-lg mx-auto px-6 pt-8">
             <UnavailableNotice />
             <PageHeader />
@@ -323,7 +325,7 @@ export default function CashAdvance({ navigation }: any) {
     return (
       <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
         <TopBar title="Cash Advance" showBack={false} />
-        <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 120 }}>
+        <ScrollView ref={scrollRef} className="flex-1" contentContainerStyle={{ paddingBottom: 120 }}>
           <View className="w-full max-w-lg mx-auto px-6 pt-8">
             <UnavailableNotice />
             <PageHeader />
@@ -353,7 +355,7 @@ export default function CashAdvance({ navigation }: any) {
     return (
       <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
         <TopBar title="Cash Advance" showBack={false} />
-        <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 120 }}>
+        <ScrollView ref={scrollRef} className="flex-1" contentContainerStyle={{ paddingBottom: 120 }}>
           <View className="w-full max-w-lg mx-auto px-6 pt-8">
             <PageHeader />
             <StatusCard application={justSubmitted} celebratory />
@@ -368,7 +370,7 @@ export default function CashAdvance({ navigation }: any) {
     return (
       <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
         <TopBar title="Cash Advance" showBack={false} />
-        <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 120 }}>
+        <ScrollView ref={scrollRef} className="flex-1" contentContainerStyle={{ paddingBottom: 120 }}>
           <View className="w-full max-w-lg mx-auto px-6 pt-8">
             <PageHeader />
             <StatusCard application={activeApplication} />
@@ -382,7 +384,7 @@ export default function CashAdvance({ navigation }: any) {
   if (showForm) {
     return (
       <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
-        <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 140 }}>
+        <ScrollView ref={scrollRef} className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 140 }}>
           <View className="w-full max-w-lg mx-auto px-6 pt-6">
             <TouchableOpacity
               onPress={() => (formStep === 1 ? setShowForm(false) : goBack())}
@@ -594,7 +596,7 @@ export default function CashAdvance({ navigation }: any) {
   return (
     <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
       <TopBar title="Cash Advance" showBack={false} />
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+      <ScrollView ref={scrollRef} className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
         <View className="w-full max-w-lg mx-auto px-6 pt-8">
           <PageHeader />
 

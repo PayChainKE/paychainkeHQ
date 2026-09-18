@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import TopBar from '../components/layout/TopBar';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/config';
+import { useScrollTopOnFocus } from '../hooks/useScrollTopOnFocus';
 
 if (Platform.OS === 'android') {
   if (UIManager.setLayoutAnimationEnabledExperimental) {
@@ -152,11 +153,12 @@ const SupportMessageForm = () => {
 };
 
 export default function SupportPage({ navigation }: any) {
+  const scrollRef = useScrollTopOnFocus();
   return (
     <SafeAreaView className="flex-1 bg-[#f0fdf4]" edges={['top', 'left', 'right']}>
       <TopBar title="Help & Support" />
 
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+      <ScrollView ref={scrollRef} className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
         <View className="w-full max-w-lg mx-auto px-6 pt-10 pb-12">
           {/* Hero Section */}
           <View className="mb-12">

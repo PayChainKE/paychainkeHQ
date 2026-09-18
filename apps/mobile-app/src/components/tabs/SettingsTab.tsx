@@ -5,9 +5,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ValidatedTextInput } from '../../components/ValidatedTextInput';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../api/config';
+import { useScrollTopOnFocus } from '../../hooks/useScrollTopOnFocus';
 
 export default function SettingsTab() {
   const { merchant, logout, refreshSession } = useAuth();
+  const scrollRef = useScrollTopOnFocus();
   const [kraPin, setKraPin] = useState(merchant?.kraPin || '');
   const [businessNumber, setBusinessNumber] = useState(merchant?.businessNumber || '');
   const [kraPinLocked, setKraPinLocked] = useState(!!merchant?.kraPin);
@@ -32,7 +34,7 @@ export default function SettingsTab() {
   }
 
   return (
-    <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+    <ScrollView ref={scrollRef} className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
       <View className="w-full max-w-lg mx-auto px-6 pt-2 pb-12">
         
         {/* Header Section */}

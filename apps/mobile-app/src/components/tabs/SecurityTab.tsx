@@ -8,6 +8,7 @@ import { ValidatedTextInput } from '../../components/ValidatedTextInput';
 import TourTarget from '../TourTarget';
 import SecurityWalkthrough from '../SecurityWalkthrough';
 import api from '../../api/config';
+import { useScrollTopOnFocus } from '../../hooks/useScrollTopOnFocus';
 
 // Fixed set — same three questions the merchant-dashboard's Profile.jsx
 // offers (backend just stores {question, answer} pairs, not a picker of
@@ -30,9 +31,9 @@ type Passkey = {
 
 // Mirrors Profile.jsx's identical helpers — a passkey registered from this
 // mobile app itself would come back with platform 'mobile', everything
-// else is a browser's WebAuthn registration (Face ID/Touch ID/Windows
-// Hello) — mobile can't register a new passkey itself (no WebAuthn), but
-// it can view/rename/remove ones registered from any device.
+// else is a browser's WebAuthn registration (fingerprint/Windows Hello) —
+// mobile can't register a new passkey itself (no WebAuthn), but it can
+// view/rename/remove ones registered from any device.
 function deviceLabel(platform?: string, userAgent = ''): string {
   if (platform === 'mobile') return 'PayChain mobile app';
   const ua = userAgent.toLowerCase();
@@ -65,6 +66,7 @@ function relativeTime(iso?: string): string {
 export default function SecurityTab() {
   const { merchant, updateToken, logout } = useAuth();
   const navigation = useNavigation<any>();
+  const scrollRef = useScrollTopOnFocus();
 
   const [passkeys, setPasskeys] = useState<Passkey[]>([]);
   const [isLoadingPasskeys, setIsLoadingPasskeys] = useState(false);
@@ -291,7 +293,7 @@ export default function SecurityTab() {
   }
 
   return (
-    <ScrollView className="flex-1 bg-[#022415]" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+    <ScrollView ref={scrollRef} className="flex-1 bg-[#022415]" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
       <SecurityWalkthrough />
       <LinearGradient colors={['#00351d', '#022415']} className="absolute inset-0" />
 
@@ -443,7 +445,7 @@ export default function SecurityTab() {
                 <View className="flex-1 min-w-0">
                   <Text className="text-[15px] font-jakarta-extrabold text-white" numberOfLines={1} ellipsizeMode="tail">Biometric Login</Text>
                   <Text className="text-[11px] text-white/50 font-jakarta-bold mt-0.5" numberOfLines={1} ellipsizeMode="tail">
-                    {merchant?.mobileBiometricUnlockEnabled ? 'Active on this device' : 'Use Touch ID or Face ID'}
+                    {merchant?.mobileBiometricUnlockEnabled ? 'Active on this device' : 'Use your fingerprint'}
                   </Text>
                 </View>
               </View>
@@ -489,7 +491,7 @@ export default function SecurityTab() {
               </View>
               <Text className="text-white text-[13px] font-jakarta-bold">No devices registered yet</Text>
               <Text className="text-white/40 text-[11px] font-jakarta-bold mt-1 text-center max-w-[220px]">
-                Add Face ID, Touch ID, or Windows Hello from the web dashboard for passwordless sign-in.
+                Add your fingerprint or Windows Hello from the web dashboard for passwordless sign-in.
               </Text>
             </View>
           ) : (
