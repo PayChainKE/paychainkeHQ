@@ -12,20 +12,19 @@ const MobileAppCTA: React.FC = () => {
 
           {/* Text Content */}
           <div className="relative z-10 p-10 sm:p-16 lg:p-20 lg:w-1/2 flex flex-col items-start text-left">
-            <span className="text-emerald-400 font-semibold tracking-wider uppercase text-sm mb-4">Coming soon ......</span>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-6 leading-tight">
               Paychain mobile app
             </h2>
             <p className="text-base sm:text-lg text-gray-300 mb-10 max-w-md leading-relaxed">
               Download the Paychain mobile app and run your business anywhere, anytime. Stay secured on top of your business on the go.
             </p>
-            
+
             <div className="flex flex-row flex-wrap gap-4 w-full sm:w-auto mt-2">
+              <a href="https://play.google.com/store/apps/details?id=ke.co.paychain.app" target="_blank" rel="noopener noreferrer" className="transition-transform hover:scale-105 inline-block">
+                <img src="/Home page/google play.png" alt="Get it on Google Play" className="h-12 sm:h-14 w-auto object-contain rounded-xl" />
+              </a>
               <a href="#download-ios" className="transition-transform hover:scale-105 inline-block">
                 <img src="/Home page/app store.png" alt="Download on the App Store" className="h-12 sm:h-14 w-auto object-contain rounded-xl" />
-              </a>
-              <a href="#download-android" className="transition-transform hover:scale-105 inline-block">
-                <img src="/Home page/google play.png" alt="Get it on Google Play" className="h-12 sm:h-14 w-auto object-contain rounded-xl" />
               </a>
             </div>
           </div>
