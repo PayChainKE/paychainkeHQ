@@ -65,11 +65,14 @@ export default function Transactions() {
     }
   }, [merchant, fetchTransactions]);
 
-  // Poll every 5s so the transaction list stays live without a manual
-  // refresh — fallback for whatever the live push below doesn't catch.
+  // Backstop poll — the SSE live push below normally catches every change
+  // instantly, so this only exists in case that connection drops without
+  // the browser noticing. 3s was needlessly tight for a fallback and just
+  // meant refetching (and re-rendering the whole list) constantly; 30s
+  // still recovers quickly from a dropped stream without the churn.
   useEffect(() => {
     if (!merchant) return;
-    const interval = setInterval(fetchTransactions, 3000);
+    const interval = setInterval(fetchTransactions, 30000);
     return () => clearInterval(interval);
   }, [merchant, fetchTransactions]);
 
