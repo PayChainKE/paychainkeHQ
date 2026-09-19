@@ -163,7 +163,7 @@ const CashAdvance: React.FC = () => {
                 ))}
               </div>
               <div className="flex flex-col sm:flex-row gap-4">
-                <a href="https://app.paychain.co.ke" className="inline-flex items-center justify-center px-8 py-4 text-base font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_20px_rgba(0,191,99,0.3)]">
+                <a href="https://app.paychain.co.ke/login?tab=signup" className="inline-flex items-center justify-center px-8 py-4 text-base font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_20px_rgba(0,191,99,0.3)]">
                   Sign Up
                 </a>
               </div>
@@ -450,7 +450,7 @@ const CashAdvance: React.FC = () => {
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-6 relative z-10">The Sooner You Start Selling on PayChain, the Sooner You Get Your First Advance.</h2>
             <p className="text-xl text-gray-400 mb-10 relative z-10">Every payment you collect through PayChain brings you closer to your first Cash Advance offer.</p>
             <div className="relative z-10">
-              <a href="https://app.paychain.co.ke" className="inline-flex px-8 py-4 text-lg font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_30px_rgba(0,191,99,0.3)]">
+              <a href="https://app.paychain.co.ke/login?tab=signup" className="inline-flex px-8 py-4 text-lg font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_30px_rgba(0,191,99,0.3)]">
                 Sign Up
               </a>
               <p className="text-sm text-gray-500 mt-4">No land or property needed · No bank queue</p>

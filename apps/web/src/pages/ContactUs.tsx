@@ -84,7 +84,7 @@ const CARD_DATA: CardData[] = [
     response: "We respond within 24 hours on business days.",
     emailHref: "mailto:support@paychain.co.ke",
     phoneHref: "tel:+254743283782",
-    secondary: { label: "Or sign up now →", href: "https://app.paychain.co.ke" },
+    secondary: { label: "Or sign up now →", href: "https://app.paychain.co.ke/login?tab=signup" },
   },
   {
     icon: Link2,
@@ -415,7 +415,7 @@ export default function ContactUs() {
                     <a href="tel:+254743283782" className={styles.successLink}>+254 743 283 782</a>
                     <div className={styles.successCtas}>
                       <a href="/how-it-works" className={styles.successCta}>How PayChain Works →</a>
-                      <a href="https://app.paychain.co.ke" className={styles.successCta}>Sign Up →</a>
+                      <a href="https://app.paychain.co.ke/login?tab=signup" className={styles.successCta}>Sign Up →</a>
                     </div>
                     <button className={styles.sendAnother} onClick={resetForm}>Send another message</button>
                   </div>
@@ -482,7 +482,7 @@ export default function ContactUs() {
           <div className={styles.pulseBadge}>Now Live</div>
           <h2 className={styles.finalHeadline}>Not Sure Where to Start? Just Sign Up.</h2>
           <p className={styles.finalBody}>If you're a Kenyan merchant and you're not sure which contact option is right for you, signing up is the best first step. Create your account and our team will reach out to help you get set up.</p>
-          <a href="https://app.paychain.co.ke" className={styles.finalBtn}>Sign Up <ArrowRight size={14} /></a>
+          <a href="https://app.paychain.co.ke/login?tab=signup" className={styles.finalBtn}>Sign Up <ArrowRight size={14} /></a>
           <div className={styles.finalMicro}>Free to sign up · No commitment</div>
         </div>
       </section>

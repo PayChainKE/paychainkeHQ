@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, Users, Menu, X, ChevronRight, Copyright, ChevronDown, ShoppingCart, HelpCircle, Mail, BookOpen, Code2 } from 'lucide-react';
+import { Home, Users, Menu, X, ChevronRight, Copyright, ChevronDown, ShoppingCart, HelpCircle, Mail, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface NavbarProps {
@@ -11,7 +11,6 @@ interface NavbarProps {
 const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isAvatarDropdownOpen, setIsAvatarDropdownOpen] = useState(false);
   const [isResourcesDropdownOpen, setIsResourcesDropdownOpen] = useState(false);
   const [isMobileResourcesDropdownOpen, setIsMobileResourcesDropdownOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
@@ -72,12 +71,9 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
     }
   }, [isMobileMenuOpen]);
 
-  // Close avatar dropdown when clicking outside
+  // Close the Products dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (isAvatarDropdownOpen && !(event.target as Element).closest('.avatar-dropdown')) {
-        setIsAvatarDropdownOpen(false);
-      }
       if (isResourcesDropdownOpen && !(event.target as Element).closest('.resources-dropdown')) {
         setIsResourcesDropdownOpen(false);
       }
@@ -87,7 +83,7 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isAvatarDropdownOpen, isResourcesDropdownOpen]);
+  }, [isResourcesDropdownOpen]);
 
   const navItems = [
     { path: '/', label: 'Home', icon: Home },
@@ -140,7 +136,7 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
             </div>
 
             {/* Desktop Nav Links and User Auth */}
-            <div className="hidden md:flex items-center gap-6 lg:gap-8 lg:translate-x-24">
+            <div className="hidden md:flex items-center gap-6 lg:gap-8">
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.path;
@@ -211,101 +207,23 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
                 );
               })}
 
-              <Link
-                to="/docs"
-                className="flex items-center gap-2 px-3 py-2 text-sm font-bold text-gray-700 hover:text-gray-900 transition-all duration-200"
-              >
-                Developers
-                <span className="text-[9px] font-bold uppercase tracking-wider text-[#00bf63] border border-[#00bf63]/30 rounded-full px-2 py-0.5">Soon</span>
-              </Link>
-
-              <Link
-                to="/book-demo"
-                className="hidden lg:inline-flex items-center justify-center px-4 py-2 text-sm font-bold text-white bg-[#00bf63] hover:bg-[#00a857] rounded-lg transition-colors shadow-sm ml-4"
-              >
-                Book a Demo
-              </Link>
-
-              {/* User Avatar Dropdown */}
-              <div className="relative ml-4 pl-4 border-l border-gray-200 avatar-dropdown">
-                  <button
-                    onClick={() => setIsAvatarDropdownOpen(!isAvatarDropdownOpen)}
-                    className="flex items-center gap-2 px-2 py-1 transition-colors duration-200"
-                    aria-label="User menu"
-                  >
-                    <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
-                      <img src="/avator.png" alt="User Avatar" className="w-full h-full object-cover" />
-                    </div>
-                    <ChevronDown className="w-4 h-4 text-gray-600" />
-                  </button>
-                  
-                  {/* Dropdown Menu */}
-                  {isAvatarDropdownOpen && (
-                    <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-4 z-50">
-                      <div className="px-4 pb-3 border-b border-gray-100">
-                        <div className="flex items-center gap-3 mb-2">
-                          <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
-                            <img src="/avator.png" alt="User Avatar" className="w-full h-full object-cover" />
-                          </div>
-                          <div>
-                            <div className="font-medium text-gray-900">User</div>
-                            <div className="text-sm text-gray-500">Log in to access your account</div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="pt-3 space-y-2 px-2">
-                        <a
-                          href="https://app.paychain.co.ke"
-                          onClick={() => setIsAvatarDropdownOpen(false)}
-                          className="w-full block px-4 py-2 text-sm font-bold text-white bg-[#00bf63] hover:bg-[#00a857] transition-colors duration-200 rounded-md text-center shadow-sm"
-                        >
-                          Sign Up
-                        </a>
-                      </div>
-                    </div>
-                  )}
-                </div>
+              <div className="flex items-center ml-2 pl-6 border-l border-gray-200">
+                <a
+                  href="https://app.paychain.co.ke/login?tab=signup"
+                  className="inline-flex items-center justify-center px-5 py-2.5 text-sm font-bold text-white bg-[#00bf63] hover:bg-[#00a857] rounded-lg transition-all shadow-sm hover:shadow-md"
+                >
+                  Get started
+                </a>
+              </div>
             </div>
 
-            {/* Mobile User Avatar */}
-            <div className="md:hidden relative avatar-dropdown">
-                <button
-                  onClick={() => setIsAvatarDropdownOpen(!isAvatarDropdownOpen)}
-                  className="flex items-center gap-2 px-2 py-1 transition-colors duration-200"
-                  aria-label="User menu"
-                >
-                  <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
-                    <img src="/avator.png" alt="User Avatar" className="w-full h-full object-cover" />
-                  </div>
-                  <ChevronDown className="w-4 h-4 text-gray-600" />
-                </button>
-                
-                {/* Mobile Dropdown Menu */}
-                {isAvatarDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-4 z-50">
-                    <div className="px-4 pb-3 border-b border-gray-100">
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
-                          <img src="/avator.png" alt="User Avatar" className="w-full h-full object-cover" />
-                        </div>
-                        <div>
-                          <div className="font-medium text-gray-900">User</div>
-                          <div className="text-sm text-gray-500">Log in to access your account</div>
-                        </div>
-                      </div>
-                    </div>
-                      <div className="pt-3 space-y-2 px-2">
-                      <a
-                        href="https://app.paychain.co.ke"
-                        onClick={() => setIsAvatarDropdownOpen(false)}
-                        className="w-full block px-4 py-2 text-sm font-bold text-white bg-[#00bf63] hover:bg-[#00a857] transition-colors duration-200 rounded-md text-center shadow-sm"
-                      >
-                        Sign Up
-                      </a>
-                    </div>
-                  </div>
-                )}
-              </div>
+            {/* Mobile: one clear action in the bar */}
+            <a
+              href="https://app.paychain.co.ke/login?tab=signup"
+              className="md:hidden inline-flex items-center justify-center px-4 py-2 text-xs font-bold text-white bg-[#00bf63] hover:bg-[#00a857] rounded-lg transition-colors shadow-sm"
+            >
+              Get started
+            </a>
           </div>
         </div>
       </nav>
@@ -438,39 +356,26 @@ const Navbar: React.FC<NavbarProps> = ({ cartCount = 0 }) => {
                   })}
                 </div>
 
-                <div className="my-3 border-t border-gray-100" />
-
-                <Link
-                  to="/docs"
-                  onClick={closeMobileMenu}
-                  className="flex items-center justify-between gap-3 px-3 py-3 rounded-xl text-gray-800 hover:bg-gray-50 transition-colors"
-                >
-                  <span className="flex items-center gap-3">
-                    <Code2 className="w-[18px] h-[18px] text-gray-400" />
-                    <span className="font-semibold text-[15px]">Developer API</span>
-                  </span>
-                  <span className="text-[9px] font-bold uppercase tracking-wider text-[#00bf63] border border-[#00bf63]/30 rounded-full px-2 py-0.5">Coming Soon</span>
-                </Link>
               </div>
 
               {/* CTAs + footer — pinned to the bottom, always reachable
                   regardless of how tall the scrollable content above gets. */}
               <div className="shrink-0 border-t border-gray-100 px-4 pt-4 pb-5 bg-[#FAFDFC]">
                 <div className="space-y-2">
-                  <Link
-                    to="/book-demo"
+                  <a
+                    href="https://app.paychain.co.ke/login?tab=signup"
                     onClick={closeMobileMenu}
                     className="flex items-center justify-center w-full px-4 py-3 text-sm font-bold text-white bg-[#00bf63] hover:bg-[#00a857] rounded-xl transition-colors shadow-sm"
                   >
-                    Book a Demo
-                  </Link>
-                  <a
-                    href="https://app.paychain.co.ke"
-                    onClick={closeMobileMenu}
-                    className="flex items-center justify-center w-full px-4 py-3 text-sm font-bold text-[#00351d] bg-white border border-[#00351d]/15 hover:bg-[#00351d]/5 rounded-xl transition-colors"
-                  >
-                    Sign Up Free
+                    Get started free
                   </a>
+                  <Link
+                    to="/book-demo"
+                    onClick={closeMobileMenu}
+                    className="flex items-center justify-center w-full px-4 py-2 text-xs font-bold text-gray-500 hover:text-gray-800 transition-colors"
+                  >
+                    or book a demo
+                  </Link>
                 </div>
                 <div className="flex items-center justify-center gap-1.5 text-[11px] text-gray-400 mt-4">
                   <Copyright className="w-3 h-3" />

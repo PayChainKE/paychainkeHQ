@@ -95,7 +95,7 @@ const OperationsTools = () => {
               <p className="text-lg text-gray-400 mb-8 max-w-xl leading-relaxed">
                 PayChain Operations Tools lets you see everything happening in your business, control who can spend what, stay on the right side of tax rules automatically, and manage your team: everything you need to run a modern Kenyan business, without the complexity.
               </p>
-              <a href="https://app.paychain.co.ke" className="inline-flex items-center justify-center px-8 py-4 text-base font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_20px_rgba(0,191,99,0.3)]">
+              <a href="https://app.paychain.co.ke/login?tab=signup" className="inline-flex items-center justify-center px-8 py-4 text-base font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_20px_rgba(0,191,99,0.3)]">
                 See It in Action
               </a>
             </motion.div>
@@ -252,7 +252,7 @@ const OperationsTools = () => {
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-6 relative z-10">Stop Running Your Business on Guesswork.</h2>
             <p className="text-xl text-gray-400 mb-10 relative z-10">Sign up and experience full financial visibility today.</p>
             <div className="relative z-10">
-              <a href="https://app.paychain.co.ke" className="inline-flex px-8 py-4 text-lg font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_30px_rgba(0,191,99,0.3)]">
+              <a href="https://app.paychain.co.ke/login?tab=signup" className="inline-flex px-8 py-4 text-lg font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_30px_rgba(0,191,99,0.3)]">
                 Sign Up
               </a>
             </div>

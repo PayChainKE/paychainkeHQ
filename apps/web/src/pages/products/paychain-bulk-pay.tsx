@@ -80,7 +80,7 @@ const PaychainBulkPay: React.FC = () => {
                 Run payroll, pay suppliers, contractors, and employees, and settle KPLC tokens (prepaid or postpaid), water, internet, and other utilities, all directly from your merchant dashboard, all in one click. No more app switching, no more manual transfers, no more end-of-month chaos.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
-                <a href="https://app.paychain.co.ke" className="inline-flex items-center justify-center px-8 py-4 text-base font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_20px_rgba(0,191,99,0.3)]">
+                <a href="https://app.paychain.co.ke/login?tab=signup" className="inline-flex items-center justify-center px-8 py-4 text-base font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_20px_rgba(0,191,99,0.3)]">
                   Start Paying Smarter
                 </a>
               </div>
@@ -262,7 +262,7 @@ PayChain Bulk Pay lets you pay everyone you owe money to — staff, suppliers, u
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-6 relative z-10">Stop Sending Transfers One by One.</h2>
             <p className="text-xl text-gray-400 mb-10 relative z-10">Sign up in minutes and run your first batch payout today.</p>
             <div className="relative z-10">
-              <a href="https://app.paychain.co.ke" className="inline-flex px-8 py-4 text-lg font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_30px_rgba(0,191,99,0.3)]">
+              <a href="https://app.paychain.co.ke/login?tab=signup" className="inline-flex px-8 py-4 text-lg font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_30px_rgba(0,191,99,0.3)]">
                 Sign Up
               </a>
             </div>
