@@ -711,6 +711,19 @@ const merchantSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  // Set when the merchant uses the unsubscribe link in a PayChain newsletter
+  // (see controllers/newsletterController.js#unsubscribeConfirm). Excludes
+  // them from newsletters and automated marketing-style emails only —
+  // transactional mail (payment confirmations, security alerts, password
+  // resets) is never affected.
+  newsletterOptOut: {
+    type: Boolean,
+    default: false,
+  },
+  newsletterOptOutAt: {
+    type: Date,
+    default: null,
+  },
   // Last time an admin used the "Resend Install Link" action (Merchants
   // page) to nudge a merchant who hasn't installed the PWA yet.
   pwaInstallReminderSentAt: {

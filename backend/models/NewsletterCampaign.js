@@ -10,6 +10,10 @@ const NewsletterCampaignSchema = new mongoose.Schema({
   recipientCount: { type: Number, required: true, default: 0 },
   successCount: { type: Number, default: 0 },
   failureCount: { type: Number, default: 0 },
+  // How it went out — a manual "Send now", a scheduled send the scheduler
+  // fired later, or an automation's weekly digest — and to whom.
+  origin: { type: String, enum: ['manual', 'scheduled', 'digest'], default: 'manual' },
+  audienceLabel: { type: String, trim: true, maxlength: 200, default: '' },
   sentByEmail: { type: String, required: true, trim: true, lowercase: true },
   sentBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null },
   sentAt: { type: Date, default: Date.now, index: true },

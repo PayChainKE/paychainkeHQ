@@ -12,6 +12,7 @@ import { KENYA_COUNTY_AREAS } from '../config/kenyaCountyAreas.js';
 import { KENYA_COUNTY_WARDS } from '../config/kenyaCountyWards.js';
 import { BUSINESS_TYPES, EMPLOYEE_BANDS } from './merchantAuthController.js';
 import { buildAccountApprovedSms } from '../utils/accountSmsTemplates.js';
+import { computePrechecks } from '../utils/applicationPrechecks.js';
 import { deleteCloudinaryAsset } from '../utils/cloudinary.js';
 import { safeSendSMS } from '../utils/smsSanitizer.js';
 import { toE164Kenyan } from '../utils/notificationService.js';
@@ -156,7 +157,6 @@ export const createApplication = async (req, res) => {
     businessType = businessType ? String(businessType).trim() : null;
     kraPin = kraPin ? normalizeKraPin(kraPin) : null;
     businessNumber = businessNumber ? String(businessNumber).trim() : null;
-
     nationalId = nationalId ? normalizeNationalId(nationalId) : null;
     county = county ? String(county).trim() : null;
     area = area ? String(area).trim() : null;
@@ -193,6 +193,7 @@ export const createApplication = async (req, res) => {
     if (agreedToTerms !== true && agreedToTerms !== 'true') {
       return res.status(400).json({ error: 'The merchant must agree to the Privacy Policy and Terms of Service.' });
     }
+
     if (kraPin && !isValidKraPin(kraPin)) {
       return res.status(400).json({ error: `Invalid KRA PIN format. ${KRA_PIN_FORMAT_HINT}` });
     }
@@ -212,10 +213,10 @@ export const createApplication = async (req, res) => {
     if (businessNumber && await Merchant.exists({ businessNumber })) {
       return res.status(409).json({ error: 'A merchant with that business registration number already exists.' });
     }
-
     if (await Merchant.exists({ nationalId })) {
       return res.status(409).json({ error: 'A merchant account already exists for that National ID number.' });
     }
+
     const files = req.files || {};
     const kybDocuments = ALL_OFFICER_DOC_TYPES.flatMap((t) => resolveDocTypes(t, files)).map((t) => ({
       type: t,
@@ -232,16 +233,15 @@ export const createApplication = async (req, res) => {
 
     const merchant = await Merchant.create({
       name,
-      email,
       firstName,
       surname,
       otherNames,
+      email,
       phone,
       businessName,
       businessType,
       kraPin,
       businessNumber,
-      isVerified: false,
       nationalId,
       county,
       businessArea: area,
@@ -251,6 +251,7 @@ export const createApplication = async (req, res) => {
       isEcommerce,
       agreedToTerms: true,
       agreedToTermsAt: new Date(),
+      isVerified: false,
       kybStatus: 'pending',
       kybDocuments,
       businessPhotos,
@@ -396,7 +397,12 @@ export const getApplication = async (req, res) => {
       .populate('reviewedBy', 'name email');
     if (!application) return res.status(404).json({ error: 'Application not found.' });
 
-    res.json({ success: true, data: application });
+    // Advisory first-pass flags for the reviewer (see utils/applicationPrechecks.js).
+    // A failure computing them must never stop the reviewer opening the application.
+    let prechecks = [];
+    try { prechecks = await computePrechecks(application); } catch (e) { console.error('Prechecks failed:', e?.message || e); }
+
+    res.json({ success: true, data: { ...application.toObject(), prechecks } });
   } catch (error) {
     console.error('Get Application Error:', error?.message || error);
     res.status(500).json({ error: 'Server Error' });

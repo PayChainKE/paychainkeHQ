@@ -18,7 +18,11 @@ const BlogPostSchema = new mongoose.Schema({
     avatar: { type: String, default: '' },
   },
   readTime: { type: String, default: '', trim: true },
-  status: { type: String, enum: ['draft', 'published'], default: 'draft' },
+  // 'scheduled' = will be published automatically at scheduledAt (see
+  // services/schedulerService.js#publishDueBlogPosts); never shown publicly
+  // until then, exactly like a draft.
+  status: { type: String, enum: ['draft', 'scheduled', 'published'], default: 'draft' },
+  scheduledAt: { type: Date, default: null },
   featured: { type: Boolean, default: false },
   publishedAt: { type: Date, default: null },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null },
@@ -26,6 +30,7 @@ const BlogPostSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 BlogPostSchema.index({ status: 1, publishedAt: -1 });
+BlogPostSchema.index({ status: 1, scheduledAt: 1 });
 
 const BlogPost = mongoose.model('BlogPost', BlogPostSchema);
 

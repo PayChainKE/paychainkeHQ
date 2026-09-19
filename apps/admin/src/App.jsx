@@ -18,6 +18,7 @@ import StkMonitor from './pages/StkMonitor';
 import CashAdvanceRequests from './pages/CashAdvanceRequests';
 import Newsletter from './pages/Newsletter';
 import BlogPosts from './pages/BlogPosts';
+import Automations from './pages/Automations';
 import WalletAudit from './pages/WalletAudit';
 import Invoices from './pages/Invoices';
 import CallCentre from './pages/CallCentre';
@@ -61,6 +62,7 @@ export default function App(){
             <Route path="/waitlist" element={<Protected><Waitlist/></Protected>} />
             <Route path="/newsletter" element={<Protected><Newsletter/></Protected>} />
             <Route path="/blog-posts" element={<Protected><BlogPosts/></Protected>} />
+            <Route path="/automations" element={<Protected><Automations/></Protected>} />
             <Route path="/sms-broadcast" element={<Protected><SmsBroadcast/></Protected>} />
             <Route path="/dormant-accounts" element={<Protected><DormantAccounts/></Protected>} />
             <Route path="/email-log" element={<Protected><EmailLog/></Protected>} />

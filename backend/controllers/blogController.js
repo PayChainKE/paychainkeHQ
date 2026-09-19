@@ -27,7 +27,7 @@ async function uniqueSlug(base, excludeId) {
   }
 }
 
-const LIST_FIELDS = 'title slug excerpt category image author readTime status featured publishedAt updatedAt';
+const LIST_FIELDS = 'title slug excerpt category image author readTime status featured publishedAt scheduledAt updatedAt';
 
 // ── Public ────────────────────────────────────────────────────────────
 
@@ -109,7 +109,11 @@ function buildFields(body) {
   if (body.image !== undefined) fields.image = String(body.image);
   if (body.readTime !== undefined) fields.readTime = String(body.readTime).trim().slice(0, 40);
   if (body.featured !== undefined) fields.featured = !!body.featured;
-  if (body.status !== undefined && ['draft', 'published'].includes(body.status)) fields.status = body.status;
+  if (body.status !== undefined && ['draft', 'scheduled', 'published'].includes(body.status)) fields.status = body.status;
+  if (body.scheduledAt !== undefined) {
+    const d = body.scheduledAt ? new Date(body.scheduledAt) : null;
+    fields.scheduledAt = d && !Number.isNaN(d.getTime()) ? d : null;
+  }
   if (body.author && typeof body.author === 'object') {
     fields.author = {
       name: String(body.author.name || '').trim().slice(0, 100),
@@ -118,6 +122,23 @@ function buildFields(body) {
     };
   }
   return fields;
+}
+
+// A 'scheduled' post needs a real future time; any other status clears it so
+// a stale scheduledAt can never linger on a draft or published post. Returns
+// an error message, or null when the fields are fine.
+function checkSchedule(fields, existing) {
+  const status = fields.status ?? existing?.status;
+  if (status !== 'scheduled') {
+    if (fields.status !== undefined) fields.scheduledAt = null;
+    return null;
+  }
+  const at = fields.scheduledAt !== undefined ? fields.scheduledAt : existing?.scheduledAt;
+  if (!at) return 'Choose a date and time to publish this post.';
+  if (at.getTime() <= Date.now() && (fields.scheduledAt !== undefined || existing?.status !== 'scheduled')) {
+    return 'The publish time must be in the future.';
+  }
+  return null;
 }
 
 // @desc    Create a new post. Starts as a draft unless status is explicitly
@@ -131,6 +152,8 @@ export const createPost = async (req, res) => {
       return res.status(400).json({ error: 'Title is required.' });
     }
     const fields = buildFields(req.body || {});
+    const scheduleError = checkSchedule(fields, null);
+    if (scheduleError) return res.status(400).json({ error: scheduleError });
     const requestedSlug = req.body?.slug ? slugify(req.body.slug) : slugify(title);
     fields.slug = await uniqueSlug(requestedSlug);
     fields.createdBy = req.admin?._id || null;
@@ -168,6 +191,8 @@ export const updatePost = async (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Post not found.' });
 
     const fields = buildFields(req.body || {});
+    const scheduleError = checkSchedule(fields, existing);
+    if (scheduleError) return res.status(400).json({ error: scheduleError });
     if (req.body?.slug !== undefined) {
       const requested = slugify(req.body.slug) || existing.slug;
       fields.slug = requested === existing.slug ? existing.slug : await uniqueSlug(requested, existing._id);

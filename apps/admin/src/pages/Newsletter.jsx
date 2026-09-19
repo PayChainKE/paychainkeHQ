@@ -12,6 +12,20 @@ const PAGE_SIZE = 25;
 // this tab's own JS thread. See backend/models/Merchant.js for the same fix.
 const EMAIL_RE = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 
+const DEFAULT_AUDIENCE = { source: 'subscribers', activity: 'all', businessType: '', county: '' };
+
+// ISO -> the "YYYY-MM-DDTHH:mm" string a datetime-local input wants (browser-local time).
+function toLocalInput(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+function fmtWhenEAT(iso) {
+  return new Date(iso).toLocaleString('en-KE', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Africa/Nairobi' }) + ' EAT';
+}
+
 function relativeTime(iso) {
   if (!iso) return '—';
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -74,6 +88,13 @@ export default function Newsletter() {
   const [activeDraftId, setActiveDraftId] = useState(null);
   const [composeInitialContent, setComposeInitialContent] = useState('');
   const [draftStatus, setDraftStatus] = useState(null); // null | 'saving' | 'saved' | 'error'
+
+  // Who the campaign goes to, and (optionally) when. `scheduledFor` is a
+  // datetime-local string in the admin's browser time; '' = send now.
+  const [audience, setAudience] = useState(DEFAULT_AUDIENCE);
+  const [audienceOptions, setAudienceOptions] = useState({ businessTypes: [], counties: [] });
+  const [audienceCount, setAudienceCount] = useState(null);
+  const [scheduledFor, setScheduledFor] = useState('');
   const [discardDraftState, setDiscardDraftState] = useState(null); // { draft, busy } | null
 
   // Delete confirmation
@@ -194,7 +215,31 @@ export default function Newsletter() {
     }
   }
 
+  const recipientCount = selectedIds.size > 0
+    ? selectedIds.size
+    : (audience.source === 'merchants' ? (audienceCount ?? 0) : stats.active);
+
+  // Live recipient count for a merchant audience (the subscriber count is
+  // already on the page). Only runs while the composer is open.
+  useEffect(() => {
+    if (!composeOpen || audience.source !== 'merchants') { setAudienceCount(null); return undefined; }
+    let cancelled = false;
+    api.post('/api/newsletter/audience-count', { audience })
+      .then((res) => { if (!cancelled) setAudienceCount(res.data?.count ?? 0); })
+      .catch(() => { if (!cancelled) setAudienceCount(null); });
+    return () => { cancelled = true; };
+  }, [composeOpen, audience]);
+
+  useEffect(() => {
+    if (!composeOpen) return;
+    api.get('/api/newsletter/audience-options')
+      .then((res) => setAudienceOptions({ businessTypes: res.data?.businessTypes || [], counties: res.data?.counties || [] }))
+      .catch(() => {});
+  }, [composeOpen]);
+
   function openCompose() {
+    setAudience(DEFAULT_AUDIENCE);
+    setScheduledFor('');
     setComposeSubject('');
     setComposeInitialContent('');
     setActiveDraftId(null);
@@ -218,6 +263,8 @@ export default function Newsletter() {
       const full = res.data?.data || draft;
       setComposeSubject(full.subject || '');
       setComposeInitialContent(full.body || '');
+      setAudience({ ...DEFAULT_AUDIENCE, ...(full.audience || {}) });
+      setScheduledFor(full.state === 'scheduled' ? toLocalInput(full.scheduledFor) : '');
       setActiveDraftId(full._id);
       setDraftStatus(null);
       setComposeError('');
@@ -237,7 +284,10 @@ export default function Newsletter() {
         draftId: activeDraftId,
         subject: composeSubject,
         body: html,
+        audience,
       });
+      // A plain save takes a scheduled draft back out of the send queue.
+      setScheduledFor('');
       setActiveDraftId(res.data?.data?._id || activeDraftId);
       setDraftStatus('saved');
       fetchDrafts();
@@ -245,6 +295,43 @@ export default function Newsletter() {
     } catch (e) {
       setDraftStatus('error');
       showToast(e?.response?.data?.error || 'Could not save draft.');
+    }
+  }
+
+  // Queue the current composer content to be sent by the scheduler later.
+  async function scheduleCampaign(html) {
+    setComposeError('');
+    if (composeSubject.trim().length < 3) { setComposeError('Subject must be at least 3 characters.'); return; }
+    if (!scheduledFor) { setComposeError('Pick a date and time to send.'); return; }
+    const when = new Date(scheduledFor);
+    if (Number.isNaN(when.getTime()) || when.getTime() <= Date.now()) { setComposeError('Choose a time in the future.'); return; }
+    setComposeBusy(true);
+    try {
+      await api.post('/api/newsletter/drafts', {
+        draftId: activeDraftId,
+        subject: composeSubject,
+        body: html,
+        audience,
+        scheduledFor: when.toISOString(),
+      });
+      setComposeOpen(false);
+      setActiveDraftId(null);
+      fetchDrafts();
+      showToast(`Scheduled for ${fmtWhenEAT(when.toISOString())}.`);
+    } catch (e) {
+      setComposeError(e?.response?.data?.error || 'Could not schedule this newsletter.');
+    } finally {
+      setComposeBusy(false);
+    }
+  }
+
+  async function unscheduleDraft(draft) {
+    try {
+      await api.post(`/api/newsletter/drafts/${draft._id}/unschedule`);
+      fetchDrafts();
+      showToast('Moved back to drafts.');
+    } catch (e) {
+      showToast(e?.response?.data?.error || 'Could not unschedule this draft.');
     }
   }
 
@@ -279,6 +366,7 @@ export default function Newsletter() {
         htmlMode: true,   // rich HTML from the editor is passed through to Resend as-is
         draftId: activeDraftId, // backend deletes the draft this was composed from, if any
         recipientIds: selectedIds.size > 0 ? Array.from(selectedIds) : undefined,
+        audience: selectedIds.size > 0 ? undefined : audience,
       });
       if (res.data?.success) {
         setComposeDone(res.data);
@@ -527,7 +615,7 @@ export default function Newsletter() {
             <div className="px-6 py-4 border-b border-outline-variant/10 flex items-center justify-between">
               <div>
                 <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-1">In progress</p>
-                <h3 className="text-base font-bold text-on-surface tracking-tight">Drafts</h3>
+                <h3 className="text-base font-bold text-on-surface tracking-tight">Drafts &amp; scheduled</h3>
               </div>
               {drafts.length > 0 && (
                 <span className="text-2xs font-bold text-on-surface-variant/40 bg-surface-container px-2.5 py-1 rounded-full">{drafts.length} saved</span>
@@ -542,18 +630,29 @@ export default function Newsletter() {
                 {drafts.map((d) => (
                   <div key={d._id} className="px-6 py-4 flex items-center justify-between gap-4 hover:bg-secondary-container/5 transition-colors group">
                     <button onClick={() => continueDraft(d)} disabled={loadingDraftId === d._id} className="min-w-0 flex-1 text-left disabled:opacity-50">
-                      <p className="font-bold text-on-surface tracking-tight truncate text-sm">{d.subject?.trim() || '(no subject)'}</p>
+                      <p className="font-bold text-on-surface tracking-tight truncate text-sm">
+                        {d.subject?.trim() || '(no subject)'}
+                        <DraftStateBadge draft={d} />
+                      </p>
                       <p className="text-2xs text-on-surface-variant/50 truncate mt-0.5">
                         {d.snippet || '(empty)'}
                       </p>
                       <p className="text-2xs text-on-surface-variant/40 mt-1">
-                        Last edited {relativeTime(d.updatedAt)}{d.updatedByEmail ? ` · ${d.updatedByEmail}` : ''}
+                        {d.state === 'failed' && d.lastError
+                          ? <span className="text-red-600 font-semibold">{d.lastError}</span>
+                          : <>Last edited {relativeTime(d.updatedAt)}{d.updatedByEmail ? ` · ${d.updatedByEmail}` : ''}</>}
                       </p>
                     </button>
                     <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {(d.state === 'scheduled' || d.state === 'failed') && (
+                        <button onClick={() => unscheduleDraft(d)}
+                          className="px-3 py-1.5 rounded-lg text-2xs font-bold uppercase tracking-widest text-amber-700 hover:bg-amber-50 transition-colors">
+                          {d.state === 'failed' ? 'Back to draft' : 'Unschedule'}
+                        </button>
+                      )}
                       <button onClick={() => continueDraft(d)} disabled={loadingDraftId === d._id}
                         className="px-3 py-1.5 rounded-lg text-2xs font-bold uppercase tracking-widest text-primary hover:bg-primary/10 transition-colors disabled:opacity-50">
-                        {loadingDraftId === d._id ? 'Loading…' : 'Continue'}
+                        {loadingDraftId === d._id ? 'Loading…' : d.state === 'awaiting_approval' ? 'Review & send' : 'Continue'}
                       </button>
                       <button onClick={() => startDiscardDraft(d)}
                         className="p-1.5 rounded-lg hover:bg-red-50 text-on-surface-variant/60 hover:text-red-600 transition-colors" title="Discard draft">
@@ -611,8 +710,14 @@ export default function Newsletter() {
         <NewsletterComposer
           subject={composeSubject}
           onSubject={setComposeSubject}
-          activeCount={selectedIds.size > 0 ? selectedIds.size : stats.active}
+          activeCount={recipientCount}
           targeted={selectedIds.size > 0}
+          audience={audience}
+          onAudience={setAudience}
+          audienceOptions={audienceOptions}
+          scheduledFor={scheduledFor}
+          onScheduledFor={setScheduledFor}
+          onSchedule={scheduleCampaign}
           busy={composeBusy}
           error={composeError}
           done={composeDone}
@@ -659,7 +764,7 @@ export default function Newsletter() {
             </div>
             <h3 className="text-xl font-bold text-on-surface mb-1">Send campaign?</h3>
             <p className="text-sm text-on-surface-variant mb-5">
-              Send "<strong>{composeSubject.trim()}</strong>" to <strong>{selectedIds.size > 0 ? selectedIds.size : stats.active}</strong> {selectedIds.size > 0 ? 'selected' : 'active'} subscriber{(selectedIds.size > 0 ? selectedIds.size : stats.active) === 1 ? '' : 's'}? This cannot be undone.
+              Send "<strong>{composeSubject.trim()}</strong>" to <strong>{recipientCount}</strong> {selectedIds.size > 0 ? 'selected subscriber' : audience.source === 'merchants' ? 'merchant' : 'active subscriber'}{recipientCount === 1 ? '' : 's'}? This cannot be undone.
             </p>
             <div className="flex gap-3">
               <button onClick={() => setPendingSend(null)} disabled={composeBusy} className="flex-1 py-2.5 rounded-lg border border-outline-variant/40 text-on-surface text-sm font-semibold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40">Cancel</button>
@@ -677,6 +782,17 @@ export default function Newsletter() {
     </Layout>
   );
 }
+
+const DraftStateBadge = ({ draft }) => {
+  const meta = {
+    scheduled:         { label: draft.scheduledFor ? `Scheduled · ${fmtWhenEAT(draft.scheduledFor)}` : 'Scheduled', cls: 'bg-blue-50 text-blue-700 border-blue-200' },
+    awaiting_approval: { label: 'Awaiting approval', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+    sending:           { label: 'Sending…', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+    failed:            { label: 'Failed', cls: 'bg-red-50 text-red-700 border-red-200' },
+  }[draft.state];
+  if (!meta) return null;
+  return <span className={`ml-2 align-middle inline-flex px-2 py-0.5 rounded-full text-2xs font-black uppercase tracking-widest border ${meta.cls}`}>{meta.label}</span>;
+};
 
 // ── Campaign delivery status row ──────────────────────────────────────
 function deliveryStatus(successCount, failureCount, recipientCount) {
@@ -726,6 +842,8 @@ const CampaignRow = ({ campaign: c, index }) => {
             </div>
             <p className="text-2xs text-on-surface-variant/50 mb-3">
               Sent {fmtDate(c.sentAt)}
+              {c.origin && c.origin !== 'manual' && <> · <span className="font-medium">{c.origin === 'digest' ? 'Weekly digest' : 'Scheduled'}</span></>}
+              {c.audienceLabel && <> · {c.audienceLabel}</>}
               {c.sentByEmail && <> · <span className="font-medium">{c.sentByEmail}</span></>}
             </p>
 

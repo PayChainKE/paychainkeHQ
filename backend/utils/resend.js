@@ -582,12 +582,22 @@ export const sendSupportReply = async (toEmail, toName, inReplyToSubject, replyB
 // Send a single newsletter campaign email. Caller iterates over subscribers
 // — we keep this single-send so a failure on one address doesn't kill the
 // whole batch. Returns Resend's response (with the message id) or throws.
-export const sendNewsletterEmail = async (toEmail, subject, htmlBody) => {
+// `opts.unsubscribeUrl` adds a one-click unsubscribe link to the footer and the
+// List-Unsubscribe headers mail providers (Gmail/Yahoo) require of bulk senders;
+// `opts.reason` is the "you're receiving this because…" line.
+export const sendNewsletterEmail = async (toEmail, subject, htmlBody, opts = {}) => {
+  const { unsubscribeUrl = null, reason = "You're receiving this because you subscribed to PayChain Updates." } = opts;
   try {
     const data = await resend.emails.send({
       from: 'PayChain Updates <info@paychain.co.ke>',
       to: [toEmail],
       subject,
+      ...(unsubscribeUrl ? {
+        headers: {
+          'List-Unsubscribe': `<${unsubscribeUrl}>`,
+          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+        },
+      } : {}),
       html: `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 640px; margin: auto; background: #fff;">
           <div style="background: linear-gradient(135deg, #06201B 0%, #0a3029 100%); padding: 34px 30px 38px; text-align: center;">
@@ -599,12 +609,17 @@ export const sendNewsletterEmail = async (toEmail, subject, htmlBody) => {
             ${htmlBody}
           </div>
           <div style="padding: 24px 30px; background: #fafafa; border-top: 1px solid #eee; text-align: center;">
-            <p style="margin: 0; color: #888; font-size: 12px;">You're receiving this because you subscribed to PayChain Updates.</p>
+            <p style="margin: 0; color: #888; font-size: 12px;">${reason}</p>
+            ${unsubscribeUrl ? `<p style="margin: 8px 0 0; font-size: 12px;"><a href="${unsubscribeUrl}" style="color: #6b7280; text-decoration: underline;">Unsubscribe</a></p>` : ''}
             <p style="margin: 10px 0 0; color: #aaa; font-size: 11px;">PayChainKE · Nairobi, Kenya · <a href="https://www.paychain.co.ke" style="color: #06201B; text-decoration: none;">paychain.co.ke</a></p>
           </div>
         </div>
       `,
     });
+    // The Resend SDK reports a rejected send (bad address, domain issue,
+    // rate limit) as { data: null, error } instead of throwing — without this
+    // check every rejection was counted as delivered in the campaign totals.
+    if (data?.error) throw new Error(data.error.message || 'Email provider rejected the message.');
     return data;
   } catch (error) {
     console.error(`❌ Newsletter email failed for ${toEmail}:`, error?.message);
@@ -2020,6 +2035,81 @@ export const sendTaxDeadlineReminderEmail = async (email, deadline, dueDate, day
     return data;
   } catch (error) {
     console.error('❌ Resend Tax Deadline Reminder Error:', error);
+    throw error;
+  }
+};
+
+// Ops notice to an admin about an automation (a digest waiting for approval,
+// a scheduled send that failed, ...). Deliberately NOT sendSecurityAlertEmail:
+// that template is branded "Security Alert" and its records feed the Security
+// page, which an automation notice doesn't belong in.
+export const sendAdminAutomationNoticeEmail = async (email, subject, heading, detailsHtml, ctaLabel, ctaPath) => {
+  try {
+    const emailPayload = {
+      from: 'PayChain <info@paychain.co.ke>',
+      to: [email],
+      subject: `[PayChain Admin] ${subject}`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 520px; margin: auto; padding: 40px 32px; border: 1px solid #eef0ee; border-radius: 20px; background: #fff;">
+          <div style="text-align: center; margin-bottom: 24px;">${logoImgDark(116)}</div>
+          <div style="text-align: center; margin-bottom: 20px;">
+            <span style="display:inline-block;background:#ecfdf5;color:#047857;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;padding:4px 10px;border-radius:999px;border:1px solid #a7f3d0;">Automation</span>
+            <h2 style="margin: 12px 0 0; color: #06201B; font-size: 20px; font-weight: 800; letter-spacing: -0.3px;">${heading}</h2>
+          </div>
+          <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 18px 20px; margin-bottom: 22px; color: #374151; font-size: 14px; line-height: 1.6;">
+            ${detailsHtml}
+          </div>
+          ${ctaLabel && ctaPath ? `<div style="text-align:center;"><a href="${String(ctaPath).startsWith('http') ? ctaPath : ADMIN_URL + ctaPath}" style="display: inline-block; background: #06201B; color: #ffffff; text-decoration: none; padding: 13px 26px; border-radius: 12px; font-weight: 800; font-size: 14px;">${ctaLabel} &rarr;</a></div>` : ''}
+          <div style="margin-top: 26px; padding-top: 16px; border-top: 1px solid #eee; text-align: center;">
+            <p style="margin: 0; color: #aaa; font-size: 11px;">Automated message — do not reply. Automations can be paused from the admin dashboard.</p>
+          </div>
+        </div>
+      `,
+    };
+    const data = await resend.emails.send(emailPayload);
+    if (data?.error) throw new Error(data.error.message || 'Email provider rejected the message.');
+    logEmail({ to: email, type: 'admin_automation_notice', subject: emailPayload.subject, bodyHtml: emailPayload.html, resendId: data?.data?.id || data?.id || null }).catch(() => {});
+    return data;
+  } catch (error) {
+    console.error('❌ Admin automation notice email failed:', error?.message);
+    throw error;
+  }
+};
+
+// Friendly lifecycle email to a merchant (onboarding tips, win-back check-ins).
+// Marketing-adjacent rather than transactional, so it always carries an
+// unsubscribe link + List-Unsubscribe headers and callers skip merchants who
+// opted out. `paragraphsHtml` is trusted HTML built by our own code.
+export const sendMerchantLifecycleEmail = async (email, { subject, heading, paragraphsHtml, ctaLabel, ctaUrl, unsubscribeUrl }) => {
+  try {
+    const emailPayload = {
+      from: 'PayChain <info@paychain.co.ke>',
+      to: [email],
+      subject,
+      ...(unsubscribeUrl ? { headers: { 'List-Unsubscribe': `<${unsubscribeUrl}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' } } : {}),
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 560px; margin: auto; background: #ffffff; border: 1px solid #eef0ee; border-radius: 18px; overflow: hidden;">
+          <div style="background: linear-gradient(135deg, #06201B 0%, #0a3029 100%); padding: 30px 32px 34px;">
+            <div style="margin-bottom: 18px;">${logoImgWhite(108, 'left')}</div>
+            <h1 style="margin: 0; color: #fff; font-size: 22px; font-weight: 800; letter-spacing: -0.3px; line-height: 1.3;">${heading}</h1>
+          </div>
+          <div style="padding: 32px; color: #1f2937; font-size: 15px; line-height: 1.7;">
+            ${paragraphsHtml}
+            ${ctaLabel && ctaUrl ? `<p style="margin: 26px 0 0;"><a href="${ctaUrl}" style="display: inline-block; background: #06201B; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 12px; font-weight: 800; font-size: 14px;">${ctaLabel} &rarr;</a></p>` : ''}
+          </div>
+          <div style="padding: 20px 30px; background: #fafafa; border-top: 1px solid #eef0ee; text-align: center;">
+            <p style="margin: 0; color: #9ca3af; font-size: 11px;">Questions? Reply to this email or write to <a href="mailto:support@paychain.co.ke" style="color: #6b7280;">support@paychain.co.ke</a>.</p>
+            ${unsubscribeUrl ? `<p style="margin: 8px 0 0; font-size: 11px;"><a href="${unsubscribeUrl}" style="color: #9ca3af; text-decoration: underline;">Unsubscribe from these emails</a></p>` : ''}
+          </div>
+        </div>
+      `,
+    };
+    const data = await resend.emails.send(emailPayload);
+    if (data?.error) throw new Error(data.error.message || 'Email provider rejected the message.');
+    logEmail({ to: email, type: 'merchant_lifecycle', subject, bodyHtml: emailPayload.html, resendId: data?.data?.id || data?.id || null }).catch(() => {});
+    return data;
+  } catch (error) {
+    console.error('❌ Merchant lifecycle email failed:', error?.message);
     throw error;
   }
 };

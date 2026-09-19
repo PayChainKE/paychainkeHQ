@@ -216,6 +216,23 @@ const Workstation = () => {
           )}
         </div>
 
+        {app.prechecks?.length > 0 && (
+          <div className={`rounded-2xl p-5 border ${app.prechecks.some((f) => f.severity === 'critical') ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'}`}>
+            <p className={`text-2xs font-bold uppercase tracking-[0.2em] mb-3 ${app.prechecks.some((f) => f.severity === 'critical') ? 'text-red-700' : 'text-amber-700'}`}>
+              Automatic checks · {app.prechecks.length} flag{app.prechecks.length === 1 ? '' : 's'}
+            </p>
+            <ul className="space-y-2">
+              {app.prechecks.map((f) => (
+                <li key={f.code} className="flex items-start gap-2 text-sm text-on-surface">
+                  <span className={`material-symbols-outlined text-base mt-0.5 ${f.severity === 'critical' ? 'text-red-600' : 'text-amber-600'}`}>{f.severity === 'critical' ? 'error' : 'warning'}</span>
+                  <span>{f.message}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-2xs text-on-surface-variant/60 mt-3">Advisory only — these do not block a decision.</p>
+          </div>
+        )}
+
         <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl p-6 shadow-editorial">
           <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-3">Verification Checklist</p>
           <div className="space-y-2.5">

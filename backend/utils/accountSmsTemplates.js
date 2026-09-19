@@ -148,3 +148,64 @@ export function buildSignupPhoneOtpSms({ otp }) {
   const message = `PayChain: Your verification code is ${otp}. It expires in 10 minutes. Never share this code with anyone.`;
   return { message, truncated: false, length: message.length };
 }
+
+const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=ke.co.paychain.app';
+
+/**
+ * Sent to someone who verified their phone in the signup wizard but never
+ * submitted the application (see services/automations/signupNudge.js). There
+ * is no merchant record yet, so no name — just a link back in.
+ *
+ * @param {{ url: string }} params
+ */
+export function buildSignupAbandonedSms({ url }) {
+  const message = `PayChain: You started creating a PayChain account but did not finish. Continue here: ${url}`;
+  return { message, truncated: false, length: message.length };
+}
+
+/**
+ * A self-serve application that has been waiting on review longer than
+ * expected. Reassurance only — no promise of a time.
+ */
+export function buildRegistrationDelaySms({ businessName }) {
+  return buildStrictSms(
+    ({ name }) => `PayChain: Hi ${name}, thank you for your patience. Your registration is still under review and we will notify you as soon as it is done.`,
+    { truncatable: [{ key: 'name', value: businessName || 'there' }] }
+  );
+}
+
+/**
+ * A reviewer asked the applicant to fix documents and they haven't yet. The
+ * resubmit link is in the email (its raw token is never stored, so an SMS
+ * can't carry it) — this points them back to it.
+ */
+export function buildRevisionNudgeSms({ businessName }) {
+  return buildStrictSms(
+    ({ name }) => `PayChain: Hi ${name}, your registration needs a few updates before we can approve it. Please use the link we emailed you to resubmit.`,
+    { truncatable: [{ key: 'name', value: businessName || 'there' }] }
+  );
+}
+
+/**
+ * Onboarding drip texts, one per stage after approval ('d1' | 'd3' | 'd7').
+ * d1 carries the merchant's Paybill + account number (same source as the
+ * welcome SMS/email); d7 links the Play Store listing.
+ */
+export function buildOnboardingTipSms({ businessName, stage, accountNumber = '' }) {
+  if (stage === 'd1') {
+    return buildStrictSms(
+      ({ name, paybill, account }) => `PayChain: Hi ${name}, share your Paybill ${paybill}, Account No. ${account}, with customers to start receiving payments.`,
+      { fixed: { paybill: PAYBILL_NUMBER, account: accountNumber }, truncatable: [{ key: 'name', value: businessName || 'there' }] }
+    );
+  }
+  if (stage === 'd3') {
+    return buildStrictSms(
+      ({ name }) => `PayChain: Hi ${name}, you can pay suppliers and staff straight from PayChain. Open the app to send your first payment.`,
+      { truncatable: [{ key: 'name', value: businessName || 'there' }] }
+    );
+  }
+  return buildStrictSms(
+    ({ name, url }) => `PayChain: Hi ${name}, run your business from your phone. Get the PayChain app: ${url}`,
+    { fixed: { url: PLAY_STORE_URL }, truncatable: [{ key: 'name', value: businessName || 'there' }] }
+  );
+}

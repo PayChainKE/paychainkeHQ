@@ -62,6 +62,8 @@ import developerPublicRoutes from './routes/developerPublicRoutes.js';
 import publicCheckoutRoutes from './routes/publicCheckoutRoutes.js';
 import etimsRoutes from './routes/etimsRoutes.js';
 import blogRoutes from './routes/blogRoutes.js';
+import automationRoutes from './routes/automationRoutes.js';
+import { runSchedulerTick } from './services/schedulerService.js';
 import { generateSitemap } from './controllers/sitemapController.js';
 import { ensurePrimaryOwner } from './migrations/ensurePrimaryOwner.js';
 import { backfillTransactionFees } from './migrations/backfillTransactionFees.js';
@@ -262,6 +264,7 @@ app.use('/api/officer', officerRoutes);
 app.use('/api/waitlist', waitlistRoutes);
 app.use('/api/newsletter', newsletterRoutes);
 app.use('/api/blog', blogRoutes);
+app.use('/api/automations', automationRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/bulkpay', bulkPayRoutes);
 app.use('/api/transactions', transactionRoutes);
@@ -512,6 +515,16 @@ async function bootstrap() {
   setInterval(() => {
     reconcileStuckStkRequests().catch((e) => console.error('STK reconciliation sweep failed:', e));
   }, 5 * 60 * 1000);
+
+  // Admin-automation scheduler — blog posts set to publish at a date, newsletters
+  // scheduled for later, the recurring newsletter digest. Once a minute so
+  // "9:00" really means 9:00; every step claims its work with an atomic
+  // database update, so a restart or a second instance can't double-fire
+  // anything. See services/schedulerService.js.
+  runSchedulerTick().catch((e) => console.error('Scheduler tick failed:', e));
+  setInterval(() => {
+    runSchedulerTick().catch((e) => console.error('Scheduler tick failed:', e));
+  }, 60 * 1000);
 
   // Monthly Batch History cleanup — see batchHistoryCleanupService.js's own
   // doc comment for why this is safe (PayoutBatch is a display-only summary,

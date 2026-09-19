@@ -2,7 +2,12 @@ import mongoose from 'mongoose';
 import Subscription from '../models/Subscription.js';
 import NewsletterCampaign from '../models/NewsletterCampaign.js';
 import NewsletterDraft from '../models/NewsletterDraft.js';
-import { sendNewsletterConfirmation, sendNewsletterEmail } from '../utils/resend.js';
+import Merchant from '../models/Merchant.js';
+import { sendNewsletterConfirmation } from '../utils/resend.js';
+import {
+  deliverCampaign, resolveAudience, sanitizeAudience, toHtmlBody,
+} from '../services/newsletterService.js';
+import { verifyUnsubscribeToken } from '../utils/unsubscribeToken.js';
 import { v2 as cloudinary } from 'cloudinary';
 
 // Linear-time shape check — see models/Merchant.js's identical field for
@@ -17,22 +22,6 @@ function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, (c) => (
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
   ));
-}
-
-// Merge-tag personalization for sendCampaign below — an admin writes
-// "Hi {{name}}," once in the composer and every recipient gets their own
-// name substituted in at send time (falling back to "there" when a
-// subscriber has none on file), instead of every inbox getting an
-// identical, generic greeting. Case-insensitive / whitespace-tolerant match
-// ({{Name}}, {{ name }}) so a typo'd tag doesn't silently fail to resolve.
-// Two variants: the subject line is plain text (HTML-escaping it would show
-// literal "&amp;" etc. in the inbox), while the body is real HTML.
-const NAME_TAG_RE = /\{\{\s*name\s*\}\}/gi;
-function personalizeSubject(subject, name) {
-  return String(subject).replace(NAME_TAG_RE, (name || '').trim() || 'there');
-}
-function personalizeHtml(html, name) {
-  return String(html).replace(NAME_TAG_RE, escapeHtml((name || '').trim() || 'there'));
 }
 
 function cleanName(name) {
@@ -74,6 +63,74 @@ export const subscribe = async (req, res) => {
       return res.status(400).json({ error: messages.join(', ') });
     }
     res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// ── Unsubscribe ───────────────────────────────────────────────────────
+// Two-step on purpose: opening the emailed link (GET) only shows a confirm
+// button — mail scanners and link-preview bots open every link in a message,
+// and unsubscribing on GET would silently opt people out just for receiving
+// an email. The state change is the POST, which is also what mail clients'
+// one-click List-Unsubscribe button sends (RFC 8058).
+
+function unsubscribePageHtml({ title, body, action = null, token = '' }) {
+  const form = action
+    ? `<form method="POST" action="/api/newsletter/unsubscribe?t=${encodeURIComponent(token)}"><button type="submit">${escapeHtml(action)}</button></form>`
+    : '';
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${escapeHtml(title)} · PayChain</title>
+<style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f4f7f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1f2937}
+.card{max-width:440px;margin:24px;padding:36px 32px;background:#fff;border:1px solid #e5ece8;border-radius:20px;text-align:center;box-shadow:0 10px 32px rgba(6,32,27,.08)}
+.brand{font-weight:800;letter-spacing:-.3px;color:#06201B;font-size:22px;margin:0 0 18px}h1{font-size:20px;margin:0 0 10px;color:#06201B}p{margin:0 0 20px;line-height:1.6;color:#4b5563;font-size:15px}
+button{background:#06201B;color:#fff;border:0;border-radius:12px;padding:13px 26px;font-size:14px;font-weight:800;cursor:pointer}a{color:#059669}</style></head>
+<body><div class="card"><p class="brand">PayChain</p><h1>${escapeHtml(title)}</h1><p>${body}</p>${form}</div></body></html>`;
+}
+
+function noStore(res) {
+  // The server-wide CSP is default-src 'none' (this API normally only returns
+  // JSON). These two pages are the one place it serves HTML, so they get their
+  // own minimal policy: inline styles and a same-origin form post, nothing else.
+  res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'");
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+}
+
+// @desc    Confirm page for the unsubscribe link in newsletter emails.
+// @route   GET /api/newsletter/unsubscribe?t=<token>
+// @access  Public (signed token)
+export const unsubscribePage = (req, res) => {
+  noStore(res);
+  const token = String(req.query.t || '');
+  if (!verifyUnsubscribeToken(token)) {
+    return res.status(400).send(unsubscribePageHtml({ title: 'Link not valid', body: 'This unsubscribe link is invalid or incomplete. Please use the link from the latest email, or contact <a href="mailto:support@paychain.co.ke">support@paychain.co.ke</a>.' }));
+  }
+  res.send(unsubscribePageHtml({ title: 'Unsubscribe from PayChain emails?', body: 'You will stop receiving PayChain newsletters and updates. Important account, payment and security emails are not affected.', action: 'Yes, unsubscribe me', token }));
+};
+
+// @desc    Perform the unsubscribe (form button, or a mail client's one-click).
+// @route   POST /api/newsletter/unsubscribe?t=<token>
+// @access  Public (signed token)
+export const unsubscribeConfirm = async (req, res) => {
+  noStore(res);
+  const parsed = verifyUnsubscribeToken(String(req.query.t || ''));
+  if (!parsed) {
+    return res.status(400).send(unsubscribePageHtml({ title: 'Link not valid', body: 'This unsubscribe link is invalid or incomplete.' }));
+  }
+  try {
+    // Idempotent: unsubscribing twice, or an already-removed record, is still a success from the reader's side.
+    if (parsed.kind === 's') {
+      await Subscription.updateOne({ _id: parsed.id }, { $set: { active: false } });
+    } else {
+      await Merchant.updateOne({ _id: parsed.id }, { $set: { newsletterOptOut: true, newsletterOptOutAt: new Date() } });
+    }
+    res.send(unsubscribePageHtml({
+      title: "You're unsubscribed",
+      body: parsed.kind === 'm'
+        ? "You won't receive PayChain newsletters any more. Your account is unaffected, and payment and security emails will still reach you."
+        : 'You have been removed from the PayChain newsletter. Changed your mind? You can subscribe again any time at <a href="https://www.paychain.co.ke">paychain.co.ke</a>.',
+    }));
+  } catch (error) {
+    console.error('Unsubscribe Error:', error);
+    res.status(500).send(unsubscribePageHtml({ title: 'Something went wrong', body: 'We could not process that just now. Please try again in a moment.' }));
   }
 };
 
@@ -163,15 +220,18 @@ export const deleteSubscriber = async (req, res) => {
   }
 };
 
-// @desc    Send a newsletter campaign to every active subscriber. Plain-text
-//          body is auto-converted to <p> tags; HTML is passed through. Sends
-//          in batches of 10 to stay under Resend's rate limits and so a
-//          single bad address doesn't kill the whole run. Records the campaign.
+// @desc    Send a newsletter campaign now. Goes to the selected subscriber
+//          rows if `recipientIds` is given, otherwise to the chosen `audience`
+//          (default: every active subscriber; can instead target approved
+//          merchants by activity / business type / county). Plain-text bodies
+//          are auto-converted to <p> tags; HTML is passed through. Records the
+//          campaign. Scheduling a send for later goes through the drafts
+//          endpoints instead (see saveDraft).
 // @route   POST /api/newsletter/send
 // @access  Private (Admin)
 export const sendCampaign = async (req, res) => {
   try {
-    const { subject, body, htmlMode, draftId, recipientIds } = req.body || {};
+    const { subject, body, htmlMode, draftId, recipientIds, audience } = req.body || {};
     if (!subject || String(subject).trim().length < 3) {
       return res.status(400).json({ error: 'Subject is required (min 3 chars).' });
     }
@@ -187,47 +247,44 @@ export const sendCampaign = async (req, res) => {
       ? recipientIds.filter((id) => mongoose.Types.ObjectId.isValid(id))
       : [];
     const hasSelection = validRecipientIds.length > 0;
-    const query = hasSelection ? { _id: { $in: validRecipientIds }, active: true } : { active: true };
-    const subscribers = await Subscription.find(query).select('email name').lean();
-    if (subscribers.length === 0) {
-      return res.status(400).json({ error: hasSelection ? 'None of the selected subscribers are active.' : 'No active subscribers to send to.' });
+    let recipients;
+    if (hasSelection) {
+      const subs = await Subscription.find({ _id: { $in: validRecipientIds }, active: true }).select('email name').lean();
+      recipients = subs.map((s) => ({ email: s.email, name: s.name, kind: 's', id: String(s._id) }));
+    } else {
+      recipients = await resolveAudience(audience);
+    }
+    if (recipients.length === 0) {
+      return res.status(400).json({ error: hasSelection ? 'None of the selected subscribers are active.' : 'Nobody matches that audience.' });
     }
 
-    // Plain text → paragraphs. HTML mode trusts the admin (it's our own UI).
-    // This is the {{name}}-bearing template shared by every recipient —
-    // personalizeSubject/personalizeHtml resolve the actual per-recipient
-    // greeting just before each send below, so this stays the raw template.
-    const htmlBody = htmlMode
-      ? String(body)
-      : String(body)
-          .split(/\n\s*\n/)
-          .map((p) => `<p style="margin:0 0 14px;">${p.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</p>`)
-          .join('');
-
-    let success = 0;
-    let failure = 0;
-    const BATCH = 10;
-    for (let i = 0; i < subscribers.length; i += BATCH) {
-      const slice = subscribers.slice(i, i + BATCH);
-      const results = await Promise.allSettled(
-        slice.map((s) => sendNewsletterEmail(
-          s.email,
-          personalizeSubject(subject, s.name),
-          personalizeHtml(htmlBody, s.name)
-        ))
+    // A draft that is already queued/being sent by the scheduler must not
+    // also be sent by hand — that would email the list twice.
+    if (draftId && mongoose.Types.ObjectId.isValid(draftId)) {
+      const claimed = await NewsletterDraft.findOneAndUpdate(
+        { _id: draftId, state: { $ne: 'sending' } },
+        { $set: { state: 'sending', sendingStartedAt: new Date() } }
       );
-      results.forEach((r) => { r.status === 'fulfilled' ? success++ : failure++; });
+      if (!claimed) {
+        return res.status(409).json({ error: 'This draft is already being sent.' });
+      }
     }
 
-    const campaign = await NewsletterCampaign.create({
-      subject: String(subject).trim(),
-      body: String(body),
-      recipientCount: subscribers.length,
-      successCount: success,
-      failureCount: failure,
+    const campaign = await deliverCampaign({
+      subject,
+      htmlBody: toHtmlBody(body, htmlMode),
+      rawBody: String(body),
+      recipients,
+      origin: 'manual',
+      audience: hasSelection ? { source: 'subscribers' } : audience,
       sentByEmail: req.admin?.email || 'unknown',
       sentBy: req.admin?._id || null,
-      sentAt: new Date(),
+    }).catch(async (err) => {
+      // Release the claim so the admin can retry from the same draft.
+      if (draftId && mongoose.Types.ObjectId.isValid(draftId)) {
+        await NewsletterDraft.updateOne({ _id: draftId, state: 'sending' }, { $set: { state: 'draft', sendingStartedAt: null } }).catch(() => {});
+      }
+      throw err;
     });
 
     // The draft this campaign was composed from (if any) is now sent —
@@ -242,7 +299,7 @@ export const sendCampaign = async (req, res) => {
 
     res.json({
       success: true,
-      message: `Campaign sent to ${success} of ${subscribers.length} subscribers${failure ? ` (${failure} failed)` : ''}.`,
+      message: `Campaign sent to ${campaign.successCount} of ${campaign.recipientCount} recipients${campaign.failureCount ? ` (${campaign.failureCount} failed)` : ''}.`,
       data: campaign,
     });
   } catch (error) {
@@ -339,7 +396,7 @@ export const listDrafts = async (req, res) => {
   try {
     const drafts = await NewsletterDraft.find({})
       .sort({ updatedAt: -1 })
-      .select('subject updatedByEmail updatedAt createdAt body')
+      .select('subject updatedByEmail updatedAt createdAt body state origin scheduledFor lastError audience')
       .lean();
     const withSnippet = drafts.map(({ body, ...d }) => ({
       ...d,
@@ -372,12 +429,15 @@ export const getDraft = async (req, res) => {
 // @desc    Save a draft — creates a new one, or updates an existing one
 //          when `draftId` is provided (upsert-by-id, not by content), so
 //          repeated "Save Draft" clicks on the same email update in place
-//          rather than piling up duplicates.
+//          rather than piling up duplicates. Also carries the audience and,
+//          if `scheduledFor` is a future time, queues the draft to be sent by
+//          the scheduler at that time (state 'scheduled'). A null/omitted
+//          `scheduledFor` on save returns it to a plain draft.
 // @route   POST /api/newsletter/drafts
 // @access  Private (Admin)
 export const saveDraft = async (req, res) => {
   try {
-    const { draftId, subject, body } = req.body || {};
+    const { draftId, subject, body, audience, scheduledFor } = req.body || {};
     if (!String(subject || '').trim() && !String(body || '').trim()) {
       return res.status(400).json({ error: 'Nothing to save — write a subject or body first.' });
     }
@@ -385,17 +445,43 @@ export const saveDraft = async (req, res) => {
     const fields = {
       subject: String(subject || '').trim(),
       body: String(body || ''),
+      audience: sanitizeAudience(audience),
       updatedByEmail: req.admin?.email || '',
       updatedBy: req.admin?._id || null,
     };
+
+    if (scheduledFor) {
+      const at = new Date(scheduledFor);
+      if (Number.isNaN(at.getTime())) return res.status(400).json({ error: 'Invalid schedule time.' });
+      if (at.getTime() <= Date.now()) return res.status(400).json({ error: 'The send time must be in the future.' });
+      if (fields.subject.length < 3) return res.status(400).json({ error: 'A scheduled newsletter needs a subject (min 3 chars).' });
+      if (fields.body.replace(/<[^>]+>/g, '').trim().length < 10) return res.status(400).json({ error: 'A scheduled newsletter needs a body (min 10 chars).' });
+      fields.state = 'scheduled';
+      fields.scheduledFor = at;
+      fields.lastError = '';
+    } else {
+      fields.state = 'draft';
+      fields.scheduledFor = null;
+      fields.lastError = '';
+    }
 
     let draft;
     if (draftId) {
       if (!mongoose.Types.ObjectId.isValid(draftId)) {
         return res.status(400).json({ error: 'Invalid draft id.' });
       }
-      draft = await NewsletterDraft.findByIdAndUpdate(draftId, fields, { returnDocument: 'after', upsert: false });
-      if (!draft) return res.status(404).json({ error: 'Draft not found.' });
+      // A draft the scheduler is sending right now can't be edited under it.
+      draft = await NewsletterDraft.findOneAndUpdate(
+        { _id: draftId, state: { $ne: 'sending' } },
+        fields,
+        { returnDocument: 'after', upsert: false }
+      );
+      if (!draft) {
+        const exists = await NewsletterDraft.exists({ _id: draftId });
+        return exists
+          ? res.status(409).json({ error: 'This draft is being sent right now and can no longer be edited.' })
+          : res.status(404).json({ error: 'Draft not found.' });
+      }
     } else {
       draft = await NewsletterDraft.create(fields);
     }
@@ -411,6 +497,60 @@ export const saveDraft = async (req, res) => {
   }
 };
 
+// @desc    Take a scheduled / failed draft out of the send queue and return it
+//          to a plain draft (it is kept, not deleted). Refuses if the send has
+//          already started.
+// @route   POST /api/newsletter/drafts/:id/unschedule
+// @access  Private (Admin)
+export const unscheduleDraft = async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: 'Invalid id.' });
+    }
+    const draft = await NewsletterDraft.findOneAndUpdate(
+      { _id: req.params.id, state: { $in: ['scheduled', 'failed'] } },
+      { $set: { state: 'draft', scheduledFor: null, lastError: '' } },
+      { returnDocument: 'after' }
+    );
+    if (!draft) return res.status(409).json({ error: 'That draft is not scheduled (it may already be sending).' });
+    res.json({ success: true, data: draft });
+  } catch (error) {
+    console.error('Unschedule Draft Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    How many recipients an audience resolves to — powers the live
+//          "Sends N emails" count in the composer and the Automations page.
+// @route   POST /api/newsletter/audience-count
+// @access  Private (Admin)
+export const audienceCount = async (req, res) => {
+  try {
+    const recipients = await resolveAudience(req.body?.audience);
+    res.json({ success: true, count: recipients.length });
+  } catch (error) {
+    console.error('Audience Count Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    The business types and counties that actually exist on merchant
+//          records, for the audience pickers.
+// @route   GET /api/newsletter/audience-options
+// @access  Private (Admin)
+export const audienceOptions = async (req, res) => {
+  try {
+    const [businessTypes, counties] = await Promise.all([
+      Merchant.distinct('businessType', { businessType: { $nin: [null, ''] } }),
+      Merchant.distinct('county', { county: { $nin: [null, ''] } }),
+    ]);
+    res.json({ success: true, businessTypes: businessTypes.sort(), counties: counties.sort() });
+  } catch (error) {
+    console.error('Audience Options Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
 // @desc    Delete a draft (discard).
 // @route   DELETE /api/newsletter/drafts/:id
 // @access  Private (Admin)
@@ -419,8 +559,8 @@ export const deleteDraft = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ error: 'Invalid id.' });
     }
-    const result = await NewsletterDraft.deleteOne({ _id: req.params.id });
-    if (result.deletedCount === 0) return res.status(404).json({ error: 'Draft not found.' });
+    const result = await NewsletterDraft.deleteOne({ _id: req.params.id, state: { $ne: 'sending' } });
+    if (result.deletedCount === 0) return res.status(404).json({ error: 'Draft not found, or it is being sent right now.' });
     res.json({ success: true, message: 'Draft discarded.' });
   } catch (error) {
     console.error('Delete Draft Error:', error);
