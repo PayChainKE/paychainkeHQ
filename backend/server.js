@@ -39,7 +39,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import connectDB, { isDbReady, startBackgroundDbRetry, disconnectDB } from './config/database.js';
+import connectDB, { isDbReady, startBackgroundDbRetry, disconnectDB, ensureModelIndexes } from './config/database.js';
 import { requireDb } from './middleware/requireDb.js';
 import authRoutes from './routes/authRoutes.js';
 import waitlistRoutes from './routes/waitlistRoutes.js';
@@ -326,6 +326,8 @@ const isServerless = process.env.VERCEL === '1';
 async function bootstrap() {
   try {
     await connectDB();
+    // Background, never blocks startup or fails it. See ensureModelIndexes().
+    ensureModelIndexes().catch((err) => console.error('Index build failed:', err?.message || err));
     await ensurePrimaryOwner();
     await backfillTransactionFees();
     await backfillNcbaMerchantCodes();
