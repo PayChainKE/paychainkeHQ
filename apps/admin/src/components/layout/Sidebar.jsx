@@ -27,6 +27,7 @@ const NAV_SECTIONS = [
     title: 'Financials & Compliance',
     items: [
       { icon: 'verified_user',   label: 'KYC/KYB Verification',   path: '/kyc-verification'       },
+      { icon: 'pin_drop',      label: 'On-site Approvals',  path: '/field-approvals'    },
       { icon: 'account_balance', label: 'Ledger',                 path: '/ledger'                 },
       { icon: 'balance',         label: 'Pool Reconciliation',    path: '/pool-reconciliation'    },
       { icon: 'account_balance_wallet', label: 'Bank & Tax Charges', path: '/bank-charges'       },

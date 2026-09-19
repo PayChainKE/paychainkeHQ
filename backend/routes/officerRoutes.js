@@ -21,6 +21,10 @@ import {
   resubmitDocuments,
 } from '../controllers/officerController.js';
 
+import {
+  getFieldReadiness, fieldApprove, resendPaymentDetails, listFieldApprovals, confirmFieldApproval, freezeFieldApproval,
+} from '../controllers/fieldApprovalController.js';
+
 const router = express.Router();
 
 // Viewing/acting on an existing application — including claiming one — is
@@ -88,7 +92,13 @@ router.patch('/applications/:id/documents/:docType', protect, viewOrAct, updateD
 router.post('/applications/:id/notes', protect, viewOrAct, addNote);
 router.post('/applications/:id/message', protect, viewOrAct, messageApplicant);
 router.patch('/applications/:id/risk-tier', protect, viewOrAct, setRiskTier);
+router.get('/applications/:id/field-readiness', protect, officerOnly, getFieldReadiness);
+router.post('/applications/:id/field-approve', protect, officerOnly, fieldApprove);
+router.post('/applications/:id/payment-details-sms', protect, officerOnly, resendPaymentDetails);
 router.post('/applications/:id/approve', protect, viewOrAct, approveApplication);
+router.get('/field-approvals', protect, adminOrOwner, listFieldApprovals);
+router.post('/field-approvals/:id/confirm', protect, adminOrOwner, confirmFieldApproval);
+router.post('/field-approvals/:id/freeze', protect, adminOrOwner, freezeFieldApproval);
 router.post('/applications/:id/request-revision', protect, viewOrAct, requestRevision);
 router.post('/applications/:id/reject', protect, viewOrAct, rejectApplication);
 

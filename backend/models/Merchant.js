@@ -636,6 +636,22 @@ const merchantSchema = new mongoose.Schema({
     }],
     default: [],
   },
+  // Set when an officer approved this merchant on site, at the visit, instead
+  // of the application waiting for an admin (see services/fieldApprovalService.js).
+  // reviewStatus is the admin's after-the-fact check: 'pending_review' until
+  // an admin confirms it or freezes the account. Stays null (approvedAt null)
+  // for every merchant who was not approved on site.
+  fieldApproval: {
+    approvedAt: { type: Date, default: null },
+    officerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null },
+    riskTier: { type: String, enum: ['low', 'medium', 'high', null], default: null },
+    reviewStatus: { type: String, enum: ['pending_review', 'confirmed', 'frozen', null], default: null },
+    reviewedAt: { type: Date, default: null },
+    reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null },
+    reviewNote: { type: String, default: null, maxlength: 500 },
+    detailsSmsAt: { type: Date, default: null },
+    detailsSmsCount: { type: Number, default: 0 },
+  },
   // Emails a reviewer sent to the applicant from the KYC screen (see
   // officerController.js#messageApplicant) — kept as a record of what was
   // asked of them. Unlike kybNotes these ARE seen by the applicant.

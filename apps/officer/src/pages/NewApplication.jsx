@@ -136,7 +136,7 @@ const NewApplication = () => {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       if (res.data?.success) {
-        navigate(`/applications/${res.data.data._id}`);
+        navigate(`/applications/${res.data.data._id}/finish`);
       } else {
         setError(res.data?.error || 'Could not submit application.');
       }

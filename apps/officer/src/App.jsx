@@ -5,6 +5,7 @@ import Login from './pages/Login';
 import Queue from './pages/Queue';
 import NewApplication from './pages/NewApplication';
 import Workstation from './pages/Workstation';
+import FinishOnSite from './pages/FinishOnSite';
 
 function Protected({ children }){
   const { isAuthenticated, isLoading } = useAuth();
@@ -23,6 +24,7 @@ export default function App(){
           <Route path="/queue" element={<Protected><Queue/></Protected>} />
           <Route path="/applications/new" element={<Protected><NewApplication/></Protected>} />
           <Route path="/applications/:id" element={<Protected><Workstation/></Protected>} />
+          <Route path="/applications/:id/finish" element={<Protected><FinishOnSite/></Protected>} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

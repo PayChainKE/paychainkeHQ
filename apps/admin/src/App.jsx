@@ -19,6 +19,7 @@ import CashAdvanceRequests from './pages/CashAdvanceRequests';
 import Newsletter from './pages/Newsletter';
 import BlogPosts from './pages/BlogPosts';
 import Automations from './pages/Automations';
+import FieldApprovals from './pages/FieldApprovals';
 import WalletAudit from './pages/WalletAudit';
 import Invoices from './pages/Invoices';
 import CallCentre from './pages/CallCentre';
@@ -81,6 +82,7 @@ export default function App(){
             <Route path="/bank-charges" element={<Protected><BankCharges/></Protected>} />
             <Route path="/kyc-verification" element={<Protected><KycVerification/></Protected>} />
             <Route path="/kyc-verification/:id" element={<Protected><KycApplicationDetail/></Protected>} />
+            <Route path="/field-approvals" element={<Protected><FieldApprovals/></Protected>} />
             <Route path="/bookkeeping" element={<Protected><Bookkeeping/></Protected>} />
             <Route path="/tax-compliance" element={<Protected><TaxCompliance/></Protected>} />
             <Route path="/wallet-audit" element={<Protected><WalletAudit/></Protected>} />

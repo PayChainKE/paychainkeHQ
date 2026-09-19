@@ -322,6 +322,12 @@ const Workstation = () => {
             </div>
 
             <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-outline-variant/10">
+              {app.kybStatus === 'pending' && admin?.role === 'officer' && (
+                <button onClick={() => navigate(`/applications/${id}/finish`)} className="px-5 py-2.5 rounded-lg bg-primary text-white text-2xs font-bold uppercase tracking-widest flex items-center gap-2">
+                  <span className="material-symbols-outlined text-sm">verified</span>
+                  Finish on site
+                </button>
+              )}
               <button
                 onClick={handleApprove}
                 disabled={!checklistComplete || !app.riskTier}

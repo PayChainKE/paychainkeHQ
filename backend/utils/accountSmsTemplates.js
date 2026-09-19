@@ -11,7 +11,7 @@ import { buildStrictSms } from './smsSanitizer.js';
 // Paybill" surface in the app currently sources it the same (fixed) way,
 // so this stays consistent with that rather than introducing a second,
 // independently-configurable source that could drift from the emails.
-const PAYBILL_NUMBER = '880100';
+export const PAYBILL_NUMBER = '880100';
 
 /**
  * Sent once, right after a merchant's account becomes usable — self-signup
@@ -207,5 +207,20 @@ export function buildOnboardingTipSms({ businessName, stage, accountNumber = '' 
   return buildStrictSms(
     ({ name, url }) => `PayChain: Hi ${name}, run your business from your phone. Get the PayChain app: ${url}`,
     { fixed: { url: PLAY_STORE_URL }, truncatable: [{ key: 'name', value: businessName || 'there' }] }
+  );
+}
+
+/**
+ * Sent at the end of an on-site (officer) approval so the merchant has their
+ * payment details in their own phone before the officer leaves. Separate from
+ * the approval SMS (which carries the set-password link) and the welcome SMS
+ * (sent after password setup).
+ *
+ * @param {{ businessName?: string|null, accountNumber: string }} params
+ */
+export function buildPaymentDetailsSms({ businessName, accountNumber }) {
+  return buildStrictSms(
+    ({ name, paybill, account }) => `PayChain: Hi ${name}, your M-PESA Paybill is ${paybill}, Account No. ${account}. Customers can pay you with these details.`,
+    { fixed: { paybill: PAYBILL_NUMBER, account: accountNumber }, truncatable: [{ key: 'name', value: businessName || 'there' }] }
   );
 }

@@ -13,6 +13,7 @@ import { KENYA_COUNTY_WARDS } from '../config/kenyaCountyWards.js';
 import { BUSINESS_TYPES, EMPLOYEE_BANDS } from './merchantAuthController.js';
 import { buildAccountApprovedSms } from '../utils/accountSmsTemplates.js';
 import { computePrechecks } from '../utils/applicationPrechecks.js';
+import { applyFieldApproval, FieldApprovalError } from '../services/fieldApprovalService.js';
 import { deleteCloudinaryAsset } from '../utils/cloudinary.js';
 import { safeSendSMS } from '../utils/smsSanitizer.js';
 import { toE164Kenyan } from '../utils/notificationService.js';
@@ -93,7 +94,7 @@ const adminActorPlain = (admin) => admin ? ({
 
 // Picks the correct actor shape based on who's actually calling — an admin
 // acting directly on the queue should log as 'admin', not 'officer'.
-const actorFor = (admin) => (admin?.role === 'officer' ? officerActor(admin) : adminActorPlain(admin));
+export const actorFor = (admin) => (admin?.role === 'officer' ? officerActor(admin) : adminActorPlain(admin));
 
 const CHECKLIST_KEYS = ['legalNameMatch', 'ubosIdentified', 'kraPinVerified', 'tillVerified', 'businessTypeCompliant'];
 
@@ -106,7 +107,7 @@ const QUEUE_LIST_FIELDS = 'name email phone businessName businessType submittedA
 // shared queue between officers. Admins/owners (who never hit this, since
 // onboardingOfficerId is only ever set by an officer's own createApplication
 // call) retain unrestricted visibility. Spread into any Merchant filter.
-const scopedToOfficer = (admin) => (admin?.role === 'officer' ? { onboardingOfficerId: admin._id } : {});
+export const scopedToOfficer = (admin) => (admin?.role === 'officer' ? { onboardingOfficerId: admin._id } : {});
 
 // @desc    Officer submits a new merchant KYC application.
 // @route   POST /api/officer/applications
@@ -685,6 +686,82 @@ export const setRiskTier = async (req, res) => {
   }
 };
 
+// The shared tail of every approval — the normal reviewer path
+// (approveApplication) and the officer's on-site flow (fieldApprove in
+// fieldApprovalController.js): sets up the password-invite link if the
+// merchant has no password yet, marks the application approved, sends the
+// invite email + approval SMS, and audits. Callers do their own gating first.
+export async function finalizeApproval(application, req, meta = {}) {
+  // paybillAccount (the old 5-digit shared-Paybill sub-account) is
+  // deliberately no longer assigned on approval — the live payment rail
+  // is the NCBA virtual account (ncbaMerchantCode), already auto-assigned
+  // by the Merchant model's pre-save hook when the application was created.
+  //
+  // Any application reaching this point without a password yet — every
+  // officer-originated application (createApplication never sets one),
+  // and every self-serve signup now that registerMerchant no longer
+  // collects one either — genuinely needs the set-up-password invite
+  // link below. Checking `!application.password` directly (rather than
+  // the origination flag) means this correctly covers both without
+  // needing to know which pipeline the application came from; a self-
+  // serve merchant reviewed via the legacy `startReview` path may
+  // already have a password from before this gate existed, in which
+  // case sending a "set up your password" link would be wrong, so that
+  // case still correctly skips it.
+  const needsCredentials = !application.password;
+  let setupLink = null;
+  if (needsCredentials) {
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+    application.passwordResetToken = hashedToken;
+    application.passwordResetExpires = expires;
+    setupLink = `${MERCHANT_DASHBOARD_URL.replace(/\/$/, '')}/setup-password?token=${rawToken}`;
+  }
+
+  application.isVerified = true;
+  application.kybStatus = 'approved';
+  application.reviewedAt = new Date();
+  application.reviewedBy = req.admin._id;
+  await application.save();
+
+  if (needsCredentials) {
+    const ncbaVirtualAccountNumber = getNcbaVirtualAccountNumber(application.ncbaMerchantCode);
+    sendMerchantInvite(
+      application.email, application.name, application.businessName, setupLink,
+      ncbaVirtualAccountNumber, application.ncbaMerchantCode
+    ).catch((err) => console.error(`📧 Failed to send approval invite to ${application.email}:`, err));
+  }
+
+  // Approval SMS goes to every approved merchant, not just the ones who
+  // need a set-up-password invite — a merchant may see the text before
+  // the email (or at all, if the email lands in spam). When they need to
+  // set a password, `setupLink` is included (never a password/code, same
+  // mechanism as sendMerchantInvite); otherwise it's the plain "you're
+  // approved, go ahead and use PayChain" version.
+  const approvedPhone = toE164Kenyan(application.phone);
+  if (approvedPhone) {
+    safeSendSMS({
+      to: approvedPhone,
+      message: buildAccountApprovedSms({
+        businessName: application.businessName,
+        setupLink,
+      }).message,
+    }).catch((err) => console.error(`📱 Failed to send approval SMS to ${approvedPhone}:`, err));
+  }
+
+  logAudit({
+    action: meta.auditAction || 'officer.application.approved', category: 'admin', severity: 'success',
+    message: (meta.auditPrefix || '') + (needsCredentials
+      ? `Approved and activated — invite email + SMS sent to ${application.email}`
+      : `KYB review approved for ${application.email} (already has a password — approval SMS sent, no invite email)`),
+    merchant: application, actor: actorFor(req.admin), req,
+    metadata: { riskTier: application.riskTier, ...(meta.auditMetadata || {}) },
+  });
+
+  return { needsCredentials };
+}
+
 // @desc    Approve and activate an application. Mirrors adminController's
 //          createMerchant activation half — paybill generation, setup link,
 //          invite email — just gated behind the checklist instead of
@@ -709,72 +786,20 @@ export const approveApplication = async (req, res) => {
       return res.status(400).json({ error: 'Assign a risk tier before approving.' });
     }
 
-    // paybillAccount (the old 5-digit shared-Paybill sub-account) is
-    // deliberately no longer assigned on approval — the live payment rail
-    // is the NCBA virtual account (ncbaMerchantCode), already auto-assigned
-    // by the Merchant model's pre-save hook when the application was created.
-    //
-    // Any application reaching this point without a password yet — every
-    // officer-originated application (createApplication never sets one),
-    // and every self-serve signup now that registerMerchant no longer
-    // collects one either — genuinely needs the set-up-password invite
-    // link below. Checking `!application.password` directly (rather than
-    // the origination flag) means this correctly covers both without
-    // needing to know which pipeline the application came from; a self-
-    // serve merchant reviewed via the legacy `startReview` path may
-    // already have a password from before this gate existed, in which
-    // case sending a "set up your password" link would be wrong, so that
-    // case still correctly skips it.
-    const needsCredentials = !application.password;
-    let setupLink = null;
-    if (needsCredentials) {
-      const rawToken = crypto.randomBytes(32).toString('hex');
-      const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
-      const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
-      application.passwordResetToken = hashedToken;
-      application.passwordResetExpires = expires;
-      setupLink = `${MERCHANT_DASHBOARD_URL.replace(/\/$/, '')}/setup-password?token=${rawToken}`;
+    // An officer's approval — from this button or the on-site flow — always
+    // goes through the field-approval gates (hard stops, evidence, daily cap,
+    // admin review afterwards), so the guardrails can't be side-stepped.
+    if (req.admin.role === 'officer') {
+      try {
+        const result = await applyFieldApproval(application, req, finalizeApproval, { officerRisk: application.riskTier });
+        return res.json({ success: true, data: { _id: application._id, kybStatus: 'approved', isVerified: true, ...result } });
+      } catch (e) {
+        if (e instanceof FieldApprovalError) return res.status(e.status).json({ error: e.message, blockers: e.blockers });
+        throw e;
+      }
     }
 
-    application.isVerified = true;
-    application.kybStatus = 'approved';
-    application.reviewedAt = new Date();
-    application.reviewedBy = req.admin._id;
-    await application.save();
-
-    if (needsCredentials) {
-      const ncbaVirtualAccountNumber = getNcbaVirtualAccountNumber(application.ncbaMerchantCode);
-      sendMerchantInvite(
-        application.email, application.name, application.businessName, setupLink,
-        ncbaVirtualAccountNumber, application.ncbaMerchantCode
-      ).catch((err) => console.error(`📧 Failed to send approval invite to ${application.email}:`, err));
-    }
-
-    // Approval SMS goes to every approved merchant, not just the ones who
-    // need a set-up-password invite — a merchant may see the text before
-    // the email (or at all, if the email lands in spam). When they need to
-    // set a password, `setupLink` is included (never a password/code, same
-    // mechanism as sendMerchantInvite); otherwise it's the plain "you're
-    // approved, go ahead and use PayChain" version.
-    const approvedPhone = toE164Kenyan(application.phone);
-    if (approvedPhone) {
-      safeSendSMS({
-        to: approvedPhone,
-        message: buildAccountApprovedSms({
-          businessName: application.businessName,
-          setupLink,
-        }).message,
-      }).catch((err) => console.error(`📱 Failed to send approval SMS to ${approvedPhone}:`, err));
-    }
-
-    logAudit({
-      action: 'officer.application.approved', category: 'admin', severity: 'success',
-      message: needsCredentials
-        ? `Approved and activated — invite email + SMS sent to ${application.email}`
-        : `KYB review approved for ${application.email} (already has a password — approval SMS sent, no invite email)`,
-      merchant: application, actor: actorFor(req.admin), req,
-      metadata: { riskTier: application.riskTier },
-    });
+    await finalizeApproval(application, req);
 
     res.json({ success: true, data: { _id: application._id, kybStatus: 'approved', isVerified: true } });
   } catch (error) {
