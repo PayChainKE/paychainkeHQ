@@ -96,9 +96,18 @@ const EMAIL_TEMPLATES = [
   },
 ];
 
+// Live access is approved per merchant. These read the per-developer summary
+// the API sends (approvedCount / pendingCount), so a developer with one
+// approved and one pending merchant shows both.
+const approvedCountOf = (d) => d.liveAccess?.approvedCount ?? (d.liveAccess?.approved ? 1 : 0);
+const pendingCountOf = (d) => d.liveAccess?.pendingCount ?? (d.liveAccess?.requestedAt && !d.liveAccess?.approved ? 1 : 0);
+
 const liveAccessMeta = (d) => {
-  if (d.liveAccess?.approved) return { label: 'Live Approved', pill: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
-  if (d.liveAccess?.requestedAt) return { label: 'Pending Review', pill: 'bg-amber-50 text-amber-700 border-amber-200' };
+  const approved = approvedCountOf(d);
+  const pending = pendingCountOf(d);
+  const total = d.merchants?.length || 0;
+  if (approved > 0) return { label: total > 1 ? `Live Approved · ${approved}/${total}` : 'Live Approved', pill: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+  if (pending > 0) return { label: 'Pending Review', pill: 'bg-amber-50 text-amber-700 border-amber-200' };
   return { label: 'Sandbox Only', pill: 'bg-gray-100 text-gray-700 border-gray-200' };
 };
 
@@ -107,7 +116,7 @@ const liveAccessMeta = (d) => {
 // row so an admin sees a pass/fail signal before ever opening the "Test"
 // modal, not just after clicking it.
 const AutoTestBadge = ({ developer }) => {
-  if (developer.liveAccess?.approved || !developer.liveAccess?.requestedAt) return null;
+  if (pendingCountOf(developer) === 0) return null;
   const test = developer.liveAccess?.autoTest;
   if (!test) {
     return (
@@ -186,8 +195,8 @@ const Developers = () => {
   const showToast = useCallback((msg) => { setToast(msg); setTimeout(() => setToast(''), 2200); }, []);
 
   const filtered = useMemo(() => developers.filter((d) => {
-    if (liveFilter === 'requested' && !(d.liveAccess?.requestedAt && !d.liveAccess?.approved)) return false;
-    if (liveFilter === 'approved' && !d.liveAccess?.approved) return false;
+    if (liveFilter === 'requested' && pendingCountOf(d) === 0) return false;
+    if (liveFilter === 'approved' && approvedCountOf(d) === 0) return false;
     if (!search) return true;
     const s = search.toLowerCase();
     return d.email.toLowerCase().includes(s) || d.companyName.toLowerCase().includes(s) || (d.name || '').toLowerCase().includes(s);
@@ -202,30 +211,32 @@ const Developers = () => {
 
   const stats = useMemo(() => ({
     total: developers.length,
-    pendingReview: developers.filter((d) => d.liveAccess?.requestedAt && !d.liveAccess?.approved).length,
-    liveApproved: developers.filter((d) => d.liveAccess?.approved).length,
+    pendingReview: developers.filter((d) => pendingCountOf(d) > 0).length,
+    liveApproved: developers.filter((d) => approvedCountOf(d) > 0).length,
   }), [developers]);
 
-  async function handleApprove(developer) {
+  async function handleApprove(developer, merchant) {
     setBusyId(developer._id);
     try {
-      const res = await api.patch(`/api/admin/developers/${developer._id}/approve-live`);
+      const res = await api.patch(`/api/admin/developers/${developer._id}/approve-live`, { merchantId: merchant.merchantId });
       if (res.data?.success) {
         setDevelopers((arr) => arr.map((d) => (d._id === developer._id ? res.data.developer : d)));
-        showToast(`Live access approved for ${developer.companyName}.`);
+        showToast(`Live access approved for ${developer.companyName} on ${merchant.businessName || 'the merchant'}.`);
       } else throw new Error(res.data?.error);
     } catch (e) {
       showToast(e?.response?.data?.error || e?.message || 'Could not approve live access.');
     } finally { setBusyId(null); }
   }
 
-  async function handleReject(developer) {
+  async function handleReject(developer, merchant) {
+    const wasApproved = merchant.liveAccess?.approved;
+    if (wasApproved && !window.confirm(`Revoke live access for ${developer.companyName} on ${merchant.businessName || 'this merchant'}? Its live API keys stop working immediately.`)) return;
     setBusyId(developer._id);
     try {
-      const res = await api.patch(`/api/admin/developers/${developer._id}/reject-live`);
+      const res = await api.patch(`/api/admin/developers/${developer._id}/reject-live`, { merchantId: merchant.merchantId });
       if (res.data?.success) {
         setDevelopers((arr) => arr.map((d) => (d._id === developer._id ? res.data.developer : d)));
-        showToast(developer.liveAccess?.approved ? `Live access revoked for ${developer.companyName}.` : `Live access request rejected for ${developer.companyName}.`);
+        showToast(wasApproved ? `Live access revoked for ${developer.companyName} on ${merchant.businessName || 'the merchant'}.` : `Live access request rejected for ${developer.companyName}.`);
       } else throw new Error(res.data?.error);
     } catch (e) {
       showToast(e?.response?.data?.error || e?.message || 'Could not update live access.');
@@ -397,7 +408,7 @@ const Developers = () => {
                 ) : filtered.length === 0 ? (
                   <tr><td colSpan={6} className="px-4 py-10 text-center text-on-surface-variant/40 text-sm">{error || 'No developer accounts yet.'}</td></tr>
                 ) : pagedDevelopers.map((d) => (
-                  <DeveloperRow key={d._id} developer={d} canManage={canManage} busy={busyId === d._id} onApprove={() => handleApprove(d)} onReject={() => handleReject(d)} onViewWebhooks={() => openWebhooks(d)} onTestIntegration={() => openIntegrationTest(d)} onViewActivity={() => openActivity(d)} onEmail={() => openMessages(d)} />
+                  <DeveloperRow key={d._id} developer={d} canManage={canManage} busy={busyId === d._id} onApprove={(m) => handleApprove(d, m)} onReject={(m) => handleReject(d, m)} onViewWebhooks={() => openWebhooks(d)} onTestIntegration={() => openIntegrationTest(d)} onViewActivity={() => openActivity(d)} onEmail={() => openMessages(d)} />
                 ))}
               </tbody>
             </table>
@@ -409,7 +420,7 @@ const Developers = () => {
           {loading ? <div className="p-8 text-center text-on-surface-variant/40 text-sm">Loading developers…</div> :
             filtered.length === 0 ? <div className="p-8 text-center text-on-surface-variant/40 text-sm">{error || 'No developer accounts yet.'}</div> :
             pagedDevelopers.map((d) => (
-              <DeveloperCard key={d._id} developer={d} canManage={canManage} busy={busyId === d._id} onApprove={() => handleApprove(d)} onReject={() => handleReject(d)} onViewWebhooks={() => openWebhooks(d)} onTestIntegration={() => openIntegrationTest(d)} onViewActivity={() => openActivity(d)} onEmail={() => openMessages(d)} />
+              <DeveloperCard key={d._id} developer={d} canManage={canManage} busy={busyId === d._id} onApprove={(m) => handleApprove(d, m)} onReject={(m) => handleReject(d, m)} onViewWebhooks={() => openWebhooks(d)} onTestIntegration={() => openIntegrationTest(d)} onViewActivity={() => openActivity(d)} onEmail={() => openMessages(d)} />
             ))}
           {!loading && filtered.length > 0 && (
             <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/20 shadow-editorial overflow-hidden">
@@ -498,33 +509,38 @@ const StatTile = ({ icon, label, value, tone, pulse }) => {
   );
 };
 
+// One line per linked merchant: approval is decided merchant by merchant.
 const DeveloperActions = ({ developer, canManage, busy, onApprove, onReject }) => {
   if (!canManage) return null;
-  const pending = developer.liveAccess?.requestedAt && !developer.liveAccess?.approved;
-  const approved = developer.liveAccess?.approved;
+  const merchants = developer.merchants || [];
+  if (merchants.length === 0) return <span className="text-2xs text-on-surface-variant/40">No merchant linked</span>;
 
-  if (pending) {
-    return (
-      <div className="flex items-center gap-2">
-        <button onClick={onApprove} disabled={busy} className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-white text-2xs font-bold uppercase tracking-widest disabled:opacity-50">
-          Approve
-        </button>
-        <button onClick={onReject} disabled={busy} className="px-3 py-1.5 rounded-lg border border-outline-variant/40 text-on-surface-variant/70 hover:bg-surface-container-low text-2xs font-bold uppercase tracking-widest disabled:opacity-50">
-          Reject
-        </button>
-      </div>
-    );
-  }
-
-  if (approved) {
-    return (
-      <button onClick={onReject} disabled={busy} className="px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-2xs font-bold uppercase tracking-widest disabled:opacity-50">
-        Revoke
-      </button>
-    );
-  }
-
-  return <span className="text-2xs text-on-surface-variant/40">No action needed</span>;
+  return (
+    <div className="flex flex-col gap-1.5 items-end">
+      {merchants.map((m) => {
+        const pending = m.liveAccess?.requestedAt && !m.liveAccess?.approved;
+        const approved = m.liveAccess?.approved;
+        return (
+          <div key={m.merchantId} className="flex items-center gap-2">
+            <span className="text-2xs text-on-surface-variant/70 max-w-[9rem] truncate" title={m.email || ''}>{m.businessName || 'Merchant'}</span>
+            {pending && (
+              <>
+                <button onClick={() => onApprove(m)} disabled={busy} className="px-2.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-white text-2xs font-bold uppercase tracking-widest disabled:opacity-50">Approve</button>
+                <button onClick={() => onReject(m)} disabled={busy} className="px-2.5 py-1 rounded-lg border border-outline-variant/40 text-on-surface-variant/70 hover:bg-surface-container-low text-2xs font-bold uppercase tracking-widest disabled:opacity-50">Reject</button>
+              </>
+            )}
+            {approved && (
+              <>
+                <span className="text-2xs font-bold uppercase tracking-widest text-emerald-600">Live</span>
+                <button onClick={() => onReject(m)} disabled={busy} className="px-2.5 py-1 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-2xs font-bold uppercase tracking-widest disabled:opacity-50">Revoke</button>
+              </>
+            )}
+            {!pending && !approved && <span className="text-2xs text-on-surface-variant/40">Sandbox only</span>}
+          </div>
+        );
+      })}
+    </div>
+  );
 };
 
 const DeveloperRow = ({ developer, canManage, busy, onApprove, onReject, onViewWebhooks, onTestIntegration, onViewActivity, onEmail }) => {
