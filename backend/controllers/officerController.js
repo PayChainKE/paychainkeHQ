@@ -7,6 +7,10 @@ import { getNcbaVirtualAccountNumber, validatePhoneNumber, isValidPhoneInputForm
 import { isValidEmail, EMAIL_FORMAT_HINT } from '../utils/emailValidator.js';
 import { sendMerchantInvite, sendKybRevisionRequest, sendKybRejection } from '../utils/resend.js';
 import { normalizeKraPin, isValidKraPin, KRA_PIN_FORMAT_HINT } from '../utils/kraPinValidator.js';
+import { normalizeNationalId, isValidNationalId, NATIONAL_ID_FORMAT_HINT } from '../utils/nationalIdValidator.js';
+import { KENYA_COUNTY_AREAS } from '../config/kenyaCountyAreas.js';
+import { KENYA_COUNTY_WARDS } from '../config/kenyaCountyWards.js';
+import { BUSINESS_TYPES, EMPLOYEE_BANDS } from './merchantAuthController.js';
 import { buildAccountApprovedSms } from '../utils/accountSmsTemplates.js';
 import { deleteCloudinaryAsset } from '../utils/cloudinary.js';
 import { safeSendSMS } from '../utils/smsSanitizer.js';
@@ -108,10 +112,20 @@ const scopedToOfficer = (admin) => (admin?.role === 'officer' ? { onboardingOffi
 // @access  Private (Officer)
 export const createApplication = async (req, res) => {
   try {
-    let { name, email, phone, businessName, businessType, kraPin, businessNumber } = req.body || {};
+    // Same required details as self-serve signup (registerMerchant in
+    // merchantAuthController.js), so an application looks identical to
+    // review no matter which door it came through. Deliberately NOT carried
+    // over: the SMS phone-ownership check (the officer is meeting the
+    // merchant in person) and blocking document requirements (documents
+    // stay optional here by design — see kybRequirements.js's mirror in
+    // apps/officer's NewApplication.jsx).
+    let {
+      firstName, surname, otherNames, email, phone, businessName, businessType, kraPin, businessNumber,
+      nationalId, county, area, ward, street, employees, ecommerce, agreedToTerms,
+    } = req.body || {};
 
-    if (!name || !email || !phone || !businessName) {
-      return res.status(400).json({ error: 'Name, email, phone and business name are required.' });
+    if (!firstName?.trim() || !surname?.trim() || !email || !phone || !businessName?.trim()) {
+      return res.status(400).json({ error: 'First name, surname, email, phone and business name are all required.' });
     }
 
     if (!isValidEmail(email)) {
@@ -132,12 +146,53 @@ export const createApplication = async (req, res) => {
 
     email = String(email).trim().toLowerCase();
     phone = String(phone).replace(/\s+/g, '');
-    name = String(name).trim();
+    firstName = firstName.trim();
+    surname = surname.trim();
+    otherNames = otherNames?.trim() || null;
+    // `name` stays the single field the rest of the app reads (see
+    // Merchant.js) — computed from all three, exactly as registerMerchant does.
+    const name = [firstName, surname, otherNames].filter(Boolean).join(' ');
     businessName = String(businessName).trim();
     businessType = businessType ? String(businessType).trim() : null;
     kraPin = kraPin ? normalizeKraPin(kraPin) : null;
     businessNumber = businessNumber ? String(businessNumber).trim() : null;
 
+    nationalId = nationalId ? normalizeNationalId(nationalId) : null;
+    county = county ? String(county).trim() : null;
+    area = area ? String(area).trim() : null;
+    ward = ward ? String(ward).trim() : null;
+    street = street ? String(street).trim() : null;
+    employees = employees ? String(employees).trim() : null;
+    const isEcommerce = ecommerce === true || ecommerce === 'yes' ? true
+      : ecommerce === false || ecommerce === 'no' ? false
+      : null;
+
+    if (!businessType || !BUSINESS_TYPES.includes(businessType)) {
+      return res.status(400).json({ error: 'Select a valid business type.' });
+    }
+    if (!county || !KENYA_COUNTY_AREAS[county]) {
+      return res.status(400).json({ error: 'Select a valid Kenyan county.' });
+    }
+    if (!area || !KENYA_COUNTY_AREAS[county].includes(area)) {
+      return res.status(400).json({ error: `Select a valid area/location within ${county}.` });
+    }
+    if (ward && !(KENYA_COUNTY_WARDS[county]?.[area] || []).includes(ward)) {
+      return res.status(400).json({ error: `Select a valid ward within ${area}.` });
+    }
+    if (!employees || !EMPLOYEE_BANDS.includes(employees)) {
+      return res.status(400).json({ error: 'Select a valid number of employees.' });
+    }
+    if (isEcommerce === null) {
+      return res.status(400).json({ error: 'Let us know whether this is an eCommerce business.' });
+    }
+    if (!nationalId || !isValidNationalId(nationalId)) {
+      return res.status(400).json({ error: `Enter a valid National ID number. ${NATIONAL_ID_FORMAT_HINT}` });
+    }
+    // The officer records that the merchant agreed in person — same consent
+    // record self-serve signup keeps, so it's never silently missing here.
+    if (agreedToTerms !== true && agreedToTerms !== 'true') {
+      return res.status(400).json({ error: 'The merchant must agree to the Privacy Policy and Terms of Service.' });
+    }
     if (kraPin && !isValidKraPin(kraPin)) {
       return res.status(400).json({ error: `Invalid KRA PIN format. ${KRA_PIN_FORMAT_HINT}` });
     }
@@ -158,6 +213,9 @@ export const createApplication = async (req, res) => {
       return res.status(409).json({ error: 'A merchant with that business registration number already exists.' });
     }
 
+    if (await Merchant.exists({ nationalId })) {
+      return res.status(409).json({ error: 'A merchant account already exists for that National ID number.' });
+    }
     const files = req.files || {};
     const kybDocuments = ALL_OFFICER_DOC_TYPES.flatMap((t) => resolveDocTypes(t, files)).map((t) => ({
       type: t,
@@ -175,12 +233,24 @@ export const createApplication = async (req, res) => {
     const merchant = await Merchant.create({
       name,
       email,
+      firstName,
+      surname,
+      otherNames,
       phone,
       businessName,
       businessType,
       kraPin,
       businessNumber,
       isVerified: false,
+      nationalId,
+      county,
+      businessArea: area,
+      ward: ward || null,
+      street: street || null,
+      employeeCount: employees,
+      isEcommerce,
+      agreedToTerms: true,
+      agreedToTermsAt: new Date(),
       kybStatus: 'pending',
       kybDocuments,
       businessPhotos,
@@ -216,7 +286,7 @@ export const createApplication = async (req, res) => {
     console.error('Create Application Error:', error);
     if (error.code === 11000) {
       const key = Object.keys(error.keyPattern || {})[0];
-      const labels = { email: 'email', phone: 'phone number', kraPin: 'KRA PIN', businessNumber: 'business registration number' };
+      const labels = { email: 'email', phone: 'phone number', kraPin: 'KRA PIN', businessNumber: 'business registration number', nationalId: 'National ID number' };
       return res.status(409).json({ error: `A merchant with that ${labels[key] || 'detail'} already exists.` });
     }
     if (error.name === 'ValidationError') {

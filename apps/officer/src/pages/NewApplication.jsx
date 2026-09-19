@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import api from '../api/api';
@@ -40,23 +40,28 @@ const BUSINESS_TYPES = [
 // documents stay optional, by design — an officer can file an
 // application with paperwork still outstanding and follow up later), so
 // this only drives which upload slots are shown/labeled, nothing is
-// required to submit. Keep both in sync if kybRequirements.js changes.
+// required to submit. `optional` documents are shown too but are optional
+// even in self-serve. Keep both in sync if kybRequirements.js changes.
 // address_proof isn't part of this vocabulary at all (self-serve signup
 // never collects it) — stays a separate, always-shown optional field
 // below, same as it always has been.
-const SOLE_TRADER_CHOICE = { mode: 'choice', options: ['national_id', 'business_permit_or_license'] };
-const REGISTERED_ENTITY_ALL = { mode: 'all', required: ['business_registration', 'business_permit_or_license'] };
-const LLC_REQUIREMENT = { mode: 'all', required: ['business_registration'], choiceAlso: ['national_id', 'kra_pin'] };
+const SOLE_TRADER_REQUIREMENT = { required: ['national_id'], optional: ['business_permit_or_license'] };
+const REGISTERED_ENTITY_ALL = { required: ['business_registration', 'national_id'], optional: ['business_permit_or_license'] };
+const LLC_REQUIREMENT = { required: ['business_registration', 'national_id'], optional: [] };
 const KYB_REQUIREMENTS_BY_BUSINESS_TYPE = {
-  'Sole Proprietorship': SOLE_TRADER_CHOICE,
-  'Partnership': SOLE_TRADER_CHOICE,
-  'NGO/Non-Profit': SOLE_TRADER_CHOICE,
-  'Other': SOLE_TRADER_CHOICE,
+  'Sole Proprietorship': SOLE_TRADER_REQUIREMENT,
+  'Partnership': SOLE_TRADER_REQUIREMENT,
+  'NGO/Non-Profit': SOLE_TRADER_REQUIREMENT,
+  'Other': SOLE_TRADER_REQUIREMENT,
   'Limited Liability Company (LLC)': LLC_REQUIREMENT,
   'SACCO': REGISTERED_ENTITY_ALL,
   'Cooperative Society': REGISTERED_ENTITY_ALL,
-  'Public Limited Company (PLC)': { mode: 'all', required: ['business_registration', 'national_id', 'kra_pin'] },
+  'Public Limited Company (PLC)': LLC_REQUIREMENT,
 };
+
+// Same bands registerMerchant validates against (EMPLOYEE_BANDS,
+// merchantAuthController.js).
+const EMPLOYEE_BANDS = ['1-10', '11-50', '51-200', '201-500', '501+'];
 
 // Mirrors the backend multer limit (backend/utils/cloudinary.js) — checking
 // client-side gives an immediate, specific error instead of letting an
@@ -86,15 +91,29 @@ function isValidKraPin(raw) {
 
 const NewApplication = () => {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ name: '', email: '', phone: '', businessName: '', businessType: '', kraPin: '', businessNumber: '' });
+  const [form, setForm] = useState({
+    firstName: '', surname: '', otherNames: '', nationalId: '',
+    email: '', phone: '', businessName: '', businessType: '', kraPin: '', businessNumber: '',
+    county: '', area: '', ward: '', street: '', employees: '', ecommerce: '', agreedToTerms: false,
+  });
   const [files, setFiles] = useState({});
-  // Which option the officer picked for a 'choice'/'all_plus_choice'
-  // business type's flexible slot (e.g. LLC's Director's ID vs KRA
-  // Certificate) — mirrors Login.jsx's signupDocType.
-  const [docChoiceType, setDocChoiceType] = useState('');
   const [businessPhotos, setBusinessPhotos] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  // County -> Area -> Ward taxonomy, served by the same public endpoint
+  // self-serve signup uses so both always offer (and the backend always
+  // validates against) exactly the same list.
+  const [locations, setLocations] = useState({ counties: [], areas: {}, wards: {} });
+  const [locationsError, setLocationsError] = useState(false);
+
+  useEffect(() => {
+    api.get('/api/auth/merchant/locations')
+      .then((res) => {
+        if (res.data?.success) setLocations({ counties: res.data.counties, areas: res.data.areas, wards: res.data.wards });
+        else setLocationsError(true);
+      })
+      .catch(() => setLocationsError(true));
+  }, []);
 
   function setField(key, value) { setForm((f) => ({ ...f, [key]: value })); }
   function setFile(key, file) { setFiles((f) => ({ ...f, [key]: file })); }
@@ -109,7 +128,7 @@ const NewApplication = () => {
     setBusy(true);
     try {
       const data = new FormData();
-      Object.entries(form).forEach(([k, v]) => { if (v) data.append(k, v); });
+      Object.entries(form).forEach(([k, v]) => { if (v) data.append(k, v === true ? 'true' : v); });
       Object.entries(files).forEach(([k, f]) => { if (f) data.append(k, f); });
       businessPhotos.forEach((f) => data.append('business_photos', f));
 
@@ -139,8 +158,17 @@ const NewApplication = () => {
 
         <form onSubmit={submit} className="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl p-6 shadow-editorial space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label="Owner Name" required>
-              <input required value={form.name} onChange={(e) => setField('name', e.target.value)} className={inputClass} />
+            <Field label="First Name" required>
+              <input required value={form.firstName} onChange={(e) => setField('firstName', e.target.value)} className={inputClass} placeholder="John" />
+            </Field>
+            <Field label="Surname" required>
+              <input required value={form.surname} onChange={(e) => setField('surname', e.target.value)} className={inputClass} placeholder="Doe" />
+            </Field>
+            <Field label="Other Names">
+              <input value={form.otherNames} onChange={(e) => setField('otherNames', e.target.value)} className={inputClass} placeholder="e.g. a middle name" />
+            </Field>
+            <Field label="National ID Number" required>
+              <input required value={form.nationalId} onChange={(e) => setField('nationalId', e.target.value)} className={inputClass} placeholder="12345678" />
             </Field>
             <Field label="Owner Email" required>
               <input type="email" required value={form.email} onChange={(e) => setField('email', e.target.value)} className={inputClass} />
@@ -148,10 +176,14 @@ const NewApplication = () => {
             <Field label="Owner Phone" required>
               <input required value={form.phone} onChange={(e) => setField('phone', e.target.value)} className={inputClass} placeholder="07XXXXXXXX" />
             </Field>
-            <Field label="Business Type">
+            <Field label="Business (Trading) Name" required>
+              <input required value={form.businessName} onChange={(e) => setField('businessName', e.target.value)} className={inputClass} />
+            </Field>
+            <Field label="Business Type" required>
               <select
+                required
                 value={form.businessType}
-                onChange={(e) => { setField('businessType', e.target.value); setDocChoiceType(''); }}
+                onChange={(e) => setField('businessType', e.target.value)}
                 className={inputClass}
               >
                 <option value="">—Select a business type—</option>
@@ -160,16 +192,76 @@ const NewApplication = () => {
                 ))}
               </select>
             </Field>
-            <Field label="Business (Trading) Name" required>
-              <input required value={form.businessName} onChange={(e) => setField('businessName', e.target.value)} className={inputClass} />
-            </Field>
             <Field label="Business Registration Number">
               <input value={form.businessNumber} onChange={(e) => setField('businessNumber', e.target.value)} className={inputClass} />
             </Field>
             <Field label="KRA PIN">
               <input value={form.kraPin} onChange={(e) => setField('kraPin', e.target.value.toUpperCase())} className={inputClass} placeholder="P051892647A" />
             </Field>
+            <Field label="County" required>
+              <select
+                required
+                value={form.county}
+                onChange={(e) => setForm((f) => ({ ...f, county: e.target.value, area: '', ward: '' }))}
+                className={inputClass}
+              >
+                <option value="">—Select a county—</option>
+                {locations.counties.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Area / Constituency" required>
+              <select
+                required
+                value={form.area}
+                disabled={!form.county}
+                onChange={(e) => setForm((f) => ({ ...f, area: e.target.value, ward: '' }))}
+                className={inputClass}
+              >
+                <option value="">{form.county ? '—Select an area—' : 'Select a county first'}</option>
+                {(locations.areas[form.county] || []).map((a) => (
+                  <option key={a} value={a}>{a}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Ward">
+              <select
+                value={form.ward}
+                disabled={!form.area}
+                onChange={(e) => setField('ward', e.target.value)}
+                className={inputClass}
+              >
+                <option value="">{form.area ? '—Select a ward (optional)—' : 'Select an area first'}</option>
+                {(locations.wards[form.county]?.[form.area] || []).map((w) => (
+                  <option key={w} value={w}>{w}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Street">
+              <input value={form.street} onChange={(e) => setField('street', e.target.value)} className={inputClass} placeholder="e.g. Moi Avenue (optional)" />
+            </Field>
+            <Field label="Number of Employees" required>
+              <select required value={form.employees} onChange={(e) => setField('employees', e.target.value)} className={inputClass}>
+                <option value="">—Select—</option>
+                {EMPLOYEE_BANDS.map((b) => (
+                  <option key={b} value={b}>{b}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Is this an eCommerce business?" required>
+              <select required value={form.ecommerce} onChange={(e) => setField('ecommerce', e.target.value)} className={inputClass}>
+                <option value="">—Select—</option>
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+              </select>
+            </Field>
           </div>
+          {locationsError && (
+            <div className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 font-medium">
+              Couldn't load the county list. Refresh the page to try again — County and Area are required.
+            </div>
+          )}
 
           <div className="border-t border-outline-variant/10 pt-5">
             <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 mb-1">KYC Documents</p>
@@ -185,47 +277,12 @@ const NewApplication = () => {
                   <p className="text-2xs text-on-surface-variant/50 mb-3">
                     {!requirement
                       ? 'Optional — none of these are required to submit. Add what you have now; the rest can be uploaded later. Select a business type above to see which document(s) it normally needs.'
-                      : requirement.mode === 'choice'
-                        ? `Normally needs one of: ${requirement.options.map((t) => DOC_LABELS[t]).join(' or ')} — still optional here, add what's available now.`
-                        : requirement.mode === 'all_plus_choice'
-                          ? `Normally needs: ${requirement.required.map((t) => DOC_LABELS[t]).join(', ')}, plus either ${requirement.choiceAlso.map((t) => DOC_LABELS[t]).join(' or ')} — still optional here, add what's available now.`
-                          : `Normally needs: ${requirement.required.map((t) => DOC_LABELS[t]).join(', ')} — still optional here, add what's available now.`}
+                      : `Normally needs: ${requirement.required.map((t) => DOC_LABELS[t]).join(', ')}${requirement.optional.length ? `. Also accepted: ${requirement.optional.map((t) => DOC_LABELS[t]).join(', ')}` : ''} — still optional here, add what's available now.`}
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {!requirement && DOC_TYPES.map((d) => renderSlot(d.key))}
 
-                    {requirement?.mode === 'all' && requirement.required.map((t) => renderSlot(t))}
-
-                    {requirement?.mode === 'all_plus_choice' && (
-                      <>
-                        {requirement.required.map((t) => renderSlot(t))}
-                        <div>
-                          <label className="block text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 mb-1.5">
-                            Also (choose one): {requirement.choiceAlso.map((t) => DOC_LABELS[t]).join(' or ')}
-                          </label>
-                          <select value={docChoiceType} onChange={(e) => setDocChoiceType(e.target.value)} className={inputClass}>
-                            <option value="">—Which document is this?—</option>
-                            {requirement.choiceAlso.map((t) => (
-                              <option key={t} value={t}>{DOC_LABELS[t]}</option>
-                            ))}
-                          </select>
-                          {docChoiceType && <div className="mt-2">{renderSlot(docChoiceType)}</div>}
-                        </div>
-                      </>
-                    )}
-
-                    {requirement?.mode === 'choice' && (
-                      <div>
-                        <label className="block text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 mb-1.5">Which document is this?</label>
-                        <select value={docChoiceType} onChange={(e) => setDocChoiceType(e.target.value)} className={inputClass}>
-                          <option value="">—Select—</option>
-                          {requirement.options.map((t) => (
-                            <option key={t} value={t}>{DOC_LABELS[t]}</option>
-                          ))}
-                        </select>
-                        {docChoiceType && <div className="mt-2">{renderSlot(docChoiceType)}</div>}
-                      </div>
-                    )}
+                    {requirement && [...requirement.required, ...requirement.optional].map((t) => renderSlot(t))}
 
                     {/* Not part of any business type's KYB requirement
                         (self-serve registration never collects it) —
@@ -242,6 +299,21 @@ const NewApplication = () => {
             <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 mb-1">Proof of Business Existence</p>
             <p className="text-2xs text-on-surface-variant/50 mb-3">Optional. If the business has a physical location, take a few photos of the shop/premises — used only for admin due diligence, no approval is gated on it.</p>
             <BusinessPhotosField photos={businessPhotos} onChange={setBusinessPhotos} />
+          </div>
+
+          <div className="border-t border-outline-variant/10 pt-5">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                required
+                checked={form.agreedToTerms}
+                onChange={(e) => setField('agreedToTerms', e.target.checked)}
+                className="mt-0.5 w-4 h-4 accent-primary"
+              />
+              <span className="text-xs text-on-surface-variant/80 leading-relaxed">
+                The merchant has read and agrees to PayChain's Privacy Policy and Terms of Service. <span className="text-red-500">*</span>
+              </span>
+            </label>
           </div>
 
           {error && <div className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-medium">{error}</div>}

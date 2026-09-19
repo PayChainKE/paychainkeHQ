@@ -52,7 +52,9 @@ export const BUSINESS_TYPES = [
   'Cooperative Society',
   'Other',
 ];
-const EMPLOYEE_BANDS = ['1-10', '11-50', '51-200', '201-500', '501+'];
+// Exported so officerController.js's createApplication validates against the
+// same list, rather than a second copy of it.
+export const EMPLOYEE_BANDS = ['1-10', '11-50', '51-200', '201-500', '501+'];
 
 // Same env var / fallback officerController.js uses to build the public
 // KYC resubmission link — reused by getMerchantKycStatus below so the
