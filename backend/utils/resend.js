@@ -286,6 +286,8 @@ export const sendWalletActivationEmail = async (email, name, stellarPublicKey) =
   }
 };
 
+const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=ke.co.paychain.app';
+
 // Send Welcome Email with Credentials
 // ncbaVirtualAccountNumber: the merchant's real bank account number, paid
 // into via NCBA's Paybill (880100) — see utils/ncbaValidators.js's
@@ -499,6 +501,23 @@ export const sendWelcomeEmail = async (email, name, password, phone, ncbaVirtual
             <a href="https://app.paychain.co.ke" style="display:inline-block;background:#06201B;color:#ffffff;text-decoration:none;font-size:14px;font-weight:800;letter-spacing:0.06em;padding:16px 40px;border-radius:10px;">
               Open Dashboard &rarr;
             </a>
+          </td></tr>
+        </table>
+      </td></tr>
+
+      <!-- GET THE APP -->
+      <tr><td style="background:#ffffff;padding:0 40px 36px;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#06201B;border-radius:14px;">
+          <tr><td style="padding:24px 28px;">
+            <p style="margin:0 0 4px;font-size:10px;font-weight:800;letter-spacing:0.22em;text-transform:uppercase;color:#5EFEB3;">PayChain mobile app</p>
+            <p style="margin:0 0 10px;font-size:18px;font-weight:800;color:#ffffff;line-height:1.3;">Run your business from your phone</p>
+            <p style="margin:0 0 18px;font-size:13px;color:rgba(255,255,255,0.65);line-height:1.65;">
+              See every payment the moment it lands, pay staff and suppliers with Bulk Pay, and sign in with your fingerprint. Use the same login as the dashboard.
+            </p>
+            <a href="${PLAY_STORE_URL}" style="display:inline-block;background:#5EFEB3;color:#06201B;text-decoration:none;font-size:13px;font-weight:800;letter-spacing:0.04em;padding:13px 26px;border-radius:10px;">
+              Get it on Google Play &rarr;
+            </a>
+            <p style="margin:12px 0 0;font-size:11px;color:rgba(255,255,255,0.35);">Free for Android.</p>
           </td></tr>
         </table>
       </td></tr>
