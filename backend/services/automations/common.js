@@ -10,6 +10,7 @@ export const MAX_EMAIL_PER_RUN = 100;
 
 export const MERCHANT_URL = (process.env.MERCHANT_DASHBOARD_URL || 'https://app.paychain.co.ke').replace(/\/+$/, '');
 export const OFFICER_URL = (process.env.OFFICER_DASHBOARD_URL || 'https://officer.paychain.co.ke').replace(/\/+$/, '');
+export const DEVELOPER_URL = (process.env.DEVELOPER_PORTAL_URL || 'https://developer.paychain.co.ke').replace(/\/+$/, '');
 export const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=ke.co.paychain.app';
 
 export function esc(str) {

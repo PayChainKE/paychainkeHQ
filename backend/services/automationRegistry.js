@@ -9,6 +9,9 @@ import { runKybSla } from './automations/kybSla.js';
 import { runOfficerDigest } from './automations/officerDigest.js';
 import { runOnboardingDrip } from './automations/onboardingDrip.js';
 import { runWinback } from './automations/winback.js';
+import { runWebhookHealth } from './automations/webhookHealth.js';
+import { runApiKeyHygiene } from './automations/apiKeyHygiene.js';
+import { runDeveloperNightlyTest } from './automations/developerNightlyTest.js';
 
 function needNumber(label, v, min, max) {
   const n = Number(v);
@@ -156,6 +159,79 @@ export const AUTOMATIONS = {
       return { d14: asBool(c.d14, true), d30: asBool(c.d30, true), flagAdmins: asBool(c.flagAdmins, true) };
     },
     run: runWinback,
+  },
+
+  webhook_health: {
+    kind: 'sweep',
+    everyMinutes: 60,
+    label: 'Webhook health',
+    description: 'Watches developers\' webhook endpoints. Warns the developer when an endpoint has kept failing, and pauses it if it is still failing later — never without the earlier warning.',
+    channel: 'Email to developers; admin notice',
+    defaults: { enabled: false, autoSend: false, config: { warnHours: 48, disableHours: 72, minFailures: 3 } },
+    fields: [
+      { key: 'warnHours', label: 'Warn the developer after (hours failing)', type: 'number', min: 1, max: 336 },
+      { key: 'disableHours', label: 'Pause the endpoint after (hours failing)', type: 'number', min: 2, max: 720 },
+      { key: 'minFailures', label: 'Only count an endpoint as failing after this many failed deliveries', type: 'number', min: 1, max: 50 },
+    ],
+    copy: () => [
+      { label: 'Warning email', text: 'Subject: "Your PayChain webhook endpoint is failing" — says how long it has been failing and the last error, that deliveries will be paused if it is still failing after the pause time, and that missed events can be checked with GET /payments/:id.' },
+      { label: 'Paused email', text: 'Subject: "PayChain has paused your webhook endpoint" — explains it was paused after repeated failures and how to switch it back on from the developer dashboard.' },
+    ],
+    validateConfig(raw) {
+      const c = raw && typeof raw === 'object' ? raw : {};
+      const warnHours = needNumber('Warning hours', c.warnHours ?? 48, 1, 336);
+      const disableHours = needNumber('Pause hours', c.disableHours ?? 72, 2, 720);
+      if (disableHours <= warnHours) throw new Error('Pausing must come later than the warning.');
+      return { warnHours, disableHours, minFailures: needNumber('Minimum failures', c.minFailures ?? 3, 1, 50) };
+    },
+    run: runWebhookHealth,
+  },
+
+  api_key_hygiene: {
+    kind: 'sweep',
+    everyMinutes: 24 * 60,
+    label: 'API key check-ups',
+    description: 'Emails developers about live keys that have not been used for a long time and keys that are old. It only emails — it never revokes or replaces a key.',
+    channel: 'Email to developers',
+    defaults: { enabled: false, autoSend: false, config: { unusedDays: 90, liveMaxAgeDays: 365, testMaxAgeDays: 180 } },
+    fields: [
+      { key: 'unusedDays', label: 'Flag live keys unused for (days)', type: 'number', min: 7, max: 730 },
+      { key: 'liveMaxAgeDays', label: 'Suggest rotating live keys older than (days)', type: 'number', min: 30, max: 1825 },
+      { key: 'testMaxAgeDays', label: 'Suggest rotating test keys older than (days)', type: 'number', min: 30, max: 1825 },
+    ],
+    copy: () => [
+      { label: 'Email', text: 'Subject: "A quick API key check-up" — lists the developer\'s flagged keys (prefix, label, why) and explains how to rotate safely: create a new key, switch over, confirm it works, then revoke the old one. Existing keys keep working until revoked.' },
+    ],
+    validateConfig(raw) {
+      const c = raw && typeof raw === 'object' ? raw : {};
+      return {
+        unusedDays: needNumber('Unused days', c.unusedDays ?? 90, 7, 730),
+        liveMaxAgeDays: needNumber('Live key age', c.liveMaxAgeDays ?? 365, 30, 1825),
+        testMaxAgeDays: needNumber('Test key age', c.testMaxAgeDays ?? 180, 30, 1825),
+      };
+    },
+    run: runApiKeyHygiene,
+  },
+
+  developer_nightly_test: {
+    kind: 'slot',
+    label: 'Nightly integration test',
+    description: 'Every night, runs a simulated test-mode collect (no real money) for each live-approved developer and alerts admins when one starts failing. Developers\' webhook endpoints are not pinged.',
+    channel: 'Email to admins',
+    defaults: { enabled: false, autoSend: false, config: { days: [0, 1, 2, 3, 4, 5, 6], time: '02:00' } },
+    fields: [
+      { key: 'days', label: 'Run on', type: 'days' },
+      { key: 'time', label: 'Time (East Africa Time)', type: 'time' },
+    ],
+    copy: null,
+    validateConfig(raw) {
+      const c = raw && typeof raw === 'object' ? raw : {};
+      const days = normalizeDays(c.days);
+      if (days.length === 0) throw new Error('Pick at least one day of the week.');
+      if (!parseTimeOfDay(c.time)) throw new Error('Time must be in HH:MM (24-hour, East Africa Time).');
+      return { days, time: c.time };
+    },
+    run: runDeveloperNightlyTest,
   },
 };
 
