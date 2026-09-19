@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import Merchant from '../models/Merchant.js';
 import { logAudit } from '../utils/auditLog.js';
 import { phoneVariations } from './adminController.js';
-import { getNcbaVirtualAccountNumber, formatAccountNumberDisplay, validatePhoneNumber, isValidPhoneInputFormat, NcbaValidationError } from '../utils/ncbaValidators.js';
+import { getNcbaVirtualAccountNumber, validatePhoneNumber, isValidPhoneInputFormat, NcbaValidationError } from '../utils/ncbaValidators.js';
 import { isValidEmail, EMAIL_FORMAT_HINT } from '../utils/emailValidator.js';
 import { sendMerchantInvite, sendKybRevisionRequest, sendKybRejection } from '../utils/resend.js';
 import { normalizeKraPin, isValidKraPin, KRA_PIN_FORMAT_HINT } from '../utils/kraPinValidator.js';
@@ -608,31 +608,30 @@ export const approveApplication = async (req, res) => {
         application.email, application.name, application.businessName, setupLink,
         ncbaVirtualAccountNumber, application.ncbaMerchantCode
       ).catch((err) => console.error(`📧 Failed to send approval invite to ${application.email}:`, err));
+    }
 
-      // SMS companion to the invite email above — a merchant may see the
-      // text before the email (or at all, if the email lands in spam), and
-      // this is the "you're approved, here's how to get in" moment the
-      // account-opening flow promises. Carries the setup link only, never
-      // a password/code, matching sendMerchantInvite's own mechanism.
-      const approvedPhone = toE164Kenyan(application.phone);
-      if (approvedPhone) {
-        safeSendSMS({
-          to: approvedPhone,
-          message: buildAccountApprovedSms({
-            businessName: application.businessName,
-            accountNumber: formatAccountNumberDisplay(ncbaVirtualAccountNumber || application.ncbaMerchantCode),
-            accountIsInterim: !ncbaVirtualAccountNumber,
-            setupLink,
-          }).message,
-        }).catch((err) => console.error(`📱 Failed to send approval SMS to ${approvedPhone}:`, err));
-      }
+    // Approval SMS goes to every approved merchant, not just the ones who
+    // need a set-up-password invite — a merchant may see the text before
+    // the email (or at all, if the email lands in spam). When they need to
+    // set a password, `setupLink` is included (never a password/code, same
+    // mechanism as sendMerchantInvite); otherwise it's the plain "you're
+    // approved, go ahead and use PayChain" version.
+    const approvedPhone = toE164Kenyan(application.phone);
+    if (approvedPhone) {
+      safeSendSMS({
+        to: approvedPhone,
+        message: buildAccountApprovedSms({
+          businessName: application.businessName,
+          setupLink,
+        }).message,
+      }).catch((err) => console.error(`📱 Failed to send approval SMS to ${approvedPhone}:`, err));
     }
 
     logAudit({
       action: 'officer.application.approved', category: 'admin', severity: 'success',
       message: needsCredentials
         ? `Approved and activated — invite email + SMS sent to ${application.email}`
-        : `KYB review approved for ${application.email} (already has a password — no invite sent)`,
+        : `KYB review approved for ${application.email} (already has a password — approval SMS sent, no invite email)`,
       merchant: application, actor: actorFor(req.admin), req,
       metadata: { riskTier: application.riskTier },
     });

@@ -49,29 +49,50 @@ export function buildMerchantWelcomeSms({ businessName, accountNumber, accountIs
 }
 
 /**
- * Sent once an application clears admin/officer KYB review — the
- * self-serve/officer-application counterpart to buildMerchantWelcomeSms
- * above, for merchants who never got a password at signup and are only now
- * gaining real account access (see officerController.js#approveApplication).
- * Carries the same Paybill/account details as the email, plus the secure
- * one-time setup-password link (`/setup-password?token=...`) — no password
- * or code is ever put in the SMS itself, only the link.
+ * Sent right after a self-serve signup is submitted, while it waits in the
+ * KYC review queue (see merchantAuthController.js#registerMerchant). The
+ * only message a merchant gets between "I registered" and "I was approved",
+ * so it says plainly that the application landed and that they'll be told
+ * when it's done — no login/next-step instructions, since there's nothing
+ * to do yet.
  *
- * @param {{ businessName?: string|null, accountNumber: string, accountIsInterim?: boolean, setupLink: string }} params
+ * @param {{ businessName?: string|null }} params
  * @returns {{ message: string, truncated: boolean, length: number }}
  */
-export function buildAccountApprovedSms({ businessName, accountNumber, accountIsInterim = false, setupLink }) {
+export function buildRegistrationReceivedSms({ businessName }) {
   return buildStrictSms(
-    ({ name, paybill, account, interimNote, url }) =>
-      `PayChain: ${name}, your application is approved! Paybill ${paybill}, Account No. ${account}${interimNote}. Set your password to log in: ${url}`,
+    ({ name }) =>
+      `PayChain: Hi ${name}, we have received your registration and it is under review. We will notify you once your account is activated.`,
+    { truncatable: [{ key: 'name', value: businessName || 'there' }] }
+  );
+}
+
+/**
+ * Sent once an application clears admin/officer KYB review (see
+ * officerController.js#approveApplication). Deliberately just "you're
+ * approved" — the Paybill/account number go out separately in
+ * buildMerchantWelcomeSms once the merchant has set their password, and
+ * again in the invite email, so repeating them here only made this longer.
+ *
+ * A merchant who has no password yet (every self-serve signup and
+ * officer-originated application) can't log in until they set one, so for
+ * them `setupLink` — the secure one-time `/setup-password?token=...` link —
+ * is what actually lets them in and MUST be included; no password or code
+ * is ever put in the SMS itself. A merchant who already has a password gets
+ * the plain version with no link.
+ *
+ * @param {{ businessName?: string|null, setupLink?: string|null }} params
+ * @returns {{ message: string, truncated: boolean, length: number }}
+ */
+export function buildAccountApprovedSms({ businessName, setupLink = null }) {
+  return buildStrictSms(
+    ({ name, url }) =>
+      url
+        ? `PayChain: Hi ${name}, your account has been approved. Set your password to get started: ${url}`
+        : `PayChain: Hi ${name}, your account has been approved. You can now start using PayChain.`,
     {
-      fixed: {
-        paybill: PAYBILL_NUMBER,
-        account: accountNumber,
-        interimNote: accountIsInterim ? ' (temporary)' : '',
-        url: setupLink,
-      },
-      truncatable: [{ key: 'name', value: businessName || 'valued merchant' }],
+      fixed: { url: setupLink || '' },
+      truncatable: [{ key: 'name', value: businessName || 'there' }],
     }
   );
 }
