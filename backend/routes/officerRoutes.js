@@ -12,6 +12,7 @@ import {
   updateChecklist,
   updateDocumentStatus,
   addNote,
+  messageApplicant,
   setRiskTier,
   approveApplication,
   requestRevision,
@@ -85,6 +86,7 @@ router.post('/applications/:id/start-review', protect, adminOrOwner, startReview
 router.patch('/applications/:id/checklist', protect, viewOrAct, updateChecklist);
 router.patch('/applications/:id/documents/:docType', protect, viewOrAct, updateDocumentStatus);
 router.post('/applications/:id/notes', protect, viewOrAct, addNote);
+router.post('/applications/:id/message', protect, viewOrAct, messageApplicant);
 router.patch('/applications/:id/risk-tier', protect, viewOrAct, setRiskTier);
 router.post('/applications/:id/approve', protect, viewOrAct, approveApplication);
 router.post('/applications/:id/request-revision', protect, viewOrAct, requestRevision);

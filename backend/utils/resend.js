@@ -2113,3 +2113,42 @@ export const sendMerchantLifecycleEmail = async (email, { subject, heading, para
     throw error;
   }
 };
+
+// A free-form email from a reviewer to a KYC applicant (documents unclear, a
+// question, something they need to send). `message` is plain text typed by
+// staff — escaped here and line breaks kept. Replies go to the sender, not a
+// no-reply mailbox, so the applicant can just answer the email.
+export const sendApplicantMessageEmail = async (email, { applicantName, subject, message, senderName, replyTo }) => {
+  const esc = (str) => String(str ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const paragraphs = String(message).split(/\n\s*\n/).map((p) => `<p style="margin: 0 0 14px;">${esc(p).replace(/\n/g, '<br>')}</p>`).join('');
+  try {
+    const emailPayload = {
+      from: 'PayChain Onboarding <info@paychain.co.ke>',
+      to: [email],
+      subject,
+      ...(replyTo ? { replyTo } : {}),
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 560px; margin: auto; background: #ffffff; border: 1px solid #eef0ee; border-radius: 18px; overflow: hidden;">
+          <div style="background: linear-gradient(135deg, #06201B 0%, #0a3029 100%); padding: 28px 32px;">
+            ${logoImgWhite(108, 'left')}
+          </div>
+          <div style="padding: 32px; color: #1f2937; font-size: 15px; line-height: 1.7;">
+            <p style="margin: 0 0 14px;">Hi ${esc(applicantName || 'there')},</p>
+            ${paragraphs}
+            <p style="margin: 22px 0 0;">Thank you,<br><strong>${esc(senderName || 'PayChain Onboarding')}</strong><br><span style="color: #6b7280;">PayChain</span></p>
+          </div>
+          <div style="padding: 18px 30px; background: #fafafa; border-top: 1px solid #eef0ee; text-align: center;">
+            <p style="margin: 0; color: #9ca3af; font-size: 11px;">You can reply directly to this email. About your PayChain application.</p>
+          </div>
+        </div>
+      `,
+    };
+    const data = await resend.emails.send(emailPayload);
+    if (data?.error) throw new Error(data.error.message || 'Email provider rejected the message.');
+    logEmail({ to: email, type: 'kyb_applicant_message', subject, bodyHtml: emailPayload.html, resendId: data?.data?.id || data?.id || null }).catch(() => {});
+    return data;
+  } catch (error) {
+    console.error('❌ Applicant message email failed:', error?.message);
+    throw error;
+  }
+};

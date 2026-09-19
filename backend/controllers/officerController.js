@@ -5,7 +5,7 @@ import { logAudit } from '../utils/auditLog.js';
 import { phoneVariations } from './adminController.js';
 import { getNcbaVirtualAccountNumber, validatePhoneNumber, isValidPhoneInputFormat, NcbaValidationError } from '../utils/ncbaValidators.js';
 import { isValidEmail, EMAIL_FORMAT_HINT } from '../utils/emailValidator.js';
-import { sendMerchantInvite, sendKybRevisionRequest, sendKybRejection } from '../utils/resend.js';
+import { sendMerchantInvite, sendKybRevisionRequest, sendKybRejection, sendApplicantMessageEmail } from '../utils/resend.js';
 import { normalizeKraPin, isValidKraPin, KRA_PIN_FORMAT_HINT } from '../utils/kraPinValidator.js';
 import { normalizeNationalId, isValidNationalId, NATIONAL_ID_FORMAT_HINT } from '../utils/nationalIdValidator.js';
 import { KENYA_COUNTY_AREAS } from '../config/kenyaCountyAreas.js';
@@ -584,6 +584,67 @@ export const addNote = async (req, res) => {
     res.json({ success: true, data: application.kybNotes });
   } catch (error) {
     console.error('Add Note Error:', error?.message || error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Email the applicant directly from the KYC screen — for anything that
+//          isn't a formal revision request: a document that is unclear, a
+//          question, something they need to send. Replies go to the sender's
+//          own email. The sent message is kept on the application.
+// @route   POST /api/officer/applications/:id/message
+// @access  Private (Owner/Admin/Officer)
+export const messageApplicant = async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: 'Invalid id.' });
+    }
+    const subject = String(req.body?.subject || '').trim().slice(0, 120) || 'About your PayChain application';
+    const message = String(req.body?.message || '').trim();
+    if (message.length < 5) return res.status(400).json({ error: 'Write a message for the applicant.' });
+    if (message.length > 3000) return res.status(400).json({ error: 'Message is too long (max 3000 characters).' });
+
+    const application = await Merchant.findOne({ _id: req.params.id, kybStatus: { $exists: true }, ...scopedToOfficer(req.admin) })
+      .select('email name businessName kybMessages');
+    if (!application) return res.status(404).json({ error: 'Application not found.' });
+    if (!application.email) return res.status(400).json({ error: 'This applicant has no email address on file.' });
+
+    // Guard against a runaway loop or a stuck button spamming one applicant.
+    const hourAgo = Date.now() - 60 * 60 * 1000;
+    if ((application.kybMessages || []).filter((m) => m.sentAt && m.sentAt.getTime() > hourAgo).length >= 5) {
+      return res.status(429).json({ error: 'Five messages already sent to this applicant in the last hour. Please wait before sending another.' });
+    }
+
+    const senderName = req.admin.name || req.admin.email;
+    try {
+      await sendApplicantMessageEmail(application.email, {
+        applicantName: application.name || application.businessName,
+        subject,
+        message,
+        senderName,
+        replyTo: req.admin.email,
+      });
+    } catch (err) {
+      return res.status(502).json({ error: 'The email could not be sent. Please try again in a moment.' });
+    }
+
+    const entry = { authorId: req.admin._id, authorName: senderName, authorEmail: req.admin.email, subject, message, sentAt: new Date() };
+    const updated = await Merchant.findOneAndUpdate(
+      { _id: application._id },
+      { $push: { kybMessages: entry } },
+      { returnDocument: 'after' }
+    ).select('kybMessages');
+
+    logAudit({
+      action: 'officer.application.message_sent', category: 'admin', severity: 'info',
+      message: `Emailed applicant: "${subject}"`,
+      merchant: application, actor: actorFor(req.admin), req,
+      metadata: { subject },
+    });
+
+    res.json({ success: true, data: updated.kybMessages });
+  } catch (error) {
+    console.error('Message Applicant Error:', error?.message || error);
     res.status(500).json({ error: 'Server Error' });
   }
 };

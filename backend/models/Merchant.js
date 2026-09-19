@@ -636,6 +636,20 @@ const merchantSchema = new mongoose.Schema({
     }],
     default: [],
   },
+  // Emails a reviewer sent to the applicant from the KYC screen (see
+  // officerController.js#messageApplicant) — kept as a record of what was
+  // asked of them. Unlike kybNotes these ARE seen by the applicant.
+  kybMessages: {
+    type: [{
+      authorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
+      authorName: { type: String, default: null },
+      authorEmail: { type: String, default: null },
+      subject: { type: String, required: true },
+      message: { type: String, required: true },
+      sentAt: { type: Date, default: Date.now },
+    }],
+    default: [],
+  },
   submittedAt: {
     type: Date,
     default: null,
