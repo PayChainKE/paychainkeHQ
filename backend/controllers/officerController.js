@@ -340,7 +340,10 @@ export const getQueue = async (req, res) => {
       Merchant.find(filter)
         .select(QUEUE_LIST_FIELDS)
         .populate('claimedBy', 'name email')
-        .sort({ submittedAt: 1 })
+        // By when the merchant signed up (createdAt), not submittedAt — that is
+        // absent on older self-serve signups, and a missing date sorted them
+        // to the top out of order. _id breaks ties so pages never repeat rows.
+        .sort(req.query.sort === 'newest' ? { createdAt: -1, _id: -1 } : { createdAt: 1, _id: 1 })
         .skip((page - 1) * limit)
         .limit(limit)
         .lean(),

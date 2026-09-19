@@ -62,6 +62,7 @@ const KycVerification = () => {
   const [error, setError] = useState('');
   const [status, setStatus] = useState('all');
   const [riskTier, setRiskTier] = useState('all');
+  const [sort, setSort] = useState('oldest'); // by signup date
   const [search, setSearch] = useState('');
   const PAGE_SIZE = 30;
   const [page, setPage] = useState(1);
@@ -75,6 +76,7 @@ const KycVerification = () => {
       if (status !== 'all') params.status = status;
       if (riskTier !== 'all') params.riskTier = riskTier;
       if (search) params.q = search;
+      params.sort = sort;
       const res = await api.get('/api/officer/applications', { params });
       if (res.data?.success) {
         setApplications(res.data.data || []);
@@ -83,9 +85,9 @@ const KycVerification = () => {
     } catch (e) {
       setError(e?.response?.data?.error || 'Could not load the queue.');
     } finally { setLoading(false); }
-  }, [status, riskTier, search, page]);
+  }, [status, riskTier, search, page, sort]);
 
-  useEffect(() => { setPage(1); }, [status, riskTier, search]);
+  useEffect(() => { setPage(1); }, [status, riskTier, search, sort]);
 
   const fetchMetrics = useCallback(async () => {
     try {
@@ -150,6 +152,10 @@ const KycVerification = () => {
                   className="w-full pl-9 pr-3 py-2 bg-surface-container-low border-transparent focus:border-primary focus:ring-0 rounded-lg text-xs"
                 />
               </div>
+              <select value={sort} onChange={(e) => setSort(e.target.value)} className="px-3 py-2 border border-outline-variant/40 rounded-lg text-xs font-bold uppercase tracking-widest bg-white" aria-label="Order by signup date">
+                <option value="oldest">Signed up: oldest first</option>
+                <option value="newest">Signed up: newest first</option>
+              </select>
               <select value={riskTier} onChange={(e) => setRiskTier(e.target.value)} className="px-3 py-2 border border-outline-variant/40 rounded-lg text-xs font-bold uppercase tracking-widest bg-white">
                 <option value="all">All risk tiers</option>
                 <option value="low">Low</option>
@@ -173,7 +179,7 @@ const KycVerification = () => {
                   <Th>Owner</Th>
                   <Th>Status</Th>
                   <Th>Risk</Th>
-                  <Th>Submitted</Th>
+                  <Th>Signed up</Th>
                   <Th>Claimed By</Th>
                 </tr>
               </thead>
@@ -267,8 +273,8 @@ const QueueRow = ({ app, onOpen }) => {
         {app.riskTier ? <span className={`inline-flex px-2 py-0.5 rounded-full text-2xs font-bold uppercase tracking-widest border ${RISK_META[app.riskTier]}`}>{app.riskTier}</span> : <span className="text-on-surface-variant/40">—</span>}
       </td>
       <td className="px-3 py-2 border-b border-outline-variant/5">
-        <p className="text-xs text-on-surface">{submittedAtLabel(app.submittedAt)}</p>
-        <p className="text-2xs text-on-surface-variant/50">{ageLabel(app.submittedAt)}</p>
+        <p className="text-xs text-on-surface">{submittedAtLabel(app.createdAt)}</p>
+        <p className="text-2xs text-on-surface-variant/50">{ageLabel(app.createdAt)}</p>
       </td>
       <td className="px-3 py-2 border-b border-outline-variant/5 text-2xs text-on-surface-variant/50">
         {app.claimedBy ? (app.claimedBy.name || app.claimedBy.email || 'Claimed') : 'Unclaimed'}
@@ -293,7 +299,7 @@ const QueueCard = ({ app, onOpen }) => {
           <p className="text-2xs text-on-surface-variant/60 truncate">{app.name} · {app.phone}</p>
           <div className="mt-2 flex items-center gap-1.5 flex-wrap">
             <span className={`inline-flex px-2 py-0.5 rounded-full text-2xs font-bold uppercase tracking-widest border ${statusStyle.pill}`}>{statusStyle.label}</span>
-            <span className="text-2xs text-on-surface-variant/50">{submittedAtLabel(app.submittedAt)} · {ageLabel(app.submittedAt)}</span>
+            <span className="text-2xs text-on-surface-variant/50">{submittedAtLabel(app.createdAt)} · {ageLabel(app.createdAt)}</span>
           </div>
         </div>
         <span className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 whitespace-nowrap">
