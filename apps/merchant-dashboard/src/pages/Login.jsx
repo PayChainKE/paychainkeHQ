@@ -9,6 +9,7 @@ import poweredByLogo from '../assets/poweredby-logo.png'
 import { ValidatedInput } from '../components/ValidatedInput'
 import { validators } from '../utils/validators'
 import { BiometricLoginButton } from '../components/BiometricButton'
+import { GetAppBanner, GetAppCard } from '../components/GetAppCard'
 import { estimateImageSharpness, isImageFile, unsupportedDocumentTypeReason } from '../utils/imageBlurCheck'
 
 // Which KYB document(s) a signup must provide, keyed by business type —
@@ -308,7 +309,13 @@ export default function Login() {
   // Navigation Tabs — a brand-new visitor (no remembered identifier, same
   // signal quickLogin above uses) lands on Signup instead of Login, so
   // first-time merchants aren't stuck on the wrong tab by default.
-  const [activeTab, setActiveTab] = useState(() => localStorage.getItem(LAST_IDENTIFIER_KEY) ? 'login' : 'signup')
+  // ?tab=login|signup (used by the marketing site's "Log in" / "Get started"
+  // buttons) wins over the remembered-identifier default.
+  const [activeTab, setActiveTab] = useState(() => {
+    const requested = new URLSearchParams(window.location.search).get('tab')
+    if (requested === 'login' || requested === 'signup') return requested
+    return localStorage.getItem(LAST_IDENTIFIER_KEY) ? 'login' : 'signup'
+  })
   const [isSignupPasswordStep, setIsSignupPasswordStep] = useState(false)
   // Shown after a successful application submission, replacing the whole
   // signup form — the account is pending admin/officer approval and has no
@@ -1160,6 +1167,7 @@ export default function Login() {
       {/* Right Login/Reset/OTP Side */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-6 lg:p-16 bg-white lg:bg-transparent -mt-10 lg:mt-0 rounded-t-[40px] lg:rounded-none relative z-20 shadow-[0_-20px_50px_rgba(0,0,0,0.1)] lg:shadow-none transition-all">
         <div className="max-w-md w-full animate-fade-in-up">
+          {activeTab === 'login' && !isOTPMode && !isResetMode && <GetAppBanner />}
           {/* Navigation Tabs */}
           <div className="flex bg-surface-container-low p-1.5 rounded-2xl mb-8 lg:mb-12 border border-outline-variant/10 shadow-inner">
             {['signup', 'login', 'reset'].map((tab) => (
@@ -1364,6 +1372,7 @@ export default function Login() {
                         Back to Log In
                         <span className="material-symbols-outlined">arrow_forward</span>
                       </button>
+                      <GetAppCard heading="Get the app while you wait" source="signup_submitted" />
                       <p className="text-[11px] text-on-surface-variant/60 font-medium leading-relaxed">
                         For more information, or to follow up on your application, contact us on{' '}
                         <a href="mailto:support@paychain.co.ke" className="font-bold text-emerald-600 hover:text-emerald-700 underline underline-offset-2">support@paychain.co.ke</a>

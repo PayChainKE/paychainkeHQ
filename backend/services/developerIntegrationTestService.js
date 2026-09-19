@@ -31,7 +31,11 @@ const COLLECT_TEST_WAIT_MS = 4500;
 // moment a developer requests live access (see
 // developerController.js#requestLiveAccess), so both stay identical by
 // construction instead of two hand-maintained copies drifting apart.
-export async function runIntegrationTestForDeveloper(developer) {
+// `includeWebhooks: false` skips test 2 — used by the nightly automated run,
+// which must not ping every developer's production endpoint with a test event
+// each night (real webhook failures are watched separately by the webhook
+// health automation, from actual deliveries).
+export async function runIntegrationTestForDeveloper(developer, { includeWebhooks = true } = {}) {
   const merchantId = developer.linkedMerchant?.merchantId || null;
   const merchant = merchantId ? await Merchant.findById(merchantId).select('businessName status') : null;
 
@@ -69,7 +73,7 @@ export async function runIntegrationTestForDeveloper(developer) {
   }
 
   // ── Test 2: webhook delivery ───────────────────────────────────────
-  const webhooks = await DeveloperWebhook.find({ developerId: developer._id, status: 'active' });
+  const webhooks = includeWebhooks ? await DeveloperWebhook.find({ developerId: developer._id, status: 'active' }) : [];
   let webhookTests = [];
   if (webhooks.length > 0) {
     webhookTests = await Promise.all(webhooks.map(async (webhook) => {
@@ -92,7 +96,7 @@ export async function runIntegrationTestForDeveloper(developer) {
     merchant: merchant ? { _id: merchant._id, businessName: merchant.businessName, status: merchant.status } : null,
     collectTest,
     webhookTests,
-    noWebhooksRegistered: webhooks.length === 0,
+    noWebhooksRegistered: includeWebhooks ? webhooks.length === 0 : null,
     ranAt: new Date(),
   };
 }

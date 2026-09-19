@@ -12,6 +12,7 @@ import {
   updateChecklist,
   updateDocumentStatus,
   addNote,
+  messageApplicant,
   setRiskTier,
   approveApplication,
   requestRevision,
@@ -19,6 +20,10 @@ import {
   validateResubmitToken,
   resubmitDocuments,
 } from '../controllers/officerController.js';
+
+import {
+  getFieldReadiness, fieldApprove, resendPaymentDetails, listFieldApprovals, confirmFieldApproval, freezeFieldApproval,
+} from '../controllers/fieldApprovalController.js';
 
 const router = express.Router();
 
@@ -85,8 +90,15 @@ router.post('/applications/:id/start-review', protect, adminOrOwner, startReview
 router.patch('/applications/:id/checklist', protect, viewOrAct, updateChecklist);
 router.patch('/applications/:id/documents/:docType', protect, viewOrAct, updateDocumentStatus);
 router.post('/applications/:id/notes', protect, viewOrAct, addNote);
+router.post('/applications/:id/message', protect, viewOrAct, messageApplicant);
 router.patch('/applications/:id/risk-tier', protect, viewOrAct, setRiskTier);
+router.get('/applications/:id/field-readiness', protect, officerOnly, getFieldReadiness);
+router.post('/applications/:id/field-approve', protect, officerOnly, fieldApprove);
+router.post('/applications/:id/payment-details-sms', protect, officerOnly, resendPaymentDetails);
 router.post('/applications/:id/approve', protect, viewOrAct, approveApplication);
+router.get('/field-approvals', protect, adminOrOwner, listFieldApprovals);
+router.post('/field-approvals/:id/confirm', protect, adminOrOwner, confirmFieldApproval);
+router.post('/field-approvals/:id/freeze', protect, adminOrOwner, freezeFieldApproval);
 router.post('/applications/:id/request-revision', protect, viewOrAct, requestRevision);
 router.post('/applications/:id/reject', protect, viewOrAct, rejectApplication);
 

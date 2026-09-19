@@ -27,6 +27,7 @@ const NAV_SECTIONS = [
     title: 'Financials & Compliance',
     items: [
       { icon: 'verified_user',   label: 'KYC/KYB Verification',   path: '/kyc-verification'       },
+      { icon: 'pin_drop',      label: 'On-site Approvals',  path: '/field-approvals'    },
       { icon: 'account_balance', label: 'Ledger',                 path: '/ledger'                 },
       { icon: 'balance',         label: 'Pool Reconciliation',    path: '/pool-reconciliation'    },
       { icon: 'account_balance_wallet', label: 'Bank & Tax Charges', path: '/bank-charges'       },
@@ -52,6 +53,7 @@ const NAV_SECTIONS = [
       { icon: 'mail',          label: 'Messages',       path: '/messages'       },
       { icon: 'newspaper',     label: 'Newsletter',     path: '/newsletter'     },
       { icon: 'article',       label: 'Blog Posts',     path: '/blog-posts'     },
+      { icon: 'auto_mode',     label: 'Automations',    path: '/automations'    },
       { icon: 'sms',           label: 'SMS Broadcast',  path: '/sms-broadcast'  },
       { icon: 'person_alert',  label: 'Dormant Accounts', path: '/dormant-accounts' },
       { icon: 'mail',          label: 'Email Log',      path: '/email-log'      },

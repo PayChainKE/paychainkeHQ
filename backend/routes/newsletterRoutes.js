@@ -14,6 +14,11 @@ import {
   getDraft,
   saveDraft,
   deleteDraft,
+  unscheduleDraft,
+  audienceCount,
+  audienceOptions,
+  unsubscribePage,
+  unsubscribeConfirm,
 } from '../controllers/newsletterController.js';
 import { protect, requireRole } from '../middleware/authMiddleware.js';
 
@@ -64,6 +69,18 @@ const subscribeLimiter = rateLimit({
   message: { error: 'Too many requests. Try again in 15 minutes.' },
 });
 
+// Unsubscribe — public, authenticated only by the signed token in the link.
+// Generous limit (mail scanners hit these), but bounded.
+const unsubscribeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: 'Too many requests. Please try again later.',
+});
+router.get('/unsubscribe', unsubscribeLimiter, unsubscribePage);
+router.post('/unsubscribe', unsubscribeLimiter, unsubscribeConfirm);
+
 // Public
 router.post('/', subscribeLimiter, subscribe);
 router.post('/subscribe', subscribeLimiter, subscribe);
@@ -75,7 +92,10 @@ router.get('/campaigns', protect, getCampaigns);
 router.get('/drafts', protect, listDrafts);
 router.get('/drafts/:id', protect, getDraft);
 router.post('/drafts', protect, requireMutator, saveDraft);
+router.post('/drafts/:id/unschedule', protect, requireMutator, unscheduleDraft);
 router.delete('/drafts/:id', protect, requireMutator, deleteDraft);
+router.get('/audience-options', protect, audienceOptions);
+router.post('/audience-count', protect, audienceCount);
 router.post('/admin', protect, requireMutator, adminAddSubscriber);
 router.post('/upload-image', protect, requireMutator, imageUpload.single('image'), uploadNewsletterImage);
 router.post('/send', protect, requireMutator, campaignLimiter, sendCampaign);

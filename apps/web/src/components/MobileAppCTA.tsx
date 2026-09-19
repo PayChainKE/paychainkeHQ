@@ -16,16 +16,17 @@ const MobileAppCTA: React.FC = () => {
               Paychain mobile app
             </h2>
             <p className="text-base sm:text-lg text-gray-300 mb-10 max-w-md leading-relaxed">
-              Download the Paychain mobile app and run your business anywhere, anytime. Stay secured on top of your business on the go.
+              Download the PayChain app for Android and run your business anywhere. See every payment as it lands, pay staff and suppliers with Bulk Pay, and sign in with your fingerprint. iPhone version coming soon.
             </p>
 
             <div className="flex flex-row flex-wrap gap-4 w-full sm:w-auto mt-2">
               <a href="https://play.google.com/store/apps/details?id=ke.co.paychain.app" target="_blank" rel="noopener noreferrer" className="transition-transform hover:scale-105 inline-block">
                 <img src="/Home page/google play.png" alt="Get it on Google Play" className="h-12 sm:h-14 w-auto object-contain rounded-xl" />
               </a>
-              <a href="#download-ios" className="transition-transform hover:scale-105 inline-block">
-                <img src="/Home page/app store.png" alt="Download on the App Store" className="h-12 sm:h-14 w-auto object-contain rounded-xl" />
-              </a>
+              <div className="relative inline-block" aria-label="App Store version coming soon">
+                <img src="/Home page/app store.png" alt="App Store (coming soon)" className="h-12 sm:h-14 w-auto object-contain rounded-xl opacity-40 grayscale" />
+                <span className="absolute -top-2 -right-2 rounded-full bg-emerald-400 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-950">Soon</span>
+              </div>
             </div>
           </div>
 

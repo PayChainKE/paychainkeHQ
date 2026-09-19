@@ -86,7 +86,7 @@ const VirtualAccount: React.FC = () => {
               <p className="text-lg text-gray-400 mb-8 max-w-xl leading-relaxed">
                 Every PayChain merchant gets a dedicated PayChain Paybill and virtual account, registered through our licensed banking partner, that replaces your basic M-PESA till, kills SMS fraud, logs every shilling, and builds your business credit automatically.
               </p>
-              <a href="https://app.paychain.co.ke" className="inline-flex items-center justify-center px-8 py-4 text-base font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_20px_rgba(0,191,99,0.3)]">
+              <a href="https://app.paychain.co.ke/login?tab=signup" className="inline-flex items-center justify-center px-8 py-4 text-base font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_20px_rgba(0,191,99,0.3)]">
                 Get Your Paybill & Account
               </a>
             </motion.div>
@@ -274,7 +274,7 @@ const VirtualAccount: React.FC = () => {
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-6 relative z-10">Stop Trusting Screenshots. Start Running a Verified Business.</h2>
             <p className="text-xl text-gray-400 mb-10 relative z-10">Sign up in minutes and start running a verified business today.</p>
             <div className="relative z-10">
-              <a href="https://app.paychain.co.ke" className="inline-flex px-8 py-4 text-lg font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_30px_rgba(0,191,99,0.3)]">
+              <a href="https://app.paychain.co.ke/login?tab=signup" className="inline-flex px-8 py-4 text-lg font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 transform hover:scale-105 shadow-[0_0_30px_rgba(0,191,99,0.3)]">
                 Sign Up
               </a>
             </div>

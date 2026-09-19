@@ -313,9 +313,13 @@ const NEWSLETTER_TEMPLATES = [
 // this component (`{composeOpen && <NewsletterComposer .../>}`), so
 // switching drafts always remounts it fresh rather than needing a
 // setContent() effect to sync a changed prop into a live editor.
+const labelCls = 'text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50';
+const fieldCls = 'px-3 py-2 rounded-lg border border-outline-variant/40 bg-white text-xs text-on-surface focus:outline-none focus:border-primary';
+
 export default function NewsletterComposer({
   subject, onSubject, activeCount, targeted, busy, error, done, onSend, onClose,
   initialContent, draftStatus, onSaveDraft,
+  audience, onAudience, audienceOptions, scheduledFor, onScheduledFor, onSchedule,
 }) {
   const [showPreview, setShowPreview] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
@@ -466,9 +470,9 @@ export default function NewsletterComposer({
             <div className="flex items-center gap-3 px-5 py-2.5 border-b border-outline-variant/15 bg-surface-container-lowest/30 shrink-0">
               <span className="text-2xs font-bold text-on-surface-variant/40 uppercase tracking-widest w-12 shrink-0">To</span>
               <span className="text-xs text-on-surface-variant/70 font-medium">
-                {activeCount} {targeted ? 'selected' : 'active'} subscriber{activeCount !== 1 ? 's' : ''}
+                {activeCount} {targeted ? 'selected subscriber' : audience?.source === 'merchants' ? 'merchant' : 'active subscriber'}{activeCount !== 1 ? 's' : ''}
                 <span className={`ml-2 px-2 py-0.5 rounded-full text-2xs font-bold border ${targeted ? 'bg-primary/10 text-primary border-primary/20' : 'bg-emerald-50 text-emerald-700 border-emerald-100'}`}>
-                  {targeted ? 'Targeted send' : 'Verified list'}
+                  {targeted ? 'Targeted send' : audience?.source === 'merchants' ? 'Segmented send' : 'Verified list'}
                 </span>
               </span>
             </div>
@@ -640,6 +644,58 @@ export default function NewsletterComposer({
           )}
         </div>
 
+        {/* Delivery options — who gets it, and when */}
+        <div className="flex flex-wrap items-end gap-3 px-5 py-3 border-t border-outline-variant/15 bg-surface-container-lowest/50 shrink-0">
+          {!targeted && audience && (
+            <>
+              <label className="flex flex-col gap-1">
+                <span className={labelCls}>Send to</span>
+                <select value={audience.source} onChange={(e) => onAudience({ ...audience, source: e.target.value })} className={fieldCls}>
+                  <option value="subscribers">Newsletter subscribers</option>
+                  <option value="merchants">Merchants</option>
+                </select>
+              </label>
+              {audience.source === 'merchants' && (
+                <>
+                  <label className="flex flex-col gap-1">
+                    <span className={labelCls}>Activity</span>
+                    <select value={audience.activity} onChange={(e) => onAudience({ ...audience, activity: e.target.value })} className={fieldCls}>
+                      <option value="all">All merchants</option>
+                      <option value="active">Active</option>
+                      <option value="dormant">Dormant (60+ days)</option>
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className={labelCls}>Business type</span>
+                    <select value={audience.businessType} onChange={(e) => onAudience({ ...audience, businessType: e.target.value })} className={fieldCls}>
+                      <option value="">Any</option>
+                      {(audienceOptions?.businessTypes || []).map((t) => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className={labelCls}>County</span>
+                    <select value={audience.county} onChange={(e) => onAudience({ ...audience, county: e.target.value })} className={fieldCls}>
+                      <option value="">Any</option>
+                      {(audienceOptions?.counties || []).map((c) => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </label>
+                </>
+              )}
+            </>
+          )}
+          <label className="flex flex-col gap-1">
+            <span className={labelCls}>Send later (optional)</span>
+            <span className="flex items-center gap-1">
+              <input type="datetime-local" value={scheduledFor || ''} onChange={(e) => onScheduledFor(e.target.value)} className={fieldCls} />
+              {scheduledFor && (
+                <button type="button" onClick={() => onScheduledFor('')} className="p-1.5 rounded-lg text-on-surface-variant/60 hover:bg-surface-container" title="Clear — send now instead">
+                  <span className="material-symbols-outlined text-base">close</span>
+                </button>
+              )}
+            </span>
+          </label>
+        </div>
+
         {/* Footer actions */}
         <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-t border-outline-variant/15 bg-surface-container-lowest/50 shrink-0">
           <div className="flex items-center gap-2 text-xs text-on-surface-variant/50">
@@ -651,6 +707,15 @@ export default function NewsletterComposer({
               className="px-4 py-2 rounded-lg border border-outline-variant/40 text-on-surface text-2xs font-bold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40">
               Cancel
             </button>
+            {scheduledFor && (
+              <button
+                onClick={() => onSchedule?.(html)}
+                disabled={busy || !canSend}
+                className="px-5 py-2 rounded-lg border border-primary text-primary text-2xs font-bold uppercase tracking-widest hover:bg-primary/5 disabled:opacity-50 flex items-center gap-2"
+              >
+                <span className="material-symbols-outlined text-sm">schedule_send</span>Schedule
+              </button>
+            )}
             <button
               onClick={() => onSend(html)}
               disabled={busy || !canSend}

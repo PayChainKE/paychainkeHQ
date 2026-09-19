@@ -98,7 +98,7 @@ export default function Products() {
 
         <div className="mt-16 text-center">
           <a
-            href="https://app.paychain.co.ke"
+            href="https://app.paychain.co.ke/login?tab=signup"
             className="inline-flex items-center justify-center px-8 py-4 text-base font-bold text-black bg-[#00bf63] hover:bg-[#00d971] rounded-xl transition-all duration-300 shadow-sm"
           >
             Get Started

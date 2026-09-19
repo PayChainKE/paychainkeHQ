@@ -12,11 +12,25 @@ const CATEGORIES = ['Company News', 'Compliance', 'Industry Insights', 'Product 
 const STATUS_META = {
   published: { label: 'Published', pill: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
   draft: { label: 'Draft', pill: 'bg-gray-100 text-gray-700 border-gray-200', dot: 'bg-gray-500' },
+  scheduled: { label: 'Scheduled', pill: 'bg-blue-50 text-blue-700 border-blue-200', dot: 'bg-blue-500' },
 };
+
+// ISO -> "YYYY-MM-DDTHH:mm" for a datetime-local input (browser-local time).
+function toLocalInput(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+function fmtWhenEAT(iso) {
+  return new Date(iso).toLocaleString('en-KE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Africa/Nairobi' }) + ' EAT';
+}
 
 const STATUS_FILTERS = [
   { id: 'all', label: 'All', icon: 'article' },
   { id: 'published', label: 'Published', icon: 'public' },
+  { id: 'scheduled', label: 'Scheduled', icon: 'schedule' },
   { id: 'draft', label: 'Drafts', icon: 'edit_note' },
 ];
 
@@ -38,6 +52,7 @@ function blankDraft() {
     readTime: '',
     featured: false,
     status: 'draft',
+    scheduledLocal: '',
   };
 }
 
@@ -93,6 +108,7 @@ const BlogPosts = () => {
     total: posts.length,
     published: posts.filter((p) => p.status === 'published').length,
     draft: posts.filter((p) => p.status === 'draft').length,
+    scheduled: posts.filter((p) => p.status === 'scheduled').length,
   }), [posts]);
 
   async function openEdit(post) {
@@ -102,7 +118,7 @@ const BlogPosts = () => {
       const res = await api.get(`/api/blog/admin/${post._id}`);
       if (res.data?.success) {
         const p = res.data.data;
-        setEditing({ ...p, slugTouched: true, author: p.author || { name: '', role: '', avatar: '' } });
+        setEditing({ ...p, slugTouched: true, author: p.author || { name: '', role: '', avatar: '' }, scheduledLocal: p.status === 'scheduled' ? toLocalInput(p.scheduledAt) : '' });
       } else showToast(res.data?.error || 'Could not load post.');
     } catch (e) {
       showToast(e?.response?.data?.error || 'Could not load post.');
@@ -115,6 +131,13 @@ const BlogPosts = () => {
 
   async function handleSave(status) {
     if (!editing.title.trim()) { setSaveError('Title is required.'); return; }
+    let scheduledAt = null;
+    if (status === 'scheduled') {
+      const when = new Date(editing.scheduledLocal);
+      if (!editing.scheduledLocal || Number.isNaN(when.getTime())) { setSaveError('Choose a date and time to publish this post.'); return; }
+      if (when.getTime() <= Date.now()) { setSaveError('The publish time must be in the future.'); return; }
+      scheduledAt = when.toISOString();
+    }
     setSaving(true);
     setSaveError('');
     try {
@@ -129,12 +152,13 @@ const BlogPosts = () => {
         readTime: editing.readTime,
         featured: editing.featured,
         status,
+        scheduledAt,
       };
       const res = editing._id
         ? await api.put(`/api/blog/admin/${editing._id}`, payload)
         : await api.post('/api/blog/admin', payload);
       if (res.data?.success) {
-        showToast(status === 'published' ? 'Published.' : 'Saved as draft.');
+        showToast(status === 'published' ? 'Published.' : status === 'scheduled' ? `Scheduled for ${fmtWhenEAT(scheduledAt)}.` : 'Saved as draft.');
         setEditing(null);
         fetchPosts();
       } else setSaveError(res.data?.error || 'Could not save.');
@@ -371,6 +395,17 @@ const EditorDrawer = ({ draft, setDraft, onClose, onSave, saving, saveError }) =
             <BlogPostEditor initialContent={draft.content} onChange={(html) => patch({ content: html })} />
           </Field>
 
+          <Field label="Publish on a date (optional)" hint="Pick a future time and press Schedule — the post goes live by itself, no one needs to be online. Times are your local time.">
+            <div className="flex items-center gap-2">
+              <input type="datetime-local" value={draft.scheduledLocal || ''} onChange={(e) => patch({ scheduledLocal: e.target.value })} className={inputClass} />
+              {draft.scheduledLocal && (
+                <button type="button" onClick={() => patch({ scheduledLocal: '' })} className="p-2 rounded-lg text-on-surface-variant/60 hover:bg-surface-container" title="Clear">
+                  <span className="material-symbols-outlined text-base">close</span>
+                </button>
+              )}
+            </div>
+          </Field>
+
           {saveError && <div className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-medium">{saveError}</div>}
 
           <div className="flex items-center justify-end gap-2 pt-4 border-t border-outline-variant/10">
@@ -381,6 +416,12 @@ const EditorDrawer = ({ draft, setDraft, onClose, onSave, saving, saveError }) =
               <span className="material-symbols-outlined text-sm">save</span>
               Save Draft
             </button>
+            {draft.scheduledLocal && (
+              <button type="button" onClick={() => onSave('scheduled')} disabled={saving} className="px-5 py-2 rounded-lg border border-primary text-primary text-2xs font-bold uppercase tracking-widest disabled:opacity-50 flex items-center gap-2">
+                <span className="material-symbols-outlined text-sm">schedule_send</span>
+                Schedule
+              </button>
+            )}
             <button type="button" onClick={() => onSave('published')} disabled={saving} className="px-5 py-2 rounded-lg bg-primary text-white text-2xs font-bold uppercase tracking-widest disabled:opacity-50 flex items-center gap-2">
               <span className="material-symbols-outlined text-sm">publish</span>
               {saving ? 'Saving…' : 'Publish'}
@@ -437,7 +478,7 @@ const PostRow = ({ post, canMutate, onEdit, onDelete }) => {
       <td className="px-3 py-2 border-b border-outline-variant/5">
         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-bold uppercase tracking-widest border ${statusStyle.pill}`}>
           <span className={`w-1.5 h-1.5 rounded-full ${statusStyle.dot}`}></span>
-          {statusStyle.label}
+          {statusStyle.label}{post.status === 'scheduled' && post.scheduledAt ? ` · ${fmtWhenEAT(post.scheduledAt)}` : ''}
         </span>
       </td>
       <td className="px-3 py-2 border-b border-outline-variant/5 text-center">

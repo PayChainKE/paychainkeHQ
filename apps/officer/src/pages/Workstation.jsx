@@ -35,6 +35,7 @@ const Workstation = () => {
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
   const [revisionOpen, setRevisionOpen] = useState(false);
+  const [messageOpen, setMessageOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [noteText, setNoteText] = useState('');
 
@@ -117,6 +118,17 @@ const Workstation = () => {
       if (res.data?.success) { showToast('Revision requested.'); setRevisionOpen(false); fetchApp(); }
       else throw new Error(res.data?.error);
     } catch (e) { showToast(e?.response?.data?.error || e?.message || 'Could not request revision.'); }
+  }
+
+  async function handleSendMessage(subject, message) {
+    try {
+      const res = await api.post(`/api/officer/applications/${id}/message`, { subject, message });
+      if (res.data?.success) {
+        setApp((a) => ({ ...a, kybMessages: res.data.data }));
+        setMessageOpen(false);
+        showToast('Email sent to the applicant.');
+      } else throw new Error(res.data?.error);
+    } catch (e) { showToast(e?.response?.data?.error || e?.message || 'Could not send the email.'); }
   }
 
   async function handleReject(note) {
@@ -216,6 +228,23 @@ const Workstation = () => {
           )}
         </div>
 
+        {app.prechecks?.length > 0 && (
+          <div className={`rounded-2xl p-5 border ${app.prechecks.some((f) => f.severity === 'critical') ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'}`}>
+            <p className={`text-2xs font-bold uppercase tracking-[0.2em] mb-3 ${app.prechecks.some((f) => f.severity === 'critical') ? 'text-red-700' : 'text-amber-700'}`}>
+              Automatic checks · {app.prechecks.length} flag{app.prechecks.length === 1 ? '' : 's'}
+            </p>
+            <ul className="space-y-2">
+              {app.prechecks.map((f) => (
+                <li key={f.code} className="flex items-start gap-2 text-sm text-on-surface">
+                  <span className={`material-symbols-outlined text-base mt-0.5 ${f.severity === 'critical' ? 'text-red-600' : 'text-amber-600'}`}>{f.severity === 'critical' ? 'error' : 'warning'}</span>
+                  <span>{f.message}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-2xs text-on-surface-variant/60 mt-3">Advisory only — these do not block a decision.</p>
+          </div>
+        )}
+
         <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl p-6 shadow-editorial">
           <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-3">Verification Checklist</p>
           <div className="space-y-2.5">
@@ -232,6 +261,29 @@ const Workstation = () => {
               </label>
             ))}
           </div>
+        </div>
+
+        <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl p-6 shadow-editorial">
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <div>
+              <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/40 mb-1">Message Applicant</p>
+              <p className="text-xs text-on-surface-variant/60">Email the applicant — for unclear documents, or anything you need them to send. They can reply straight to you.</p>
+            </div>
+            <button onClick={() => setMessageOpen(true)} className="shrink-0 px-3 py-2 rounded-lg bg-primary text-white text-2xs font-bold uppercase tracking-widest flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-sm">mail</span>Write
+            </button>
+          </div>
+          {(app.kybMessages || []).length > 0 && (
+            <div className="space-y-2 max-h-56 overflow-y-auto">
+              {[...app.kybMessages].reverse().map((m, i) => (
+                <details key={i} className="p-2.5 bg-surface-container-low rounded-lg">
+                  <summary className="text-xs font-bold text-on-surface cursor-pointer">{m.subject}</summary>
+                  <p className="text-xs text-on-surface whitespace-pre-wrap mt-2">{m.message}</p>
+                  <p className="text-2xs text-on-surface-variant/50 mt-1">Sent by {m.authorName} · {new Date(m.sentAt).toLocaleString()}</p>
+                </details>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-2xl p-6 shadow-editorial">
@@ -270,6 +322,12 @@ const Workstation = () => {
             </div>
 
             <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-outline-variant/10">
+              {app.kybStatus === 'pending' && admin?.role === 'officer' && (
+                <button onClick={() => navigate(`/applications/${id}/finish`)} className="px-5 py-2.5 rounded-lg bg-primary text-white text-2xs font-bold uppercase tracking-widest flex items-center gap-2">
+                  <span className="material-symbols-outlined text-sm">verified</span>
+                  Finish on site
+                </button>
+              )}
               <button
                 onClick={handleApprove}
                 disabled={!checklistComplete || !app.riskTier}
@@ -295,6 +353,7 @@ const Workstation = () => {
           <div className="fixed bottom-6 right-6 z-50 bg-on-surface text-white px-4 py-2.5 rounded-xl shadow-lg text-xs font-bold">{toast}</div>
         )}
 
+        {messageOpen && <MessageApplicantModal onClose={() => setMessageOpen(false)} onSubmit={handleSendMessage} />}
         {revisionOpen && <RevisionModal onClose={() => setRevisionOpen(false)} onSubmit={handleRequestRevision} />}
         {rejectOpen && <RejectModal onClose={() => setRejectOpen(false)} onSubmit={handleReject} />}
       </div>
@@ -363,3 +422,46 @@ const RejectModal = ({ onClose, onSubmit }) => {
 };
 
 export default Workstation;
+
+const MESSAGE_TEMPLATES = [
+  { label: 'Documents are unclear', subject: 'Please resend clearer documents', text: 'Some of the documents you submitted were not clear enough for us to read.\n\nPlease reply to this email with clearer photos or scans of:\n- \n\nMake sure all four corners are visible and the text is sharp.' },
+  { label: 'We need another document', subject: 'One more document needed for your application', text: 'To finish reviewing your application we need one more thing from you:\n\n- \n\nPlease reply to this email with it attached.' },
+  { label: 'Confirm a detail', subject: 'A quick question about your application', text: 'We need to confirm a detail on your application:\n\n- \n\nPlease reply to this email to confirm.' },
+];
+
+const MessageApplicantModal = ({ onClose, onSubmit }) => {
+  const [subject, setSubject] = useState('About your PayChain application');
+  const [message, setMessage] = useState('');
+  const [sending, setSending] = useState(false);
+
+  function applyTemplate(t) { setSubject(t.subject); setMessage(t.text); }
+
+  async function send() {
+    setSending(true);
+    try { await onSubmit(subject.trim(), message.trim()); } finally { setSending(false); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => !sending && onClose()}>
+      <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-lg font-bold tracking-tight text-on-surface mb-1">Message applicant</h3>
+        <p className="text-xs text-on-surface-variant/60 mb-4">Sent by email from PayChain Onboarding. Their reply comes to your own email address. Do not include passwords or PINs.</p>
+        <div className="flex flex-wrap gap-2 mb-3">
+          {MESSAGE_TEMPLATES.map((t) => (
+            <button key={t.label} type="button" onClick={() => applyTemplate(t)} className="px-2.5 py-1 rounded-full border border-outline-variant/40 text-2xs font-bold text-on-surface-variant/80 hover:border-primary hover:text-primary">{t.label}</button>
+          ))}
+        </div>
+        <input value={subject} onChange={(e) => setSubject(e.target.value)} maxLength={120} placeholder="Subject" className="w-full px-3 py-2 border border-outline-variant/40 rounded-lg text-sm mb-3" />
+        <textarea value={message} onChange={(e) => setMessage(e.target.value)} maxLength={3000} rows={8} placeholder="Write your message to the applicant…" className="w-full px-3 py-2 border border-outline-variant/40 rounded-lg text-sm mb-1" />
+        <p className="text-2xs text-on-surface-variant/50 mb-4 text-right">{message.length}/3000</p>
+        <div className="flex items-center justify-end gap-2">
+          <button onClick={onClose} disabled={sending} className="px-4 py-2 rounded-lg text-2xs font-bold uppercase tracking-widest text-on-surface-variant/70 hover:bg-surface-container-low disabled:opacity-40">Cancel</button>
+          <button onClick={send} disabled={sending || message.trim().length < 5 || subject.trim().length < 3}
+            className="px-5 py-2 rounded-lg bg-primary text-white text-2xs font-bold uppercase tracking-widest disabled:opacity-40">
+            {sending ? 'Sending…' : 'Send email'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};

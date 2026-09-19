@@ -410,7 +410,7 @@ export default function FAQPage(): JSX.Element {
                 <div className="card-sub">info@paychain.co.ke</div>
               </div>
             </a>
-            <a href="https://app.paychain.co.ke" className="card primary">
+            <a href="https://app.paychain.co.ke/login?tab=signup" className="card primary">
               <div className="card-icon"><UserPlus size={20} /></div>
               <div>
                 <strong>Sign Up</strong>

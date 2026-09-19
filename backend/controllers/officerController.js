@@ -3,11 +3,17 @@ import mongoose from 'mongoose';
 import Merchant from '../models/Merchant.js';
 import { logAudit } from '../utils/auditLog.js';
 import { phoneVariations } from './adminController.js';
-import { getNcbaVirtualAccountNumber, formatAccountNumberDisplay, validatePhoneNumber, isValidPhoneInputFormat, NcbaValidationError } from '../utils/ncbaValidators.js';
+import { getNcbaVirtualAccountNumber, validatePhoneNumber, isValidPhoneInputFormat, NcbaValidationError } from '../utils/ncbaValidators.js';
 import { isValidEmail, EMAIL_FORMAT_HINT } from '../utils/emailValidator.js';
-import { sendMerchantInvite, sendKybRevisionRequest, sendKybRejection } from '../utils/resend.js';
+import { sendMerchantInvite, sendKybRevisionRequest, sendKybRejection, sendApplicantMessageEmail } from '../utils/resend.js';
 import { normalizeKraPin, isValidKraPin, KRA_PIN_FORMAT_HINT } from '../utils/kraPinValidator.js';
+import { normalizeNationalId, isValidNationalId, NATIONAL_ID_FORMAT_HINT } from '../utils/nationalIdValidator.js';
+import { KENYA_COUNTY_AREAS } from '../config/kenyaCountyAreas.js';
+import { KENYA_COUNTY_WARDS } from '../config/kenyaCountyWards.js';
+import { BUSINESS_TYPES, EMPLOYEE_BANDS } from './merchantAuthController.js';
 import { buildAccountApprovedSms } from '../utils/accountSmsTemplates.js';
+import { computePrechecks } from '../utils/applicationPrechecks.js';
+import { applyFieldApproval, FieldApprovalError } from '../services/fieldApprovalService.js';
 import { deleteCloudinaryAsset } from '../utils/cloudinary.js';
 import { safeSendSMS } from '../utils/smsSanitizer.js';
 import { toE164Kenyan } from '../utils/notificationService.js';
@@ -88,7 +94,7 @@ const adminActorPlain = (admin) => admin ? ({
 
 // Picks the correct actor shape based on who's actually calling — an admin
 // acting directly on the queue should log as 'admin', not 'officer'.
-const actorFor = (admin) => (admin?.role === 'officer' ? officerActor(admin) : adminActorPlain(admin));
+export const actorFor = (admin) => (admin?.role === 'officer' ? officerActor(admin) : adminActorPlain(admin));
 
 const CHECKLIST_KEYS = ['legalNameMatch', 'ubosIdentified', 'kraPinVerified', 'tillVerified', 'businessTypeCompliant'];
 
@@ -101,17 +107,27 @@ const QUEUE_LIST_FIELDS = 'name email phone businessName businessType submittedA
 // shared queue between officers. Admins/owners (who never hit this, since
 // onboardingOfficerId is only ever set by an officer's own createApplication
 // call) retain unrestricted visibility. Spread into any Merchant filter.
-const scopedToOfficer = (admin) => (admin?.role === 'officer' ? { onboardingOfficerId: admin._id } : {});
+export const scopedToOfficer = (admin) => (admin?.role === 'officer' ? { onboardingOfficerId: admin._id } : {});
 
 // @desc    Officer submits a new merchant KYC application.
 // @route   POST /api/officer/applications
 // @access  Private (Officer)
 export const createApplication = async (req, res) => {
   try {
-    let { name, email, phone, businessName, businessType, kraPin, businessNumber } = req.body || {};
+    // Same required details as self-serve signup (registerMerchant in
+    // merchantAuthController.js), so an application looks identical to
+    // review no matter which door it came through. Deliberately NOT carried
+    // over: the SMS phone-ownership check (the officer is meeting the
+    // merchant in person) and blocking document requirements (documents
+    // stay optional here by design — see kybRequirements.js's mirror in
+    // apps/officer's NewApplication.jsx).
+    let {
+      firstName, surname, otherNames, email, phone, businessName, businessType, kraPin, businessNumber,
+      nationalId, county, area, ward, street, employees, ecommerce, agreedToTerms,
+    } = req.body || {};
 
-    if (!name || !email || !phone || !businessName) {
-      return res.status(400).json({ error: 'Name, email, phone and business name are required.' });
+    if (!firstName?.trim() || !surname?.trim() || !email || !phone || !businessName?.trim()) {
+      return res.status(400).json({ error: 'First name, surname, email, phone and business name are all required.' });
     }
 
     if (!isValidEmail(email)) {
@@ -132,11 +148,52 @@ export const createApplication = async (req, res) => {
 
     email = String(email).trim().toLowerCase();
     phone = String(phone).replace(/\s+/g, '');
-    name = String(name).trim();
+    firstName = firstName.trim();
+    surname = surname.trim();
+    otherNames = otherNames?.trim() || null;
+    // `name` stays the single field the rest of the app reads (see
+    // Merchant.js) — computed from all three, exactly as registerMerchant does.
+    const name = [firstName, surname, otherNames].filter(Boolean).join(' ');
     businessName = String(businessName).trim();
     businessType = businessType ? String(businessType).trim() : null;
     kraPin = kraPin ? normalizeKraPin(kraPin) : null;
     businessNumber = businessNumber ? String(businessNumber).trim() : null;
+    nationalId = nationalId ? normalizeNationalId(nationalId) : null;
+    county = county ? String(county).trim() : null;
+    area = area ? String(area).trim() : null;
+    ward = ward ? String(ward).trim() : null;
+    street = street ? String(street).trim() : null;
+    employees = employees ? String(employees).trim() : null;
+    const isEcommerce = ecommerce === true || ecommerce === 'yes' ? true
+      : ecommerce === false || ecommerce === 'no' ? false
+      : null;
+
+    if (!businessType || !BUSINESS_TYPES.includes(businessType)) {
+      return res.status(400).json({ error: 'Select a valid business type.' });
+    }
+    if (!county || !KENYA_COUNTY_AREAS[county]) {
+      return res.status(400).json({ error: 'Select a valid Kenyan county.' });
+    }
+    if (!area || !KENYA_COUNTY_AREAS[county].includes(area)) {
+      return res.status(400).json({ error: `Select a valid area/location within ${county}.` });
+    }
+    if (ward && !(KENYA_COUNTY_WARDS[county]?.[area] || []).includes(ward)) {
+      return res.status(400).json({ error: `Select a valid ward within ${area}.` });
+    }
+    if (!employees || !EMPLOYEE_BANDS.includes(employees)) {
+      return res.status(400).json({ error: 'Select a valid number of employees.' });
+    }
+    if (isEcommerce === null) {
+      return res.status(400).json({ error: 'Let us know whether this is an eCommerce business.' });
+    }
+    if (!nationalId || !isValidNationalId(nationalId)) {
+      return res.status(400).json({ error: `Enter a valid National ID number. ${NATIONAL_ID_FORMAT_HINT}` });
+    }
+    // The officer records that the merchant agreed in person — same consent
+    // record self-serve signup keeps, so it's never silently missing here.
+    if (agreedToTerms !== true && agreedToTerms !== 'true') {
+      return res.status(400).json({ error: 'The merchant must agree to the Privacy Policy and Terms of Service.' });
+    }
 
     if (kraPin && !isValidKraPin(kraPin)) {
       return res.status(400).json({ error: `Invalid KRA PIN format. ${KRA_PIN_FORMAT_HINT}` });
@@ -157,6 +214,9 @@ export const createApplication = async (req, res) => {
     if (businessNumber && await Merchant.exists({ businessNumber })) {
       return res.status(409).json({ error: 'A merchant with that business registration number already exists.' });
     }
+    if (await Merchant.exists({ nationalId })) {
+      return res.status(409).json({ error: 'A merchant account already exists for that National ID number.' });
+    }
 
     const files = req.files || {};
     const kybDocuments = ALL_OFFICER_DOC_TYPES.flatMap((t) => resolveDocTypes(t, files)).map((t) => ({
@@ -174,12 +234,24 @@ export const createApplication = async (req, res) => {
 
     const merchant = await Merchant.create({
       name,
+      firstName,
+      surname,
+      otherNames,
       email,
       phone,
       businessName,
       businessType,
       kraPin,
       businessNumber,
+      nationalId,
+      county,
+      businessArea: area,
+      ward: ward || null,
+      street: street || null,
+      employeeCount: employees,
+      isEcommerce,
+      agreedToTerms: true,
+      agreedToTermsAt: new Date(),
       isVerified: false,
       kybStatus: 'pending',
       kybDocuments,
@@ -216,7 +288,7 @@ export const createApplication = async (req, res) => {
     console.error('Create Application Error:', error);
     if (error.code === 11000) {
       const key = Object.keys(error.keyPattern || {})[0];
-      const labels = { email: 'email', phone: 'phone number', kraPin: 'KRA PIN', businessNumber: 'business registration number' };
+      const labels = { email: 'email', phone: 'phone number', kraPin: 'KRA PIN', businessNumber: 'business registration number', nationalId: 'National ID number' };
       return res.status(409).json({ error: `A merchant with that ${labels[key] || 'detail'} already exists.` });
     }
     if (error.name === 'ValidationError') {
@@ -269,7 +341,10 @@ export const getQueue = async (req, res) => {
       Merchant.find(filter)
         .select(QUEUE_LIST_FIELDS)
         .populate('claimedBy', 'name email')
-        .sort({ submittedAt: 1 })
+        // By when the merchant signed up (createdAt), not submittedAt — that is
+        // absent on older self-serve signups, and a missing date sorted them
+        // to the top out of order. _id breaks ties so pages never repeat rows.
+        .sort(req.query.sort === 'newest' ? { createdAt: -1, _id: -1 } : { createdAt: 1, _id: 1 })
         .skip((page - 1) * limit)
         .limit(limit)
         .lean(),
@@ -326,7 +401,12 @@ export const getApplication = async (req, res) => {
       .populate('reviewedBy', 'name email');
     if (!application) return res.status(404).json({ error: 'Application not found.' });
 
-    res.json({ success: true, data: application });
+    // Advisory first-pass flags for the reviewer (see utils/applicationPrechecks.js).
+    // A failure computing them must never stop the reviewer opening the application.
+    let prechecks = [];
+    try { prechecks = await computePrechecks(application); } catch (e) { console.error('Prechecks failed:', e?.message || e); }
+
+    res.json({ success: true, data: { ...application.toObject(), prechecks } });
   } catch (error) {
     console.error('Get Application Error:', error?.message || error);
     res.status(500).json({ error: 'Server Error' });
@@ -512,6 +592,67 @@ export const addNote = async (req, res) => {
   }
 };
 
+// @desc    Email the applicant directly from the KYC screen — for anything that
+//          isn't a formal revision request: a document that is unclear, a
+//          question, something they need to send. Replies go to the sender's
+//          own email. The sent message is kept on the application.
+// @route   POST /api/officer/applications/:id/message
+// @access  Private (Owner/Admin/Officer)
+export const messageApplicant = async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: 'Invalid id.' });
+    }
+    const subject = String(req.body?.subject || '').trim().slice(0, 120) || 'About your PayChain application';
+    const message = String(req.body?.message || '').trim();
+    if (message.length < 5) return res.status(400).json({ error: 'Write a message for the applicant.' });
+    if (message.length > 3000) return res.status(400).json({ error: 'Message is too long (max 3000 characters).' });
+
+    const application = await Merchant.findOne({ _id: req.params.id, kybStatus: { $exists: true }, ...scopedToOfficer(req.admin) })
+      .select('email name businessName kybMessages');
+    if (!application) return res.status(404).json({ error: 'Application not found.' });
+    if (!application.email) return res.status(400).json({ error: 'This applicant has no email address on file.' });
+
+    // Guard against a runaway loop or a stuck button spamming one applicant.
+    const hourAgo = Date.now() - 60 * 60 * 1000;
+    if ((application.kybMessages || []).filter((m) => m.sentAt && m.sentAt.getTime() > hourAgo).length >= 5) {
+      return res.status(429).json({ error: 'Five messages already sent to this applicant in the last hour. Please wait before sending another.' });
+    }
+
+    const senderName = req.admin.name || req.admin.email;
+    try {
+      await sendApplicantMessageEmail(application.email, {
+        applicantName: application.name || application.businessName,
+        subject,
+        message,
+        senderName,
+        replyTo: req.admin.email,
+      });
+    } catch (err) {
+      return res.status(502).json({ error: 'The email could not be sent. Please try again in a moment.' });
+    }
+
+    const entry = { authorId: req.admin._id, authorName: senderName, authorEmail: req.admin.email, subject, message, sentAt: new Date() };
+    const updated = await Merchant.findOneAndUpdate(
+      { _id: application._id },
+      { $push: { kybMessages: entry } },
+      { returnDocument: 'after' }
+    ).select('kybMessages');
+
+    logAudit({
+      action: 'officer.application.message_sent', category: 'admin', severity: 'info',
+      message: `Emailed applicant: "${subject}"`,
+      merchant: application, actor: actorFor(req.admin), req,
+      metadata: { subject },
+    });
+
+    res.json({ success: true, data: updated.kybMessages });
+  } catch (error) {
+    console.error('Message Applicant Error:', error?.message || error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
 // @desc    Assign or override an application's risk tier.
 // @route   PATCH /api/officer/applications/:id/risk-tier
 // @access  Private (Owner/Admin/Officer)
@@ -545,6 +686,82 @@ export const setRiskTier = async (req, res) => {
   }
 };
 
+// The shared tail of every approval — the normal reviewer path
+// (approveApplication) and the officer's on-site flow (fieldApprove in
+// fieldApprovalController.js): sets up the password-invite link if the
+// merchant has no password yet, marks the application approved, sends the
+// invite email + approval SMS, and audits. Callers do their own gating first.
+export async function finalizeApproval(application, req, meta = {}) {
+  // paybillAccount (the old 5-digit shared-Paybill sub-account) is
+  // deliberately no longer assigned on approval — the live payment rail
+  // is the NCBA virtual account (ncbaMerchantCode), already auto-assigned
+  // by the Merchant model's pre-save hook when the application was created.
+  //
+  // Any application reaching this point without a password yet — every
+  // officer-originated application (createApplication never sets one),
+  // and every self-serve signup now that registerMerchant no longer
+  // collects one either — genuinely needs the set-up-password invite
+  // link below. Checking `!application.password` directly (rather than
+  // the origination flag) means this correctly covers both without
+  // needing to know which pipeline the application came from; a self-
+  // serve merchant reviewed via the legacy `startReview` path may
+  // already have a password from before this gate existed, in which
+  // case sending a "set up your password" link would be wrong, so that
+  // case still correctly skips it.
+  const needsCredentials = !application.password;
+  let setupLink = null;
+  if (needsCredentials) {
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+    application.passwordResetToken = hashedToken;
+    application.passwordResetExpires = expires;
+    setupLink = `${MERCHANT_DASHBOARD_URL.replace(/\/$/, '')}/setup-password?token=${rawToken}`;
+  }
+
+  application.isVerified = true;
+  application.kybStatus = 'approved';
+  application.reviewedAt = new Date();
+  application.reviewedBy = req.admin._id;
+  await application.save();
+
+  if (needsCredentials) {
+    const ncbaVirtualAccountNumber = getNcbaVirtualAccountNumber(application.ncbaMerchantCode);
+    sendMerchantInvite(
+      application.email, application.name, application.businessName, setupLink,
+      ncbaVirtualAccountNumber, application.ncbaMerchantCode
+    ).catch((err) => console.error(`📧 Failed to send approval invite to ${application.email}:`, err));
+  }
+
+  // Approval SMS goes to every approved merchant, not just the ones who
+  // need a set-up-password invite — a merchant may see the text before
+  // the email (or at all, if the email lands in spam). When they need to
+  // set a password, `setupLink` is included (never a password/code, same
+  // mechanism as sendMerchantInvite); otherwise it's the plain "you're
+  // approved, go ahead and use PayChain" version.
+  const approvedPhone = toE164Kenyan(application.phone);
+  if (approvedPhone) {
+    safeSendSMS({
+      to: approvedPhone,
+      message: buildAccountApprovedSms({
+        businessName: application.businessName,
+        setupLink,
+      }).message,
+    }).catch((err) => console.error(`📱 Failed to send approval SMS to ${approvedPhone}:`, err));
+  }
+
+  logAudit({
+    action: meta.auditAction || 'officer.application.approved', category: 'admin', severity: 'success',
+    message: (meta.auditPrefix || '') + (needsCredentials
+      ? `Approved and activated — invite email + SMS sent to ${application.email}`
+      : `KYB review approved for ${application.email} (already has a password — approval SMS sent, no invite email)`),
+    merchant: application, actor: actorFor(req.admin), req,
+    metadata: { riskTier: application.riskTier, ...(meta.auditMetadata || {}) },
+  });
+
+  return { needsCredentials };
+}
+
 // @desc    Approve and activate an application. Mirrors adminController's
 //          createMerchant activation half — paybill generation, setup link,
 //          invite email — just gated behind the checklist instead of
@@ -569,73 +786,20 @@ export const approveApplication = async (req, res) => {
       return res.status(400).json({ error: 'Assign a risk tier before approving.' });
     }
 
-    // paybillAccount (the old 5-digit shared-Paybill sub-account) is
-    // deliberately no longer assigned on approval — the live payment rail
-    // is the NCBA virtual account (ncbaMerchantCode), already auto-assigned
-    // by the Merchant model's pre-save hook when the application was created.
-    //
-    // Any application reaching this point without a password yet — every
-    // officer-originated application (createApplication never sets one),
-    // and every self-serve signup now that registerMerchant no longer
-    // collects one either — genuinely needs the set-up-password invite
-    // link below. Checking `!application.password` directly (rather than
-    // the origination flag) means this correctly covers both without
-    // needing to know which pipeline the application came from; a self-
-    // serve merchant reviewed via the legacy `startReview` path may
-    // already have a password from before this gate existed, in which
-    // case sending a "set up your password" link would be wrong, so that
-    // case still correctly skips it.
-    const needsCredentials = !application.password;
-    let setupLink = null;
-    if (needsCredentials) {
-      const rawToken = crypto.randomBytes(32).toString('hex');
-      const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
-      const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
-      application.passwordResetToken = hashedToken;
-      application.passwordResetExpires = expires;
-      setupLink = `${MERCHANT_DASHBOARD_URL.replace(/\/$/, '')}/setup-password?token=${rawToken}`;
-    }
-
-    application.isVerified = true;
-    application.kybStatus = 'approved';
-    application.reviewedAt = new Date();
-    application.reviewedBy = req.admin._id;
-    await application.save();
-
-    if (needsCredentials) {
-      const ncbaVirtualAccountNumber = getNcbaVirtualAccountNumber(application.ncbaMerchantCode);
-      sendMerchantInvite(
-        application.email, application.name, application.businessName, setupLink,
-        ncbaVirtualAccountNumber, application.ncbaMerchantCode
-      ).catch((err) => console.error(`📧 Failed to send approval invite to ${application.email}:`, err));
-
-      // SMS companion to the invite email above — a merchant may see the
-      // text before the email (or at all, if the email lands in spam), and
-      // this is the "you're approved, here's how to get in" moment the
-      // account-opening flow promises. Carries the setup link only, never
-      // a password/code, matching sendMerchantInvite's own mechanism.
-      const approvedPhone = toE164Kenyan(application.phone);
-      if (approvedPhone) {
-        safeSendSMS({
-          to: approvedPhone,
-          message: buildAccountApprovedSms({
-            businessName: application.businessName,
-            accountNumber: formatAccountNumberDisplay(ncbaVirtualAccountNumber || application.ncbaMerchantCode),
-            accountIsInterim: !ncbaVirtualAccountNumber,
-            setupLink,
-          }).message,
-        }).catch((err) => console.error(`📱 Failed to send approval SMS to ${approvedPhone}:`, err));
+    // An officer's approval — from this button or the on-site flow — always
+    // goes through the field-approval gates (hard stops, evidence, daily cap,
+    // admin review afterwards), so the guardrails can't be side-stepped.
+    if (req.admin.role === 'officer') {
+      try {
+        const result = await applyFieldApproval(application, req, finalizeApproval, { officerRisk: application.riskTier });
+        return res.json({ success: true, data: { _id: application._id, kybStatus: 'approved', isVerified: true, ...result } });
+      } catch (e) {
+        if (e instanceof FieldApprovalError) return res.status(e.status).json({ error: e.message, blockers: e.blockers });
+        throw e;
       }
     }
 
-    logAudit({
-      action: 'officer.application.approved', category: 'admin', severity: 'success',
-      message: needsCredentials
-        ? `Approved and activated — invite email + SMS sent to ${application.email}`
-        : `KYB review approved for ${application.email} (already has a password — no invite sent)`,
-      merchant: application, actor: actorFor(req.admin), req,
-      metadata: { riskTier: application.riskTier },
-    });
+    await finalizeApproval(application, req);
 
     res.json({ success: true, data: { _id: application._id, kybStatus: 'approved', isVerified: true } });
   } catch (error) {

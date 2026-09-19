@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../api/config'
 import mainLogo from '../assets/signin-logo.png'
+import { GetAppCard } from '../components/GetAppCard'
 
 function Strength({ met, children }) {
   return (
@@ -64,7 +65,6 @@ export default function SetupPassword() {
       const res = await api.post('/api/auth/merchant/setup-password', { token, password })
       if (res.data?.success) {
         setPhase('done')
-        setTimeout(() => nav('/login'), 2200)
       } else {
         setErr(res.data?.error || 'Could not set password.')
       }
@@ -103,12 +103,20 @@ export default function SetupPassword() {
           )}
 
           {phase === 'done' && (
-            <div className="text-center py-8">
+            <div className="text-center py-4">
               <div className="w-14 h-14 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-4">
                 <span className="material-symbols-outlined text-3xl">check_circle</span>
               </div>
-              <h2 className="text-xl font-bold text-gray-900 mb-2">Password set</h2>
-              <p className="text-sm text-gray-500">Redirecting you to sign in…</p>
+              <h2 className="text-xl font-bold text-gray-900 mb-1">You're all set</h2>
+              <p className="text-sm text-gray-500 mb-6">Your password is saved. Sign in to open your dashboard.</p>
+              <button
+                type="button"
+                onClick={() => nav('/login?tab=login')}
+                className="w-full py-3 rounded-lg bg-[#06201B] text-white font-bold text-sm tracking-wide hover:bg-[#0a3029] transition-colors mb-5"
+              >
+                Continue to Log In
+              </button>
+              <GetAppCard heading="Get the PayChain app" source="setup_password_done" />
             </div>
           )}
 

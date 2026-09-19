@@ -11,7 +11,7 @@ import { buildStrictSms } from './smsSanitizer.js';
 // Paybill" surface in the app currently sources it the same (fixed) way,
 // so this stays consistent with that rather than introducing a second,
 // independently-configurable source that could drift from the emails.
-const PAYBILL_NUMBER = '880100';
+export const PAYBILL_NUMBER = '880100';
 
 /**
  * Sent once, right after a merchant's account becomes usable — self-signup
@@ -49,29 +49,50 @@ export function buildMerchantWelcomeSms({ businessName, accountNumber, accountIs
 }
 
 /**
- * Sent once an application clears admin/officer KYB review — the
- * self-serve/officer-application counterpart to buildMerchantWelcomeSms
- * above, for merchants who never got a password at signup and are only now
- * gaining real account access (see officerController.js#approveApplication).
- * Carries the same Paybill/account details as the email, plus the secure
- * one-time setup-password link (`/setup-password?token=...`) — no password
- * or code is ever put in the SMS itself, only the link.
+ * Sent right after a self-serve signup is submitted, while it waits in the
+ * KYC review queue (see merchantAuthController.js#registerMerchant). The
+ * only message a merchant gets between "I registered" and "I was approved",
+ * so it says plainly that the application landed and that they'll be told
+ * when it's done — no login/next-step instructions, since there's nothing
+ * to do yet.
  *
- * @param {{ businessName?: string|null, accountNumber: string, accountIsInterim?: boolean, setupLink: string }} params
+ * @param {{ businessName?: string|null }} params
  * @returns {{ message: string, truncated: boolean, length: number }}
  */
-export function buildAccountApprovedSms({ businessName, accountNumber, accountIsInterim = false, setupLink }) {
+export function buildRegistrationReceivedSms({ businessName }) {
   return buildStrictSms(
-    ({ name, paybill, account, interimNote, url }) =>
-      `PayChain: ${name}, your application is approved! Paybill ${paybill}, Account No. ${account}${interimNote}. Set your password to log in: ${url}`,
+    ({ name }) =>
+      `PayChain: Hi ${name}, we have received your registration and it is under review. We will notify you once your account is activated.`,
+    { truncatable: [{ key: 'name', value: businessName || 'there' }] }
+  );
+}
+
+/**
+ * Sent once an application clears admin/officer KYB review (see
+ * officerController.js#approveApplication). Deliberately just "you're
+ * approved" — the Paybill/account number go out separately in
+ * buildMerchantWelcomeSms once the merchant has set their password, and
+ * again in the invite email, so repeating them here only made this longer.
+ *
+ * A merchant who has no password yet (every self-serve signup and
+ * officer-originated application) can't log in until they set one, so for
+ * them `setupLink` — the secure one-time `/setup-password?token=...` link —
+ * is what actually lets them in and MUST be included; no password or code
+ * is ever put in the SMS itself. A merchant who already has a password gets
+ * the plain version with no link.
+ *
+ * @param {{ businessName?: string|null, setupLink?: string|null }} params
+ * @returns {{ message: string, truncated: boolean, length: number }}
+ */
+export function buildAccountApprovedSms({ businessName, setupLink = null }) {
+  return buildStrictSms(
+    ({ name, url }) =>
+      url
+        ? `PayChain: Hi ${name}, your account has been approved. Set your password to get started: ${url}`
+        : `PayChain: Hi ${name}, your account has been approved. You can now start using PayChain.`,
     {
-      fixed: {
-        paybill: PAYBILL_NUMBER,
-        account: accountNumber,
-        interimNote: accountIsInterim ? ' (temporary)' : '',
-        url: setupLink,
-      },
-      truncatable: [{ key: 'name', value: businessName || 'valued merchant' }],
+      fixed: { url: setupLink || '' },
+      truncatable: [{ key: 'name', value: businessName || 'there' }],
     }
   );
 }
@@ -126,4 +147,80 @@ export function buildNewDeviceLoginSms() {
 export function buildSignupPhoneOtpSms({ otp }) {
   const message = `PayChain: Your verification code is ${otp}. It expires in 10 minutes. Never share this code with anyone.`;
   return { message, truncated: false, length: message.length };
+}
+
+const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=ke.co.paychain.app';
+
+/**
+ * Sent to someone who verified their phone in the signup wizard but never
+ * submitted the application (see services/automations/signupNudge.js). There
+ * is no merchant record yet, so no name — just a link back in.
+ *
+ * @param {{ url: string }} params
+ */
+export function buildSignupAbandonedSms({ url }) {
+  const message = `PayChain: You started creating a PayChain account but did not finish. Continue here: ${url}`;
+  return { message, truncated: false, length: message.length };
+}
+
+/**
+ * A self-serve application that has been waiting on review longer than
+ * expected. Reassurance only — no promise of a time.
+ */
+export function buildRegistrationDelaySms({ businessName }) {
+  return buildStrictSms(
+    ({ name }) => `PayChain: Hi ${name}, thank you for your patience. Your registration is still under review and we will notify you as soon as it is done.`,
+    { truncatable: [{ key: 'name', value: businessName || 'there' }] }
+  );
+}
+
+/**
+ * A reviewer asked the applicant to fix documents and they haven't yet. The
+ * resubmit link is in the email (its raw token is never stored, so an SMS
+ * can't carry it) — this points them back to it.
+ */
+export function buildRevisionNudgeSms({ businessName }) {
+  return buildStrictSms(
+    ({ name }) => `PayChain: Hi ${name}, your registration needs a few updates before we can approve it. Please use the link we emailed you to resubmit.`,
+    { truncatable: [{ key: 'name', value: businessName || 'there' }] }
+  );
+}
+
+/**
+ * Onboarding drip texts, one per stage after approval ('d1' | 'd3' | 'd7').
+ * d1 carries the merchant's Paybill + account number (same source as the
+ * welcome SMS/email); d7 links the Play Store listing.
+ */
+export function buildOnboardingTipSms({ businessName, stage, accountNumber = '' }) {
+  if (stage === 'd1') {
+    return buildStrictSms(
+      ({ name, paybill, account }) => `PayChain: Hi ${name}, share your Paybill ${paybill}, Account No. ${account}, with customers to start receiving payments.`,
+      { fixed: { paybill: PAYBILL_NUMBER, account: accountNumber }, truncatable: [{ key: 'name', value: businessName || 'there' }] }
+    );
+  }
+  if (stage === 'd3') {
+    return buildStrictSms(
+      ({ name }) => `PayChain: Hi ${name}, you can pay suppliers and staff straight from PayChain. Open the app to send your first payment.`,
+      { truncatable: [{ key: 'name', value: businessName || 'there' }] }
+    );
+  }
+  return buildStrictSms(
+    ({ name, url }) => `PayChain: Hi ${name}, run your business from your phone. Get the PayChain app: ${url}`,
+    { fixed: { url: PLAY_STORE_URL }, truncatable: [{ key: 'name', value: businessName || 'there' }] }
+  );
+}
+
+/**
+ * Sent at the end of an on-site (officer) approval so the merchant has their
+ * payment details in their own phone before the officer leaves. Separate from
+ * the approval SMS (which carries the set-password link) and the welcome SMS
+ * (sent after password setup).
+ *
+ * @param {{ businessName?: string|null, accountNumber: string }} params
+ */
+export function buildPaymentDetailsSms({ businessName, accountNumber }) {
+  return buildStrictSms(
+    ({ name, paybill, account }) => `PayChain: Hi ${name}, your M-PESA Paybill is ${paybill}, Account No. ${account}. Customers can pay you with these details.`,
+    { fixed: { paybill: PAYBILL_NUMBER, account: accountNumber }, truncatable: [{ key: 'name', value: businessName || 'there' }] }
+  );
 }

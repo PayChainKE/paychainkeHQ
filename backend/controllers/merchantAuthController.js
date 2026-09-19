@@ -11,7 +11,7 @@ import { encryptKey } from '../utils/cryptoHelper.js';
 import bcrypt from 'bcryptjs';
 import { createNotification } from './notificationController.js';
 import { getNcbaVirtualAccountNumber, formatAccountNumberDisplay, validatePhoneNumber, isValidPhoneInputFormat, NcbaValidationError } from '../utils/ncbaValidators.js';
-import { buildMerchantWelcomeSms, buildSignupPhoneOtpSms } from '../utils/accountSmsTemplates.js';
+import { buildMerchantWelcomeSms, buildSignupPhoneOtpSms, buildRegistrationReceivedSms } from '../utils/accountSmsTemplates.js';
 import { isValidEmail, EMAIL_FORMAT_HINT } from '../utils/emailValidator.js';
 import { toE164Kenyan } from '../utils/notificationService.js';
 import { safeSendSMS } from '../utils/smsSanitizer.js';
@@ -52,7 +52,9 @@ export const BUSINESS_TYPES = [
   'Cooperative Society',
   'Other',
 ];
-const EMPLOYEE_BANDS = ['1-10', '11-50', '51-200', '201-500', '501+'];
+// Exported so officerController.js's createApplication validates against the
+// same list, rather than a second copy of it.
+export const EMPLOYEE_BANDS = ['1-10', '11-50', '51-200', '201-500', '501+'];
 
 // Same env var / fallback officerController.js uses to build the public
 // KYC resubmission link — reused by getMerchantKycStatus below so the
@@ -577,7 +579,16 @@ export const registerMerchant = async (req, res) => {
     // anyone into yet. The account details + setup-password credentials go
     // out only once an admin/officer approves it (see
     // officerController.js#approveApplication's sendMerchantInvite +
-    // buildAccountApprovedSms calls) — never before.
+    // buildAccountApprovedSms calls) — never before. The one thing that
+    // does go out now is a short "received, under review" SMS, so the
+    // merchant isn't left wondering whether the submission landed.
+    const receivedPhone = toE164Kenyan(merchant.phone);
+    if (receivedPhone) {
+      safeSendSMS({
+        to: receivedPhone,
+        message: buildRegistrationReceivedSms({ businessName: merchant.businessName }).message,
+      }).catch((err) => console.error(`📱 Failed to send registration-received SMS to ${receivedPhone}:`, err));
+    }
 
     // Wallet provisioning is intentionally NOT done here. The Digital Wallet
     // is opt-in: a merchant activates it whenever they want via
