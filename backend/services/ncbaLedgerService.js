@@ -3,6 +3,8 @@ import Merchant from '../models/Merchant.js';
 import Transaction from '../models/Transaction.js';
 import STKRequest from '../models/STKRequest.js';
 import { getNcbaTariffBand } from '../config/ncbaTariffCard.js';
+import { getNcbaVirtualAccountNumber } from '../utils/ncbaValidators.js';
+import { dispatchPaybillPaymentReceived } from './webhookDeliveryService.js';
 
 // STK-collected money (see services/ncbaStkPushService.js) lands in the same
 // NCBA account as every other collection and settles via the app-aware
@@ -218,6 +220,23 @@ export async function creditNcbaCollection({ merchant, grossAmount, bankRef, cus
         netAmount,
         streamId: transaction.revenueStream,
       };
+    });
+
+    // Let any linked developer's system know (an ISP reconnecting a subscriber,
+    // a CRM syncing a payment). Outside the DB transaction and never awaited,
+    // so a slow or broken webhook endpoint cannot hold up the credit.
+    dispatchPaybillPaymentReceived(merchant._id, {
+      id: `paybill_${result.transaction._id}`,
+      kind: 'paybill',
+      mode: 'live',
+      status: 'success',
+      amount: grossAmount,
+      currency: 'KES',
+      reference: bankRef,
+      merchantId: String(merchant._id),
+      accountNumber: getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode) || merchant.ncbaMerchantCode,
+      payer: { name: customerName || null, phone: customerPhone || null },
+      receivedAt: result.transaction.createdAt || new Date(),
     });
 
     return result;

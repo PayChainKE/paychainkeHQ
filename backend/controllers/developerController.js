@@ -4,6 +4,9 @@ import ApiKey from '../models/ApiKey.js';
 import { logAudit } from '../utils/auditLog.js';
 import { notifyAdmins, escapeHtml } from '../utils/securityAlerts.js';
 import { runIntegrationTestForDeveloper } from '../services/developerIntegrationTestService.js';
+import Merchant from '../models/Merchant.js';
+import { linkedMerchantIds, isMerchantLinked, liveAccessFor, liveAccessSummary } from '../utils/developerMerchants.js';
+import { migrateLegacyLink } from '../services/developerMerchantLinkService.js';
 
 const publicApiKey = (key) => ({
   _id: key._id,
@@ -14,6 +17,9 @@ const publicApiKey = (key) => ({
   lastUsedAt: key.lastUsedAt,
   createdAt: key.createdAt,
   revokedAt: key.revokedAt,
+  // merchantId is populated (with businessName) on the list endpoint.
+  merchantId: key.merchantId?._id || key.merchantId || null,
+  merchantName: key.merchantId?.businessName || null,
 });
 
 // @desc    Current developer's own profile
@@ -31,11 +37,10 @@ export const getMe = async (req, res) => {
       phone: d.phone,
       status: d.status,
       isVerified: d.isVerified,
-      liveAccess: {
-        approved: d.liveAccess?.approved || false,
-        requestedAt: d.liveAccess?.requestedAt || null,
-        approvedAt: d.liveAccess?.approvedAt || null,
-      },
+      // Summary across merchants (approval is per merchant: see
+      // GET /link-merchant/status for each merchant's own state).
+      liveAccess: liveAccessSummary(d),
+      linkedMerchantCount: linkedMerchantIds(d).length,
       createdAt: d.createdAt,
       lastLogin: d.lastLogin,
     },
@@ -47,7 +52,7 @@ export const getMe = async (req, res) => {
 // @access  Private (Developer)
 export const listApiKeys = async (req, res) => {
   try {
-    const keys = await ApiKey.find({ developerId: req.developer._id }).sort({ createdAt: -1 });
+    const keys = await ApiKey.find({ developerId: req.developer._id }).sort({ createdAt: -1 }).populate('merchantId', 'businessName');
     res.json({ success: true, data: keys.map(publicApiKey) });
   } catch (error) {
     console.error('List API Keys Error:', error);
@@ -65,9 +70,30 @@ export const createApiKey = async (req, res) => {
       return res.status(400).json({ error: 'mode must be "test" or "live".' });
     }
 
-    if (mode === 'live' && !req.developer.liveAccess?.approved) {
+    // Which merchant this key acts for. A live key must have one: the
+    // developer picks it, or it defaults when they have exactly one linked.
+    // A test key may leave it out (pure sandbox).
+    const developerDoc = await Developer.findById(req.developer._id);
+    const linkedIds = linkedMerchantIds(developerDoc);
+    let merchantId = req.body?.merchantId || null;
+    if (merchantId) {
+      if (!isMerchantLinked(developerDoc, merchantId)) {
+        return res.status(400).json({ error: 'That merchant is not linked to your account. Link it first.', code: 'MERCHANT_NOT_LINKED' });
+      }
+    } else if (mode === 'live') {
+      if (linkedIds.length === 0) {
+        return res.status(400).json({ error: 'Link your real merchant account before creating a live key.', code: 'NO_LINKED_MERCHANT' });
+      }
+      if (linkedIds.length > 1) {
+        return res.status(400).json({ error: 'Choose which merchant this live key is for (merchantId).', code: 'MERCHANT_REQUIRED' });
+      }
+      merchantId = linkedIds[0];
+    }
+
+    // Live access is approved per merchant: this merchant must be cleared.
+    if (mode === 'live' && !liveAccessFor(developerDoc, merchantId).approved) {
       return res.status(403).json({
-        error: 'Live API access has not been approved for this account yet. Request live access first, or use a test-mode key in the meantime.',
+        error: 'Live access has not been approved for this merchant yet. Request live access for it first, or use a test-mode key in the meantime.',
         code: 'LIVE_ACCESS_NOT_APPROVED',
       });
     }
@@ -78,6 +104,7 @@ export const createApiKey = async (req, res) => {
     const apiKey = await ApiKey.create({
       developerId: req.developer._id,
       mode,
+      merchantId,
       keyPrefix: rawKey.slice(0, 12),
       hashedKey,
       label: label ? String(label).trim().slice(0, 100) : null,
@@ -87,7 +114,7 @@ export const createApiKey = async (req, res) => {
       action: 'developer.api_key.created', category: 'security', severity: mode === 'live' ? 'warning' : 'info',
       message: `Created a ${mode}-mode API key`,
       req, actor: { type: 'self', id: req.developer._id, email: req.developer.email, name: req.developer.name },
-      metadata: { mode, keyPrefix: apiKey.keyPrefix },
+      metadata: { mode, keyPrefix: apiKey.keyPrefix, merchantId: merchantId ? String(merchantId) : null },
     });
 
     // The only point in this flow the plaintext key is ever available —
@@ -142,10 +169,34 @@ export const revokeApiKey = async (req, res) => {
 // @access  Private (Developer)
 export const requestLiveAccess = async (req, res) => {
   try {
-    const developer = await Developer.findById(req.developer._id);
-    if (developer.liveAccess?.approved) {
-      return res.status(400).json({ error: 'Live access is already approved for this account.' });
+    // A legacy single link is moved into the per-merchant list first.
+    const developer = await migrateLegacyLink(req.developer._id);
+
+    // Sandbox needs no merchant, but production does: live collections settle
+    // into a real merchant's wallet. Nothing goes to an admin for approval
+    // until that real account is linked.
+    const linkedIds = linkedMerchantIds(developer);
+    if (linkedIds.length === 0) {
+      return res.status(400).json({
+        error: 'Link your real PayChain merchant account before requesting live access.',
+        code: 'NO_LINKED_MERCHANT',
+      });
     }
+
+    // Live access is approved per merchant, so say which one.
+    let merchantId = req.body?.merchantId || null;
+    if (!merchantId) {
+      if (linkedIds.length > 1) {
+        return res.status(400).json({ error: 'Choose which merchant you are requesting live access for (merchantId).', code: 'MERCHANT_REQUIRED' });
+      }
+      merchantId = linkedIds[0];
+    } else if (!isMerchantLinked(developer, merchantId)) {
+      return res.status(400).json({ error: 'That merchant is not linked to your account. Link it first.', code: 'MERCHANT_NOT_LINKED' });
+    }
+    if (liveAccessFor(developer, merchantId).approved) {
+      return res.status(400).json({ error: 'Live access is already approved for this merchant.' });
+    }
+    const merchantDoc = await Merchant.findById(merchantId).select('businessName');
 
     let autoTest = null;
     try {
@@ -154,10 +205,10 @@ export const requestLiveAccess = async (req, res) => {
       console.error('requestLiveAccess: auto integration test failed to run:', err?.message || err);
     }
 
-    developer.liveAccess = developer.liveAccess || {};
-    developer.liveAccess.requestedAt = new Date();
-    developer.liveAccess.autoTest = autoTest;
-    await developer.save();
+    await Developer.updateOne(
+      { _id: developer._id, 'linkedMerchants.merchantId': merchantId },
+      { $set: { 'linkedMerchants.$.liveAccess.requestedAt': new Date(), 'linkedMerchants.$.liveAccess.autoTest': autoTest } }
+    );
 
     const webhookSummary = autoTest?.noWebhooksRegistered
       ? 'no webhook registered (polling-only integration)'
@@ -168,12 +219,13 @@ export const requestLiveAccess = async (req, res) => {
 
     logAudit({
       action: 'developer.live_access.requested', category: 'security', severity: 'info',
-      message: 'Requested live API access',
+      message: `Requested live API access for ${merchantDoc?.businessName || merchantId}`,
       req, actor: { type: 'self', id: developer._id, email: developer.email, name: developer.name },
       metadata: {
         collectTestPassed: autoTest?.collectTest?.passed ?? null,
         webhookCount: autoTest?.webhookTests?.length ?? 0,
         webhookTestsPassed: autoTest?.webhookTests?.filter((w) => w.passed).length ?? 0,
+        merchantId: String(merchantId),
       },
     });
 
@@ -182,11 +234,11 @@ export const requestLiveAccess = async (req, res) => {
       severity: autoTest && !autoTest.collectTest.passed ? 'warning' : 'info',
       subject: 'Developer requested live API access',
       heading: 'Live API Access Requested',
-      details: `<strong>${escapeHtml(developer.companyName)}</strong> (${escapeHtml(developer.email)}) requested approval for live-mode API keys.<br><br>${testSummary}`,
-      metadata: { developerId: String(developer._id), companyName: developer.companyName, email: developer.email, autoTestPassed: autoTest?.collectTest?.passed ?? null },
+      details: `<strong>${escapeHtml(developer.companyName)}</strong> (${escapeHtml(developer.email)}) requested approval for live-mode API keys for the merchant <strong>${escapeHtml(merchantDoc?.businessName || String(merchantId))}</strong>.<br><br>${testSummary}`,
+      metadata: { developerId: String(developer._id), merchantId: String(merchantId), companyName: developer.companyName, email: developer.email, autoTestPassed: autoTest?.collectTest?.passed ?? null },
     });
 
-    res.json({ success: true, message: 'Request submitted. An admin will review your account.' });
+    res.json({ success: true, merchantId, message: 'Request submitted. An admin will review this merchant.' });
   } catch (error) {
     console.error('Request Live Access Error:', error);
     res.status(500).json({ error: 'Server Error' });

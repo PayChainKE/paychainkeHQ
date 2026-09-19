@@ -1,3 +1,4 @@
+import { resolveKeyMerchantId, keyScope, scopedIdempotencyKey } from '../utils/developerMerchants.js';
 import bcrypt from 'bcryptjs';
 import DeveloperPayment from '../models/DeveloperPayment.js';
 import Merchant from '../models/Merchant.js';
@@ -80,14 +81,17 @@ function simulatePayoutSettlement(payment) {
 // @access  Public (API key)
 export const collectPayment = async (req, res) => {
   try {
-    const idempotencyKey = req.headers['idempotency-key'];
-    if (!idempotencyKey) return res.status(400).json({ error: 'Idempotency-Key header is required.', code: 'IDEMPOTENCY_KEY_REQUIRED' });
+    const rawIdempotencyKey = req.headers['idempotency-key'];
+    if (!rawIdempotencyKey) return res.status(400).json({ error: 'Idempotency-Key header is required.', code: 'IDEMPOTENCY_KEY_REQUIRED' });
 
     const developer = req.developer;
-    const merchantId = developer.linkedMerchant?.merchantId;
-    if (!merchantId) {
+    // Sandbox (test) keys work without a linked merchant — nothing real is
+    // touched. Live keys always need one.
+    const merchantId = resolveKeyMerchantId(req.apiKey, developer);
+    if (!merchantId && req.apiKey.mode === 'live') {
       return res.status(400).json({ error: 'No merchant account linked. Complete /api/developer/link-merchant first.', code: 'NO_LINKED_MERCHANT' });
     }
+    const idempotencyKey = scopedIdempotencyKey(developer, merchantId, rawIdempotencyKey);
 
     const { amount, phone, reference } = req.body || {};
 
@@ -169,14 +173,17 @@ export function parsePayoutDestination(body) {
 // @access  Public (API key)
 export const payoutPayment = async (req, res) => {
   try {
-    const idempotencyKey = req.headers['idempotency-key'];
-    if (!idempotencyKey) return res.status(400).json({ error: 'Idempotency-Key header is required.', code: 'IDEMPOTENCY_KEY_REQUIRED' });
+    const rawIdempotencyKey = req.headers['idempotency-key'];
+    if (!rawIdempotencyKey) return res.status(400).json({ error: 'Idempotency-Key header is required.', code: 'IDEMPOTENCY_KEY_REQUIRED' });
 
     const developer = req.developer;
-    const merchantId = developer.linkedMerchant?.merchantId;
-    if (!merchantId) {
+    // Sandbox (test) keys work without a linked merchant — nothing real is
+    // touched. Live keys always need one.
+    const merchantId = resolveKeyMerchantId(req.apiKey, developer);
+    if (!merchantId && req.apiKey.mode === 'live') {
       return res.status(400).json({ error: 'No merchant account linked. Complete /api/developer/link-merchant first.', code: 'NO_LINKED_MERCHANT' });
     }
+    const idempotencyKey = scopedIdempotencyKey(developer, merchantId, rawIdempotencyKey);
 
     const { narration, apiPayoutPin } = req.body || {};
     const numericAmount = Number(req.body?.amount);
@@ -336,7 +343,7 @@ export const payoutPayment = async (req, res) => {
 // @access  Public (API key)
 export const getPaymentStatus = async (req, res) => {
   try {
-    const payment = await DeveloperPayment.findOne({ _id: req.params.id, developerId: req.developer._id });
+    const payment = await DeveloperPayment.findOne({ _id: req.params.id, developerId: req.developer._id, ...keyScope(req.apiKey) });
     if (!payment) return res.status(404).json({ error: 'Payment not found.' });
 
     await syncLiveCollectFromStkRequest(payment);

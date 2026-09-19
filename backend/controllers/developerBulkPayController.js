@@ -1,3 +1,4 @@
+import { resolveKeyMerchantId, keyScope, scopedIdempotencyKey } from '../utils/developerMerchants.js';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import DeveloperPayment from '../models/DeveloperPayment.js';
@@ -88,14 +89,17 @@ function priceRows(rawPayments) {
 // @access  Public (API key)
 export const createDeveloperBulkPayment = async (req, res) => {
   try {
-    const idempotencyKey = req.headers['idempotency-key'];
-    if (!idempotencyKey) return res.status(400).json({ error: 'Idempotency-Key header is required.', code: 'IDEMPOTENCY_KEY_REQUIRED' });
+    const rawIdempotencyKey = req.headers['idempotency-key'];
+    if (!rawIdempotencyKey) return res.status(400).json({ error: 'Idempotency-Key header is required.', code: 'IDEMPOTENCY_KEY_REQUIRED' });
 
     const developer = req.developer;
-    const merchantId = developer.linkedMerchant?.merchantId;
-    if (!merchantId) {
+    // Sandbox (test) keys work without a linked merchant — nothing real is
+    // touched. Live keys always need one.
+    const merchantId = resolveKeyMerchantId(req.apiKey, developer);
+    if (!merchantId && req.apiKey.mode === 'live') {
       return res.status(400).json({ error: 'No merchant account linked. Complete /api/developer/link-merchant first.', code: 'NO_LINKED_MERCHANT' });
     }
+    const idempotencyKey = scopedIdempotencyKey(developer, merchantId, rawIdempotencyKey);
 
     const { payments, apiPayoutPin } = req.body || {};
     if (!Array.isArray(payments) || payments.length === 0) {
@@ -273,7 +277,7 @@ export const createDeveloperBulkPayment = async (req, res) => {
 // @access  Public (API key)
 export const getDeveloperBulkPaymentBatch = async (req, res) => {
   try {
-    const payments = await DeveloperPayment.find({ developerId: req.developer._id, batchId: req.params.batchId }).sort('createdAt');
+    const payments = await DeveloperPayment.find({ developerId: req.developer._id, batchId: req.params.batchId, ...keyScope(req.apiKey) }).sort('createdAt');
     if (!payments.length) return res.status(404).json({ error: 'Batch not found.' });
     res.json({ success: true, batchId: req.params.batchId, payments: payments.map(publicDeveloperPayment) });
   } catch (error) {

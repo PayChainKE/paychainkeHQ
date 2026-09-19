@@ -1,3 +1,4 @@
+import { liveAccessSummary } from '../utils/developerMerchants.js';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import Developer from '../models/Developer.js';
@@ -43,8 +44,8 @@ const publicDeveloper = (developer) => ({
   status: developer.status,
   isVerified: developer.isVerified,
   liveAccess: {
-    approved: developer.liveAccess?.approved || false,
-    requestedAt: developer.liveAccess?.requestedAt || null,
+    approved: liveAccessSummary(developer).approved,
+    requestedAt: liveAccessSummary(developer).requestedAt,
   },
   createdAt: developer.createdAt,
   lastLogin: developer.lastLogin,

@@ -1,4 +1,5 @@
 import ApiKey from '../models/ApiKey.js';
+import { linkedMerchantIds, resolveKeyMerchantId } from '../utils/developerMerchants.js';
 import Merchant from '../models/Merchant.js';
 import DeveloperPayment from '../models/DeveloperPayment.js';
 import DeveloperWebhook from '../models/DeveloperWebhook.js';
@@ -36,39 +37,37 @@ const COLLECT_TEST_WAIT_MS = 4500;
 // each night (real webhook failures are watched separately by the webhook
 // health automation, from actual deliveries).
 export async function runIntegrationTestForDeveloper(developer, { includeWebhooks = true } = {}) {
-  const merchantId = developer.linkedMerchant?.merchantId || null;
+  // First linked merchant, for the admin's summary only. The simulated collect
+  // below is pure sandbox and doesn't need one.
+  const merchantId = linkedMerchantIds(developer)[0] || null;
   const merchant = merchantId ? await Merchant.findById(merchantId).select('businessName status') : null;
 
   // ── Test 1: simulated collect ──────────────────────────────────────
   let collectTest;
-  if (!merchantId || !merchant) {
-    collectTest = { passed: false, message: 'No merchant account linked yet — complete /api/developer/link-merchant first.' };
+  const testKey = await ApiKey.findOne({ developerId: developer._id, mode: 'test', status: 'active' }).sort({ createdAt: -1 });
+  if (!testKey) {
+    collectTest = { passed: false, message: 'No active test-mode API key found — the developer needs to create one from their dashboard.' };
   } else {
-    const testKey = await ApiKey.findOne({ developerId: developer._id, mode: 'test', status: 'active' }).sort({ createdAt: -1 });
-    if (!testKey) {
-      collectTest = { passed: false, message: 'No active test-mode API key found — the developer needs to create one from their dashboard.' };
-    } else {
-      try {
-        const idempotencyKey = `paychain-integration-test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-        const payment = await initiateCollectPayment({
-          developerId: developer._id,
-          apiKeyId: testKey._id,
-          merchantId,
-          mode: 'test',
-          amount: 10,
-          phone: '0712345678',
-          reference: 'paychain-integration-test',
-          idempotencyKey,
-        });
-        await new Promise((resolve) => setTimeout(resolve, COLLECT_TEST_WAIT_MS));
-        const settled = await DeveloperPayment.findById(payment._id);
-        collectTest = settled?.status === 'success'
-          ? { passed: true, message: 'Simulated test-mode collect resolved to success.', paymentId: settled._id }
-          : { passed: false, message: `Simulated collect did not resolve to success (status: ${settled?.status || 'unknown'}).`, paymentId: settled?._id || null };
-      } catch (err) {
-        const message = err instanceof CollectValidationError ? err.message : (err.message || 'Unexpected error running the simulated collect.');
-        collectTest = { passed: false, message };
-      }
+    try {
+      const idempotencyKey = `paychain-integration-test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const payment = await initiateCollectPayment({
+        developerId: developer._id,
+        apiKeyId: testKey._id,
+        merchantId: resolveKeyMerchantId(testKey, developer),
+        mode: 'test',
+        amount: 10,
+        phone: '0712345678',
+        reference: 'paychain-integration-test',
+        idempotencyKey,
+      });
+      await new Promise((resolve) => setTimeout(resolve, COLLECT_TEST_WAIT_MS));
+      const settled = await DeveloperPayment.findById(payment._id);
+      collectTest = settled?.status === 'success'
+        ? { passed: true, message: 'Simulated test-mode collect resolved to success.', paymentId: settled._id }
+        : { passed: false, message: `Simulated collect did not resolve to success (status: ${settled?.status || 'unknown'}).`, paymentId: settled?._id || null };
+    } catch (err) {
+      const message = err instanceof CollectValidationError ? err.message : (err.message || 'Unexpected error running the simulated collect.');
+      collectTest = { passed: false, message };
     }
   }
 

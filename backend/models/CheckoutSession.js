@@ -12,7 +12,9 @@ import mongoose from 'mongoose';
 const checkoutSessionSchema = new mongoose.Schema({
   developerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Developer', required: true, index: true },
   apiKeyId: { type: mongoose.Schema.Types.ObjectId, ref: 'ApiKey', required: true },
-  merchantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Merchant', required: true, index: true },
+  // Live records always belong to a real merchant. Sandbox (test-mode)
+  // records made by a developer who hasn't linked one yet have none.
+  merchantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Merchant', required() { return this.mode === 'live'; }, default: null, index: true },
   mode: { type: String, enum: ['test', 'live'], required: true },
   amount: { type: Number, required: true },
   currency: { type: String, default: 'KES' },

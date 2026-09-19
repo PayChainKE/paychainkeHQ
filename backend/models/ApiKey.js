@@ -33,6 +33,16 @@ const apiKeySchema = new mongoose.Schema({
     unique: true,
     index: true,
   },
+  // The one merchant this key acts for: live collections settle into its
+  // wallet. Required for new live keys. A test key may leave it empty
+  // (pure sandbox). Keys created before this field existed have none and are
+  // resolved by utils/developerMerchants.js.
+  merchantId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Merchant',
+    default: null,
+    index: true,
+  },
   label: {
     type: String,
     default: null,

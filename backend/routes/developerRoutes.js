@@ -13,6 +13,7 @@ import {
   startMerchantLink,
   verifyMerchantLink,
   getMerchantLinkStatus,
+  unlinkMerchant,
 } from '../controllers/developerMerchantLinkController.js';
 import {
   listWebhooks,
@@ -51,6 +52,7 @@ router.post('/live-access/request', protectDeveloper, requestLiveAccess);
 router.post('/link-merchant/start', protectDeveloper, apiKeyActionLimiter, startMerchantLink);
 router.post('/link-merchant/verify', protectDeveloper, apiKeyActionLimiter, verifyMerchantLink);
 router.get('/link-merchant/status', protectDeveloper, getMerchantLinkStatus);
+router.delete('/link-merchant/:merchantId', protectDeveloper, apiKeyActionLimiter, unlinkMerchant);
 
 // Webhooks — how integrations (CRM sync, ISP auto-reconnection systems,
 // etc.) find out about a payment event without polling GET /payments/:id.

@@ -74,6 +74,10 @@ export async function initiateCollectPayment({ developerId, apiKeyId, merchantId
     throw e;
   }
 
+  if (mode === 'live' && !merchantId) {
+    throw new CollectValidationError('A live collection needs a linked merchant account.', 'NO_LINKED_MERCHANT');
+  }
+
   await claimClientIdempotencyKey(developerId, idempotencyKey);
 
   const payment = await DeveloperPayment.create({

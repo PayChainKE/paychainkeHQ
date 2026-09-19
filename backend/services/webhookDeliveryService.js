@@ -1,5 +1,7 @@
 import crypto from 'crypto';
 import axios from 'axios';
+import Developer from '../models/Developer.js';
+import { liveAccessFor } from '../utils/developerMerchants.js';
 import DeveloperWebhook from '../models/DeveloperWebhook.js';
 import WebhookDelivery from '../models/WebhookDelivery.js';
 import { assertPublicHttpsUrl } from '../utils/urlSsrfGuard.js';
@@ -13,6 +15,9 @@ export const WEBHOOK_EVENT_TYPES = [
   'payment.collect.failed',
   'payment.payout.succeeded',
   'payment.payout.failed',
+  // A customer paid the merchant's Paybill directly (not through an API
+  // call). Sent to every approved developer linked to that merchant.
+  'payment.paybill.received',
   'invoice.sent',
   'invoice.paid',
   'bulk_payment.completed',
@@ -121,6 +126,25 @@ export async function dispatchDeveloperEvent(developerId, event, data) {
     }));
   } catch (err) {
     console.error(`dispatchDeveloperEvent: failed to fan out '${event}' for developer ${developerId}:`, err?.message || err);
+  }
+}
+
+// Tells every approved developer linked to `merchantId` that a customer paid
+// that merchant's Paybill directly. Called once per credited payment (after a
+// duplicate bank reference has already been rejected), fire-and-forget: it
+// must never delay or fail the NCBA credit that triggered it. Only live
+// developers get these — sandbox accounts have no real Paybill traffic.
+export async function dispatchPaybillPaymentReceived(merchantId, payment) {
+  try {
+    const candidates = await Developer.find({
+      $or: [{ 'linkedMerchants.merchantId': merchantId }, { 'linkedMerchant.merchantId': merchantId }],
+      status: 'active',
+    });
+    // Live access is approved per merchant.
+    const developers = candidates.filter((d) => liveAccessFor(d, merchantId).approved);
+    await Promise.all(developers.map((d) => dispatchDeveloperEvent(d._id, 'payment.paybill.received', { payment })));
+  } catch (err) {
+    console.error(`dispatchPaybillPaymentReceived: failed for merchant ${merchantId}:`, err?.message || err);
   }
 }
 

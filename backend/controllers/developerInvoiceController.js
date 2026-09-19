@@ -1,3 +1,4 @@
+import { resolveKeyMerchantId, keyScope } from '../utils/developerMerchants.js';
 import crypto from 'crypto';
 import Invoice from '../models/Invoice.js';
 import PaymentLink from '../models/PaymentLink.js';
@@ -34,7 +35,7 @@ import {
 export const createDeveloperInvoice = async (req, res) => {
   try {
     const developer = req.developer;
-    const merchantId = developer.linkedMerchant?.merchantId;
+    const merchantId = resolveKeyMerchantId(req.apiKey, developer);
     if (!merchantId) {
       return res.status(400).json({ error: 'No merchant account linked. Complete /api/developer/link-merchant first.', code: 'NO_LINKED_MERCHANT' });
     }
@@ -83,7 +84,7 @@ export const createDeveloperInvoice = async (req, res) => {
 export const sendDeveloperInvoice = async (req, res) => {
   try {
     const developer = req.developer;
-    const merchantId = developer.linkedMerchant?.merchantId;
+    const merchantId = resolveKeyMerchantId(req.apiKey, developer);
     if (!merchantId) {
       return res.status(400).json({ error: 'No merchant account linked. Complete /api/developer/link-merchant first.', code: 'NO_LINKED_MERCHANT' });
     }
@@ -175,7 +176,7 @@ export const getDeveloperInvoice = async (req, res) => {
     // it's only ever set to the developer that created the invoice in the
     // first place, so it already excludes every other developer and every
     // dashboard-created invoice with no possible cross-tenant overlap.
-    const invoice = await Invoice.findOne({ _id: req.params.id, createdViaDeveloperId: req.developer._id })
+    const invoice = await Invoice.findOne({ _id: req.params.id, createdViaDeveloperId: req.developer._id, ...keyScope(req.apiKey) })
       .populate('paymentLinkId', 'linkId status')
       .populate('etimsInvoiceId');
     if (!invoice) return res.status(404).json({ error: 'Invoice not found.' });
@@ -191,7 +192,7 @@ export const getDeveloperInvoice = async (req, res) => {
 // @access  Public (API key)
 export const listDeveloperInvoices = async (req, res) => {
   try {
-    const invoices = await Invoice.find({ createdViaDeveloperId: req.developer._id })
+    const invoices = await Invoice.find({ createdViaDeveloperId: req.developer._id, ...keyScope(req.apiKey) })
       .sort({ createdAt: -1 })
       .limit(100)
       .populate('paymentLinkId', 'linkId status')

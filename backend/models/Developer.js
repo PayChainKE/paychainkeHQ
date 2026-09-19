@@ -53,6 +53,9 @@ const developerSchema = new mongoose.Schema({
     default: 'pending_verification',
     index: true,
   },
+  // LEGACY developer-level gate, from before approval became per merchant
+  // (see linkedMerchants[].liveAccess). No longer written; developerMerchants.js
+  // still honours it for a developer whose single link has not been migrated.
   // Gate for live-mode (real money) API keys — separate from `status`
   // because a developer can be a fully verified, active account and still
   // not be cleared to move real funds until an admin reviews them. Mirrors
@@ -74,9 +77,32 @@ const developerSchema = new mongoose.Schema({
   // Set once this developer proves control of a Merchant account (see
   // developerMerchantLinkController.js) — the public payment API operates
   // on this merchant's own wallet, never a separate developer-owned one.
+  // LEGACY single link, from before a developer could link several merchants.
+  // Never written any more; read only through utils/developerMerchants.js,
+  // which merges it with linkedMerchants below.
   linkedMerchant: {
     merchantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Merchant', default: null },
     linkedAt: { type: Date, default: null },
+  },
+  // Every merchant this developer has proven control of (see
+  // developerMerchantLinkController.js). Each live API key is tied to exactly
+  // one of these (ApiKey.merchantId).
+  linkedMerchants: {
+    type: [new mongoose.Schema({
+      merchantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Merchant', required: true },
+      linkedAt: { type: Date, default: Date.now },
+      // Live (real-money) approval is decided per merchant, not per developer:
+      // an admin reviews each merchant a developer wants to go live with.
+      liveAccess: {
+        approved: { type: Boolean, default: false },
+        requestedAt: { type: Date, default: null },
+        approvedAt: { type: Date, default: null },
+        approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null },
+        // Snapshot of the automatic integration test run when they requested.
+        autoTest: { type: mongoose.Schema.Types.Mixed, default: null },
+      },
+    }, { _id: false })],
+    default: [],
   },
   lastLogin: {
     type: Date,

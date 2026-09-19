@@ -7,6 +7,9 @@ export function publicDeveloperPayment(payment) {
     id: payment._id,
     mode: payment.mode,
     kind: payment.kind,
+    // Which of the developer's linked merchants this payment is for. Matters
+    // when one account serves several: events all arrive at the same webhook.
+    merchantId: payment.merchantId || null,
     amount: payment.amount,
     currency: payment.currency,
     status: payment.status,
