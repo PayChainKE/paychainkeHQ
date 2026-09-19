@@ -7,7 +7,7 @@ import { getMerchantLinkStatus } from "@/lib/api";
 const CARDS = [
   { icon: KeyRound, title: "API keys", desc: "Create and manage test and live keys.", to: "/dashboard/api-keys" },
   { icon: Webhook, title: "Webhooks", desc: "Register endpoints, send test events.", to: "/dashboard/webhooks" },
-  { icon: Store, title: "Merchant", desc: "Link the merchant account your keys operate on.", to: "/dashboard/merchant" },
+  { icon: Store, title: "Merchants", desc: "Only needed for live payments. Link each real merchant account you build for.", to: "/dashboard/merchant" },
   { icon: ShieldCheck, title: "Live access", desc: "Request approval to move real money.", to: "/dashboard/live-access" },
 ];
 
@@ -26,8 +26,8 @@ export default function Overview() {
   const steps = [
     { done: true, label: "Create account" },
     { done: developer.isVerified, label: "Verify email" },
-    { done: linked === true, label: "Link a merchant account" },
-    { done: null, label: "Create a test-mode key and make your first call" },
+    { done: null, label: "Create a test-mode key and make your first call (no merchant needed)" },
+    { done: linked === true, label: "Link your real merchant account (required to go live)" },
   ];
   const doneCount = steps.filter((s) => s.done).length;
 
@@ -61,7 +61,7 @@ export default function Overview() {
         </div>
         {linked === false && (
           <Link to="/dashboard/merchant" className="inline-flex items-center gap-1 text-[13px] font-semibold text-brand hover:text-brand-bright mt-4">
-            Link a merchant account <ArrowRight className="w-3.5 h-3.5" />
+            Link your merchant account to go live <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         )}
       </div>

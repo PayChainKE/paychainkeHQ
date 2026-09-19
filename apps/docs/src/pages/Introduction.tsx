@@ -179,9 +179,10 @@ payment = JSON.parse(res.body)['payment']`,
 
       <h2>Get your key</h2>
       <p>
-        <Link to="/signup">Sign up</Link> for a free account, link the merchant you're building for, and
-        create a test-mode key from your dashboard, under two minutes, no approval needed. Then
-        drop the key into the example above and it runs. Prefer the API directly? The same three
+        <Link to="/signup">Sign up</Link> for a free account and create a test-mode key from your dashboard, under
+        two minutes, no approval and no merchant account needed. Then drop the key into the
+        example above and it runs. Link the real merchant(s) you're building for when you're ready
+        to go live; each live key is tied to one of them. Prefer the API directly? The same three
         calls (register, link merchant, create key) are in the{" "}
         <Link to="/integration-guide">Integration Guide</Link>, along with the account model and
         what "sandbox" actually means here.

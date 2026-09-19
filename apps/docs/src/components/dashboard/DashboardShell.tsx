@@ -10,7 +10,7 @@ const NAV = [
   { to: "/dashboard", label: "Overview", icon: LayoutGrid, end: true },
   { to: "/dashboard/api-keys", label: "API keys", icon: KeyRound },
   { to: "/dashboard/webhooks", label: "Webhooks", icon: Webhook },
-  { to: "/dashboard/merchant", label: "Merchant", icon: Store },
+  { to: "/dashboard/merchant", label: "Merchants", icon: Store },
   { to: "/dashboard/live-access", label: "Live access", icon: ShieldCheck },
 ];
 

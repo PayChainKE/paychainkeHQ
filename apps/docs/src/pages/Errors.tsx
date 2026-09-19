@@ -37,8 +37,10 @@ export default function Errors() {
       <ParamsTable
         params={[
           { name: "IDEMPOTENCY_KEY_REQUIRED", type: "code", description: "You're missing the Idempotency-Key header on a POST /payments/collect or /payments/payout call." },
-          { name: "NO_LINKED_MERCHANT", type: "code", description: "This developer account hasn't completed /api/developer/link-merchant yet." },
-          { name: "LIVE_ACCESS_NOT_APPROVED", type: "code", description: "You tried to create a live-mode API key before an admin approved your live-access request." },
+          { name: "MERCHANT_REQUIRED", type: "code", description: "You have more than one merchant linked and created a live key without saying which one. Send merchantId." },
+          { name: "MERCHANT_NOT_LINKED", type: "code", description: "The merchantId you gave for a new key isn't linked to your developer account. Link it first." },
+          { name: "NO_LINKED_MERCHANT", type: "code", description: "A live call (or any invoice call) from a developer account that hasn't completed /api/developer/link-merchant yet. Test-mode payment calls don't need it." },
+          { name: "LIVE_ACCESS_NOT_APPROVED", type: "code", description: "You tried to create a live-mode API key for a merchant that an admin hasn't approved for live access yet. Approval is per merchant." },
           { name: "API_PAYOUT_NOT_ENABLED", type: "code", description: "The linked merchant hasn't enabled API payouts (and set a PIN + caps) from their dashboard." },
           { name: "PER_TRANSACTION_CAP_EXCEEDED", type: "code", description: "A live payout exceeded the merchant's configured per-transaction limit." },
           { name: "DAILY_CAP_EXCEEDED", type: "code", description: "A live payout would exceed the merchant's rolling 24-hour payout limit." },

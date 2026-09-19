@@ -22,8 +22,17 @@ export interface Developer {
   status: "pending_verification" | "active" | "suspended";
   isVerified: boolean;
   liveAccess: { approved: boolean; requestedAt: string | null; approvedAt: string | null };
+  linkedMerchantCount?: number;
   createdAt: string;
   lastLogin: string | null;
+}
+
+export interface LinkedMerchant {
+  merchantId: string;
+  businessName: string | null;
+  email: string | null;
+  linkedAt: string | null;
+  liveAccess?: { approved: boolean; requestedAt: string | null; approvedAt: string | null };
 }
 
 export interface ApiKey {
@@ -35,6 +44,8 @@ export interface ApiKey {
   lastUsedAt: string | null;
   createdAt: string;
   revokedAt: string | null;
+  merchantId: string | null;
+  merchantName: string | null;
 }
 
 export interface Webhook {
@@ -142,8 +153,11 @@ export function getMe() {
   return request<{ success: boolean; developer: Developer }>("/api/developer/me");
 }
 
-export function requestLiveAccess() {
-  return request<{ success: boolean; message: string }>("/api/developer/live-access/request", { method: "POST" });
+export function requestLiveAccess(merchantId?: string) {
+  return request<{ success: boolean; message: string; merchantId: string }>("/api/developer/live-access/request", {
+    method: "POST",
+    body: JSON.stringify(merchantId ? { merchantId } : {}),
+  });
 }
 
 // --- API keys (private) ---
@@ -152,7 +166,7 @@ export function listApiKeys() {
   return request<{ success: boolean; data: ApiKey[] }>("/api/developer/api-keys");
 }
 
-export function createApiKey(body: { mode: "test" | "live"; label?: string }) {
+export function createApiKey(body: { mode: "test" | "live"; label?: string; merchantId?: string }) {
   return request<{ success: boolean; apiKey: ApiKey & { key: string } }>("/api/developer/api-keys", {
     method: "POST",
     body: JSON.stringify(body),
@@ -180,9 +194,11 @@ export function verifyMerchantLink(body: { merchantEmail: string; otp: string })
 }
 
 export function getMerchantLinkStatus() {
-  return request<{ success: boolean; linked: boolean; merchant?: { businessName: string; email: string }; linkedAt?: string }>(
-    "/api/developer/link-merchant/status"
-  );
+  return request<{ success: boolean; linked: boolean; merchants: LinkedMerchant[] }>("/api/developer/link-merchant/status");
+}
+
+export function unlinkMerchant(merchantId: string) {
+  return request<{ success: boolean; keysRevoked: number }>(`/api/developer/link-merchant/${merchantId}`, { method: "DELETE" });
 }
 
 // --- Webhooks (private) ---

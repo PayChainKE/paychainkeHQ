@@ -50,11 +50,13 @@ export default function IntegrationGuide() {
       </div>
 
       <p>
-        A developer account <strong>links to</strong> exactly one merchant account (see{" "}
+        A developer account <strong>links to</strong> one or more merchant accounts (see{" "}
         <Link to="/authentication">Authentication</Link> for how that link is proven). If you're
         integrating for your own business, you're both: sign up as a merchant first, then again
-        as a developer, then link the two. If you're building for a client, they need an existing
-        merchant account and hand you the credentials for the linking step only, once.
+        as a developer, then link the two. If you're building for clients, each needs an existing
+        merchant account and hands you the credentials for the linking step only, once. Link as many
+        as you serve; each live key is created for one of them, so a client's key only ever touches
+        that client's money.
       </p>
 
       <h2>Is there a sandbox, and where is it?</h2>
@@ -63,14 +65,15 @@ export default function IntegrationGuide() {
         your app at differently. <code>https://api.paychain.co.ke</code> is the only host, for both
         test and live. The sandbox is just <em>which key you send it</em>: a{" "}
         <code>test</code>-mode key routes through the exact same endpoints and short-circuits to
-        simulated behavior. Create your developer account, link a merchant, call{" "}
+        simulated behavior. Create your developer account, call{" "}
         <code>POST /api/developer/api-keys</code> with <code>{`{"mode":"test"}`}</code>, and you
-        have a working key in the same response, usually under two minutes end to end.
+        have a working key in the same response, usually under two minutes end to end. No
+        merchant account is needed for the sandbox.
       </Callout>
       <p>What "sandbox" means concretely here: every collect and payout made with a <code>test</code> key</p>
       <ul>
         <li>Never calls M-PESA, NCBA, or any real payment rail</li>
-        <li>Never touches the linked merchant's real balance</li>
+        <li>Never touches any real balance, and needs no merchant account at all</li>
         <li>Settles itself to <code>success</code> a few seconds after creation, automatically, nothing to trigger manually</li>
         <li>Fires the exact same webhook events a live payment would, with the exact same payload shape</li>
       </ul>
@@ -102,11 +105,12 @@ curl -X POST https://api.paychain.co.ke/api/auth/developer/verify-otp \\
   -d '{"email":"asha@example.com","otp":"482910"}'`}
       />
 
-      <h3>2. Link a PayChain merchant</h3>
+      <h3>2. Link your real merchant (to go live)</h3>
       <p className="text-[13.5px] text-ink-muted leading-6">
         One-time proof of control: the merchant's own password, then an OTP sent to{" "}
-        <em>their</em> inbox, not yours. Skip this and every payment call returns{" "}
-        <code>NO_LINKED_MERCHANT</code>.
+        <em>their</em> inbox, not yours. Test-mode keys work without it. Live access can't be
+        requested until it's done, and a live call without it returns{" "}
+        <code>NO_LINKED_MERCHANT</code>. Invoices also need a linked merchant.
       </p>
       <CodeBlock
         lang="bash"
@@ -139,18 +143,20 @@ curl -X POST https://api.paychain.co.ke/api/auth/developer/verify-otp \\
       </p>
 
       <h3>5. Request live access</h3>
-      <p className="text-[13.5px] text-ink-muted leading-6">One call, once you're confident. Drops into a PayChain admin's review queue.</p>
+      <p className="text-[13.5px] text-ink-muted leading-6">One call per merchant, once you're confident. Drops into a PayChain admin's review queue. Approval is per merchant, so each real merchant you link is reviewed separately.</p>
       <CodeBlock
         lang="bash"
         label="curl · with your developer JWT"
         code={`curl -X POST https://api.paychain.co.ke/api/developer/live-access/request \\
-  -H "Authorization: Bearer <developer-jwt>"`}
+  -H "Authorization: Bearer <developer-jwt>" \\
+  -H "Content-Type: application/json" \\
+  -d '{"merchantId":"<merchant-id>"}'`}
       />
 
       <h3>6. Create a live key</h3>
       <p className="text-[13.5px] text-ink-muted leading-6 mb-6">
         Same endpoints, real money: the same <code>POST /api/developer/api-keys</code> call with{" "}
-        <code>{`{"mode":"live"}`}</code> once your request is approved. Payouts also need the
+        <code>{`{"mode":"live","merchantId":"<merchant-id>"}`}</code> once that merchant is approved. Payouts also need the
         merchant to enable API payouts and set a PIN and caps from their own dashboard.
       </p>
 
