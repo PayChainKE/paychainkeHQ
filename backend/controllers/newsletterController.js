@@ -8,6 +8,7 @@ import {
   deliverCampaign, resolveAudience, sanitizeAudience, toHtmlBody,
 } from '../services/newsletterService.js';
 import { verifyUnsubscribeToken } from '../utils/unsubscribeToken.js';
+import { logAudit } from '../utils/auditLog.js';
 import { v2 as cloudinary } from 'cloudinary';
 
 // Linear-time shape check — see models/Merchant.js's identical field for
@@ -382,6 +383,54 @@ export const getCampaigns = async (req, res) => {
   }
 };
 
+// @desc    Remove one entry from the sent-campaign history. Only the record is
+//          deleted: the emails were already sent and stay sent.
+// @route   DELETE /api/newsletter/campaigns/:id
+// @access  Private (Admin)
+export const deleteCampaign = async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: 'Invalid id.' });
+    }
+    const campaign = await NewsletterCampaign.findByIdAndDelete(req.params.id).select('subject');
+    if (!campaign) return res.status(404).json({ error: 'Campaign not found.' });
+    logAudit({
+      action: 'admin.newsletter.campaign_deleted', category: 'admin', severity: 'info',
+      message: `${req.admin.name || req.admin.email} deleted the newsletter history entry "${campaign.subject}"`,
+      req, actor: { type: 'admin', id: req.admin._id, email: req.admin.email, name: req.admin.name },
+      metadata: { campaignId: String(campaign._id), subject: campaign.subject },
+    });
+    res.json({ success: true, message: 'History entry deleted.' });
+  } catch (error) {
+    console.error('Delete Campaign Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Clear the whole sent-campaign history. Only the records go; nothing
+//          is unsent or recalled. Needs ?confirm=true so a stray request can
+//          never wipe it.
+// @route   DELETE /api/newsletter/campaigns?confirm=true
+// @access  Private (Admin)
+export const clearCampaigns = async (req, res) => {
+  try {
+    if (req.query.confirm !== 'true') {
+      return res.status(400).json({ error: 'Add ?confirm=true to clear the whole history.' });
+    }
+    const result = await NewsletterCampaign.deleteMany({});
+    logAudit({
+      action: 'admin.newsletter.history_cleared', category: 'admin', severity: 'warning',
+      message: `${req.admin.name || req.admin.email} cleared the newsletter history (${result.deletedCount} entries)`,
+      req, actor: { type: 'admin', id: req.admin._id, email: req.admin.email, name: req.admin.name },
+      metadata: { deletedCount: result.deletedCount },
+    });
+    res.json({ success: true, deletedCount: result.deletedCount, message: `Cleared ${result.deletedCount} history entries.` });
+  } catch (error) {
+    console.error('Clear Campaigns Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
 // ── Drafts ────────────────────────────────────────────────────────────
 // Any admin can see and continue any draft — this is a small internal
 // team tool, not a multi-tenant workspace, so drafts aren't scoped to
@@ -564,6 +613,34 @@ export const deleteDraft = async (req, res) => {
     res.json({ success: true, message: 'Draft discarded.' });
   } catch (error) {
     console.error('Delete Draft Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Delete every unsent newsletter: plain drafts, digests waiting for
+//          approval and failed sends. Scheduled sends are queued emails, so
+//          they are kept unless ?includeScheduled=true. A send that is in
+//          flight right now is never touched.
+// @route   DELETE /api/newsletter/drafts?confirm=true[&includeScheduled=true]
+// @access  Private (Admin)
+export const clearDrafts = async (req, res) => {
+  try {
+    if (req.query.confirm !== 'true') {
+      return res.status(400).json({ error: 'Add ?confirm=true to clear the drafts.' });
+    }
+    const includeScheduled = req.query.includeScheduled === 'true';
+    const states = ['draft', 'awaiting_approval', 'failed', ...(includeScheduled ? ['scheduled'] : [])];
+    const result = await NewsletterDraft.deleteMany({ state: { $in: states } });
+    const skippedScheduled = includeScheduled ? 0 : await NewsletterDraft.countDocuments({ state: 'scheduled' });
+    logAudit({
+      action: 'admin.newsletter.drafts_cleared', category: 'admin', severity: 'warning',
+      message: `${req.admin.name || req.admin.email} cleared ${result.deletedCount} newsletter draft(s)${includeScheduled ? ' including scheduled sends' : ''}`,
+      req, actor: { type: 'admin', id: req.admin._id, email: req.admin.email, name: req.admin.name },
+      metadata: { deletedCount: result.deletedCount, includeScheduled },
+    });
+    res.json({ success: true, deletedCount: result.deletedCount, keptScheduled: skippedScheduled, message: `Deleted ${result.deletedCount} draft(s).` });
+  } catch (error) {
+    console.error('Clear Drafts Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };
