@@ -296,9 +296,16 @@ export default function EmailLog() {
                 )}
                 <div className="flex-1 overflow-y-auto p-4">
                   <div className="max-w-[560px] mx-auto bg-[#f4f4f4] rounded-2xl p-4">
-                    <div
-                      className="bg-white rounded-xl shadow-sm overflow-hidden text-sm"
-                      dangerouslySetInnerHTML={{ __html: detail.data.bodyHtml }}
+                    {/* Stored email HTML is rendered in a fully sandboxed iframe
+                        (empty sandbox = no scripts, no same-origin access), so
+                        anything a template interpolated can never run in the
+                        admin origin or touch the admin session. */}
+                    <iframe
+                      title="Email preview"
+                      sandbox=""
+                      referrerPolicy="no-referrer"
+                      srcDoc={detail.data.bodyHtml || ''}
+                      className="w-full h-[65vh] bg-white rounded-xl shadow-sm border-0"
                     />
                   </div>
                 </div>

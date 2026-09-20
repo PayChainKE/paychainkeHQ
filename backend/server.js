@@ -9,6 +9,11 @@ if (!process.env.JWT_SECRET) {
   console.error('FATAL: JWT_SECRET is not set. Refusing to start.');
   process.exit(1);
 }
+// HS256 tokens are only as strong as the secret. Warn (don't refuse to boot —
+// that would take production down) so a weak value is visible in the logs.
+if (process.env.NODE_ENV === 'production' && process.env.JWT_SECRET.length < 32) {
+  console.warn('SECURITY WARNING: JWT_SECRET is shorter than 32 characters. Rotate it to a random 64+ character value.');
+}
 
 // Imported before everything else so Sentry.init() runs (or safely no-ops)
 // before any route module that might throw during its own module-load.
