@@ -90,11 +90,12 @@ const merchantSchema = new mongoose.Schema({
     type: String,
     default: null,
   },
+  // Uniqueness comes from the partial index declared below the schema (same
+  // reason as businessNumber: sparse still indexes an explicit null, so the
+  // old unique+sparse index could never be built in production).
   kraPin: {
     type: String,
     default: null,
-    unique: true,
-    sparse: true,
     set: (v) => normalizeKraPin(v),
     // Only enforced when kraPin is actually being set/changed — every
     // controller path that writes this field already normalizes+validates
@@ -1007,6 +1008,12 @@ merchantSchema.pre('save', async function() {
 merchantSchema.index(
   { businessNumber: 1 },
   { unique: true, partialFilterExpression: { businessNumber: { $type: 'string', $gt: '' } } }
+);
+
+// Same for the KRA PIN.
+merchantSchema.index(
+  { kraPin: 1 },
+  { unique: true, partialFilterExpression: { kraPin: { $type: 'string', $gt: '' } } }
 );
 
 merchantSchema.methods.matchPassword = async function(enteredPassword) {
