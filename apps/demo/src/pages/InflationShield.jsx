@@ -6,6 +6,9 @@ import { formatDateISO } from '../utils/formatDate'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import StellarConnectPanel from '../components/ui/StellarConnectPanel'
+import SettlementRuleCard from '../components/stellar/SettlementRuleCard'
+import RequestPayoutModal from '../components/stellar/RequestPayoutModal'
+import ReconciliationTable from '../components/stellar/ReconciliationTable'
 import api from '../api/config'
 
 // Testnet-only — matches backend/utils/stellarHelper.js's STELLAR_NETWORK
@@ -25,6 +28,8 @@ export default function InflationShield() {
   const [swapping, setSwapping] = useState(false)
   const [swapError, setSwapError] = useState('')
   const [lastTxHash, setLastTxHash] = useState('')
+  const [showPayout, setShowPayout] = useState(false)
+  const [ledgerRefresh, setLedgerRefresh] = useState(0)
 
   const loadRate = useCallback(async () => {
     try {
@@ -138,7 +143,15 @@ export default function InflationShield() {
                     <span className="material-symbols-outlined text-2xl md:text-3xl text-white" style={{fontVariationSettings: "'FILL' 1"}}>security</span>
                   </div>
                 </div>
-                <div className="mt-8 pt-6 border-t border-white/10 flex justify-end">
+                <div className="mt-8 pt-6 border-t border-white/10 flex items-center justify-between gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowPayout(true)}
+                    className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-[#00210f] text-[10px] font-black uppercase tracking-[0.15em] transition-colors flex items-center gap-2"
+                  >
+                    <span className="material-symbols-outlined text-sm">payments</span>
+                    Request Payout
+                  </button>
                   <Link
                     to="/wallet"
                     className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-300 hover:text-white transition-colors flex items-center gap-2"
@@ -149,6 +162,9 @@ export default function InflationShield() {
                 </div>
               </div>
             </div>
+
+            {/* Settlement rule — Stellar Instaward D1 */}
+            <SettlementRuleCard rate={rate} />
 
             {/* Section 3: Swap Interface & History Grid */}
             <div className="grid grid-cols-12 gap-8 items-start">
@@ -341,6 +357,18 @@ export default function InflationShield() {
                 )}
               </div>
             </div>
+
+            {/* Settlement statement — Stellar Instaward D2 */}
+            <ReconciliationTable refreshKey={ledgerRefresh} />
+
+            <RequestPayoutModal
+              open={showPayout}
+              onClose={() => setShowPayout(false)}
+              usdcBalance={usdcBalance}
+              rate={rate}
+              phone={realMerchant?.phone}
+              onSuccess={() => { refreshRealMerchant(); loadHistory(); setLedgerRefresh((n) => n + 1) }}
+            />
           </>
         )}
       </div>
