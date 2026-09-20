@@ -42,18 +42,18 @@ export default function BulkPayments() {
       <p>Each entry in <code>payments</code> takes the same shape as a single payout:</p>
       <ParamsTable
         params={[
-          { name: "amount", type: "number", required: true, description: "For payeeType \"employee\": gross pay before deductions. For \"contract\": the exact amount paid, no deductions." },
-          { name: "payeeType", type: "\"employee\" | \"contract\"", description: "Defaults to \"contract\". \"employee\" rows are automatically PAYE/NSSF/SHIF-deducted (see below) and must be paid to a phone (mobile money); no other destination type is valid for payroll." },
+          { name: "amount", type: "number", required: true, description: "The exact amount paid to this destination, in whole shillings. PayChain does not withhold PAYE, NSSF or SHIF from it." },
+          { name: "payeeType", type: "\"employee\" | \"contract\"", description: "\"employee\" or \"contract\", defaults to \"contract\". A label recorded on the payment for your own reporting. It does not change the amount paid or where it can go." },
           { name: "narration", type: "string", description: "Shown on the receiving statement. Defaults to \"Developer API bulk payout\"." },
           { name: "bankCode + accountNumber / phone / paybillNumber + accountReference / tillNumber", type: "destination", description: "Exactly one, same rules as a single Send Money payout." },
         ]}
       />
 
-      <Callout variant="info" title="Employee rows are real payroll: statutory deductions included">
-        Send the gross salary as <code>amount</code>. PayChain computes real PAYE, NSSF, and SHIF
-        (the same calculator the dashboard's own Bulk Pay CSV upload uses) and pays out the net,
-        never the raw amount you sent, to the employee's phone. The breakdown comes back on each
-        row as <code>grossAmount</code> and <code>taxDeductions</code>.
+      <Callout variant="warning" title="PayChain does not withhold PAYE, NSSF or SHIF">
+        Every row is paid exactly the <code>amount</code> you send. For payroll, work out each
+        employee's net pay yourself, send that as <code>amount</code>, and remit the statutory
+        deductions to KRA, NSSF and SHA on your own. <code>payeeType: "employee"</code> only labels
+        the row.
       </Callout>
 
       <CodeGroup
@@ -180,23 +180,23 @@ batch_id, payments = body['batchId'], body['payments']`,
       "id": "66c1...a01",
       "mode": "live",
       "kind": "payout",
-      "amount": 55482.50,
+      "amount": 65000,
       "status": "pending",
       "counterparty": { "phone": "254712345678", "network": "safaricom" },
       "payeeType": "employee",
-      "grossAmount": 65000,
-      "taxDeductions": { "paye": 8127.5, "nssf": 2160, "shif": 1787.5 }
+      "grossAmount": null,
+      "taxDeductions": null
     },
     {
       "id": "66c1...a02",
       "mode": "live",
       "kind": "payout",
-      "amount": 41230.00,
+      "amount": 48000,
       "status": "pending",
       "counterparty": { "phone": "254798765432", "network": "safaricom" },
       "payeeType": "employee",
-      "grossAmount": 48000,
-      "taxDeductions": { "paye": 5810, "nssf": 2160, "shif": 1320 }
+      "grossAmount": null,
+      "taxDeductions": null
     },
     {
       "id": "66c1...a03",
@@ -213,18 +213,16 @@ batch_id, payments = body['batchId'], body['payments']`,
 }`}
       />
       <p>
-        <code>amount</code> on an employee row is the real net figure that was actually paid, not
-        what you sent. Mobile money and Paybill/Till rows start <code>pending</code> and resolve
+        <code>amount</code> is what was paid to that destination. Mobile money and Paybill/Till rows start <code>pending</code> and resolve
         asynchronously (same as a single payout); Till and bank rows can resolve synchronously.
         <strong> One row failing doesn't fail the batch:</strong> check each row's own{" "}
         <code>status</code>/<code>failureReason</code> rather than assuming a <code>201</code>
         means every payment went through.
       </p>
 
-      <Callout variant="warning" title="Caps apply to the batch's real total, not the sum of what you sent">
-        The merchant's daily API payout cap is checked against the batch's total <em>net</em>{" "}
-        spend (post-tax for employee rows), and the per-transaction cap against each row's net
-        amount individually. A batch that would exceed either is rejected in full,{" "}
+      <Callout variant="warning" title="Caps apply to the whole batch">
+        The merchant's daily API payout cap is checked against the batch's total, and the
+        per-transaction cap against each row individually. A batch that would exceed either is rejected in full,{" "}
         <em>before</em> any row is paid; never a partial batch because the cap was hit halfway
         through.
       </Callout>
@@ -244,8 +242,8 @@ batch_id, payments = body['batchId'], body['payments']`,
         params={[
           { name: "batchId", type: "string", description: "Groups every row from the same POST /bulk-payments call." },
           { name: "payeeType", type: "\"employee\" | \"contract\" | null", description: "null for a payment created via the single-payout endpoint instead." },
-          { name: "grossAmount", type: "number | null", description: "Pre-tax figure, only present for payeeType \"employee\"." },
-          { name: "taxDeductions", type: "object | null", description: "{ paye, nssf, shif }, only present for payeeType \"employee\"." },
+          { name: "grossAmount", type: "number | null", description: "Always null. Reserved: PayChain does not calculate payroll deductions." },
+          { name: "taxDeductions", type: "object | null", description: "Always null. Reserved: PayChain does not calculate payroll deductions." },
         ]}
       />
       <p>

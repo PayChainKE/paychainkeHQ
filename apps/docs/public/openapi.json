@@ -1,0 +1,1525 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "PayChain Developer API",
+    "version": "1.0.0",
+    "description": "Collect M-PESA payments, send money, invoice customers and pay in bulk, then get told when each one resolves.\n\n**Keys.** `pc_test_` keys use the sandbox: no real money, no merchant needed. `pc_live_` keys move real money for the one merchant they are tied to. Send the key as `Authorization: Bearer <key>`.\n\n**Idempotency.** Collection, payout and bulk calls need an `Idempotency-Key` header. Repeat a request with the same key and you get the original result back, never a second payment.\n\n**Webhooks.** Register an https endpoint in the developer portal. Every delivery is a POST with a JSON body `{ id, event, createdAt, data }` and an `X-PayChain-Signature` header: the hex HMAC-SHA256 of the raw body using your webhook secret. Events: `payment.collect.succeeded`, `payment.collect.failed`, `payment.payout.succeeded`, `payment.payout.failed`, `payment.paybill.received`, `invoice.sent`, `invoice.paid`, `bulk_payment.completed`. Failed deliveries retry after 1 minute, 5 minutes, 30 minutes, 2 hours and 6 hours.\n\n**Limits per key, per 15 minutes.** Reads 900, collections and checkouts 600, payouts, bulk payments and invoice sends 60. Over the limit you get HTTP 429.\n\nAmounts are whole Kenyan shillings (KES). Guides: https://developer.paychain.co.ke"
+  },
+  "servers": [
+    {
+      "url": "https://api.paychain.co.ke",
+      "description": "Production (test and live keys)"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Account"
+    },
+    {
+      "name": "Payments"
+    },
+    {
+      "name": "Hosted checkout"
+    },
+    {
+      "name": "Invoices"
+    },
+    {
+      "name": "Bulk payments"
+    }
+  ],
+  "paths": {
+    "/api/v1/developer/ping": {
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "operationId": "ping",
+        "summary": "Check your API key",
+        "description": "Returns the key's mode. A quick way to confirm a key works.",
+        "responses": {
+          "200": {
+            "description": "The key is valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "test",
+                        "live"
+                      ]
+                    },
+                    "developer": {
+                      "type": "object",
+                      "properties": {
+                        "companyName": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "mode"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          }
+        }
+      }
+    },
+    "/api/v1/developer/payments/collect": {
+      "post": {
+        "tags": [
+          "Payments"
+        ],
+        "operationId": "collectPayment",
+        "summary": "Collect a payment (M-PESA STK push)",
+        "description": "Sends an M-PESA prompt to the customer's phone. In test mode nothing real is sent and the payment settles to success after about 4 seconds. Listen for the payment.collect.succeeded webhook.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "amount": {
+                    "type": "number",
+                    "description": "Whole shillings, greater than zero.",
+                    "minimum": 1
+                  },
+                  "phone": {
+                    "type": "string",
+                    "description": "Customer phone, for example 0712345678."
+                  },
+                  "reference": {
+                    "type": "string",
+                    "description": "Your own reference. Returned on every webhook."
+                  }
+                },
+                "required": [
+                  "amount",
+                  "phone"
+                ]
+              },
+              "example": {
+                "amount": 500,
+                "phone": "0712345678",
+                "reference": "order-1001"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Replay of an earlier request with the same Idempotency-Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "payment": {
+                      "$ref": "#/components/schemas/Payment"
+                    },
+                    "replayed": {
+                      "type": "boolean",
+                      "description": "True when this Idempotency-Key was used before and the original payment is returned."
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "payment"
+                  ]
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Started.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "payment": {
+                      "$ref": "#/components/schemas/Payment"
+                    },
+                    "replayed": {
+                      "type": "boolean",
+                      "description": "True when this Idempotency-Key was used before and the original payment is returned."
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "payment"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "409": {
+            "$ref": "#/components/responses/E409"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          }
+        }
+      }
+    },
+    "/api/v1/developer/payments/payout": {
+      "post": {
+        "tags": [
+          "Payments"
+        ],
+        "operationId": "payoutPayment",
+        "summary": "Send money",
+        "description": "Pays out to a bank account, mobile money number, Paybill or Till. Live payouts need the merchant to have API payouts enabled, and the payout PIN in apiPayoutPin. Amounts are capped per payment and per day.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/PayoutDestination"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "amount": {
+                        "type": "number",
+                        "description": "Whole shillings, greater than zero.",
+                        "minimum": 1
+                      },
+                      "narration": {
+                        "type": "string",
+                        "description": "Shown on the statement."
+                      },
+                      "apiPayoutPin": {
+                        "type": "string",
+                        "description": "The merchant's API payout PIN. Required for live keys."
+                      }
+                    },
+                    "required": [
+                      "amount"
+                    ]
+                  }
+                ]
+              },
+              "example": {
+                "amount": 1000,
+                "phone": "0712345678",
+                "narration": "Refund order-1001"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Replay of an earlier request with the same Idempotency-Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "payment": {
+                      "$ref": "#/components/schemas/Payment"
+                    },
+                    "replayed": {
+                      "type": "boolean",
+                      "description": "True when this Idempotency-Key was used before and the original payment is returned."
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "payment"
+                  ]
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "payment": {
+                      "$ref": "#/components/schemas/Payment"
+                    },
+                    "replayed": {
+                      "type": "boolean",
+                      "description": "True when this Idempotency-Key was used before and the original payment is returned."
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "payment"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "409": {
+            "$ref": "#/components/responses/E409"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          }
+        }
+      }
+    },
+    "/api/v1/developer/payments/{id}": {
+      "get": {
+        "tags": [
+          "Payments"
+        ],
+        "operationId": "getPayment",
+        "summary": "Get a payment",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Payment id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The payment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "payment": {
+                      "$ref": "#/components/schemas/Payment"
+                    },
+                    "replayed": {
+                      "type": "boolean",
+                      "description": "True when this Idempotency-Key was used before and the original payment is returned."
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "payment"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          }
+        }
+      }
+    },
+    "/api/v1/developer/checkout": {
+      "post": {
+        "tags": [
+          "Hosted checkout"
+        ],
+        "operationId": "createCheckout",
+        "summary": "Create a hosted checkout link",
+        "description": "PayChain hosts the payment page. Send the customer to checkoutUrl. The result arrives on your webhook with the same reference.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "amount": {
+                    "type": "number",
+                    "description": "Whole shillings. A value with cents is rounded up.",
+                    "minimum": 1
+                  },
+                  "reference": {
+                    "type": "string",
+                    "description": "Your own reference. Returned on every webhook."
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "Shown to the customer (max 200 characters)."
+                  },
+                  "callbackUrl": {
+                    "type": "string",
+                    "description": "Where to send the customer afterwards. https only."
+                  },
+                  "customer": {
+                    "type": "object",
+                    "properties": {
+                      "phone": {
+                        "type": "string",
+                        "description": "Pre-fills the phone field."
+                      },
+                      "email": {
+                        "type": "string",
+                        "description": "Customer email."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "Customer name."
+                      }
+                    }
+                  },
+                  "expiresInMinutes": {
+                    "type": "integer",
+                    "minimum": 5,
+                    "maximum": 10080,
+                    "description": "How long the link works. Default 30, from 5 minutes to 7 days."
+                  }
+                },
+                "required": [
+                  "amount"
+                ]
+              },
+              "example": {
+                "amount": 1500,
+                "reference": "TKT-1042",
+                "description": "Concert, 2 tickets",
+                "callbackUrl": "https://tickets.example.com/orders/1042",
+                "expiresInMinutes": 10
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "session": {
+                      "$ref": "#/components/schemas/CheckoutSession"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "session"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          }
+        }
+      }
+    },
+    "/api/v1/developer/checkout/{id}": {
+      "get": {
+        "tags": [
+          "Hosted checkout"
+        ],
+        "operationId": "getCheckout",
+        "summary": "Get a checkout session",
+        "description": "Use it as a fallback if a webhook is late. status is success once the customer has paid.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Checkout session id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "session": {
+                      "$ref": "#/components/schemas/CheckoutSession"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "session"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          }
+        }
+      }
+    },
+    "/api/v1/developer/invoices": {
+      "post": {
+        "tags": [
+          "Invoices"
+        ],
+        "operationId": "createInvoice",
+        "summary": "Create an invoice (draft)",
+        "description": "Creating an invoice moves no money. Needs a linked merchant. Send it with POST /invoices/{id}/send.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "customer": {
+                    "$ref": "#/components/schemas/InvoiceCustomer"
+                  },
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/InvoiceItem"
+                    }
+                  },
+                  "issueDate": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Defaults to now."
+                  },
+                  "dueDate": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Optional."
+                  },
+                  "notes": {
+                    "type": "string",
+                    "description": "Shown on the invoice."
+                  }
+                },
+                "required": [
+                  "customer",
+                  "items"
+                ]
+              },
+              "example": {
+                "customer": {
+                  "name": "Wanjiku Traders",
+                  "email": "accounts@wanjiku.example"
+                },
+                "items": [
+                  {
+                    "description": "Monthly service",
+                    "qty": 1,
+                    "price": 3500
+                  }
+                ],
+                "dueDate": "2026-10-15T00:00:00.000Z"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "invoice": {
+                      "$ref": "#/components/schemas/Invoice"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "invoice"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Invoices"
+        ],
+        "operationId": "listInvoices",
+        "summary": "List invoices",
+        "description": "Your 100 most recent invoices, newest first.",
+        "responses": {
+          "200": {
+            "description": "The invoices.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "invoices": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Invoice"
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "invoices"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          }
+        }
+      }
+    },
+    "/api/v1/developer/invoices/{id}": {
+      "get": {
+        "tags": [
+          "Invoices"
+        ],
+        "operationId": "getInvoice",
+        "summary": "Get an invoice",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Invoice id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The invoice.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "invoice": {
+                      "$ref": "#/components/schemas/Invoice"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "invoice"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          }
+        }
+      }
+    },
+    "/api/v1/developer/invoices/{id}/send": {
+      "post": {
+        "tags": [
+          "Invoices"
+        ],
+        "operationId": "sendInvoice",
+        "summary": "Email an invoice to the customer",
+        "description": "Emails the customer a payable invoice. The customer needs an email address. You get invoice.sent now and invoice.paid when it is paid.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Invoice id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "invoice": {
+                      "$ref": "#/components/schemas/Invoice"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "invoice"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "502": {
+            "$ref": "#/components/responses/E502"
+          }
+        }
+      }
+    },
+    "/api/v1/developer/bulk-payments": {
+      "post": {
+        "tags": [
+          "Bulk payments"
+        ],
+        "operationId": "createBulkPayment",
+        "summary": "Pay many people in one call",
+        "description": "Up to 200 payouts per batch, each with its own destination. Live batches need API payouts enabled and the payout PIN. Track it with GET /bulk-payments/{batchId} and the payment.payout.* webhooks.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "payments": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 200,
+                    "items": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/PayoutDestination"
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "number",
+                              "description": "Whole shillings.",
+                              "minimum": 1
+                            },
+                            "payeeType": {
+                              "type": "string",
+                              "enum": [
+                                "employee",
+                                "contract"
+                              ],
+                              "description": "A label for your own reporting. Defaults to contract. Every row is paid exactly its amount: PayChain does not withhold PAYE, NSSF or SHIF."
+                            },
+                            "narration": {
+                              "type": "string",
+                              "description": "Shown on the statement."
+                            }
+                          },
+                          "required": [
+                            "amount"
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "apiPayoutPin": {
+                    "type": "string",
+                    "description": "The merchant's API payout PIN. Required for live keys."
+                  }
+                },
+                "required": [
+                  "payments"
+                ]
+              },
+              "example": {
+                "payments": [
+                  {
+                    "amount": 1200,
+                    "phone": "0712345678",
+                    "narration": "Delivery fee"
+                  },
+                  {
+                    "amount": 900,
+                    "phone": "0723456789",
+                    "narration": "Delivery fee"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Replay of an earlier request with the same Idempotency-Key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "batchId": {
+                      "type": "string"
+                    },
+                    "payments": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Payment"
+                      }
+                    },
+                    "replayed": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "batchId": {
+                      "type": "string"
+                    },
+                    "payments": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Payment"
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "batchId",
+                    "payments"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "409": {
+            "$ref": "#/components/responses/E409"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          }
+        }
+      }
+    },
+    "/api/v1/developer/bulk-payments/{batchId}": {
+      "get": {
+        "tags": [
+          "Bulk payments"
+        ],
+        "operationId": "getBulkPayment",
+        "summary": "Get a batch",
+        "parameters": [
+          {
+            "name": "batchId",
+            "in": "path",
+            "required": true,
+            "description": "Batch id from the create call.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Every payment in the batch.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "batchId": {
+                      "type": "string"
+                    },
+                    "payments": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Payment"
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "batchId",
+                    "payments"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "pc_test_… or pc_live_…",
+        "description": "Your API key."
+      }
+    },
+    "parameters": {
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "description": "A unique value per operation, for example your order id. A repeat returns the original result.",
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "responses": {
+      "E400": {
+        "description": "The request is invalid. The error field says why.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "E401": {
+        "description": "Missing, invalid or revoked API key, or a wrong payout PIN.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "E403": {
+        "description": "Not allowed: API payouts are off for this merchant, or a cap was exceeded.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "E404": {
+        "description": "Not found (or it belongs to another key's merchant).",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "E409": {
+        "description": "The same Idempotency-Key is already being processed.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "E429": {
+        "description": "Too many requests for this key. Slow down.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "E502": {
+        "description": "A downstream service (for example KRA eTIMS) refused or failed.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "What went wrong, in plain words."
+          },
+          "code": {
+            "type": "string",
+            "description": "A stable machine-readable code, when there is one. Examples: IDEMPOTENCY_KEY_REQUIRED, NO_LINKED_MERCHANT, API_PAYOUT_NOT_ENABLED, PER_TRANSACTION_CAP_EXCEEDED, DAILY_CAP_EXCEEDED, INVALID_API_KEY."
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "Payment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Payment id."
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "collect",
+              "payout"
+            ]
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "api",
+              "admin_test"
+            ],
+            "description": "admin_test is a small real payment PayChain staff made to check your setup. Safe to ignore."
+          },
+          "merchantId": {
+            "type": "string",
+            "nullable": true,
+            "description": "The merchant this payment belongs to. Null for test-mode payments made before any merchant is linked."
+          },
+          "amount": {
+            "type": "number",
+            "description": "Amount in Kenyan shillings."
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "KES"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "success",
+              "failed"
+            ]
+          },
+          "failureReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "reference": {
+            "type": "string",
+            "nullable": true,
+            "description": "Your own reference, returned unchanged on every webhook."
+          },
+          "counterparty": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Who paid or was paid: { phone } for a collection; bank, mobile money, paybill or till details for a payout."
+          },
+          "batchId": {
+            "type": "string",
+            "nullable": true
+          },
+          "payeeType": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "employee",
+              "contract"
+            ]
+          },
+          "grossAmount": {
+            "type": "number",
+            "nullable": true,
+            "description": "Always null. Reserved: PayChain does not calculate payroll deductions."
+          },
+          "taxDeductions": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true,
+            "description": "Always null. Reserved: PayChain does not calculate payroll deductions."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was created."
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it last changed."
+          }
+        },
+        "required": [
+          "id",
+          "mode",
+          "kind",
+          "amount",
+          "currency",
+          "status"
+        ]
+      },
+      "CheckoutSession": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Checkout session id."
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "amount": {
+            "type": "number",
+            "description": "Whole shillings."
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "KES"
+            ]
+          },
+          "reference": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "processing",
+              "success",
+              "expired"
+            ]
+          },
+          "callbackUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "checkoutUrl": {
+            "type": "string",
+            "description": "Send the customer here."
+          },
+          "qrCodeDataUri": {
+            "type": "string",
+            "description": "The same URL as a scannable PNG (data URI)."
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the link stops working."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was created."
+          }
+        },
+        "required": [
+          "id",
+          "amount",
+          "status",
+          "checkoutUrl"
+        ]
+      },
+      "InvoiceItem": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string",
+            "description": "Line description (max 200 characters)."
+          },
+          "qty": {
+            "type": "number",
+            "description": "Quantity."
+          },
+          "price": {
+            "type": "number",
+            "description": "Unit price in KES."
+          },
+          "discountRate": {
+            "type": "number",
+            "description": "Percent discount, 0 to 100."
+          },
+          "taxTyCd": {
+            "type": "string",
+            "enum": [
+              "A",
+              "B",
+              "C",
+              "D",
+              "E"
+            ],
+            "description": "KRA tax type code. Defaults to B."
+          },
+          "itemClsCd": {
+            "type": "string",
+            "nullable": true,
+            "description": "KRA item classification code."
+          }
+        },
+        "required": [
+          "description",
+          "qty",
+          "price"
+        ]
+      },
+      "InvoiceCustomer": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Required."
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "kraPin": {
+            "type": "string",
+            "nullable": true,
+            "description": "Required when your merchant has a verified KRA PIN."
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "Invoice": {
+        "type": "object",
+        "properties": {
+          "_id": {
+            "type": "string",
+            "description": "Invoice id."
+          },
+          "invoiceNumber": {
+            "type": "string",
+            "description": "For example INV-000042."
+          },
+          "publicToken": {
+            "type": "string",
+            "description": "Token in the public view link."
+          },
+          "customer": {
+            "$ref": "#/components/schemas/InvoiceCustomer"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InvoiceItem"
+            }
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "KES"
+            ]
+          },
+          "issueDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Issue date."
+          },
+          "dueDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Due date.",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "sent",
+              "paid",
+              "void"
+            ]
+          },
+          "subtotal": {
+            "type": "number",
+            "description": "Before discount."
+          },
+          "discount": {
+            "type": "number",
+            "description": "Total discount."
+          },
+          "total": {
+            "type": "number",
+            "description": "What the customer pays."
+          },
+          "sentAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was emailed.",
+            "nullable": true
+          },
+          "paidAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was paid.",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was created."
+          },
+          "payUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "Payment page. Set once the invoice is sent."
+          },
+          "paymentLinkStatus": {
+            "type": "string",
+            "nullable": true
+          },
+          "qrCodeDataUri": {
+            "type": "string",
+            "description": "QR code of the payment or view link."
+          },
+          "etims": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "KRA eTIMS signing status and receipt data."
+          }
+        },
+        "required": [
+          "_id",
+          "invoiceNumber",
+          "status",
+          "total"
+        ]
+      },
+      "PayoutDestination": {
+        "type": "object",
+        "description": "Send exactly one destination: bankCode + accountNumber, phone, paybillNumber + accountReference, or tillNumber.",
+        "properties": {
+          "bankCode": {
+            "type": "string",
+            "description": "Bank code."
+          },
+          "accountNumber": {
+            "type": "string",
+            "description": "Bank account number."
+          },
+          "accountName": {
+            "type": "string",
+            "description": "Beneficiary name (optional)."
+          },
+          "phone": {
+            "type": "string",
+            "description": "Mobile money number."
+          },
+          "mobileNetwork": {
+            "type": "string",
+            "enum": [
+              "safaricom",
+              "airtel"
+            ],
+            "description": "Defaults to safaricom."
+          },
+          "paybillNumber": {
+            "type": "string",
+            "description": "Paybill number."
+          },
+          "accountReference": {
+            "type": "string",
+            "description": "Account number at the paybill."
+          },
+          "tillNumber": {
+            "type": "string",
+            "description": "Till number."
+          }
+        }
+      }
+    }
+  }
+}

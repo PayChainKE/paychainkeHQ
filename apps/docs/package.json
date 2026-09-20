@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:api": "node scripts/build-api-artifacts.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.462.0",

@@ -1,3 +1,4 @@
+import { resolveKeyMerchantId, keyScope } from '../utils/developerMerchants.js';
 import CheckoutSession from '../models/CheckoutSession.js';
 import { syncCheckoutSessionStatus } from '../services/checkoutSessionService.js';
 import { generateBrandedQrDataUri } from '../utils/qrCode.js';
@@ -48,8 +49,10 @@ async function publicSession(session) {
 export const createCheckoutSession = async (req, res) => {
   try {
     const developer = req.developer;
-    const merchantId = developer.linkedMerchant?.merchantId;
-    if (!merchantId) {
+    // Sandbox (test) keys work without a linked merchant — nothing real is
+    // touched. Live keys always need one.
+    const merchantId = resolveKeyMerchantId(req.apiKey, developer);
+    if (!merchantId && req.apiKey.mode === 'live') {
       return res.status(400).json({ error: 'No merchant account linked. Complete /api/developer/link-merchant first.', code: 'NO_LINKED_MERCHANT' });
     }
 
@@ -101,7 +104,7 @@ export const createCheckoutSession = async (req, res) => {
 // @access  Public (API key)
 export const getCheckoutSession = async (req, res) => {
   try {
-    const session = await CheckoutSession.findOne({ _id: req.params.id, developerId: req.developer._id });
+    const session = await CheckoutSession.findOne({ _id: req.params.id, developerId: req.developer._id, ...keyScope(req.apiKey) });
     if (!session) return res.status(404).json({ error: 'Checkout session not found.' });
 
     await syncCheckoutSessionStatus(session);

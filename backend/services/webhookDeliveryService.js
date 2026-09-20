@@ -1,5 +1,7 @@
 import crypto from 'crypto';
 import axios from 'axios';
+import Developer from '../models/Developer.js';
+import { liveAccessFor } from '../utils/developerMerchants.js';
 import DeveloperWebhook from '../models/DeveloperWebhook.js';
 import WebhookDelivery from '../models/WebhookDelivery.js';
 import { assertPublicHttpsUrl } from '../utils/urlSsrfGuard.js';
@@ -13,6 +15,9 @@ export const WEBHOOK_EVENT_TYPES = [
   'payment.collect.failed',
   'payment.payout.succeeded',
   'payment.payout.failed',
+  // A customer paid the merchant's Paybill directly (not through an API
+  // call). Sent to every approved developer linked to that merchant.
+  'payment.paybill.received',
   'invoice.sent',
   'invoice.paid',
   'bulk_payment.completed',
@@ -124,6 +129,25 @@ export async function dispatchDeveloperEvent(developerId, event, data) {
   }
 }
 
+// Tells every approved developer linked to `merchantId` that a customer paid
+// that merchant's Paybill directly. Called once per credited payment (after a
+// duplicate bank reference has already been rejected), fire-and-forget: it
+// must never delay or fail the NCBA credit that triggered it. Only live
+// developers get these — sandbox accounts have no real Paybill traffic.
+export async function dispatchPaybillPaymentReceived(merchantId, payment) {
+  try {
+    const candidates = await Developer.find({
+      $or: [{ 'linkedMerchants.merchantId': merchantId }, { 'linkedMerchant.merchantId': merchantId }],
+      status: 'active',
+    });
+    // Live access is approved per merchant.
+    const developers = candidates.filter((d) => liveAccessFor(d, merchantId).approved);
+    await Promise.all(developers.map((d) => dispatchDeveloperEvent(d._id, 'payment.paybill.received', { payment })));
+  } catch (err) {
+    console.error(`dispatchPaybillPaymentReceived: failed for merchant ${merchantId}:`, err?.message || err);
+  }
+}
+
 // Manual single-endpoint test ping, triggered from the developer dashboard
 // ("Send test event") so an integration can be wired up and verified before
 // any real payment traffic depends on it.
@@ -144,6 +168,27 @@ export async function sendTestWebhook(webhookId) {
   });
   await attemptDelivery(delivery, webhook);
   return delivery;
+}
+
+// Re-sends an earlier delivery's exact payload (same event id, so a receiver
+// that de-duplicates on it still recognises it) as a brand-new delivery with
+// its own retry schedule. Used by the portal's "Resend" button: the usual
+// reason is that the receiver was down or had a bug, and is fixed now.
+export async function resendWebhookDelivery(originalId, developerId) {
+  const original = await WebhookDelivery.findOne({ _id: originalId, developerId });
+  if (!original) return { error: 'Delivery not found.', status: 404 };
+  const webhook = await DeveloperWebhook.findOne({ _id: original.webhookId, developerId });
+  if (!webhook) return { error: 'Webhook not found.', status: 404 };
+  if (webhook.status !== 'active') return { error: 'This webhook is disabled. Enable it before resending.', status: 400 };
+
+  const delivery = await WebhookDelivery.create({
+    webhookId: webhook._id,
+    developerId,
+    event: original.event,
+    payload: original.payload,
+  });
+  await attemptDelivery(delivery, webhook);
+  return { delivery };
 }
 
 // Periodic sweep for deliveries whose retry window has arrived. Long-running

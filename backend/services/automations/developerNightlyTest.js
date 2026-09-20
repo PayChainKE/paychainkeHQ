@@ -1,3 +1,4 @@
+import { liveAccessSummary } from '../../utils/developerMerchants.js';
 import AutomationEvent from '../../models/AutomationEvent.js';
 import Developer from '../../models/Developer.js';
 import { notifyAdminsOfAutomation } from '../../utils/adminNotices.js';
@@ -19,9 +20,12 @@ const dayKey = (d) => new Date(d.getTime() + EAT_OFFSET_MS).toISOString().slice(
 // from the webhook-health automation. Admins are alerted only when a
 // developer goes from passing to failing, not every night a failure persists.
 export async function runDeveloperNightlyTest(auto, { now = new Date(), dryRun = false } = {}) {
-  const developers = await Developer.find({
-    status: 'active', 'liveAccess.approved': true, 'linkedMerchant.merchantId': { $ne: null },
+  const candidates = await Developer.find({
+    status: 'active',
+    $or: [{ 'linkedMerchants.liveAccess.approved': true }, { 'liveAccess.approved': true }],
   }).limit(MAX_DEVELOPERS);
+  // Live access is approved per merchant; test a developer if any is approved.
+  const developers = candidates.filter((d) => liveAccessSummary(d).approved);
 
   if (dryRun) return { status: 'ok', summary: `Would test ${developers.length} developer integration${developers.length === 1 ? '' : 's'} (simulated test-mode collect, no real money).`, counts: { developers: developers.length } };
   if (developers.length === 0) return { status: 'skipped', summary: 'No live-approved developers to test.' };

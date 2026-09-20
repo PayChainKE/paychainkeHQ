@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Trash2, Send, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Trash2, Send, ChevronDown, ChevronUp, RotateCw } from "lucide-react";
 import Callout from "@/components/Callout";
 import CopyButton from "@/components/CopyButton";
 import {
@@ -11,6 +11,7 @@ import {
   deleteWebhook,
   testWebhook,
   listWebhookDeliveries,
+  resendWebhookDelivery,
 } from "@/lib/api";
 
 function formatDate(d: string | null) {
@@ -18,42 +19,93 @@ function formatDate(d: string | null) {
   return new Date(d).toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
+const STATUS_LABEL: Record<string, string> = {
+  success: "Delivered",
+  pending: "Retrying",
+  failed: "Failed",
+  exhausted: "Gave up",
+};
+
+function statusClass(status: string) {
+  if (status === "success") return "text-brand-bright font-semibold";
+  if (status === "exhausted" || status === "failed") return "text-red-500 font-semibold";
+  return "text-amber-500 font-semibold";
+}
+
 function DeliveriesPanel({ webhookId }: { webhookId: string }) {
   const [deliveries, setDeliveries] = useState<WebhookDelivery[] | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
+  const [resending, setResending] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = () =>
     listWebhookDeliveries(webhookId).then((res) => {
       if (res.ok) setDeliveries(res.data.data);
     });
+
+  useEffect(() => {
+    load();
   }, [webhookId]);
 
+  async function handleResend(id: string) {
+    setResending(id);
+    setNote(null);
+    const res = await resendWebhookDelivery(webhookId, id);
+    setResending(null);
+    if (!res.ok) {
+      setNote(res.data.error || "Could not resend.");
+      return;
+    }
+    const d = res.data.delivery;
+    setNote(d.status === "success" ? `Resent. Your server answered HTTP ${d.lastResponseCode}.` : `Resent, but it failed: ${d.lastError || "no response"}. PayChain will retry it automatically.`);
+    load();
+  }
+
   if (!deliveries) return <p className="text-[12.5px] text-ink-faint px-4 py-3">Loading…</p>;
-  if (deliveries.length === 0) return <p className="text-[12.5px] text-ink-faint px-4 py-3">No deliveries yet.</p>;
+  if (deliveries.length === 0) return <p className="text-[12.5px] text-ink-faint px-4 py-3">No deliveries yet. Use Test to send one.</p>;
 
   return (
     <div className="divide-y divide-border-subtle">
-      {deliveries.map((d) => (
-        <div key={d._id} className="px-4 py-2.5 flex items-center justify-between gap-3 text-[12.5px]">
-          <div className="min-w-0">
-            <code className="font-mono text-ink">{d.event}</code>
-            <span className="text-ink-faint ml-2">{formatDate(d.createdAt)}</span>
+      {note && <p className="px-4 py-2 text-[12.5px] text-ink-muted bg-surface-raised/60">{note}</p>}
+      {deliveries.map((d) => {
+        const isOpen = open === d._id;
+        return (
+          <div key={d._id}>
+            <button type="button" onClick={() => setOpen(isOpen ? null : d._id)} className="w-full text-left px-4 py-2.5 flex items-center justify-between gap-3 text-[12.5px] hover:bg-surface-raised transition-colors">
+              <div className="min-w-0">
+                <code className="font-mono text-ink">{d.event}</code>
+                <span className="text-ink-faint ml-2">{formatDate(d.createdAt)}</span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {d.lastResponseCode && <span className="text-ink-faint">HTTP {d.lastResponseCode}</span>}
+                <span className={statusClass(d.status)}>{STATUS_LABEL[d.status] || d.status}</span>
+              </div>
+            </button>
+            {isOpen && (
+              <div className="px-4 pb-3 pt-1 bg-surface-raised/40 text-[12.5px]">
+                <div className="flex flex-wrap gap-x-6 gap-y-1 text-ink-faint mb-2">
+                  <span>Attempts: <span className="text-ink">{d.attempts}</span></span>
+                  {d.lastError && <span>Error: <span className="text-red-500">{d.lastError}</span></span>}
+                  {d.status === "pending" && d.nextAttemptAt && <span>Next retry: <span className="text-ink">{formatDate(d.nextAttemptAt)}</span></span>}
+                </div>
+                <pre className="rounded-lg bg-code-bg border border-code-border text-code-text text-[12px] leading-5 p-3 overflow-x-auto max-h-64">{JSON.stringify(d.payload, null, 2)}</pre>
+                <div className="flex items-center gap-3 mt-2.5">
+                  <button
+                    type="button"
+                    disabled={resending === d._id}
+                    onClick={() => handleResend(d._id)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-surface text-[12.5px] font-semibold text-ink hover:bg-surface-raised disabled:opacity-60"
+                  >
+                    <RotateCw className={`w-3.5 h-3.5 ${resending === d._id ? "animate-spin" : ""}`} />
+                    {resending === d._id ? "Sending…" : "Resend"}
+                  </button>
+                  <span className="text-ink-faint">Sends the same event again with the same event id, so your server can skip a duplicate.</span>
+                </div>
+              </div>
+            )}
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {d.lastResponseCode && <span className="text-ink-faint">HTTP {d.lastResponseCode}</span>}
-            <span
-              className={
-                d.status === "delivered"
-                  ? "text-brand-bright font-semibold"
-                  : d.status === "exhausted" || d.status === "failed"
-                  ? "text-red-500 font-semibold"
-                  : "text-amber-500 font-semibold"
-              }
-            >
-              {d.status}
-            </span>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

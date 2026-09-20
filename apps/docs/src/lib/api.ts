@@ -22,8 +22,17 @@ export interface Developer {
   status: "pending_verification" | "active" | "suspended";
   isVerified: boolean;
   liveAccess: { approved: boolean; requestedAt: string | null; approvedAt: string | null };
+  linkedMerchantCount?: number;
   createdAt: string;
   lastLogin: string | null;
+}
+
+export interface LinkedMerchant {
+  merchantId: string;
+  businessName: string | null;
+  email: string | null;
+  linkedAt: string | null;
+  liveAccess?: { approved: boolean; requestedAt: string | null; approvedAt: string | null };
 }
 
 export interface ApiKey {
@@ -35,6 +44,8 @@ export interface ApiKey {
   lastUsedAt: string | null;
   createdAt: string;
   revokedAt: string | null;
+  merchantId: string | null;
+  merchantName: string | null;
 }
 
 export interface Webhook {
@@ -50,12 +61,29 @@ export interface Webhook {
 export interface WebhookDelivery {
   _id: string;
   event: string;
-  status: "pending" | "delivered" | "failed" | "exhausted";
+  status: "pending" | "success" | "failed" | "exhausted";
   attempts: number;
   lastResponseCode: number | null;
   lastError: string | null;
   nextAttemptAt: string | null;
   createdAt: string;
+  payload: unknown;
+}
+
+export interface DeveloperPayment {
+  id: string;
+  mode: "test" | "live";
+  kind: "collect" | "payout";
+  origin: "api" | "admin_test";
+  merchantId: string | null;
+  amount: number;
+  currency: string;
+  status: "pending" | "success" | "failed";
+  failureReason: string | null;
+  reference: string | null;
+  counterparty: Record<string, string> | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<{ ok: boolean; status: number; data: T & { error?: string; code?: string } }> {
@@ -142,8 +170,11 @@ export function getMe() {
   return request<{ success: boolean; developer: Developer }>("/api/developer/me");
 }
 
-export function requestLiveAccess() {
-  return request<{ success: boolean; message: string }>("/api/developer/live-access/request", { method: "POST" });
+export function requestLiveAccess(merchantId?: string) {
+  return request<{ success: boolean; message: string; merchantId: string }>("/api/developer/live-access/request", {
+    method: "POST",
+    body: JSON.stringify(merchantId ? { merchantId } : {}),
+  });
 }
 
 // --- API keys (private) ---
@@ -152,7 +183,7 @@ export function listApiKeys() {
   return request<{ success: boolean; data: ApiKey[] }>("/api/developer/api-keys");
 }
 
-export function createApiKey(body: { mode: "test" | "live"; label?: string }) {
+export function createApiKey(body: { mode: "test" | "live"; label?: string; merchantId?: string }) {
   return request<{ success: boolean; apiKey: ApiKey & { key: string } }>("/api/developer/api-keys", {
     method: "POST",
     body: JSON.stringify(body),
@@ -180,9 +211,20 @@ export function verifyMerchantLink(body: { merchantEmail: string; otp: string })
 }
 
 export function getMerchantLinkStatus() {
-  return request<{ success: boolean; linked: boolean; merchant?: { businessName: string; email: string }; linkedAt?: string }>(
-    "/api/developer/link-merchant/status"
-  );
+  return request<{ success: boolean; linked: boolean; merchants: LinkedMerchant[] }>("/api/developer/link-merchant/status");
+}
+
+export function unlinkMerchant(merchantId: string) {
+  return request<{ success: boolean; keysRevoked: number }>(`/api/developer/link-merchant/${merchantId}`, { method: "DELETE" });
+}
+
+// --- Transactions (private) ---
+
+export function listPayments(params: { mode?: string; kind?: string; status?: string; q?: string; page?: number; limit?: number } = {}) {
+  const qs = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== "") qs.set(k, String(v)); });
+  const suffix = qs.toString() ? `?${qs}` : "";
+  return request<{ success: boolean; data: DeveloperPayment[]; total: number; page: number; pages: number }>(`/api/developer/payments${suffix}`);
 }
 
 // --- Webhooks (private) ---
@@ -214,6 +256,10 @@ export function testWebhook(id: string) {
     `/api/developer/webhooks/${id}/test`,
     { method: "POST" }
   );
+}
+
+export function resendWebhookDelivery(webhookId: string, deliveryId: string) {
+  return request<{ success: boolean; delivery: WebhookDelivery }>(`/api/developer/webhooks/${webhookId}/deliveries/${deliveryId}/resend`, { method: "POST" });
 }
 
 export function listWebhookDeliveries(id: string) {

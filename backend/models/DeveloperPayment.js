@@ -10,8 +10,19 @@ import mongoose from 'mongoose';
 // that don't know to filter it out — nothing else in the app queries this.
 const developerPaymentSchema = new mongoose.Schema({
   developerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Developer', required: true, index: true },
-  apiKeyId: { type: mongoose.Schema.Types.ObjectId, ref: 'ApiKey', required: true },
-  merchantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Merchant', required: true, index: true },
+  // Required for anything a developer made through the API. A payment an admin
+  // started from the dashboard to test a developer's setup has no key.
+  apiKeyId: { type: mongoose.Schema.Types.ObjectId, ref: 'ApiKey', required() { return this.origin !== 'admin_test'; }, default: null },
+  // 'admin_test': a small real payment an admin started from the dashboard to
+  // check a developer's merchant end to end. Distinguishable in webhook
+  // payloads so a developer's system can ignore it.
+  origin: { type: String, enum: ['api', 'admin_test'], default: 'api' },
+  testedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null },
+  // When true no webhook is sent to the developer for this payment.
+  suppressWebhooks: { type: Boolean, default: false },
+  // Live records always belong to a real merchant. Sandbox (test-mode)
+  // records made by a developer who hasn't linked one yet have none.
+  merchantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Merchant', required() { return this.mode === 'live'; }, default: null, index: true },
   mode: { type: String, enum: ['test', 'live'], required: true },
   kind: { type: String, enum: ['collect', 'payout'], required: true },
   amount: { type: Number, required: true },
@@ -41,12 +52,10 @@ const developerPaymentSchema = new mongoose.Schema({
   // — groups every row from the same batch request together for
   // GET /bulk-payments/:batchId. A single POST /payments/payout leaves this null.
   batchId: { type: String, default: null, index: true },
-  // 'employee' rows are priced as gross payroll (see grossAmount/taxDeductions
-  // below) and PAYE/NSSF/SHIF-deducted the same way bulkPayController.js's
-  // authorizeBatch does for the merchant dashboard's own Bulk Pay — `amount`
-  // above is always the real net amount actually paid, same meaning it has
-  // everywhere else in this model. 'contract' rows pay `amount` as-is, no
-  // tax withheld (a vendor/supplier settlement, not payroll).
+  // A label only: 'employee' vs 'contract' does not change the amount paid.
+  // The Developer API makes no PAYE/NSSF/SHIF deductions (see priceRows in
+  // developerBulkPayController.js), so `amount` is exactly what was paid.
+  // grossAmount/taxDeductions below are reserved and stay null.
   payeeType: { type: String, enum: ['employee', 'contract'], default: 'contract' },
   grossAmount: { type: Number, default: null },
   taxDeductions: {
@@ -57,6 +66,9 @@ const developerPaymentSchema = new mongoose.Schema({
 }, {
   timestamps: true,
 });
+
+// Powers the portal's Transactions page (newest first, per developer).
+developerPaymentSchema.index({ developerId: 1, createdAt: -1 });
 
 const DeveloperPayment = mongoose.model('DeveloperPayment', developerPaymentSchema);
 

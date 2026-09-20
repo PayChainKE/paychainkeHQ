@@ -112,6 +112,8 @@ const scheduleReconnect = () => {
       }
       await connectDB({ silent: true });
       console.log('✅ MongoDB reconnected');
+      // If the first connect at boot failed, this is the first time we're up.
+      ensureModelIndexes().catch((err) => console.error('Index build failed:', err?.message || err));
     } catch (error) {
       logConnectError(error);
       scheduleReconnect();
@@ -195,6 +197,42 @@ const connectDB = async ({ retries = 5, silent = false } = {}) => {
   } finally {
     inFlightConnect = null;
   }
+};
+
+// Builds any schema indexes that are missing. bufferCommands is off (above),
+// and with it off Mongoose's automatic index build at model compile time runs
+// before the connection exists and silently does nothing. So without this, a
+// fresh database never gets its unique indexes, and the code that relies on
+// them (Idempotency-Key replays, duplicate NCBA credit detection, unique
+// emails and API keys) quietly stops protecting anything.
+//
+// Additive only: createIndexes() creates what is missing and never drops or
+// changes an index. An index that already exists is a no-op. One that can't be
+// built (existing duplicate data for a unique index, or a same-name index with
+// different options) is logged and skipped, never fatal. Run once per process,
+// in the background, after the first successful connect. Set
+// SKIP_INDEX_BUILD=1 to switch it off.
+let indexBuildStarted = false;
+export const ensureModelIndexes = async () => {
+  if (indexBuildStarted) return;
+  indexBuildStarted = true;
+  if (process.env.SKIP_INDEX_BUILD === '1') {
+    console.log('ℹ️  Index build skipped (SKIP_INDEX_BUILD=1)');
+    return;
+  }
+
+  const names = mongoose.modelNames();
+  const failed = [];
+  for (const name of names) {
+    try {
+      await mongoose.model(name).createIndexes();
+    } catch (err) {
+      failed.push(name);
+      console.error(`⚠️ Could not build indexes for ${name}: ${err?.message || err}`);
+    }
+  }
+  if (failed.length === 0) console.log(`🗂️  Schema indexes verified for ${names.length} models`);
+  else console.warn(`🗂️  Schema indexes verified for ${names.length - failed.length}/${names.length} models; needs attention: ${failed.join(', ')}`);
 };
 
 export const startBackgroundDbRetry = () => {

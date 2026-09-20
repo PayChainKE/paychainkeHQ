@@ -1,3 +1,12 @@
+import mongoose from 'mongoose';
+import Merchant from '../models/Merchant.js';
+import ApiKey from '../models/ApiKey.js';
+import { linkedMerchantIds, liveAccessFor, liveAccessSummary } from '../utils/developerMerchants.js';
+import { migrateLegacyLink } from '../services/developerMerchantLinkService.js';
+import DeveloperPayment from '../models/DeveloperPayment.js';
+import { initiateCollectPayment, syncLiveCollectFromStkRequest, CollectValidationError } from '../services/developerCollectService.js';
+import { validatePhoneNumber } from '../utils/ncbaValidators.js';
+import { publicDeveloperPayment } from '../utils/developerPaymentView.js';
 import Developer from '../models/Developer.js';
 import DeveloperWebhook from '../models/DeveloperWebhook.js';
 import WebhookDelivery from '../models/WebhookDelivery.js';
@@ -6,6 +15,36 @@ import { logAudit } from '../utils/auditLog.js';
 import { runIntegrationTestForDeveloper } from '../services/developerIntegrationTestService.js';
 import { sendSupportReply } from '../utils/resend.js';
 
+// A developer as the admin dashboard needs it: the account, plus each linked
+// merchant with its own live-access state (approval is per merchant), and a
+// summary `liveAccess` for the list badges.
+async function describeDevelopers(developers) {
+  const ids = new Set();
+  developers.forEach((d) => linkedMerchantIds(d).forEach((id) => ids.add(String(id))));
+  const docs = ids.size ? await Merchant.find({ _id: { $in: [...ids] } }).select('businessName email') : [];
+  const byId = new Map(docs.map((m) => [String(m._id), m]));
+  return developers.map((d) => {
+    const plain = d.toObject ? d.toObject() : d;
+    const merchants = linkedMerchantIds(d).map((id) => ({
+      merchantId: id,
+      businessName: byId.get(String(id))?.businessName || null,
+      email: byId.get(String(id))?.email || null,
+      liveAccess: liveAccessFor(d, id),
+    }));
+    const summary = liveAccessSummary(d);
+    // autoTest of the pending request, for the badge on the list row.
+    const pending = merchants.find((m) => !m.liveAccess.approved && m.liveAccess.requestedAt);
+    return { ...plain, merchants, liveAccess: { ...(plain.liveAccess || {}), ...summary, autoTest: pending?.liveAccess.autoTest ?? null } };
+  });
+}
+
+// Picks which of a developer's linked merchants an admin action is for.
+function resolveTargetMerchant(developer, requested) {
+  const ids = linkedMerchantIds(developer);
+  if (requested) return ids.find((id) => String(id) === String(requested)) || null;
+  return ids.length === 1 ? ids[0] : null;
+}
+
 // @desc    List developer accounts (filterable by live-access review state)
 // @route   GET /api/admin/developers
 // @access  Private (Admin — owner/admin/analyst)
@@ -13,11 +52,18 @@ export const listDevelopers = async (req, res) => {
   try {
     const { liveAccessStatus, page = 1, pageSize = 25 } = req.query;
     const filter = {};
+    // Per merchant, with the old developer-level fields still honoured for a
+    // developer whose single link has not been migrated yet.
     if (liveAccessStatus === 'requested') {
-      filter['liveAccess.approved'] = false;
-      filter['liveAccess.requestedAt'] = { $ne: null };
+      filter.$or = [
+        { linkedMerchants: { $elemMatch: { 'liveAccess.requestedAt': { $ne: null }, 'liveAccess.approved': false } } },
+        { 'linkedMerchants.0': { $exists: false }, 'liveAccess.approved': false, 'liveAccess.requestedAt': { $ne: null } },
+      ];
     } else if (liveAccessStatus === 'approved') {
-      filter['liveAccess.approved'] = true;
+      filter.$or = [
+        { 'linkedMerchants.liveAccess.approved': true },
+        { 'linkedMerchants.0': { $exists: false }, 'liveAccess.approved': true },
+      ];
     }
 
     const skip = (Number(page) - 1) * Number(pageSize);
@@ -28,7 +74,7 @@ export const listDevelopers = async (req, res) => {
 
     res.json({
       success: true,
-      data: developers,
+      data: await describeDevelopers(developers),
       page: Number(page),
       pageSize: Number(pageSize),
       total,
@@ -40,28 +86,42 @@ export const listDevelopers = async (req, res) => {
   }
 };
 
-// @desc    Approve a developer for live (real-money) API keys
-// @route   PATCH /api/admin/developers/:id/approve-live
+// @desc    Approve live (real-money) API keys for ONE of a developer's merchants
+// @route   PATCH /api/admin/developers/:id/approve-live   body: { merchantId }
 // @access  Private (Admin — owner/admin)
 export const approveLiveAccess = async (req, res) => {
   try {
-    const developer = await Developer.findById(req.params.id);
+    // Moves a legacy single link into the per-merchant list first.
+    const developer = await migrateLegacyLink(req.params.id);
     if (!developer) return res.status(404).json({ error: 'Developer not found.' });
 
-    developer.liveAccess = developer.liveAccess || {};
-    developer.liveAccess.approved = true;
-    developer.liveAccess.approvedAt = new Date();
-    developer.liveAccess.approvedBy = req.admin._id;
-    await developer.save();
+    if (linkedMerchantIds(developer).length === 0) {
+      return res.status(400).json({ error: 'This developer has not linked a real merchant account yet, so live access cannot be approved.', code: 'NO_LINKED_MERCHANT' });
+    }
+    const merchantId = resolveTargetMerchant(developer, req.body?.merchantId);
+    if (!merchantId) {
+      return res.status(400).json({ error: 'Say which of the developer\'s merchants this is for (merchantId).', code: 'MERCHANT_REQUIRED' });
+    }
+
+    await Developer.updateOne(
+      { _id: developer._id, 'linkedMerchants.merchantId': merchantId },
+      { $set: {
+        'linkedMerchants.$.liveAccess.approved': true,
+        'linkedMerchants.$.liveAccess.approvedAt': new Date(),
+        'linkedMerchants.$.liveAccess.approvedBy': req.admin._id,
+      } }
+    );
+    const merchantDoc = await Merchant.findById(merchantId).select('businessName');
 
     logAudit({
       action: 'admin.developer.live_access_approved', category: 'admin', severity: 'warning',
-      message: `${req.admin.name || req.admin.email} approved live API access for ${developer.companyName}`,
+      message: `${req.admin.name || req.admin.email} approved live API access for ${developer.companyName} on merchant ${merchantDoc?.businessName || merchantId}`,
       req, actor: { type: 'admin', id: req.admin._id, email: req.admin.email, name: req.admin.name },
-      metadata: { developerId: String(developer._id), companyName: developer.companyName },
+      metadata: { developerId: String(developer._id), companyName: developer.companyName, merchantId: String(merchantId) },
     });
 
-    res.json({ success: true, developer });
+    const [described] = await describeDevelopers([await Developer.findById(developer._id)]);
+    res.json({ success: true, developer: described });
   } catch (error) {
     console.error('Approve Live Access Error:', error);
     res.status(500).json({ error: 'Server Error' });
@@ -123,27 +183,50 @@ export const getDeveloperWebhooks = async (req, res) => {
   }
 };
 
-// @desc    Reject a developer's live-access request (leaves sandbox access untouched)
-// @route   PATCH /api/admin/developers/:id/reject-live
+// @desc    Reject a live-access request, or revoke approval, for ONE of a
+//          developer's merchants. Sandbox access is untouched. Revoking an
+//          approved merchant also revokes that merchant's live API keys.
+// @route   PATCH /api/admin/developers/:id/reject-live   body: { merchantId }
 // @access  Private (Admin — owner/admin)
 export const rejectLiveAccess = async (req, res) => {
   try {
-    const developer = await Developer.findById(req.params.id);
+    const developer = await migrateLegacyLink(req.params.id);
     if (!developer) return res.status(404).json({ error: 'Developer not found.' });
 
-    developer.liveAccess = developer.liveAccess || {};
-    developer.liveAccess.approved = false;
-    developer.liveAccess.requestedAt = null;
-    await developer.save();
+    const merchantId = resolveTargetMerchant(developer, req.body?.merchantId);
+    if (!merchantId) {
+      return res.status(400).json({ error: 'Say which of the developer\'s merchants this is for (merchantId).', code: 'MERCHANT_REQUIRED' });
+    }
+
+    const wasApproved = liveAccessFor(developer, merchantId).approved;
+    await Developer.updateOne(
+      { _id: developer._id, 'linkedMerchants.merchantId': merchantId },
+      { $set: {
+        'linkedMerchants.$.liveAccess.approved': false,
+        'linkedMerchants.$.liveAccess.requestedAt': null,
+        'linkedMerchants.$.liveAccess.approvedAt': null,
+        'linkedMerchants.$.liveAccess.approvedBy': null,
+      } }
+    );
+    let keysRevoked = 0;
+    if (wasApproved) {
+      const r = await ApiKey.updateMany(
+        { developerId: developer._id, merchantId, mode: 'live', status: 'active' },
+        { $set: { status: 'revoked', revokedAt: new Date() } }
+      );
+      keysRevoked = r.modifiedCount;
+    }
+    const merchantDoc = await Merchant.findById(merchantId).select('businessName');
 
     logAudit({
       action: 'admin.developer.live_access_rejected', category: 'admin', severity: 'info',
-      message: `${req.admin.name || req.admin.email} rejected live API access for ${developer.companyName}`,
+      message: `${req.admin.name || req.admin.email} ${wasApproved ? 'revoked' : 'rejected'} live API access for ${developer.companyName} on merchant ${merchantDoc?.businessName || merchantId}${keysRevoked ? ` (${keysRevoked} live key(s) revoked)` : ''}`,
       req, actor: { type: 'admin', id: req.admin._id, email: req.admin.email, name: req.admin.name },
-      metadata: { developerId: String(developer._id), companyName: developer.companyName },
+      metadata: { developerId: String(developer._id), companyName: developer.companyName, merchantId: String(merchantId), keysRevoked },
     });
 
-    res.json({ success: true, developer });
+    const [described] = await describeDevelopers([await Developer.findById(developer._id)]);
+    res.json({ success: true, developer: described, keysRevoked });
   } catch (error) {
     console.error('Reject Live Access Error:', error);
     res.status(500).json({ error: 'Server Error' });
@@ -295,6 +378,143 @@ export const sendDeveloperEmail = async (req, res) => {
     res.json({ success: true, data: thread });
   } catch (error) {
     console.error('Send Developer Email Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// ── Live test: a small REAL payment, started by an admin ────────────────────
+// Checks a developer's linked merchant end to end (the STK push reaches a phone,
+// the money lands in that merchant's wallet). Money IN only: it never pays
+// anything out, because a payout would spend the merchant's own balance and
+// bypass the merchant's payout PIN and limits.
+//
+// Guardrails: owner/admin only, a hard amount cap, a phone chosen from three
+// known parties (the admin's own, the developer's, or the merchant's) rather
+// than typed in, one test at a time per merchant, rate limited, and audited.
+// By default no webhook is sent to the developer's endpoints, so their system
+// never mistakes it for a real customer payment.
+const LIVE_TEST_MAX_KES = () => Math.max(1, Number(process.env.ADMIN_LIVE_TEST_MAX_KES) || 50);
+
+// 254733444555 -> 0733***555. Never send a full number to the browser.
+const maskPhone = (p) => (p ? (() => { const local = `0${String(p).replace(/^\+?254/, '')}`; return `${local.slice(0, 4)}${'*'.repeat(Math.max(0, local.length - 7))}${local.slice(-3)}`; })() : null);
+
+// Resolves the three phones an admin may send a test to.
+async function livePhoneChoices(developer, admin, merchantId) {
+  const merchant = merchantId ? await Merchant.findById(merchantId).select('businessName phone') : null;
+  const raw = { admin: admin?.phone, developer: developer?.phone, merchant: merchant?.phone };
+  const labels = { admin: 'My phone', developer: 'The developer\'s phone', merchant: `The merchant's phone (${merchant?.businessName || 'merchant'})` };
+  const out = [];
+  for (const source of ['admin', 'developer', 'merchant']) {
+    let normalized = null;
+    try { normalized = raw[source] ? validatePhoneNumber(raw[source]) : null; } catch { normalized = null; }
+    out.push({ source, label: labels[source], hint: maskPhone(normalized), available: !!normalized, normalized });
+  }
+  return { merchant, choices: out };
+}
+
+// @desc    What an admin can pick for a live test on one merchant.
+// @route   GET /api/admin/developers/:id/live-test/options?merchantId=
+// @access  Private (Admin — owner/admin)
+export const getLiveTestOptions = async (req, res) => {
+  try {
+    const developer = await Developer.findById(req.params.id);
+    if (!developer) return res.status(404).json({ error: 'Developer not found.' });
+    const merchantId = resolveTargetMerchant(developer, req.query?.merchantId);
+    if (!merchantId) return res.status(400).json({ error: 'Choose one of the developer\'s merchants.', code: 'MERCHANT_REQUIRED' });
+    const { merchant, choices } = await livePhoneChoices(developer, req.admin, merchantId);
+    res.json({
+      success: true,
+      merchant: { merchantId, businessName: merchant?.businessName || null },
+      maxAmount: LIVE_TEST_MAX_KES(),
+      phones: choices.map(({ normalized, ...c }) => c),
+    });
+  } catch (error) {
+    console.error('Live Test Options Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Start a small real STK push into one of the developer's merchants.
+// @route   POST /api/admin/developers/:id/live-test   body: { merchantId, phoneSource, amount, deliverWebhook }
+// @access  Private (Admin — owner/admin)
+export const startLiveTest = async (req, res) => {
+  try {
+    const developer = await Developer.findById(req.params.id);
+    if (!developer) return res.status(404).json({ error: 'Developer not found.' });
+    if (developer.status !== 'active') return res.status(400).json({ error: 'This developer account is not active.' });
+
+    const merchantId = resolveTargetMerchant(developer, req.body?.merchantId);
+    if (!merchantId) return res.status(400).json({ error: 'Choose one of the developer\'s merchants.', code: 'MERCHANT_REQUIRED' });
+
+    const amount = Math.ceil(Number(req.body?.amount));
+    const max = LIVE_TEST_MAX_KES();
+    if (!Number.isFinite(amount) || amount < 1 || amount > max) {
+      return res.status(400).json({ error: `Amount must be a whole number of KES between 1 and ${max}.`, code: 'AMOUNT_OUT_OF_RANGE' });
+    }
+
+    const { merchant, choices } = await livePhoneChoices(developer, req.admin, merchantId);
+    const choice = choices.find((c) => c.source === req.body?.phoneSource);
+    if (!choice) return res.status(400).json({ error: 'Choose whose phone receives the M-PESA prompt.', code: 'PHONE_SOURCE_REQUIRED' });
+    if (!choice.available) return res.status(400).json({ error: `There is no valid phone number on file for that choice.`, code: 'PHONE_UNAVAILABLE' });
+
+    // One at a time per merchant: a double-click must not send two prompts.
+    const recent = await DeveloperPayment.findOne({
+      developerId: developer._id, merchantId, origin: 'admin_test', status: 'pending', createdAt: { $gte: new Date(Date.now() - 3 * 60 * 1000) },
+    });
+    if (recent) return res.status(409).json({ error: 'A test for this merchant is still waiting for the M-PESA prompt. Let it finish or expire first.', code: 'TEST_IN_PROGRESS', paymentId: recent._id });
+
+    const deliverWebhook = req.body?.deliverWebhook === true;
+    let payment;
+    try {
+      payment = await initiateCollectPayment({
+        developerId: developer._id,
+        apiKeyId: null,
+        merchantId,
+        mode: 'live',
+        amount,
+        phone: choice.normalized,
+        reference: `admin-test-${String(new mongoose.Types.ObjectId()).slice(-8)}`,
+        idempotencyKey: `admin-live-test-${req.admin._id}-${Date.now()}`,
+        origin: 'admin_test',
+        testedBy: req.admin._id,
+        suppressWebhooks: !deliverWebhook,
+      });
+    } catch (e) {
+      if (e instanceof CollectValidationError) return res.status(400).json({ error: e.message });
+      throw e;
+    }
+
+    logAudit({
+      action: 'admin.developer.live_test', category: 'admin', severity: 'warning',
+      message: `${req.admin.name || req.admin.email} started a real KES ${amount} test payment for ${developer.companyName} into ${merchant?.businessName || merchantId}, to ${choice.label.toLowerCase()} (${choice.hint})`,
+      req, actor: { type: 'admin', id: req.admin._id, email: req.admin.email, name: req.admin.name },
+      metadata: { developerId: String(developer._id), merchantId: String(merchantId), paymentId: String(payment._id), amount, phoneSource: choice.source, deliverWebhook },
+    });
+
+    res.status(201).json({
+      success: true,
+      payment: { ...publicDeveloperPayment(payment), webhooksSent: deliverWebhook },
+      sentTo: choice.hint,
+      merchant: { merchantId, businessName: merchant?.businessName || null },
+    });
+  } catch (error) {
+    console.error('Start Live Test Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Status of a live test (the page polls this while the prompt is open).
+// @route   GET /api/admin/developers/:id/live-test/:paymentId
+// @access  Private (Admin — owner/admin)
+export const getLiveTest = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.paymentId)) return res.status(404).json({ error: 'Test not found.' });
+    const payment = await DeveloperPayment.findOne({ _id: req.params.paymentId, developerId: req.params.id, origin: 'admin_test' });
+    if (!payment) return res.status(404).json({ error: 'Test not found.' });
+    await syncLiveCollectFromStkRequest(payment);
+    res.json({ success: true, payment: { ...publicDeveloperPayment(payment), webhooksSent: !payment.suppressWebhooks } });
+  } catch (error) {
+    console.error('Get Live Test Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };

@@ -23,11 +23,22 @@ export default function Webhooks() {
           { name: "payment.collect.failed", type: "event", description: "The customer cancelled, the prompt timed out, or the collection otherwise failed." },
           { name: "payment.payout.succeeded", type: "event", description: "A Send Money payout, or one row of a bulk payment batch, was sent successfully." },
           { name: "payment.payout.failed", type: "event", description: "A payout (or one bulk-payment row) failed: insufficient funds, an invalid account, etc." },
+          { name: "payment.paybill.received", type: "event", description: "A customer paid your linked merchant's Paybill directly (not through an API call). Live developers only. Carries the amount, the bank reference, and the payer's phone or name when the bank supplies one. See the note below." },
           { name: "bulk_payment.completed", type: "event", description: "Every row in a POST /bulk-payments batch has resolved; fires once per batch with the final succeeded/pending/failed tally. See Bulk Payments." },
           { name: "invoice.sent", type: "event", description: "An invoice created via POST /invoices was emailed to its customer. See Invoices." },
           { name: "invoice.paid", type: "event", description: "A customer paid an API-created invoice via its payment link or QR code." },
         ]}
       />
+
+      <h2>Direct Paybill payments</h2>
+      <p>
+        <code>payment.paybill.received</code> fires once for each customer payment to the linked
+        merchant's Paybill account, after PayChain has credited it. Every customer of the same
+        merchant pays the same account number, so the event can't say <em>which of your customers</em>
+        paid, and the bank does not always supply a usable payer phone. To match a payment to a
+        specific subscriber or order, collect with an STK push or a hosted checkout and set your
+        own <code>reference</code>; those events carry it back to you.
+      </p>
 
       <h2>Managing webhooks</h2>
       <p>These routes use your developer JWT, not an API key. Same auth as account management.</p>
@@ -314,6 +325,14 @@ end`,
         After the last retry, the delivery is marked <code>exhausted</code> and stops. Check{" "}
         <code>GET /api/developer/webhooks/:id/deliveries</code> if events seem to be going missing.
         It shows the HTTP status and error for every attempt.
+      </p>
+
+      <h2>Resend a delivery</h2>
+      <p>
+        Fixed a bug in your handler, or your server was down? Open <em>Deliveries</em> on the{" "}
+        <a href="/dashboard/webhooks">Webhooks page</a>, pick the event, and press <strong>Resend</strong>. PayChain sends
+        the same payload again, with the same event <code>id</code>, so a handler that skips events it has already seen
+        stays safe. The API is <code>POST /api/developer/webhooks/:id/deliveries/:deliveryId/resend</code>.
       </p>
     </>
   );

@@ -242,4 +242,4 @@ const requireRole = (...allowedRoles) => (req, res, next) => {
   return next();
 };
 
-export { protect, protectAdminSSE, protectMerchant, protectMerchantSSE, protectDeveloper, authenticateApiKey, requireRole };
+export { protect, protectAdminSSE, protectMerchant, protectMerchantSSE, protectDeveloper, authenticateApiKey, extractApiKey, requireRole };

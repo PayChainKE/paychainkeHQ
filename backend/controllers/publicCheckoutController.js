@@ -21,7 +21,7 @@ export const getPublicCheckoutSession = async (req, res) => {
     const session = await CheckoutSession.findById(req.params.id);
     if (!session) return res.status(404).json({ error: 'Checkout link not found or no longer valid.' });
 
-    const merchant = await Merchant.findById(session.merchantId).select('businessName');
+    const merchant = session.merchantId ? await Merchant.findById(session.merchantId).select('businessName') : null;
     const checkoutUrl = `${CHECKOUT_BASE_URL}/pay/${session._id}`;
 
     res.json({
@@ -34,7 +34,7 @@ export const getPublicCheckoutSession = async (req, res) => {
         description: session.description,
         reference: session.reference,
         status: isCheckoutSessionExpired(session) ? 'expired' : session.status,
-        merchantName: merchant?.businessName || 'PayChain Merchant',
+        merchantName: merchant?.businessName || (session.mode === 'test' ? 'PayChain Sandbox' : 'PayChain Merchant'),
         prefillPhone: session.customer?.phone || null,
         // Encodes this exact page's own URL — lets a merchant display this
         // page on a desktop/kiosk screen and have the customer scan with

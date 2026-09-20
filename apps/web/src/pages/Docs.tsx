@@ -20,7 +20,7 @@ const upcoming = [
   { icon: Receipt, title: 'Electronic invoicing', description: 'Create, send, and track real, payable invoices, with delivery and payment status pushed to you.' },
 ];
 
-const codePreview = `curl -X POST https://api.paychain.co.ke/payments/collect \\
+const codePreview = `curl -X POST https://api.paychain.co.ke/api/v1/developer/payments/collect \\
   -H "Authorization: Bearer pc_live_..." \\
   -H "Idempotency-Key: order-4471" \\
   -d '{"amount": 2500, "phone": "2547XXXXXXXX"}'`;

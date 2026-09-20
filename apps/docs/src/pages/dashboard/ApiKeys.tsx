@@ -3,8 +3,7 @@ import { Link } from "react-router-dom";
 import { Plus, Ban } from "lucide-react";
 import Callout from "@/components/Callout";
 import CopyButton from "@/components/CopyButton";
-import { useDeveloperAuth } from "@/context/DeveloperAuthContext";
-import { ApiKey, listApiKeys, createApiKey, revokeApiKey } from "@/lib/api";
+import { ApiKey, LinkedMerchant, listApiKeys, createApiKey, revokeApiKey, getMerchantLinkStatus } from "@/lib/api";
 
 function formatDate(d: string | null) {
   if (!d) return "Never";
@@ -12,10 +11,11 @@ function formatDate(d: string | null) {
 }
 
 export default function ApiKeys() {
-  const { developer } = useDeveloperAuth();
   const [keys, setKeys] = useState<ApiKey[] | null>(null);
   const [mode, setMode] = useState<"test" | "live">("test");
   const [label, setLabel] = useState("");
+  const [merchants, setMerchants] = useState<LinkedMerchant[]>([]);
+  const [merchantId, setMerchantId] = useState("");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
@@ -27,13 +27,27 @@ export default function ApiKeys() {
 
   useEffect(() => {
     load();
+    getMerchantLinkStatus().then((res) => {
+      if (res.ok) {
+        setMerchants(res.data.merchants || []);
+        if ((res.data.merchants || []).length === 1) setMerchantId(res.data.merchants[0].merchantId);
+      }
+    });
   }, []);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (mode === "live" && !merchantId) {
+      setError("Choose which merchant this live key is for.");
+      return;
+    }
+    if (mode === "live" && !approvedMerchants.some((m) => m.merchantId === merchantId)) {
+      setError("That merchant hasn't been approved for live access yet.");
+      return;
+    }
     setCreating(true);
-    const res = await createApiKey({ mode, label: label || undefined });
+    const res = await createApiKey({ mode, label: label || undefined, merchantId: merchantId || undefined });
     setCreating(false);
     if (!res.ok) {
       setError(res.data.error || "Could not create key.");
@@ -50,13 +64,17 @@ export default function ApiKeys() {
     load();
   }
 
-  const liveApproved = developer?.liveAccess?.approved;
+  // Live access is approved per merchant: a live key needs an approved one.
+  const approvedMerchants = merchants.filter((m) => m.liveAccess?.approved);
+  const liveApproved = approvedMerchants.length > 0;
 
   return (
     <>
       <h1 className="text-2xl font-extrabold text-ink tracking-tight mb-1.5">API keys</h1>
       <p className="text-[14px] text-ink-muted mb-8">
-        Test keys work immediately: everything's simulated. Live keys need approval; see{" "}
+        Test keys work immediately: everything's simulated, and no merchant is needed. A live key acts for one merchant,
+        so link it under{" "}
+        <Link to="/dashboard/merchant" className="text-brand hover:text-brand-bright">Merchants</Link> first, then see{" "}
         <Link to="/dashboard/live-access" className="text-brand hover:text-brand-bright">Live access</Link>.
       </p>
 
@@ -86,7 +104,27 @@ export default function ApiKeys() {
               className="px-3 py-2 rounded-lg bg-canvas border border-border text-[13.5px] text-ink focus:outline-none focus:border-brand/40"
             >
               <option value="test">Test</option>
-              <option value="live" disabled={!liveApproved}>Live {!liveApproved ? "(needs approval)" : ""}</option>
+              <option value="live" disabled={!liveApproved}>Live {!liveApproved ? "(no approved merchant yet)" : ""}</option>
+            </select>
+          </label>
+          <label className="min-w-[12rem]">
+            <span className="block text-[12px] font-medium text-ink-faint mb-1.5">
+              Merchant {mode === "live" ? "" : "(optional)"}
+            </span>
+            <select
+              value={merchantId}
+              onChange={(e) => setMerchantId(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg bg-canvas border border-border text-[13.5px] text-ink focus:outline-none focus:border-brand/40"
+            >
+              <option value="">{mode === "live" ? "Choose a merchant…" : "None (pure sandbox)"}</option>
+              {merchants.map((m) => {
+                const needsApproval = mode === "live" && !m.liveAccess?.approved;
+                return (
+                  <option key={m.merchantId} value={m.merchantId} disabled={needsApproval}>
+                    {m.businessName || m.email || "Merchant"}{needsApproval ? " (needs approval)" : ""}
+                  </option>
+                );
+              })}
             </select>
           </label>
           <label className="flex-1 min-w-[10rem]">
@@ -115,6 +153,7 @@ export default function ApiKeys() {
             <tr className="border-b border-border-subtle bg-surface/60">
               <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-widest text-ink-faint">Key</th>
               <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-widest text-ink-faint">Mode</th>
+              <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-widest text-ink-faint">Merchant</th>
               <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-widest text-ink-faint">Status</th>
               <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-widest text-ink-faint">Last used</th>
               <th className="px-4 py-2.5" />
@@ -122,7 +161,7 @@ export default function ApiKeys() {
           </thead>
           <tbody className="divide-y divide-border-subtle">
             {keys?.length === 0 && (
-              <tr><td colSpan={5} className="px-4 py-6 text-center text-[13px] text-ink-faint">No keys yet, create one above.</td></tr>
+              <tr><td colSpan={6} className="px-4 py-6 text-center text-[13px] text-ink-faint">No keys yet, create one above.</td></tr>
             )}
             {keys?.map((k) => (
               <tr key={k._id}>
@@ -131,6 +170,7 @@ export default function ApiKeys() {
                   {k.label && <span className="block text-[12px] text-ink-faint mt-0.5">{k.label}</span>}
                 </td>
                 <td className="px-4 py-3 text-[13px] text-ink-muted capitalize">{k.mode}</td>
+                <td className="px-4 py-3 text-[13px] text-ink-muted">{k.merchantName || (k.mode === "test" ? "Sandbox" : "-")}</td>
                 <td className="px-4 py-3">
                   <span className={`text-[12px] font-semibold ${k.status === "active" ? "text-brand-bright" : "text-ink-faint"}`}>
                     {k.status === "active" ? "Active" : "Revoked"}
