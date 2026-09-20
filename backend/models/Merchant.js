@@ -82,11 +82,13 @@ const merchantSchema = new mongoose.Schema({
       message: `Invalid National ID number. ${NATIONAL_ID_FORMAT_HINT}`,
     },
   },
+  // Uniqueness is enforced by the partial index declared below the schema,
+  // not by `unique + sparse`: sparse still indexes an explicit null, so every
+  // merchant without a business number collided on null and the unique index
+  // could never be built in production (E11000 on boot).
   businessNumber: {
     type: String,
     default: null,
-    unique: true,
-    sparse: true,
   },
   kraPin: {
     type: String,
@@ -1001,6 +1003,12 @@ merchantSchema.pre('save', async function() {
 // invisible trailing space or newline that typing the same password never
 // produces, which otherwise fails bcrypt.compare even though it "looks"
 // identical to the user.
+// Unique only when a real (non-empty string) business number is present.
+merchantSchema.index(
+  { businessNumber: 1 },
+  { unique: true, partialFilterExpression: { businessNumber: { $type: 'string', $gt: '' } } }
+);
+
 merchantSchema.methods.matchPassword = async function(enteredPassword) {
   return await bcrypt.compare(String(enteredPassword).trim(), this.password);
 };
