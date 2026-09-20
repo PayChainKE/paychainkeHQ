@@ -32,10 +32,16 @@ const StkMonitor = () => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [page, setPage] = useState(1);
+  // Pushes that never went out (no STK record exists for them), shown when the "Not sent" tile is chosen.
+  const [sendFailures, setSendFailures] = useState([]);
 
   const fetchRequests = useCallback(async () => {
     try {
-      const res = await api.get('/api/admin/stk-requests');
+      const [res, failRes] = await Promise.all([
+        api.get('/api/admin/stk-requests'),
+        api.get('/api/admin/stk-send-failures').catch(() => null),
+      ]);
+      if (failRes?.data?.success) setSendFailures(failRes.data.data || []);
       if (res.data?.success) {
         setRows(res.data.data || []);
         setError('');
@@ -68,7 +74,18 @@ const StkMonitor = () => {
     failed: rows.filter((r) => r.status === 'failed').length,
   }), [rows]);
 
+  const showingNotSent = statusFilter === 'notsent';
+
+  const filteredFailures = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return sendFailures;
+    return sendFailures.filter((r) =>
+      [r.merchantId?.businessName, r.phone, r.detail, r.stage].filter(Boolean).some((f) => String(f).toLowerCase().includes(q))
+    );
+  }, [sendFailures, search]);
+
   const filteredRows = useMemo(() => {
+    if (showingNotSent) return filteredFailures;
     let list = rows;
     if (statusFilter !== 'all') list = list.filter((r) => r.status === statusFilter);
     const q = search.trim().toLowerCase();
@@ -78,7 +95,7 @@ const StkMonitor = () => {
       );
     }
     return list;
-  }, [rows, search, statusFilter]);
+  }, [rows, search, statusFilter, showingNotSent, filteredFailures]);
 
   const pagedRows = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE;
@@ -109,7 +126,7 @@ const StkMonitor = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <button onClick={() => setStatusFilter(statusFilter === 'pending' ? 'all' : 'pending')} className={`text-left p-5 rounded-2xl border shadow-sm transition-all ${statusFilter === 'pending' ? 'bg-amber-50 border-amber-300 ring-2 ring-amber-300' : 'bg-surface-container-lowest border-outline-variant/20 hover:-translate-y-1'}`}>
             <span className="text-2xs font-bold uppercase tracking-[0.15em] text-amber-600/70 block mb-2">Awaiting PIN</span>
             <span className="text-3xl md:text-4xl font-black text-amber-600 tracking-tighter tabular-nums">{summary.pending}</span>
@@ -122,6 +139,10 @@ const StkMonitor = () => {
             <span className="text-2xs font-bold uppercase tracking-[0.15em] text-rose-600/70 block mb-2">Failed</span>
             <span className="text-3xl md:text-4xl font-black text-rose-600 tracking-tighter tabular-nums">{summary.failed}</span>
           </button>
+          <button onClick={() => setStatusFilter(statusFilter === 'notsent' ? 'all' : 'notsent')} className={`text-left p-5 rounded-2xl border shadow-sm transition-all ${statusFilter === 'notsent' ? 'bg-slate-100 border-slate-400 ring-2 ring-slate-300' : 'bg-surface-container-lowest border-outline-variant/20 hover:-translate-y-1'}`} title="Pushes that could not be sent to NCBA at all (last 60 days)">
+            <span className="text-2xs font-bold uppercase tracking-[0.15em] text-slate-600/70 block mb-2">Not sent</span>
+            <span className="text-3xl md:text-4xl font-black text-slate-700 tracking-tighter tabular-nums">{sendFailures.length}</span>
+          </button>
         </div>
 
         {error ? (
@@ -132,8 +153,12 @@ const StkMonitor = () => {
           <div className="bg-surface-container-lowest rounded-3xl border border-outline-variant/20 shadow-editorial overflow-hidden">
             <div className="px-6 py-5 border-b border-outline-variant/10 bg-white/50 backdrop-blur-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h3 className="text-lg font-black text-on-surface tracking-tight">Recent Attempts</h3>
-                <p className="text-xs text-on-surface-variant/60 font-medium">Last 500 STK Push / QR requests, newest first</p>
+                <h3 className="text-lg font-black text-on-surface tracking-tight">{showingNotSent ? 'Pushes that were not sent' : 'Recent Attempts'}</h3>
+                <p className="text-xs text-on-surface-variant/60 font-medium">
+                  {showingNotSent
+                    ? 'Requests NCBA refused or could not be reached for, so no prompt reached the customer (unless marked unclear). Kept 60 days.'
+                    : 'Last 500 STK Push / QR requests, newest first'}
+                </p>
               </div>
               <div className="relative w-full sm:w-64">
                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-lg text-on-surface-variant/40">search</span>
@@ -154,8 +179,8 @@ const StkMonitor = () => {
                     <Th>Phone</Th>
                     <Th className="text-right">Amount</Th>
                     <Th>Type</Th>
-                    <Th>Status</Th>
-                    <Th>Result</Th>
+                    <Th>{showingNotSent ? 'Failed at' : 'Status'}</Th>
+                    <Th>{showingNotSent ? 'What went wrong' : 'Result'}</Th>
                     <Th className="pr-6">When</Th>
                   </tr>
                 </thead>
@@ -172,9 +197,9 @@ const StkMonitor = () => {
                     </td></tr>
                   ) : filteredRows.length === 0 ? (
                     <tr><td colSpan="7" className="px-6 py-12 text-center text-on-surface-variant/40 text-sm font-medium">
-                      {rows.length === 0 ? 'No STK Push requests yet.' : 'No requests match this filter.'}
+                      {showingNotSent ? 'No failed sends in the last 60 days.' : rows.length === 0 ? 'No STK Push requests yet.' : 'No requests match this filter.'}
                     </td></tr>
-                  ) : pagedRows.map((row) => <StkRow key={row._id} row={row} />)}
+                  ) : pagedRows.map((row) => (showingNotSent ? <SendFailureRow key={row._id} row={row} /> : <StkRow key={row._id} row={row} />))}
                 </tbody>
               </table>
             </div>
@@ -211,11 +236,44 @@ const StkRow = ({ row }) => {
           {label}
         </span>
       </td>
-      <td className="px-3 py-4 text-xs text-slate-500 max-w-[220px] truncate" title={row.resultDesc}>{row.resultDesc || '—'}</td>
+      <td className="px-3 py-4 text-xs text-slate-500 max-w-[260px]" title={row.ncbaReason ? `${row.resultDesc} — NCBA said: ${row.ncbaReason}` : row.resultDesc}>
+        <div className="truncate">{row.resultDesc || '—'}</div>
+        {row.ncbaReason && row.status === 'failed' && <div className="truncate text-2xs text-rose-600/80 mt-0.5">NCBA said: {row.ncbaReason}</div>}
+      </td>
       <td className="px-6 py-4 text-xs text-slate-500 whitespace-nowrap">{fmtTime(row.createdAt)}</td>
     </tr>
   );
 };
+
+const STAGE_LABELS = {
+  setup: 'Account not ready',
+  auth: 'NCBA login',
+  request: 'NCBA request',
+  rejected: 'NCBA refused',
+  other: 'Unexpected',
+};
+
+const SendFailureRow = ({ row }) => (
+  <tr className="hover:bg-surface-container-lowest transition-colors bg-white">
+    <td className="px-6 py-4">
+      <p className="text-sm font-bold text-on-surface tracking-tight">{row.merchantId?.businessName || 'Unknown merchant'}</p>
+      {row.merchantId?.email && <p className="text-2xs text-on-surface-variant/50">{row.merchantId.email}</p>}
+    </td>
+    <td className="px-3 py-4 text-xs font-mono text-slate-500">{row.phone || '—'}</td>
+    <td className="px-3 py-4 text-right text-sm font-bold text-on-surface tabular-nums">{row.amount != null ? formatKES(row.amount) : '—'}</td>
+    <td className="px-3 py-4 text-xs font-medium text-slate-500">{KIND_LABELS[row.kind] || row.kind || '—'}</td>
+    <td className="px-3 py-4">
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-2xs font-bold uppercase tracking-widest border bg-slate-50 text-slate-700 border-slate-200">
+        {STAGE_LABELS[row.stage] || row.stage}
+      </span>
+      {!row.notSent && <p className="text-2xs text-amber-600 mt-1">Unclear: the prompt may have been sent</p>}
+    </td>
+    <td className="px-3 py-4 text-xs text-slate-500 max-w-[340px]">
+      <div className="break-words line-clamp-3" title={row.detail}>{row.httpStatus ? `HTTP ${row.httpStatus}: ` : ''}{row.detail || '—'}</div>
+    </td>
+    <td className="px-6 py-4 text-xs text-slate-500 whitespace-nowrap">{fmtTime(row.createdAt)}</td>
+  </tr>
+);
 
 const Th = ({ children, className = '' }) => (
   <th className={`px-3 py-4 text-2xs font-black uppercase tracking-[0.15em] text-slate-400 ${className}`}>{children}</th>

@@ -34,6 +34,7 @@ import {
   getLedger,
   getSystemStatus,
   getStkRequests,
+  getStkSendFailures,
   searchTransactionAudit,
   exportPayoutAuditCsv,
   getTransactionAuditDetail,
@@ -301,6 +302,7 @@ router.delete('/bookkeeping/expenses/:id',protect, requireMutator, deleteExpense
 // Compact health pulse for the sidebar widget.
 router.get('/system-status', protect, excludeOfficer, getSystemStatus);
 router.get('/stk-requests', protect, excludeOfficer, getStkRequests);
+router.get('/stk-send-failures', protect, excludeOfficer, getStkSendFailures);
 
 // Transaction Audit — search any transaction across every merchant and drill
 // into a full forensic detail view (related STK Push attempt + SMS receipts),

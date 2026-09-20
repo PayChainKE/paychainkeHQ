@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import { useBiometrics } from '../hooks/useBiometrics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ValidatedTextInput } from '../components/ValidatedTextInput';
+import { OtpInput } from '../components/OtpInput';
 import { validators } from '../utils/validators';
 import { KENYA_COUNTY_AREAS } from '../utils/kenyaCountyAreas';
 import { fetchSignupWards, searchSignupPlaces, StreetSearchResult } from '../utils/kenyaLocations';
@@ -164,6 +165,8 @@ export default function Login({ route }: any) {
   // OTP Flow States
   const [isOTPMode, setIsOTPMode] = useState(false);
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  // The code boxes work on one string; the rest of this screen keeps six slots.
+  const toSlots = (v: string) => Array.from({ length: 6 }, (_, i) => v[i] || '');
 
   // Navigation Tabs
   const [activeTab, setActiveTab] = useState(route?.params?.initialTab || 'login');
@@ -934,35 +937,8 @@ export default function Login({ route }: any) {
                     : `Enter the code sent to ${authEmail}`}
                 </Text>
                 
-                <View className="flex-row justify-between mb-8">
-                  {otp.map((digit, index) => (
-                    <TextInput
-                      key={index}
-                      className="w-[45px] h-[55px] bg-[#f9fafb] border border-[#e5e7eb] rounded-xl text-center text-[20px] font-jakarta-bold text-[#0c2010]"
-                      keyboardType="number-pad"
-                      textContentType="oneTimeCode"
-                      autoComplete="sms-otp"
-                      value={digit}
-                      onChangeText={(val) => {
-                        // No maxLength here — it would truncate a pasted or
-                        // autofilled code down to a single character before
-                        // this handler ever sees it. A paste or SMS autofill
-                        // lands as one multi-digit string (on whichever box
-                        // it happened to focus) — spread it across every box
-                        // at once instead of the old one-digit-at-a-time-only
-                        // behavior.
-                        const digitsOnly = val.replace(/\D/g, '');
-                        if (digitsOnly.length > 1) {
-                          const chars = digitsOnly.slice(0, 6).split('');
-                          setOtp((prev) => prev.map((d, i) => chars[i] ?? d));
-                          return;
-                        }
-                        const newOtp = [...otp];
-                        newOtp[index] = digitsOnly;
-                        setOtp(newOtp);
-                      }}
-                    />
-                  ))}
+                <View className="mb-8">
+                  <OtpInput value={otp.join('')} onChange={(v) => setOtp(toSlots(v))} autoFocus />
                 </View>
                 
                 <TouchableOpacity onPress={handleVerifyOTP} disabled={loading || otp.join('').length < 6} className="w-full bg-[#06201b] py-4 rounded-2xl flex-row justify-center items-center mb-4 opacity-100">
@@ -1242,31 +1218,8 @@ export default function Login({ route }: any) {
                   Enter the 6-digit code sent via SMS to {phoneOtpMaskedPhone || 'your phone'}
                 </Text>
 
-                <View className="flex-row justify-between mb-6">
-                  {phoneOtp.map((digit, index) => (
-                    <TextInput
-                      key={index}
-                      className="w-[45px] h-[55px] bg-[#f9fafb] border border-[#e5e7eb] rounded-xl text-center text-[20px] font-jakarta-bold text-[#0c2010]"
-                      keyboardType="number-pad"
-                      textContentType="oneTimeCode"
-                      autoComplete="sms-otp"
-                      value={digit}
-                      onChangeText={(val) => {
-                        // See the login OTP boxes above for why there's no
-                        // maxLength and why a multi-digit value (paste or
-                        // SMS autofill) spreads across every box at once.
-                        const digitsOnly = val.replace(/\D/g, '');
-                        if (digitsOnly.length > 1) {
-                          const chars = digitsOnly.slice(0, 6).split('');
-                          setPhoneOtp((prev) => prev.map((d, i) => chars[i] ?? d));
-                          return;
-                        }
-                        const newOtp = [...phoneOtp];
-                        newOtp[index] = digitsOnly;
-                        setPhoneOtp(newOtp);
-                      }}
-                    />
-                  ))}
+                <View className="mb-6">
+                  <OtpInput value={phoneOtp.join('')} onChange={(v) => setPhoneOtp(toSlots(v))} autoFocus />
                 </View>
 
                 <TouchableOpacity

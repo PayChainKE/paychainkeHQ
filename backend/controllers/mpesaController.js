@@ -28,6 +28,7 @@ import { validatePhoneNumber, NcbaValidationError, getNcbaVirtualAccountNumber }
 import { isLipaNaMpesaBetaMerchant, LIPA_NA_MPESA_NOT_AVAILABLE_MESSAGE } from '../config/lipaNaMpesaBetaAllowlist.js';
 import { generateBrandedQrDataUri } from '../utils/qrCode.js';
 import DeveloperPayment from '../models/DeveloperPayment.js';
+import { StkSetupError, classifyStkSendError, recordStkSendFailure } from '../services/stkSendFailureService.js';
 import { publicDeveloperPayment } from '../utils/developerPaymentView.js';
 import { dispatchDeveloperEvent } from '../services/webhookDeliveryService.js';
 import { wasAlreadyCreditedByOtherNcbaFeed } from '../services/ncbaLedgerService.js';
@@ -159,7 +160,15 @@ export const initiateSTKPush = async (req, res) => {
   } catch (error) {
     const detail = error.response?.data ? JSON.stringify(error.response.data) : error.message;
     console.error('❌ STK Push Error:', detail);
-    res.status(502).json({ error: error.response?.data?.errorMessage || 'Failed to send STK Push — please try again.', detail });
+    // A 4xx here means we know NO prompt went out, so the app can say so
+    // plainly. Anything unclear stays 502, which the app words as "the
+    // prompt may have been sent".
+    const c = classifyStkSendError(error);
+    res.status(c.httpStatus).json({
+      error: error.response?.data?.errorMessage || c.message,
+      code: c.notSent ? 'STK_NOT_SENT' : 'STK_UNCERTAIN',
+      detail,
+    });
   }
 };
 
@@ -752,6 +761,8 @@ export function pollAndResolveNcbaStkPush(checkoutRequestId, transactionId) {
   // request" (the prompt never reached the phone at all) rather than a
   // real non-response.
   let lastUnresolvedFailureDescription = null;
+  // Last wording saved to the STK record, so an unchanged reply is not written every 2 seconds.
+  let lastSavedReason = null;
 
   const poll = async () => {
     attempts += 1;
@@ -775,7 +786,14 @@ export function pollAndResolveNcbaStkPush(checkoutRequestId, transactionId) {
           // Not logged as an error — see doc comment above, this is the
           // expected transient/unrecognized shape, not a real problem yet.
           console.log(`ℹ️ NCBA STK query reported FAILED for ${checkoutRequestId} (attempt ${attempts}, confirmed declines ${consecutiveFailures}/${REQUIRED_CONSECUTIVE_FAILURES}) — not treating as final:`, description);
-          if (description) lastUnresolvedFailureDescription = description;
+          if (description) {
+            lastUnresolvedFailureDescription = description;
+            if (description !== lastSavedReason) {
+              lastSavedReason = description;
+              // Keep NCBA's exact words on the record for the admin STK page.
+              STKRequest.updateOne({ checkoutRequestId }, { $set: { ncbaReason: String(description).slice(0, 300) } }).catch(() => {});
+            }
+          }
         } else {
           const stkReq = await STKRequest.findOne({ checkoutRequestId });
           if (!stkReq) {
@@ -834,7 +852,9 @@ export function pollAndResolveNcbaStkPush(checkoutRequestId, transactionId) {
 export async function initiateAndTrackNcbaStk({ merchantId, phone, checkoutTotal, extra = {} }) {
   const merchant = await Merchant.findById(merchantId).select('ncbaMerchantCode');
   if (!merchant?.ncbaMerchantCode) {
-    throw new Error('This merchant has no NCBA virtual account assigned yet — cannot process this payment request.');
+    const setupErr = new StkSetupError('This merchant has no NCBA virtual account assigned yet — cannot process this payment request.');
+    await recordStkSendFailure({ merchantId, phone, amount: checkoutTotal, kind: extra.kind || (extra.linkId ? 'payment_link' : null), err: setupErr });
+    throw setupErr;
   }
 
   // Must be the merchant's real NCBA virtual account (or its bare
@@ -847,7 +867,15 @@ export async function initiateAndTrackNcbaStk({ merchantId, phone, checkoutTotal
   // meant every STK collection landed unattributed — confirmed via a real
   // 5 KES UAT test that came back with `ncba_account_notification_unattributed`.
   const ncbaAccountNo = getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode) || merchant.ncbaMerchantCode;
-  const { transactionId } = await ncbaInitiateStkPush({ phone, amount: checkoutTotal, accountNo: ncbaAccountNo });
+  let transactionId;
+  try {
+    ({ transactionId } = await ncbaInitiateStkPush({ phone, amount: checkoutTotal, accountNo: ncbaAccountNo }));
+  } catch (sendErr) {
+    // No STKRequest exists for a push that never went out, so without this the
+    // failure would leave no record outside the server log.
+    await recordStkSendFailure({ merchantId, phone, amount: checkoutTotal, kind: extra.kind || (extra.linkId ? 'payment_link' : null), err: sendErr });
+    throw sendErr;
+  }
 
   // Past this point, NCBA has already sent the real prompt to the
   // customer's phone — a failure below is a local bookkeeping problem, not

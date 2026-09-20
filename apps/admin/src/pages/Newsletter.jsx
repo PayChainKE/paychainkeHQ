@@ -96,6 +96,9 @@ export default function Newsletter() {
   const [audienceCount, setAudienceCount] = useState(null);
   const [scheduledFor, setScheduledFor] = useState('');
   const [discardDraftState, setDiscardDraftState] = useState(null); // { draft, busy } | null
+  const [clearDraftsState, setClearDraftsState] = useState(null); // { includeScheduled, busy } | null
+  const [clearHistoryState, setClearHistoryState] = useState(null); // { busy } | null
+  const [deleteCampaignState, setDeleteCampaignState] = useState(null); // { campaign, busy } | null
 
   // Delete confirmation
   const [deleteState, setDeleteState] = useState(null);
@@ -333,6 +336,52 @@ export default function Newsletter() {
     } catch (e) {
       showToast(e?.response?.data?.error || 'Could not unschedule this draft.');
     }
+  }
+
+  // Drafts that "Clear all" would remove. A send that is in flight is never
+  // touched, and scheduled sends only go when the admin ticks the box.
+  const clearableDrafts = (includeScheduled) => drafts.filter((d) => d.state !== 'sending' && (includeScheduled || d.state !== 'scheduled'));
+  async function confirmClearDrafts() {
+    if (!clearDraftsState) return;
+    setClearDraftsState((st) => ({ ...st, busy: true }));
+    try {
+      const res = await api.delete(`/api/newsletter/drafts?confirm=true${clearDraftsState.includeScheduled ? '&includeScheduled=true' : ''}`);
+      setActiveDraftId(null);
+      showToast(res.data?.message || 'Drafts cleared.');
+      setClearDraftsState(null);
+      fetchDrafts();
+    } catch (e) {
+      showToast(e?.response?.data?.error || 'Could not clear drafts.');
+      setClearDraftsState(null);
+    }
+  }
+
+  async function confirmClearHistory() {
+    if (!clearHistoryState) return;
+    setClearHistoryState({ busy: true });
+    try {
+      const res = await api.delete('/api/newsletter/campaigns?confirm=true');
+      setCampaigns([]);
+      setCampaignPage(1);
+      showToast(res.data?.message || 'History cleared.');
+    } catch (e) {
+      showToast(e?.response?.data?.error || 'Could not clear the history.');
+    }
+    setClearHistoryState(null);
+  }
+
+  async function confirmDeleteCampaign() {
+    if (!deleteCampaignState) return;
+    const id = deleteCampaignState.campaign._id;
+    setDeleteCampaignState((st) => ({ ...st, busy: true }));
+    try {
+      await api.delete(`/api/newsletter/campaigns/${id}`);
+      setCampaigns((arr) => arr.filter((c) => c._id !== id));
+      showToast('History entry deleted.');
+    } catch (e) {
+      showToast(e?.response?.data?.error || 'Could not delete this entry.');
+    }
+    setDeleteCampaignState(null);
   }
 
   function startDiscardDraft(draft) { setDiscardDraftState({ draft, busy: false }); }
@@ -618,7 +667,14 @@ export default function Newsletter() {
                 <h3 className="text-base font-bold text-on-surface tracking-tight">Drafts &amp; scheduled</h3>
               </div>
               {drafts.length > 0 && (
-                <span className="text-2xs font-bold text-on-surface-variant/40 bg-surface-container px-2.5 py-1 rounded-full">{drafts.length} saved</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-2xs font-bold text-on-surface-variant/40 bg-surface-container px-2.5 py-1 rounded-full">{drafts.length} saved</span>
+                  <button onClick={() => setClearDraftsState({ includeScheduled: false, busy: false })}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-2xs font-bold uppercase tracking-widest text-red-600 hover:bg-red-50 transition-colors">
+                    <span className="material-symbols-outlined text-sm">delete_sweep</span>
+                    Clear all
+                  </button>
+                </div>
               )}
             </div>
             {draftsLoading ? (
@@ -681,6 +737,13 @@ export default function Newsletter() {
                 </div>
               )}
               <span className="text-2xs font-bold text-on-surface-variant/40 bg-surface-container px-2.5 py-1 rounded-full">{campaigns.length} sent</span>
+              {campaigns.length > 0 && (
+                <button onClick={() => setClearHistoryState({ busy: false })}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-2xs font-bold uppercase tracking-widest text-red-600 hover:bg-red-50 transition-colors">
+                  <span className="material-symbols-outlined text-sm">delete_sweep</span>
+                  Clear history
+                </button>
+              )}
             </div>
           </div>
 
@@ -696,7 +759,7 @@ export default function Newsletter() {
             <>
               <div className="divide-y divide-outline-variant/8">
                 {pagedCampaigns.map((c, idx) => (
-                  <CampaignRow key={c._id} campaign={c} index={(campaignPage - 1) * PAGE_SIZE + idx} />
+                  <CampaignRow key={c._id} campaign={c} index={(campaignPage - 1) * PAGE_SIZE + idx} onDelete={() => setDeleteCampaignState({ campaign: c, busy: false })} />
                 ))}
               </div>
               <TablePagination page={campaignPage} pageSize={PAGE_SIZE} total={campaigns.length} onPage={setCampaignPage} />
@@ -749,6 +812,89 @@ export default function Newsletter() {
               <button onClick={() => setDiscardDraftState(null)} disabled={discardDraftState.busy} className="flex-1 py-2.5 rounded-lg border border-outline-variant/40 text-on-surface text-sm font-semibold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40">Cancel</button>
               <button onClick={confirmDiscardDraft} disabled={discardDraftState.busy} className="flex-1 py-2.5 rounded-lg bg-red-600 text-white text-sm font-semibold uppercase tracking-widest hover:bg-red-700 disabled:opacity-50">
                 {discardDraftState.busy ? 'Discarding…' : 'Discard'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Clear all drafts */}
+      {clearDraftsState && (() => {
+        const eligible = clearableDrafts(clearDraftsState.includeScheduled);
+        const scheduledCount = drafts.filter((d) => d.state === 'scheduled').length;
+        const sendingCount = drafts.filter((d) => d.state === 'sending').length;
+        return (
+          <Modal onClose={() => !clearDraftsState.busy && setClearDraftsState(null)} maxWidth="max-w-md">
+            <div className="p-7">
+              <div className="w-14 h-14 rounded-full bg-red-50 text-red-600 flex items-center justify-center mb-4">
+                <span className="material-symbols-outlined text-3xl">delete_sweep</span>
+              </div>
+              <h3 className="text-xl font-bold text-on-surface mb-1">Clear all drafts?</h3>
+              <p className="text-sm text-on-surface-variant mb-4">
+                {eligible.length > 0
+                  ? <>Permanently delete <strong>{eligible.length}</strong> unsent newsletter{eligible.length === 1 ? '' : 's'}: drafts, digests waiting for approval and failed sends. This cannot be undone.</>
+                  : 'There is nothing to delete with the current choice.'}
+              </p>
+              {scheduledCount > 0 && (
+                <label className="flex items-start gap-2.5 text-sm text-on-surface mb-4 cursor-pointer">
+                  <input type="checkbox" className="mt-0.5" checked={clearDraftsState.includeScheduled} disabled={clearDraftsState.busy}
+                    onChange={(e) => setClearDraftsState((st) => ({ ...st, includeScheduled: e.target.checked }))} />
+                  <span>Also delete <strong>{scheduledCount}</strong> scheduled send{scheduledCount === 1 ? '' : 's'}. They will not go out.</span>
+                </label>
+              )}
+              {scheduledCount > 0 && !clearDraftsState.includeScheduled && (
+                <p className="text-xs text-on-surface-variant/70 mb-4">Scheduled sends are kept, so they still go out on time.</p>
+              )}
+              {sendingCount > 0 && (
+                <p className="text-xs text-on-surface-variant/70 mb-4">{sendingCount} newsletter{sendingCount === 1 ? ' is' : 's are'} being sent right now and can't be deleted.</p>
+              )}
+              <div className="flex gap-3">
+                <button onClick={() => setClearDraftsState(null)} disabled={clearDraftsState.busy} className="flex-1 py-2.5 rounded-lg border border-outline-variant/40 text-on-surface text-sm font-semibold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40">Cancel</button>
+                <button onClick={confirmClearDrafts} disabled={clearDraftsState.busy || eligible.length === 0} className="flex-1 py-2.5 rounded-lg bg-red-600 text-white text-sm font-semibold uppercase tracking-widest hover:bg-red-700 disabled:opacity-50">
+                  {clearDraftsState.busy ? 'Deleting…' : 'Delete'}
+                </button>
+              </div>
+            </div>
+          </Modal>
+        );
+      })()}
+
+      {/* Clear history */}
+      {clearHistoryState && (
+        <Modal onClose={() => !clearHistoryState.busy && setClearHistoryState(null)} maxWidth="max-w-md">
+          <div className="p-7">
+            <div className="w-14 h-14 rounded-full bg-red-50 text-red-600 flex items-center justify-center mb-4">
+              <span className="material-symbols-outlined text-3xl">delete_sweep</span>
+            </div>
+            <h3 className="text-xl font-bold text-on-surface mb-1">Clear the newsletter history?</h3>
+            <p className="text-sm text-on-surface-variant mb-5">
+              This deletes the record of every newsletter you have sent, with its delivery counts. Emails already sent stay sent. This cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setClearHistoryState(null)} disabled={clearHistoryState.busy} className="flex-1 py-2.5 rounded-lg border border-outline-variant/40 text-on-surface text-sm font-semibold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40">Cancel</button>
+              <button onClick={confirmClearHistory} disabled={clearHistoryState.busy} className="flex-1 py-2.5 rounded-lg bg-red-600 text-white text-sm font-semibold uppercase tracking-widest hover:bg-red-700 disabled:opacity-50">
+                {clearHistoryState.busy ? 'Clearing…' : 'Clear history'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Delete one history entry */}
+      {deleteCampaignState && (
+        <Modal onClose={() => !deleteCampaignState.busy && setDeleteCampaignState(null)} maxWidth="max-w-md">
+          <div className="p-7">
+            <div className="w-14 h-14 rounded-full bg-red-50 text-red-600 flex items-center justify-center mb-4">
+              <span className="material-symbols-outlined text-3xl">delete</span>
+            </div>
+            <h3 className="text-xl font-bold text-on-surface mb-1">Delete this history entry?</h3>
+            <p className="text-sm text-on-surface-variant mb-5">
+              Remove "<strong>{deleteCampaignState.campaign.subject}</strong>" from the history. The emails were already sent and stay sent. This cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setDeleteCampaignState(null)} disabled={deleteCampaignState.busy} className="flex-1 py-2.5 rounded-lg border border-outline-variant/40 text-on-surface text-sm font-semibold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40">Cancel</button>
+              <button onClick={confirmDeleteCampaign} disabled={deleteCampaignState.busy} className="flex-1 py-2.5 rounded-lg bg-red-600 text-white text-sm font-semibold uppercase tracking-widest hover:bg-red-700 disabled:opacity-50">
+                {deleteCampaignState.busy ? 'Deleting…' : 'Delete'}
               </button>
             </div>
           </div>
@@ -813,7 +959,7 @@ const statusStyles = {
   gray:    { badge: 'bg-gray-50   text-gray-600   border-gray-200',    bar: 'bg-gray-300',    dot: 'bg-gray-400',    icon: 'text-gray-500'   },
 };
 
-const CampaignRow = ({ campaign: c, index }) => {
+const CampaignRow = ({ campaign: c, index, onDelete }) => {
   const { successCount = 0, failureCount = 0, recipientCount = 0 } = c;
   const { label, color, icon } = deliveryStatus(successCount, failureCount, recipientCount);
   const styles = statusStyles[color];
@@ -834,6 +980,12 @@ const CampaignRow = ({ campaign: c, index }) => {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap mb-0.5">
               <h4 className="font-bold text-on-surface tracking-tight truncate text-sm">{c.subject}</h4>
+              {onDelete && (
+                <button onClick={onDelete} title="Delete this history entry" aria-label="Delete this history entry"
+                  className="p-1 rounded-lg text-on-surface-variant/50 hover:text-red-600 hover:bg-red-50 transition-colors sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 order-last ml-auto">
+                  <span className="material-symbols-outlined text-base">delete</span>
+                </button>
+              )}
               {/* Status badge */}
               <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-black uppercase tracking-widest border ${styles.badge}`}>
                 <span className="material-symbols-outlined text-2xs" style={{ fontVariationSettings: "'FILL' 1" }}>{icon}</span>

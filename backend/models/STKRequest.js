@@ -95,6 +95,14 @@ const stkRequestSchema = new Schema({
   // credited twice. This flag removes the time bound entirely — once
   // claimed, this specific STKRequest can never be matched again, so no
   // window width can ever be "too short" again.
+  // NCBA's own wording from its last "failed" reply for this push, kept so an
+  // admin can see WHY a prompt was not delivered without reading server logs.
+  // resultDesc is the plain-language text merchants see; this is the raw one.
+  ncbaReason: {
+    type: String,
+    default: null,
+    maxlength: 300,
+  },
   notificationMatched: {
     type: Boolean,
     default: false,

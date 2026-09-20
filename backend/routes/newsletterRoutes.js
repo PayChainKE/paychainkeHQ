@@ -14,6 +14,9 @@ import {
   getDraft,
   saveDraft,
   deleteDraft,
+  clearDrafts,
+  deleteCampaign,
+  clearCampaigns,
   unscheduleDraft,
   audienceCount,
   audienceOptions,
@@ -89,10 +92,13 @@ router.post('/subscribe', subscribeLimiter, subscribe);
 // doesn't treat them as ids.
 router.get('/', protect, getSubscribers);
 router.get('/campaigns', protect, getCampaigns);
+router.delete('/campaigns', protect, requireMutator, clearCampaigns);
+router.delete('/campaigns/:id', protect, requireMutator, deleteCampaign);
 router.get('/drafts', protect, listDrafts);
 router.get('/drafts/:id', protect, getDraft);
 router.post('/drafts', protect, requireMutator, saveDraft);
 router.post('/drafts/:id/unschedule', protect, requireMutator, unscheduleDraft);
+router.delete('/drafts', protect, requireMutator, clearDrafts);
 router.delete('/drafts/:id', protect, requireMutator, deleteDraft);
 router.get('/audience-options', protect, audienceOptions);
 router.post('/audience-count', protect, audienceCount);
