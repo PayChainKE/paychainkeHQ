@@ -852,8 +852,9 @@ export default function SendMoney({ navigation }: any) {
                       <TextInput
                         value={stepUpCode}
                         onChangeText={(t) => setStepUpCode(t.replace(/\D/g, '').slice(0, 6))}
-                        keyboardType="numeric"
-                        maxLength={6}
+                        keyboardType="number-pad"
+                        textContentType="oneTimeCode"
+                        autoComplete="sms-otp"
                         autoFocus
                         editable={!isLoading}
                         className="bg-[#f7faf7] border border-[#eff4ef] rounded-2xl px-5 py-4 text-[#00351d] font-jakarta-extrabold text-[20px] tracking-[0.5em] text-center"

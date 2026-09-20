@@ -11,6 +11,7 @@ import { validators } from '../utils/validators'
 import { BiometricLoginButton } from '../components/BiometricButton'
 import { GetAppBanner, GetAppCard } from '../components/GetAppCard'
 import { estimateImageSharpness, isImageFile, unsupportedDocumentTypeReason } from '../utils/imageBlurCheck'
+import OtpInput from '../components/OtpInput'
 
 // Which KYB document(s) a signup must provide, keyed by business type —
 // mirrors backend/config/kybRequirements.js exactly. registerMerchant
@@ -298,6 +299,9 @@ export default function Login() {
   // OTP Flow States
   const [isOTPMode, setIsOTPMode] = useState(false)
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
+  // The code boxes work on one string; the rest of this page keeps the
+  // six-slot array (reset, join, progress dots).
+  const toSlots = (v) => Array.from({ length: 6 }, (_, i) => v[i] || '')
 
   const signupSubmittingRef = useRef(false)
   // One native file-input ref per doc type, keyed the same way as
@@ -568,44 +572,6 @@ export default function Login() {
     } else {
       setErr(res.error)
     }
-  }
-
-  const otpRefs = useRef([])
-
-  const handleOtpChange = (element, index) => {
-    const val = element.value.replace(/\D/g, '')
-    if (element.value !== '' && val === '') return
-    const newOtp = [...otp]
-    newOtp[index] = val
-    setOtp(newOtp)
-    if (val && index < 5) otpRefs.current[index + 1]?.focus()
-  }
-
-  const handleOtpKeyDown = (e, index) => {
-    if (e.key === 'Backspace') {
-      if (otp[index]) {
-        const newOtp = [...otp]
-        newOtp[index] = ''
-        setOtp(newOtp)
-      } else if (index > 0) {
-        otpRefs.current[index - 1]?.focus()
-      }
-    } else if (e.key === 'ArrowLeft' && index > 0) {
-      otpRefs.current[index - 1]?.focus()
-    } else if (e.key === 'ArrowRight' && index < 5) {
-      otpRefs.current[index + 1]?.focus()
-    }
-  }
-
-  const handleOtpPaste = (e) => {
-    e.preventDefault()
-    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
-    if (!pasted) return
-    const newOtp = [...otp]
-    for (let i = 0; i < 6; i++) newOtp[i] = pasted[i] || ''
-    setOtp(newOtp)
-    const nextEmpty = newOtp.findIndex(v => !v)
-    otpRefs.current[nextEmpty === -1 ? 5 : nextEmpty]?.focus()
   }
 
   // national_id always resolves to a front+back pair now (see
@@ -992,44 +958,6 @@ export default function Login() {
     setPhoneOtp(['', '', '', '', '', ''])
   }
 
-  const phoneOtpRefs = useRef([])
-
-  const handlePhoneOtpChange = (element, index) => {
-    const val = element.value.replace(/\D/g, '')
-    if (element.value !== '' && val === '') return
-    const newOtp = [...phoneOtp]
-    newOtp[index] = val
-    setPhoneOtp(newOtp)
-    if (val && index < 5) phoneOtpRefs.current[index + 1]?.focus()
-  }
-
-  const handlePhoneOtpKeyDown = (e, index) => {
-    if (e.key === 'Backspace') {
-      if (phoneOtp[index]) {
-        const newOtp = [...phoneOtp]
-        newOtp[index] = ''
-        setPhoneOtp(newOtp)
-      } else if (index > 0) {
-        phoneOtpRefs.current[index - 1]?.focus()
-      }
-    } else if (e.key === 'ArrowLeft' && index > 0) {
-      phoneOtpRefs.current[index - 1]?.focus()
-    } else if (e.key === 'ArrowRight' && index < 5) {
-      phoneOtpRefs.current[index + 1]?.focus()
-    }
-  }
-
-  const handlePhoneOtpPaste = (e) => {
-    e.preventDefault()
-    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
-    if (!pasted) return
-    const newOtp = [...phoneOtp]
-    for (let i = 0; i < 6; i++) newOtp[i] = pasted[i] || ''
-    setPhoneOtp(newOtp)
-    const nextEmpty = newOtp.findIndex(v => !v)
-    phoneOtpRefs.current[nextEmpty === -1 ? 5 : nextEmpty]?.focus()
-  }
-
   async function handleSignupCreateAccount(e) {
     e.preventDefault()
     if (signupSubmittingRef.current) return
@@ -1280,32 +1208,7 @@ export default function Login() {
                       <p className="text-center text-[9px] font-black uppercase tracking-[0.3em] text-emerald-400/60 mb-4">
                         Verification Code
                       </p>
-                      <div className="flex items-center justify-center gap-2 lg:gap-3">
-                        {phoneOtp.map((digit, index) => (
-                          <input
-                            key={index}
-                            ref={el => { phoneOtpRefs.current[index] = el }}
-                            type="text"
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                            autoComplete={index === 0 ? 'one-time-code' : 'off'}
-                            maxLength="1"
-                            value={digit}
-                            onChange={e => handlePhoneOtpChange(e.target, index)}
-                            onKeyDown={e => handlePhoneOtpKeyDown(e, index)}
-                            onPaste={index === 0 ? handlePhoneOtpPaste : undefined}
-                            onFocus={e => e.target.select()}
-                            className={`
-                              w-10 h-12 lg:w-12 lg:h-14 rounded-xl text-center font-black text-xl lg:text-2xl
-                              outline-none transition-all duration-200 select-none caret-transparent
-                              ${digit
-                                ? 'bg-emerald-400 text-[#06201B] shadow-[0_0_20px_rgba(52,211,153,0.4)] scale-105'
-                                : 'bg-white/8 text-white/20 border border-white/10 focus:bg-white/15 focus:border-emerald-400/60 focus:shadow-[0_0_0_3px_rgba(52,211,153,0.15)]'
-                              }
-                            `}
-                          />
-                        ))}
-                      </div>
+                      <OtpInput value={phoneOtp.join('')} onChange={(v) => setPhoneOtp(toSlots(v))} autoFocus />
                       <div className="flex justify-center gap-1.5 mt-4">
                         {phoneOtp.map((digit, i) => (
                           <div
@@ -2025,32 +1928,7 @@ export default function Login() {
                     Security Code
                   </p>
 
-                  <div className="flex items-center justify-center gap-2 lg:gap-3">
-                    {otp.map((digit, index) => (
-                      <input
-                        key={index}
-                        ref={el => { otpRefs.current[index] = el }}
-                        type="text"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        autoComplete={index === 0 ? 'one-time-code' : 'off'}
-                        maxLength="1"
-                        value={digit}
-                        onChange={e => handleOtpChange(e.target, index)}
-                        onKeyDown={e => handleOtpKeyDown(e, index)}
-                        onPaste={index === 0 ? handleOtpPaste : undefined}
-                        onFocus={e => e.target.select()}
-                        className={`
-                          w-10 h-12 lg:w-12 lg:h-14 rounded-xl text-center font-black text-xl lg:text-2xl
-                          outline-none transition-all duration-200 select-none caret-transparent
-                          ${digit
-                            ? 'bg-emerald-400 text-[#06201B] shadow-[0_0_20px_rgba(52,211,153,0.4)] scale-105'
-                            : 'bg-white/8 text-white/20 border border-white/10 focus:bg-white/15 focus:border-emerald-400/60 focus:shadow-[0_0_0_3px_rgba(52,211,153,0.15)]'
-                          }
-                        `}
-                      />
-                    ))}
-                  </div>
+                  <OtpInput value={otp.join('')} onChange={(v) => setOtp(toSlots(v))} autoFocus />
 
                   {/* Progress dots */}
                   <div className="flex justify-center gap-1.5 mt-4">

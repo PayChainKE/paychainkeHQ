@@ -2466,9 +2466,10 @@ export default function BulkPay() {
 
                     <input
                       type="text"
-                      maxLength="6"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
                       value={otp}
-                      onChange={(e) => { setOtp(e.target.value.replace(/\D/g, '')); setOtpError(''); }}
+                      onChange={(e) => { setOtp(e.target.value.replace(/\D/g, '').slice(0, 6)); setOtpError(''); }}
                       placeholder="• • • • • •"
                       className="w-full bg-surface-container-low/30 border border-outline-variant/20 rounded-2xl px-5 py-4 text-center font-headline tracking-[1em] text-xl font-bold text-primary focus:ring-0 focus:border-emerald-500/50 transition-all outline-none"
                     />

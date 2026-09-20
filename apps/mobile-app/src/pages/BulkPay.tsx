@@ -1713,8 +1713,9 @@ export default function BulkPay() {
                   <TextInput
                     value={securityOtp}
                     onChangeText={(t) => setSecurityOtp(t.replace(/\D/g, '').slice(0, 6))}
-                    keyboardType="numeric"
-                    maxLength={6}
+                    keyboardType="number-pad"
+                    textContentType="oneTimeCode"
+                    autoComplete="sms-otp"
                     className="bg-[#f0fdf4] border border-[#e7ece7] rounded-2xl px-5 py-4 text-[#0c2010] font-jakarta-bold text-[20px] tracking-[0.5em] text-center mb-6"
                     placeholder="••••••"
                     placeholderTextColor="#a1a1aa"
