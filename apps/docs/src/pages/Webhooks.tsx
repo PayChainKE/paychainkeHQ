@@ -326,6 +326,14 @@ end`,
         <code>GET /api/developer/webhooks/:id/deliveries</code> if events seem to be going missing.
         It shows the HTTP status and error for every attempt.
       </p>
+
+      <h2>Resend a delivery</h2>
+      <p>
+        Fixed a bug in your handler, or your server was down? Open <em>Deliveries</em> on the{" "}
+        <a href="/dashboard/webhooks">Webhooks page</a>, pick the event, and press <strong>Resend</strong>. PayChain sends
+        the same payload again, with the same event <code>id</code>, so a handler that skips events it has already seen
+        stays safe. The API is <code>POST /api/developer/webhooks/:id/deliveries/:deliveryId/resend</code>.
+      </p>
     </>
   );
 }

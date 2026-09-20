@@ -14,6 +14,8 @@ export const nav: NavGroup[] = [
     label: "Get started",
     items: [
       { title: "Introduction", path: "/", description: "What the PayChain API does and how the pieces fit together." },
+      { title: "Quickstart", path: "/quickstart", description: "Take your first sandbox payment in five minutes." },
+      { title: "Where to integrate", path: "/integrations", description: "Shops, ticketing, ISPs, apps and marketplaces: what to use for each." },
       { title: "No-code integration", path: "/no-code-integration", description: "Add a working payment button to Wix, Shopify, or WordPress. No code, no developer account." },
       { title: "WooCommerce plugin", path: "/woocommerce", description: "Take M-PESA payments in a WooCommerce shop. Install a plugin, paste a key." },
       { title: "Shopify app", path: "/shopify", description: "Take M-PESA payments in a Shopify store with a small service you run. Orders are marked paid for you." },
@@ -34,7 +36,9 @@ export const nav: NavGroup[] = [
   {
     label: "Resources",
     items: [
+      { title: "Ticketing and events", path: "/ticketing", description: "Sell tickets with M-PESA: hold seats, take payment, issue tickets from the webhook." },
       { title: "Guides", path: "/guides", description: "ISP auto-reconnection and CRM sync, end to end." },
+      { title: "OpenAPI & Postman", path: "/openapi", description: "Download the OpenAPI spec and a ready-made Postman collection." },
       { title: "Errors & idempotency", path: "/errors", description: "Error shape, status codes, and safe retries." },
     ],
   },

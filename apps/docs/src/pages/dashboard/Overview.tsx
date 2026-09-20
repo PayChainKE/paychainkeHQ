@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { KeyRound, Webhook, Store, ShieldCheck, ArrowRight, CheckCircle2, Circle } from "lucide-react";
+import { KeyRound, Webhook, Store, ShieldCheck, ArrowRight, CheckCircle2, Circle, ReceiptText } from "lucide-react";
 import { useDeveloperAuth } from "@/context/DeveloperAuthContext";
-import { getMerchantLinkStatus } from "@/lib/api";
+import { getMerchantLinkStatus, listApiKeys, listPayments, DeveloperPayment } from "@/lib/api";
 
 const CARDS = [
+  { icon: ReceiptText, title: "Transactions", desc: "Every payment your keys have made, test and live.", to: "/dashboard/transactions" },
   { icon: KeyRound, title: "API keys", desc: "Create and manage test and live keys.", to: "/dashboard/api-keys" },
   { icon: Webhook, title: "Webhooks", desc: "Register endpoints, send test events.", to: "/dashboard/webhooks" },
   { icon: Store, title: "Merchants", desc: "Only needed for live payments. Link each real merchant account you build for.", to: "/dashboard/merchant" },
@@ -14,10 +15,19 @@ const CARDS = [
 export default function Overview() {
   const { developer } = useDeveloperAuth();
   const [linked, setLinked] = useState<boolean | null>(null);
+  const [hasKey, setHasKey] = useState<boolean | null>(null);
+  const [recent, setRecent] = useState<DeveloperPayment[] | null>(null);
+  const [totalPayments, setTotalPayments] = useState<number | null>(null);
 
   useEffect(() => {
     getMerchantLinkStatus().then((res) => {
       if (res.ok) setLinked(res.data.linked);
+    });
+    listApiKeys().then((res) => {
+      if (res.ok) setHasKey(res.data.data.some((k) => k.status === "active"));
+    });
+    listPayments({ limit: 5 }).then((res) => {
+      if (res.ok) { setRecent(res.data.data); setTotalPayments(res.data.total); }
     });
   }, []);
 
@@ -26,7 +36,8 @@ export default function Overview() {
   const steps = [
     { done: true, label: "Create account" },
     { done: developer.isVerified, label: "Verify email" },
-    { done: null, label: "Create a test-mode key and make your first call (no merchant needed)" },
+    { done: hasKey === true, label: "Create a test-mode API key (no merchant needed)" },
+    { done: (totalPayments ?? 0) > 0, label: "Make your first test payment" },
     { done: linked === true, label: "Link your real merchant account (required to go live)" },
   ];
   const doneCount = steps.filter((s) => s.done).length;
@@ -59,12 +70,42 @@ export default function Overview() {
             </div>
           ))}
         </div>
-        {linked === false && (
+        {hasKey === false && (
+          <Link to="/dashboard/api-keys" className="inline-flex items-center gap-1 text-[13px] font-semibold text-brand hover:text-brand-bright mt-4">
+            Create your first key <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        )}
+        {hasKey === true && totalPayments === 0 && (
+          <Link to="/quickstart" className="inline-flex items-center gap-1 text-[13px] font-semibold text-brand hover:text-brand-bright mt-4">
+            Follow the Quickstart to make your first call <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        )}
+        {linked === false && hasKey !== false && (totalPayments ?? 0) > 0 && (
           <Link to="/dashboard/merchant" className="inline-flex items-center gap-1 text-[13px] font-semibold text-brand hover:text-brand-bright mt-4">
             Link your merchant account to go live <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         )}
       </div>
+
+      {recent && recent.length > 0 && (
+        <div className="rounded-xl border border-border bg-surface mb-8">
+          <div className="flex items-center justify-between px-4 pt-4 pb-2">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-ink-faint">Recent transactions</p>
+            <Link to="/dashboard/transactions" className="text-[12.5px] font-semibold text-brand hover:text-brand-bright">View all</Link>
+          </div>
+          <div className="divide-y divide-border-subtle">
+            {recent.map((p) => (
+              <div key={p.id} className="px-4 py-2.5 flex items-center justify-between gap-3 text-[13px]">
+                <span className="min-w-0 truncate text-ink">{p.reference || (p.kind === "collect" ? "Collection" : "Payout")}{p.mode === "test" && <span className="ml-2 text-[10.5px] font-bold uppercase tracking-wider text-ink-faint">Test</span>}</span>
+                <span className="flex items-center gap-3 shrink-0">
+                  <span className="tabular-nums text-ink">{p.currency} {p.amount.toLocaleString()}</span>
+                  <span className={p.status === "success" ? "text-brand-bright font-semibold" : p.status === "failed" ? "text-red-500 font-semibold" : "text-amber-500 font-semibold"}>{p.status}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid sm:grid-cols-2 gap-3">
         {CARDS.map((c) => {

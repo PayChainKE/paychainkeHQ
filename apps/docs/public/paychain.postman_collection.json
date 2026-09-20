@@ -1,0 +1,514 @@
+{
+  "info": {
+    "name": "PayChain Developer API",
+    "description": "Set the apiKey variable to a pc_test_ key and send Ping first. Requests that create something save its id, so the next request (Get a payment, Get a checkout session, and so on) works without copying ids by hand.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{apiKey}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://api.paychain.co.ke"
+    },
+    {
+      "key": "apiKey",
+      "value": "pc_test_replace_me"
+    },
+    {
+      "key": "paymentId",
+      "value": ""
+    },
+    {
+      "key": "checkoutId",
+      "value": ""
+    },
+    {
+      "key": "invoiceId",
+      "value": ""
+    },
+    {
+      "key": "batchId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Account",
+      "item": [
+        {
+          "name": "Check your API key",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/developer/ping",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "developer",
+                "ping"
+              ]
+            },
+            "description": "Returns the key's mode. A quick way to confirm a key works."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payments",
+      "item": [
+        {
+          "name": "Collect a payment (M-PESA STK push)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}",
+                "description": "A fresh value per request. Use your own order id in real code."
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/developer/payments/collect",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "developer",
+                "payments",
+                "collect"
+              ]
+            },
+            "description": "Sends an M-PESA prompt to the customer's phone. In test mode nothing real is sent and the payment settles to success after about 4 seconds. Listen for the payment.collect.succeeded webhook.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 500,\n  \"phone\": \"0712345678\",\n  \"reference\": \"order-1001\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201 || pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  const value = body?.payment?.id;",
+                  "  if (value) pm.collectionVariables.set('paymentId', value);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Send money",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}",
+                "description": "A fresh value per request. Use your own order id in real code."
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/developer/payments/payout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "developer",
+                "payments",
+                "payout"
+              ]
+            },
+            "description": "Pays out to a bank account, mobile money number, Paybill or Till. Live payouts need the merchant to have API payouts enabled, and the payout PIN in apiPayoutPin. Amounts are capped per payment and per day.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 1000,\n  \"phone\": \"0712345678\",\n  \"narration\": \"Refund order-1001\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201 || pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  const value = body?.payment?.id;",
+                  "  if (value) pm.collectionVariables.set('paymentId', value);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get a payment",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/developer/payments/{{paymentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "developer",
+                "payments",
+                "{{paymentId}}"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Hosted checkout",
+      "item": [
+        {
+          "name": "Create a hosted checkout link",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/developer/checkout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "developer",
+                "checkout"
+              ]
+            },
+            "description": "PayChain hosts the payment page. Send the customer to checkoutUrl. The result arrives on your webhook with the same reference.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 1500,\n  \"reference\": \"TKT-1042\",\n  \"description\": \"Concert, 2 tickets\",\n  \"callbackUrl\": \"https://tickets.example.com/orders/1042\",\n  \"expiresInMinutes\": 10\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201 || pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  const value = body?.session?.id;",
+                  "  if (value) pm.collectionVariables.set('checkoutId', value);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get a checkout session",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/developer/checkout/{{checkoutId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "developer",
+                "checkout",
+                "{{checkoutId}}"
+              ]
+            },
+            "description": "Use it as a fallback if a webhook is late. status is success once the customer has paid."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Invoices",
+      "item": [
+        {
+          "name": "Create an invoice (draft)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/developer/invoices",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "developer",
+                "invoices"
+              ]
+            },
+            "description": "Creating an invoice moves no money. Needs a linked merchant. Send it with POST /invoices/{id}/send.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer\": {\n    \"name\": \"Wanjiku Traders\",\n    \"email\": \"accounts@wanjiku.example\"\n  },\n  \"items\": [\n    {\n      \"description\": \"Monthly service\",\n      \"qty\": 1,\n      \"price\": 3500\n    }\n  ],\n  \"dueDate\": \"2026-10-15T00:00:00.000Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201 || pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  const value = body?.invoice?._id;",
+                  "  if (value) pm.collectionVariables.set('invoiceId', value);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List invoices",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/developer/invoices",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "developer",
+                "invoices"
+              ]
+            },
+            "description": "Your 100 most recent invoices, newest first."
+          }
+        },
+        {
+          "name": "Get an invoice",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/developer/invoices/{{invoiceId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "developer",
+                "invoices",
+                "{{invoiceId}}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Email an invoice to the customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/developer/invoices/{{invoiceId}}/send",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "developer",
+                "invoices",
+                "{{invoiceId}}",
+                "send"
+              ]
+            },
+            "description": "Emails the customer a payable invoice. The customer needs an email address. You get invoice.sent now and invoice.paid when it is paid."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bulk payments",
+      "item": [
+        {
+          "name": "Pay many people in one call",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}",
+                "description": "A fresh value per request. Use your own order id in real code."
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/developer/bulk-payments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "developer",
+                "bulk-payments"
+              ]
+            },
+            "description": "Up to 200 payouts per batch, each with its own destination. Live batches need API payouts enabled and the payout PIN. Track it with GET /bulk-payments/{batchId} and the payment.payout.* webhooks.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"payments\": [\n    {\n      \"amount\": 1200,\n      \"phone\": \"0712345678\",\n      \"narration\": \"Delivery fee\"\n    },\n    {\n      \"amount\": 900,\n      \"phone\": \"0723456789\",\n      \"narration\": \"Delivery fee\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201 || pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  const value = body?.batchId;",
+                  "  if (value) pm.collectionVariables.set('batchId', value);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get a batch",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/developer/bulk-payments/{{batchId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "developer",
+                "bulk-payments",
+                "{{batchId}}"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    }
+  ]
+}

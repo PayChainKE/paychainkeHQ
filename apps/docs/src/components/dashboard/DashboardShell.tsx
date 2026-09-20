@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Navigate, NavLink } from "react-router-dom";
-import { KeyRound, Webhook, Store, ShieldCheck, LayoutGrid, LogOut, X } from "lucide-react";
+import { KeyRound, Webhook, Store, ShieldCheck, LayoutGrid, LogOut, X, ReceiptText } from "lucide-react";
 import Topbar from "@/components/Topbar";
 import { cn } from "@/lib/cn";
 import { useDeveloperAuth } from "@/context/DeveloperAuthContext";
@@ -8,6 +8,7 @@ import { logoutDeveloper } from "@/lib/api";
 
 const NAV = [
   { to: "/dashboard", label: "Overview", icon: LayoutGrid, end: true },
+  { to: "/dashboard/transactions", label: "Transactions", icon: ReceiptText },
   { to: "/dashboard/api-keys", label: "API keys", icon: KeyRound },
   { to: "/dashboard/webhooks", label: "Webhooks", icon: Webhook },
   { to: "/dashboard/merchant", label: "Merchants", icon: Store },

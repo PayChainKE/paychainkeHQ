@@ -10,6 +10,10 @@ import IntegrationGuide from "@/pages/IntegrationGuide";
 import NoCodeIntegration from "@/pages/NoCodeIntegration";
 import WooCommerce from "@/pages/WooCommerce";
 import Shopify from "@/pages/Shopify";
+import Quickstart from "@/pages/Quickstart";
+import Ticketing from "@/pages/Ticketing";
+import Integrations from "@/pages/Integrations";
+import ApiReference from "@/pages/ApiReference";
 import Authentication from "@/pages/Authentication";
 import PaymentCollection from "@/pages/PaymentCollection";
 import SendMoney from "@/pages/SendMoney";
@@ -29,6 +33,7 @@ import ForgotPassword from "@/pages/auth/ForgotPassword";
 import ResetPassword from "@/pages/auth/ResetPassword";
 import Overview from "@/pages/dashboard/Overview";
 import ApiKeys from "@/pages/dashboard/ApiKeys";
+import Transactions from "@/pages/dashboard/Transactions";
 import DashboardWebhooks from "@/pages/dashboard/Webhooks";
 import MerchantLink from "@/pages/dashboard/MerchantLink";
 import LiveAccess from "@/pages/dashboard/LiveAccess";
@@ -61,6 +66,10 @@ export default function App() {
               <Route path="/no-code-integration" element={<NoCodeIntegration />} />
               <Route path="/woocommerce" element={<WooCommerce />} />
               <Route path="/shopify" element={<Shopify />} />
+              <Route path="/quickstart" element={<Quickstart />} />
+              <Route path="/ticketing" element={<Ticketing />} />
+              <Route path="/integrations" element={<Integrations />} />
+              <Route path="/openapi" element={<ApiReference />} />
               <Route path="/authentication" element={<Authentication />} />
               <Route path="/payment-collection" element={<PaymentCollection />} />
               <Route path="/send-money" element={<SendMoney />} />
@@ -83,6 +92,7 @@ export default function App() {
 
             <Route element={<DashboardPages />}>
               <Route path="/dashboard" element={<Overview />} />
+              <Route path="/dashboard/transactions" element={<Transactions />} />
               <Route path="/dashboard/api-keys" element={<ApiKeys />} />
               <Route path="/dashboard/webhooks" element={<DashboardWebhooks />} />
               <Route path="/dashboard/merchant" element={<MerchantLink />} />

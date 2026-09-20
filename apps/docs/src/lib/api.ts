@@ -61,12 +61,29 @@ export interface Webhook {
 export interface WebhookDelivery {
   _id: string;
   event: string;
-  status: "pending" | "delivered" | "failed" | "exhausted";
+  status: "pending" | "success" | "failed" | "exhausted";
   attempts: number;
   lastResponseCode: number | null;
   lastError: string | null;
   nextAttemptAt: string | null;
   createdAt: string;
+  payload: unknown;
+}
+
+export interface DeveloperPayment {
+  id: string;
+  mode: "test" | "live";
+  kind: "collect" | "payout";
+  origin: "api" | "admin_test";
+  merchantId: string | null;
+  amount: number;
+  currency: string;
+  status: "pending" | "success" | "failed";
+  failureReason: string | null;
+  reference: string | null;
+  counterparty: Record<string, string> | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<{ ok: boolean; status: number; data: T & { error?: string; code?: string } }> {
@@ -201,6 +218,15 @@ export function unlinkMerchant(merchantId: string) {
   return request<{ success: boolean; keysRevoked: number }>(`/api/developer/link-merchant/${merchantId}`, { method: "DELETE" });
 }
 
+// --- Transactions (private) ---
+
+export function listPayments(params: { mode?: string; kind?: string; status?: string; q?: string; page?: number; limit?: number } = {}) {
+  const qs = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== "") qs.set(k, String(v)); });
+  const suffix = qs.toString() ? `?${qs}` : "";
+  return request<{ success: boolean; data: DeveloperPayment[]; total: number; page: number; pages: number }>(`/api/developer/payments${suffix}`);
+}
+
 // --- Webhooks (private) ---
 
 export function listWebhooks() {
@@ -230,6 +256,10 @@ export function testWebhook(id: string) {
     `/api/developer/webhooks/${id}/test`,
     { method: "POST" }
   );
+}
+
+export function resendWebhookDelivery(webhookId: string, deliveryId: string) {
+  return request<{ success: boolean; delivery: WebhookDelivery }>(`/api/developer/webhooks/${webhookId}/deliveries/${deliveryId}/resend`, { method: "POST" });
 }
 
 export function listWebhookDeliveries(id: string) {
