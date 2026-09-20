@@ -62,6 +62,9 @@ import {
   rejectLiveAccess,
   getDeveloperWebhooks,
   runIntegrationTest,
+  getLiveTestOptions,
+  startLiveTest,
+  getLiveTest,
   getDeveloperMessages,
   sendDeveloperEmail,
 } from '../controllers/developerAdminController.js';
@@ -339,6 +342,20 @@ router.patch('/developers/:id/reject-live', protect, requireMutator, rejectLiveA
 // collect + a real ping of every registered webhook) — lets an admin verify
 // everything actually works before approving a live-access request.
 router.post('/developers/:id/run-integration-test', protect, requireMutator, sensitiveActionLimiter, runIntegrationTest);
+
+// Real, small money movement started by an admin. Tighter than the general
+// limiter, and counted per admin rather than per IP.
+const liveTestLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  keyGenerator: (req) => String(req.admin?._id || 'anon'),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many live tests this hour. Try again later.' },
+});
+router.get('/developers/:id/live-test/options', protect, requireMutator, getLiveTestOptions);
+router.post('/developers/:id/live-test', protect, requireMutator, liveTestLimiter, startLiveTest);
+router.get('/developers/:id/live-test/:paymentId', protect, requireMutator, getLiveTest);
 
 // Admin → merchant SMS broadcasts (system maintenance notices, public
 // holiday greetings, security reminders, etc). Sending is rate-limited with

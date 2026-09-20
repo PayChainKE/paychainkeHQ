@@ -1,7 +1,12 @@
+import mongoose from 'mongoose';
 import Merchant from '../models/Merchant.js';
 import ApiKey from '../models/ApiKey.js';
 import { linkedMerchantIds, liveAccessFor, liveAccessSummary } from '../utils/developerMerchants.js';
 import { migrateLegacyLink } from '../services/developerMerchantLinkService.js';
+import DeveloperPayment from '../models/DeveloperPayment.js';
+import { initiateCollectPayment, syncLiveCollectFromStkRequest, CollectValidationError } from '../services/developerCollectService.js';
+import { validatePhoneNumber } from '../utils/ncbaValidators.js';
+import { publicDeveloperPayment } from '../utils/developerPaymentView.js';
 import Developer from '../models/Developer.js';
 import DeveloperWebhook from '../models/DeveloperWebhook.js';
 import WebhookDelivery from '../models/WebhookDelivery.js';
@@ -373,6 +378,143 @@ export const sendDeveloperEmail = async (req, res) => {
     res.json({ success: true, data: thread });
   } catch (error) {
     console.error('Send Developer Email Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// ── Live test: a small REAL payment, started by an admin ────────────────────
+// Checks a developer's linked merchant end to end (the STK push reaches a phone,
+// the money lands in that merchant's wallet). Money IN only: it never pays
+// anything out, because a payout would spend the merchant's own balance and
+// bypass the merchant's payout PIN and limits.
+//
+// Guardrails: owner/admin only, a hard amount cap, a phone chosen from three
+// known parties (the admin's own, the developer's, or the merchant's) rather
+// than typed in, one test at a time per merchant, rate limited, and audited.
+// By default no webhook is sent to the developer's endpoints, so their system
+// never mistakes it for a real customer payment.
+const LIVE_TEST_MAX_KES = () => Math.max(1, Number(process.env.ADMIN_LIVE_TEST_MAX_KES) || 50);
+
+// 254733444555 -> 0733***555. Never send a full number to the browser.
+const maskPhone = (p) => (p ? (() => { const local = `0${String(p).replace(/^\+?254/, '')}`; return `${local.slice(0, 4)}${'*'.repeat(Math.max(0, local.length - 7))}${local.slice(-3)}`; })() : null);
+
+// Resolves the three phones an admin may send a test to.
+async function livePhoneChoices(developer, admin, merchantId) {
+  const merchant = merchantId ? await Merchant.findById(merchantId).select('businessName phone') : null;
+  const raw = { admin: admin?.phone, developer: developer?.phone, merchant: merchant?.phone };
+  const labels = { admin: 'My phone', developer: 'The developer\'s phone', merchant: `The merchant's phone (${merchant?.businessName || 'merchant'})` };
+  const out = [];
+  for (const source of ['admin', 'developer', 'merchant']) {
+    let normalized = null;
+    try { normalized = raw[source] ? validatePhoneNumber(raw[source]) : null; } catch { normalized = null; }
+    out.push({ source, label: labels[source], hint: maskPhone(normalized), available: !!normalized, normalized });
+  }
+  return { merchant, choices: out };
+}
+
+// @desc    What an admin can pick for a live test on one merchant.
+// @route   GET /api/admin/developers/:id/live-test/options?merchantId=
+// @access  Private (Admin — owner/admin)
+export const getLiveTestOptions = async (req, res) => {
+  try {
+    const developer = await Developer.findById(req.params.id);
+    if (!developer) return res.status(404).json({ error: 'Developer not found.' });
+    const merchantId = resolveTargetMerchant(developer, req.query?.merchantId);
+    if (!merchantId) return res.status(400).json({ error: 'Choose one of the developer\'s merchants.', code: 'MERCHANT_REQUIRED' });
+    const { merchant, choices } = await livePhoneChoices(developer, req.admin, merchantId);
+    res.json({
+      success: true,
+      merchant: { merchantId, businessName: merchant?.businessName || null },
+      maxAmount: LIVE_TEST_MAX_KES(),
+      phones: choices.map(({ normalized, ...c }) => c),
+    });
+  } catch (error) {
+    console.error('Live Test Options Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Start a small real STK push into one of the developer's merchants.
+// @route   POST /api/admin/developers/:id/live-test   body: { merchantId, phoneSource, amount, deliverWebhook }
+// @access  Private (Admin — owner/admin)
+export const startLiveTest = async (req, res) => {
+  try {
+    const developer = await Developer.findById(req.params.id);
+    if (!developer) return res.status(404).json({ error: 'Developer not found.' });
+    if (developer.status !== 'active') return res.status(400).json({ error: 'This developer account is not active.' });
+
+    const merchantId = resolveTargetMerchant(developer, req.body?.merchantId);
+    if (!merchantId) return res.status(400).json({ error: 'Choose one of the developer\'s merchants.', code: 'MERCHANT_REQUIRED' });
+
+    const amount = Math.ceil(Number(req.body?.amount));
+    const max = LIVE_TEST_MAX_KES();
+    if (!Number.isFinite(amount) || amount < 1 || amount > max) {
+      return res.status(400).json({ error: `Amount must be a whole number of KES between 1 and ${max}.`, code: 'AMOUNT_OUT_OF_RANGE' });
+    }
+
+    const { merchant, choices } = await livePhoneChoices(developer, req.admin, merchantId);
+    const choice = choices.find((c) => c.source === req.body?.phoneSource);
+    if (!choice) return res.status(400).json({ error: 'Choose whose phone receives the M-PESA prompt.', code: 'PHONE_SOURCE_REQUIRED' });
+    if (!choice.available) return res.status(400).json({ error: `There is no valid phone number on file for that choice.`, code: 'PHONE_UNAVAILABLE' });
+
+    // One at a time per merchant: a double-click must not send two prompts.
+    const recent = await DeveloperPayment.findOne({
+      developerId: developer._id, merchantId, origin: 'admin_test', status: 'pending', createdAt: { $gte: new Date(Date.now() - 3 * 60 * 1000) },
+    });
+    if (recent) return res.status(409).json({ error: 'A test for this merchant is still waiting for the M-PESA prompt. Let it finish or expire first.', code: 'TEST_IN_PROGRESS', paymentId: recent._id });
+
+    const deliverWebhook = req.body?.deliverWebhook === true;
+    let payment;
+    try {
+      payment = await initiateCollectPayment({
+        developerId: developer._id,
+        apiKeyId: null,
+        merchantId,
+        mode: 'live',
+        amount,
+        phone: choice.normalized,
+        reference: `admin-test-${String(new mongoose.Types.ObjectId()).slice(-8)}`,
+        idempotencyKey: `admin-live-test-${req.admin._id}-${Date.now()}`,
+        origin: 'admin_test',
+        testedBy: req.admin._id,
+        suppressWebhooks: !deliverWebhook,
+      });
+    } catch (e) {
+      if (e instanceof CollectValidationError) return res.status(400).json({ error: e.message });
+      throw e;
+    }
+
+    logAudit({
+      action: 'admin.developer.live_test', category: 'admin', severity: 'warning',
+      message: `${req.admin.name || req.admin.email} started a real KES ${amount} test payment for ${developer.companyName} into ${merchant?.businessName || merchantId}, to ${choice.label.toLowerCase()} (${choice.hint})`,
+      req, actor: { type: 'admin', id: req.admin._id, email: req.admin.email, name: req.admin.name },
+      metadata: { developerId: String(developer._id), merchantId: String(merchantId), paymentId: String(payment._id), amount, phoneSource: choice.source, deliverWebhook },
+    });
+
+    res.status(201).json({
+      success: true,
+      payment: { ...publicDeveloperPayment(payment), webhooksSent: deliverWebhook },
+      sentTo: choice.hint,
+      merchant: { merchantId, businessName: merchant?.businessName || null },
+    });
+  } catch (error) {
+    console.error('Start Live Test Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Status of a live test (the page polls this while the prompt is open).
+// @route   GET /api/admin/developers/:id/live-test/:paymentId
+// @access  Private (Admin — owner/admin)
+export const getLiveTest = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.paymentId)) return res.status(404).json({ error: 'Test not found.' });
+    const payment = await DeveloperPayment.findOne({ _id: req.params.paymentId, developerId: req.params.id, origin: 'admin_test' });
+    if (!payment) return res.status(404).json({ error: 'Test not found.' });
+    await syncLiveCollectFromStkRequest(payment);
+    res.json({ success: true, payment: { ...publicDeveloperPayment(payment), webhooksSent: !payment.suppressWebhooks } });
+  } catch (error) {
+    console.error('Get Live Test Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };

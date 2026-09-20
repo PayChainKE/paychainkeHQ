@@ -10,7 +10,16 @@ import mongoose from 'mongoose';
 // that don't know to filter it out — nothing else in the app queries this.
 const developerPaymentSchema = new mongoose.Schema({
   developerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Developer', required: true, index: true },
-  apiKeyId: { type: mongoose.Schema.Types.ObjectId, ref: 'ApiKey', required: true },
+  // Required for anything a developer made through the API. A payment an admin
+  // started from the dashboard to test a developer's setup has no key.
+  apiKeyId: { type: mongoose.Schema.Types.ObjectId, ref: 'ApiKey', required() { return this.origin !== 'admin_test'; }, default: null },
+  // 'admin_test': a small real payment an admin started from the dashboard to
+  // check a developer's merchant end to end. Distinguishable in webhook
+  // payloads so a developer's system can ignore it.
+  origin: { type: String, enum: ['api', 'admin_test'], default: 'api' },
+  testedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null },
+  // When true no webhook is sent to the developer for this payment.
+  suppressWebhooks: { type: Boolean, default: false },
   // Live records always belong to a real merchant. Sandbox (test-mode)
   // records made by a developer who hasn't linked one yet have none.
   merchantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Merchant', required() { return this.mode === 'live'; }, default: null, index: true },

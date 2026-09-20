@@ -689,7 +689,7 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
     },
     { returnDocument: 'after' }
   );
-  if (developerPayment) {
+  if (developerPayment && !developerPayment.suppressWebhooks) {
     dispatchDeveloperEvent(
       developerPayment.developerId,
       `payment.collect.${claimed.status === 'success' ? 'succeeded' : 'failed'}`,

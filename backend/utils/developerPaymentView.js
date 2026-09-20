@@ -7,6 +7,9 @@ export function publicDeveloperPayment(payment) {
     id: payment._id,
     mode: payment.mode,
     kind: payment.kind,
+    // 'admin_test' for a small real payment PayChain staff made to check the
+    // setup. Safe for a developer's system to ignore.
+    origin: payment.origin || 'api',
     // Which of the developer's linked merchants this payment is for. Matters
     // when one account serves several: events all arrive at the same webhook.
     merchantId: payment.merchantId || null,

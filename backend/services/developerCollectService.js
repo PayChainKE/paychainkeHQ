@@ -60,7 +60,7 @@ export async function findReplayedPayment(developerId, idempotencyKey) {
 // Throws CollectValidationError for bad input, or DuplicateSubmissionError
 // (from claimClientIdempotencyKey) for a replayed idempotency key — callers
 // are expected to catch both.
-export async function initiateCollectPayment({ developerId, apiKeyId, merchantId, mode, amount, phone: rawPhone, reference, idempotencyKey }) {
+export async function initiateCollectPayment({ developerId, apiKeyId, merchantId, mode, amount, phone: rawPhone, reference, idempotencyKey, origin = 'api', testedBy = null, suppressWebhooks = false }) {
   const intAmount = Math.ceil(Number(amount));
   if (!Number.isFinite(intAmount) || intAmount <= 0) {
     throw new CollectValidationError('A positive amount is required.', 'INVALID_AMOUNT');
@@ -86,6 +86,9 @@ export async function initiateCollectPayment({ developerId, apiKeyId, merchantId
     merchantId,
     mode,
     kind: 'collect',
+    origin,
+    testedBy,
+    suppressWebhooks,
     amount: intAmount,
     status: 'pending',
     reference: reference || null,
@@ -117,7 +120,7 @@ export async function initiateCollectPayment({ developerId, apiKeyId, merchantId
     payment.status = 'failed';
     payment.failureReason = err.message;
     await payment.save();
-    dispatchDeveloperEvent(developerId, 'payment.collect.failed', { payment: publicDeveloperPayment(payment) });
+    if (!suppressWebhooks) dispatchDeveloperEvent(developerId, 'payment.collect.failed', { payment: publicDeveloperPayment(payment) });
   }
 
   return payment;
