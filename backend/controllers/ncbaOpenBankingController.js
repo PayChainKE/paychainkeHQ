@@ -33,6 +33,7 @@ import { assertOutboundVelocityOk, OutboundVelocityLockedError } from '../utils/
 import { requiresPayoutStepUp, issuePayoutStepUpOtp, verifyPayoutStepUpOtp, PayoutStepUpInvalidError } from '../utils/payoutStepUpGuard.js';
 import { debitAvailableBalance } from '../utils/availableBalance.js';
 import { KENYAN_BANK_CODES } from '../config/kenyanBankCodes.js';
+import { bankDestination, mobileDestination, paybillTillDestination } from '../utils/transactionDestination.js';
 import { getB2cTariff } from '../config/mpesaB2cTariffCard.js';
 import { getLipaNaMpesaTariff } from '../config/lipaNaMpesaTariffCard.js';
 import { getBankTransferTariff } from '../config/bankTransferTariffCard.js';
@@ -279,6 +280,7 @@ export async function executeNcbaBankPayout({
       reference: transactionId,
       sender: { name: reservedMerchant.businessName, id: process.env.NCBA_OPENBANKING_ACCOUNT_NUMBER || 'PAYCHAIN_NCBA_ACCOUNT' },
       recipient: { name: accountName || 'Bank Account', id: accountNumber },
+      destination: bankDestination({ bankCode }),
       settlementRail: actualRail,
     });
   } catch (recordErr) {
@@ -383,6 +385,7 @@ export async function executeNcbaMobileMoneyPayout({ merchantId, phone, network,
       reference: transactionId,
       sender: { name: reservedMerchant.businessName, id: process.env.NCBA_OPENBANKING_ACCOUNT_NUMBER || 'PAYCHAIN_NCBA_ACCOUNT' },
       recipient: { name: null, id: phone },
+      destination: mobileDestination(resolvedNetwork),
       mobileNetwork: resolvedNetwork,
     });
   } catch (recordErr) {
@@ -477,6 +480,7 @@ export async function executeNcbaLipaNaMpesaPayout({ merchantId, paymentType, pa
       reference: transactionId,
       sender: { name: reservedMerchant.businessName, id: process.env.NCBA_OPENBANKING_ACCOUNT_NUMBER || 'PAYCHAIN_NCBA_ACCOUNT' },
       recipient: { name: null, id: payBillTillNo },
+      destination: paybillTillDestination(resolvedPaymentType, accountReference),
     });
   } catch (recordErr) {
     logEvent('error', 'ncba_lnm_payout_confirmed_but_recording_failed', {

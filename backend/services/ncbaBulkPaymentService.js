@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { bankDestination, mobileDestination } from '../utils/transactionDestination.js';
 import crypto from 'crypto';
 import mongoose from 'mongoose';
 import Merchant from '../models/Merchant.js';
@@ -229,6 +230,11 @@ export async function initiateBulkPayment(merchantId, payoutItems) {
           reference: paymentInstructions[index].PaymentReference,
           sender: { name: reservedMerchant.businessName, id: ncbaDebitAccount || 'PAYCHAIN_SETTLEMENT_ACCOUNT' },
           recipient: { name: item.name, id: item.accountNumber },
+          destination: item.type === 'utility' && item.utilityProvider
+            ? { kind: 'utility', provider: item.utilityProvider }
+            : item.routing === 'mobile'
+              ? mobileDestination(item.mobileNetwork)
+              : bankDestination({ bankCode: item.bankCode }),
         }));
 
         const createdTransactions = await Transaction.create(transactionDocs, { session });

@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { payeeDestination } from '../utils/transactionDestination.js';
 import Payee from '../models/Payee.js';
 import PayoutBatch from '../models/PayoutBatch.js';
 import Merchant from '../models/Merchant.js';
@@ -974,6 +975,7 @@ export const authorizeBatch = async (req, res) => {
           reference: payoutRef,
           sender: { name: merchant.businessName, id: merchant.ncbaMerchantCode },
           recipient: { name: payee.name, id: (payee.type === 'utility' && payee.utilityProvider) ? payee.accountNumber : (payee.phone || payee.paybillNumber || payee.tillNumber) },
+          destination: payeeDestination(payee),
           mobileNetwork: (payee.paymentMethod === 'Mobile Money' && payee.mobileMoneyType === 'Personal Number')
             ? (payee.mobileNetwork === 'airtel' ? 'airtel' : 'safaricom')
             : null,

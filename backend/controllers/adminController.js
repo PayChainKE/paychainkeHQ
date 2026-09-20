@@ -2975,6 +2975,7 @@ export const searchTransactionAudit = async (req, res) => {
         accountNumber: t.accountNumber,
         sender: t.sender,
         recipient: t.recipient,
+        destination: t.destination,
         settlementRail: t.settlementRail,
         mobileNetwork: t.mobileNetwork,
         paymentLinkId: t.paymentLinkId,

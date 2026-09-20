@@ -91,6 +91,7 @@ function buildTransactionUnionStage({ merchantId, action, category, severity, ac
           mobileNetwork: '$mobileNetwork',
           sender: '$sender',
           recipient: '$recipient',
+          destination: '$destination',
         },
         createdAt: 1,
         updatedAt: '$createdAt',
