@@ -46,6 +46,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import connectDB, { isDbReady, startBackgroundDbRetry, disconnectDB, ensureModelIndexes } from './config/database.js';
 import { requireDb } from './middleware/requireDb.js';
+import { accountOrIpKey } from './middleware/rateLimitKey.js';
 import authRoutes from './routes/authRoutes.js';
 import waitlistRoutes from './routes/waitlistRoutes.js';
 import newsletterRoutes from './routes/newsletterRoutes.js';
@@ -252,7 +253,11 @@ app.get('/api/health', (req, res) => {
 // net, not the primary defense.
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 600,
+  // Signed-in accounts are counted per account (see middleware/rateLimitKey.js)
+  // with more headroom, since a dashboard tab legitimately polls; anonymous
+  // traffic stays on the tighter per-IP budget.
+  keyGenerator: accountOrIpKey,
+  limit: (req) => (req.rateLimitedByAccount ? 1500 : 600),
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests. Please try again later.' },
