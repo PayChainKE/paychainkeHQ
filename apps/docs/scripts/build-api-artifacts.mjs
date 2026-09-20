@@ -42,8 +42,8 @@ const schemas = {
     counterparty: { type: 'object', additionalProperties: true, description: 'Who paid or was paid: { phone } for a collection; bank, mobile money, paybill or till details for a payout.' },
     batchId: { type: 'string', nullable: true },
     payeeType: { type: 'string', nullable: true, enum: ['employee', 'contract'] },
-    grossAmount: { type: 'number', nullable: true },
-    taxDeductions: { type: 'object', nullable: true, additionalProperties: true },
+    grossAmount: { type: 'number', nullable: true, description: 'Always null. Reserved: PayChain does not calculate payroll deductions.' },
+    taxDeductions: { type: 'object', nullable: true, additionalProperties: true, description: 'Always null. Reserved: PayChain does not calculate payroll deductions.' },
     createdAt: dt('When it was created.'),
     updatedAt: dt('When it last changed.'),
   }, ['id', 'mode', 'kind', 'amount', 'currency', 'status']),
@@ -187,7 +187,7 @@ const paths = {
       description: 'Up to 200 payouts per batch, each with its own destination. Live batches need API payouts enabled and the payout PIN. Track it with GET /bulk-payments/{batchId} and the payment.payout.* webhooks.',
       parameters: [idem],
       requestBody: jsonBody(obj({
-        payments: { type: 'array', minItems: 1, maxItems: 200, items: { allOf: [ref('PayoutDestination'), obj({ amount: num('Whole shillings.', { minimum: 1 }), payeeType: { type: 'string', enum: ['employee', 'contract'], description: 'Defaults to contract.' }, narration: str('Shown on the statement.') }, ['amount'])] } },
+        payments: { type: 'array', minItems: 1, maxItems: 200, items: { allOf: [ref('PayoutDestination'), obj({ amount: num('Whole shillings.', { minimum: 1 }), payeeType: { type: 'string', enum: ['employee', 'contract'], description: 'A label for your own reporting. Defaults to contract. Every row is paid exactly its amount: PayChain does not withhold PAYE, NSSF or SHIF.' }, narration: str('Shown on the statement.') }, ['amount'])] } },
         apiPayoutPin: str('The merchant\'s API payout PIN. Required for live keys.'),
       }, ['payments']), { payments: [{ amount: 1200, phone: '0712345678', narration: 'Delivery fee' }, { amount: 900, phone: '0723456789', narration: 'Delivery fee' }] }),
       responses: {

@@ -21,9 +21,9 @@ import { dispatchDeveloperEvent } from '../services/webhookDeliveryService.js';
 const MAX_BATCH_SIZE = 200;
 const SIMULATED_SETTLE_MS = 4000;
 
-// Send one payout to many destinations in one call: employee payroll (net
-// of real PAYE/NSSF/SHIF, same calculator bulkPayController.js's dashboard
-// Bulk Pay uses), or contract/vendor settlements, to any mix of mobile
+// Send one payout to many destinations in one call: payroll or contract/vendor
+// settlements (payeeType is only a label; no statutory deductions are made,
+// see priceRows), to any mix of mobile
 // money, Paybill, Till, or bank destinations — reusing the exact same
 // per-destination execution functions and apiPayoutPin/cap gate already
 // proven by POST /payments/payout, just applied once per row instead of

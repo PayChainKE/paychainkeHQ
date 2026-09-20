@@ -52,12 +52,10 @@ const developerPaymentSchema = new mongoose.Schema({
   // — groups every row from the same batch request together for
   // GET /bulk-payments/:batchId. A single POST /payments/payout leaves this null.
   batchId: { type: String, default: null, index: true },
-  // 'employee' rows are priced as gross payroll (see grossAmount/taxDeductions
-  // below) and PAYE/NSSF/SHIF-deducted the same way bulkPayController.js's
-  // authorizeBatch does for the merchant dashboard's own Bulk Pay — `amount`
-  // above is always the real net amount actually paid, same meaning it has
-  // everywhere else in this model. 'contract' rows pay `amount` as-is, no
-  // tax withheld (a vendor/supplier settlement, not payroll).
+  // A label only: 'employee' vs 'contract' does not change the amount paid.
+  // The Developer API makes no PAYE/NSSF/SHIF deductions (see priceRows in
+  // developerBulkPayController.js), so `amount` is exactly what was paid.
+  // grossAmount/taxDeductions below are reserved and stay null.
   payeeType: { type: String, enum: ['employee', 'contract'], default: 'contract' },
   grossAmount: { type: Number, default: null },
   taxDeductions: {
