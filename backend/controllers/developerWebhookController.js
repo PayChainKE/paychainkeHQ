@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import DeveloperWebhook from '../models/DeveloperWebhook.js';
 import WebhookDelivery from '../models/WebhookDelivery.js';
-import { WEBHOOK_EVENT_TYPES, sendTestWebhook } from '../services/webhookDeliveryService.js';
+import { WEBHOOK_EVENT_TYPES, sendTestWebhook, resendWebhookDelivery } from '../services/webhookDeliveryService.js';
 import { logAudit } from '../utils/auditLog.js';
 import { assertPublicHttpsUrl } from '../utils/urlSsrfGuard.js';
 
@@ -13,6 +13,20 @@ const publicWebhook = (w) => ({
   lastDeliveryAt: w.lastDeliveryAt,
   lastDeliveryStatus: w.lastDeliveryStatus,
   createdAt: w.createdAt,
+});
+
+// payload is exactly what was POSTed to the endpoint, so a developer can see
+// what their server received (or should have) without asking support.
+const publicDelivery = (d) => ({
+  _id: d._id,
+  event: d.event,
+  status: d.status,
+  attempts: d.attempts,
+  lastResponseCode: d.lastResponseCode,
+  lastError: d.lastError,
+  nextAttemptAt: d.nextAttemptAt,
+  createdAt: d.createdAt,
+  payload: d.payload,
 });
 
 function parseEvents(events) {
@@ -169,19 +183,37 @@ export const listWebhookDeliveries = async (req, res) => {
     const deliveries = await WebhookDelivery.find({ webhookId: webhook._id }).sort({ createdAt: -1 }).limit(50);
     res.json({
       success: true,
-      data: deliveries.map((d) => ({
-        _id: d._id,
-        event: d.event,
-        status: d.status,
-        attempts: d.attempts,
-        lastResponseCode: d.lastResponseCode,
-        lastError: d.lastError,
-        nextAttemptAt: d.nextAttemptAt,
-        createdAt: d.createdAt,
-      })),
+      data: deliveries.map(publicDelivery),
     });
   } catch (error) {
     console.error('List Webhook Deliveries Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Send a past delivery again (same payload) as a new delivery.
+// @route   POST /api/developer/webhooks/:id/deliveries/:deliveryId/resend
+// @access  Private (Developer)
+export const resendDelivery = async (req, res) => {
+  try {
+    const webhook = await DeveloperWebhook.findOne({ _id: req.params.id, developerId: req.developer._id });
+    if (!webhook) return res.status(404).json({ error: 'Webhook not found.' });
+    const original = await WebhookDelivery.findOne({ _id: req.params.deliveryId, webhookId: webhook._id });
+    if (!original) return res.status(404).json({ error: 'Delivery not found.' });
+
+    const out = await resendWebhookDelivery(original._id, req.developer._id);
+    if (out.error) return res.status(out.status).json({ error: out.error });
+
+    logAudit({
+      action: 'developer.webhook.resend', category: 'security', severity: 'info',
+      message: `Resent webhook delivery ${original._id} (${original.event})`,
+      req, actor: { type: 'self', id: req.developer._id, email: req.developer.email, name: req.developer.name },
+      metadata: { webhookId: String(webhook._id), deliveryId: String(original._id) },
+    });
+    res.status(201).json({ success: true, delivery: publicDelivery(out.delivery) });
+  } catch (error) {
+    if (error?.name === 'CastError') return res.status(404).json({ error: 'Delivery not found.' });
+    console.error('Resend Webhook Delivery Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };

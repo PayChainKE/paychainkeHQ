@@ -69,6 +69,9 @@ const developerPaymentSchema = new mongoose.Schema({
   timestamps: true,
 });
 
+// Powers the portal's Transactions page (newest first, per developer).
+developerPaymentSchema.index({ developerId: 1, createdAt: -1 });
+
 const DeveloperPayment = mongoose.model('DeveloperPayment', developerPaymentSchema);
 
 export default DeveloperPayment;

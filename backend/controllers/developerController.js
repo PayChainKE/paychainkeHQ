@@ -7,6 +7,9 @@ import { runIntegrationTestForDeveloper } from '../services/developerIntegration
 import Merchant from '../models/Merchant.js';
 import { linkedMerchantIds, isMerchantLinked, liveAccessFor, liveAccessSummary } from '../utils/developerMerchants.js';
 import { migrateLegacyLink } from '../services/developerMerchantLinkService.js';
+import mongoose from 'mongoose';
+import DeveloperPayment from '../models/DeveloperPayment.js';
+import { publicDeveloperPayment } from '../utils/developerPaymentView.js';
 
 const publicApiKey = (key) => ({
   _id: key._id,
@@ -241,6 +244,48 @@ export const requestLiveAccess = async (req, res) => {
     res.json({ success: true, merchantId, message: 'Request submitted. An admin will review this merchant.' });
   } catch (error) {
     console.error('Request Live Access Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+const escapeRegex = (v) => String(v).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// @desc    The developer's own payments, newest first: every collection and
+//          payout made through their API keys, in both modes. The portal's
+//          Transactions page reads this.
+// @route   GET /api/developer/payments?mode=&kind=&status=&q=&page=&limit=
+// @access  Private (Developer)
+export const listPayments = async (req, res) => {
+  try {
+    const { mode, kind, status, q } = req.query;
+    const filter = { developerId: req.developer._id };
+    if (['test', 'live'].includes(mode)) filter.mode = mode;
+    if (['collect', 'payout'].includes(kind)) filter.kind = kind;
+    if (['pending', 'success', 'failed'].includes(status)) filter.status = status;
+
+    const term = String(q || '').trim().slice(0, 100);
+    if (term) {
+      const ors = [{ reference: { $regex: escapeRegex(term), $options: 'i' } }];
+      if (mongoose.isValidObjectId(term)) ors.push({ _id: term });
+      filter.$or = ors;
+    }
+
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const [rows, total] = await Promise.all([
+      DeveloperPayment.find(filter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit),
+      DeveloperPayment.countDocuments(filter),
+    ]);
+
+    res.json({
+      success: true,
+      data: rows.map(publicDeveloperPayment),
+      total,
+      page,
+      pages: Math.max(1, Math.ceil(total / limit)),
+    });
+  } catch (error) {
+    console.error('List Developer Payments Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };

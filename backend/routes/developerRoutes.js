@@ -8,6 +8,7 @@ import {
   createApiKey,
   revokeApiKey,
   requestLiveAccess,
+  listPayments,
 } from '../controllers/developerController.js';
 import {
   startMerchantLink,
@@ -22,9 +23,19 @@ import {
   deleteWebhook,
   testWebhook,
   listWebhookDeliveries,
+  resendDelivery,
 } from '../controllers/developerWebhookController.js';
 
 const router = express.Router();
+
+// A resend is a real outbound request from our servers, so it is throttled.
+const webhookResendLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many resends. Try again in 15 minutes.' },
+});
 
 // Key creation/revocation are credential-issuing actions — same throttle
 // shape as the PIN/password-change limiters elsewhere in this app.
@@ -39,6 +50,7 @@ const apiKeyActionLimiter = rateLimit({
 router.get('/me', protectDeveloper, getMe);
 router.post('/logout', protectDeveloper, logoutDeveloper);
 
+router.get('/payments', protectDeveloper, listPayments);
 router.get('/api-keys', protectDeveloper, listApiKeys);
 router.post('/api-keys', protectDeveloper, apiKeyActionLimiter, createApiKey);
 router.patch('/api-keys/:id/revoke', protectDeveloper, apiKeyActionLimiter, revokeApiKey);
@@ -62,5 +74,6 @@ router.patch('/webhooks/:id', protectDeveloper, apiKeyActionLimiter, updateWebho
 router.delete('/webhooks/:id', protectDeveloper, apiKeyActionLimiter, deleteWebhook);
 router.post('/webhooks/:id/test', protectDeveloper, apiKeyActionLimiter, testWebhook);
 router.get('/webhooks/:id/deliveries', protectDeveloper, listWebhookDeliveries);
+router.post('/webhooks/:id/deliveries/:deliveryId/resend', protectDeveloper, webhookResendLimiter, resendDelivery);
 
 export default router;

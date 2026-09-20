@@ -170,6 +170,27 @@ export async function sendTestWebhook(webhookId) {
   return delivery;
 }
 
+// Re-sends an earlier delivery's exact payload (same event id, so a receiver
+// that de-duplicates on it still recognises it) as a brand-new delivery with
+// its own retry schedule. Used by the portal's "Resend" button: the usual
+// reason is that the receiver was down or had a bug, and is fixed now.
+export async function resendWebhookDelivery(originalId, developerId) {
+  const original = await WebhookDelivery.findOne({ _id: originalId, developerId });
+  if (!original) return { error: 'Delivery not found.', status: 404 };
+  const webhook = await DeveloperWebhook.findOne({ _id: original.webhookId, developerId });
+  if (!webhook) return { error: 'Webhook not found.', status: 404 };
+  if (webhook.status !== 'active') return { error: 'This webhook is disabled. Enable it before resending.', status: 400 };
+
+  const delivery = await WebhookDelivery.create({
+    webhookId: webhook._id,
+    developerId,
+    event: original.event,
+    payload: original.payload,
+  });
+  await attemptDelivery(delivery, webhook);
+  return { delivery };
+}
+
 // Periodic sweep for deliveries whose retry window has arrived. Long-running
 // process only — invoked once at boot then on a setInterval in server.js,
 // the exact same shape as the dormancy-reminder/revenue-sweep/Open-Banking
