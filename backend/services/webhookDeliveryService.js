@@ -73,6 +73,11 @@ async function attemptDelivery(delivery, webhook) {
       // on non-2xx — a 4xx/5xx both mean "schedule a retry", just like a
       // network-level failure does.
       validateStatus: () => true,
+      // Never follow redirects. assertPublicHttpsUrl above only vets the
+      // registered URL; a public endpoint answering 302 → http://169.254.x.x
+      // or an internal host would otherwise be followed unchecked (SSRF by
+      // redirect). A 3xx simply counts as a failed attempt below.
+      maxRedirects: 0,
     });
   } catch (err) {
     networkError = err;

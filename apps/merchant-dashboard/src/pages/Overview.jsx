@@ -69,13 +69,22 @@ export default function Overview() {
     else setIsLoading(false)
   }, [merchant, fetchData])
 
-  // Poll every 5s so revenue chart and recent transactions stay live —
-  // fallback for whatever the live push below doesn't catch (e.g. a stream
-  // reconnect gap).
+  // Fallback poll for whatever the live push below doesn't catch (e.g. a
+  // stream reconnect gap). Every 10s, and never while the tab is hidden —
+  // a background tab polling every few seconds was the biggest single source
+  // of API load and rate-limit pressure. Catches up as soon as the tab is
+  // visible again.
   useEffect(() => {
     if (!merchant) return
-    const interval = setInterval(fetchData, 3000)
-    return () => clearInterval(interval)
+    const interval = setInterval(() => {
+      if (!document.hidden) fetchData()
+    }, 10000)
+    const onVisible = () => { if (!document.hidden) fetchData() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [merchant, fetchData])
 
   // Live push — refetch immediately the instant PayChain changes anything

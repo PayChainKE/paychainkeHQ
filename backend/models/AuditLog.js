@@ -56,8 +56,9 @@ const AuditLogSchema = new mongoose.Schema({
 
   // Retention — MongoDB TTL index fires on this field and removes the document
   // automatically once the date passes.  Set at write-time by logAudit():
-  //   critical / warning  →  21 days  (security events, longer retention)
-  //   info    / success   →  14 days  (routine auth events)
+  //   critical / warning  →  2 years  (security events, longer retention)
+  //   info    / success   →  1 year    (routine auth events)
+  // (see RETENTION_MS in utils/auditLog.js — that is the source of truth)
   // Existing documents without this field are unaffected by the TTL index.
   expiresAt: { type: Date, default: null },
 }, { timestamps: true });

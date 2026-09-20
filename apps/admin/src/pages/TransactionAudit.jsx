@@ -7,6 +7,7 @@ import TablePagination from '../components/ui/TablePagination';
 import { formatKES } from '../utils/formatCurrency';
 import { formatName } from '../utils/formatName';
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay';
+import { describeDestination } from '../utils/transactionDestination';
 import logo from '../assets/logo.png';
 
 // Row cap for "Generate Report" below — matches the backend's own cap on
@@ -415,9 +416,9 @@ const TransactionAudit = () => {
                         </span>
                       </td>
                       <td className="px-3 py-2 border-b border-outline-variant/5 text-on-surface-variant/70 whitespace-nowrap">{fmtTime(t.createdAt)}</td>
-                      <td className="px-3 py-2 border-b border-outline-variant/5">
-                        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-2xs font-bold uppercase tracking-widest border ${tm.color}`}>
-                          <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: tm.dot }}></span>
+                      <td className="px-3 py-2 border-b border-outline-variant/5 whitespace-nowrap">
+                        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-2xs font-bold uppercase tracking-widest border whitespace-nowrap ${tm.color}`}>
+                          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: tm.dot }}></span>
                           {tm.label}
                         </span>
                       </td>
@@ -439,9 +440,9 @@ const TransactionAudit = () => {
                       <td className="px-3 py-2 border-b border-outline-variant/5 text-right text-on-surface-variant/70 tabular-nums">
                         {t.safaricomFee > 0 ? fmtKES(t.safaricomFee) : <span className="text-on-surface-variant/30">—</span>}
                       </td>
-                      <td className="px-3 py-2 border-b border-outline-variant/5">
-                        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-2xs font-bold uppercase tracking-widest border ${sm.pill}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${sm.dot}`}></span>
+                      <td className="px-3 py-2 border-b border-outline-variant/5 whitespace-nowrap">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-2xs font-bold uppercase tracking-widest border whitespace-nowrap ${sm.pill}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${sm.dot}`}></span>
                           {sm.label}
                         </span>
                       </td>
@@ -514,7 +515,7 @@ const AuditDrawer = ({ id, onClose }) => {
               </h3>
               <p className="text-xs text-indigo-100/70 font-mono break-all">{txn.reference}</p>
               <div className="mt-3">
-                <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-2xs font-bold uppercase tracking-widest border ${sm.pill}`}>
+                <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-2xs font-bold uppercase tracking-widest border whitespace-nowrap ${sm.pill}`}>
                   <span className={`w-1.5 h-1.5 rounded-full ${sm.dot}`}></span>
                   {sm.label}
                 </span>
@@ -581,7 +582,23 @@ const AuditDrawer = ({ id, onClose }) => {
                     <div className="bg-surface-container-low/60 rounded-lg p-3">
                       <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 mb-1">Recipient</p>
                       <p className="text-xs font-bold text-on-surface">{formatName(txn.recipient.name) || '—'}</p>
-                      {txn.recipient.id && <p className="text-2xs text-on-surface-variant/60 font-mono">{formatPhoneDisplay(txn.recipient.id)}</p>}
+                      {(() => {
+                        const dest = describeDestination(txn)
+                        if (!dest) {
+                          return txn.recipient.id ? <p className="text-2xs text-on-surface-variant/60 font-mono">{formatPhoneDisplay(txn.recipient.id)}</p> : null
+                        }
+                        return (
+                          <div className="mt-2 space-y-1">
+                            <p className="text-2xs font-bold uppercase tracking-widest text-primary/70">{dest.label}</p>
+                            {dest.rows.map((r) => (
+                              <div key={r.label} className="flex items-baseline justify-between gap-4">
+                                <span className="text-2xs text-on-surface-variant/50">{r.label}</span>
+                                <span className="text-xs font-bold text-on-surface font-mono text-right break-all">{r.value}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )
+                      })()}
                     </div>
                   )}
                 </Section>
@@ -595,7 +612,7 @@ const AuditDrawer = ({ id, onClose }) => {
                       <div key={s._id} className="bg-surface-container-low/60 rounded-lg p-3 mb-2 last:mb-0">
                         <div className="flex items-center justify-between mb-1">
                           <span className="text-xs font-bold text-on-surface font-mono">{s.checkoutRequestId}</span>
-                          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-2xs font-bold uppercase border ${ssm.pill}`}>{s.status}</span>
+                          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-2xs font-bold uppercase border whitespace-nowrap ${ssm.pill}`}>{s.status}</span>
                         </div>
                         <p className="text-2xs text-on-surface-variant/70">{s.phone || 'unknown phone'} · {formatKES(s.amount)} · {s.kind}{s.channel === 'qr' ? ' (QR)' : ''}</p>
                         {s.resultDesc && <p className="text-2xs text-on-surface-variant/50 mt-1 italic">{s.resultDesc}</p>}
@@ -663,7 +680,7 @@ const DetailPill = ({ label, value, mono }) => (
 );
 
 const Th = ({ children, className = '' }) => (
-  <th className={`px-3 py-3 text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 ${className}`}>{children}</th>
+  <th className={`px-3 py-3 text-2xs font-bold uppercase tracking-widest text-on-surface-variant/60 whitespace-nowrap ${className}`}>{children}</th>
 );
 
 export default TransactionAudit;

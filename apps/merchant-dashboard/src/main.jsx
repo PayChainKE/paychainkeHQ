@@ -4,6 +4,7 @@ import axios from 'axios'
 import App from './App'
 import './index.css'
 import './lib/sentry'
+import './lib/registerServiceWorker'
 
 // Tag every outbound API call so the admin audit log can split web vs mobile.
 // Set once at boot — applies to all axios callers in the app.

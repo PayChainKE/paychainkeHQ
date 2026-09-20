@@ -33,6 +33,7 @@ import { publicDeveloperPayment } from '../utils/developerPaymentView.js';
 import { dispatchDeveloperEvent } from '../services/webhookDeliveryService.js';
 import { wasAlreadyCreditedByOtherNcbaFeed } from '../services/ncbaLedgerService.js';
 import { debitAvailableBalance } from '../utils/availableBalance.js';
+import { mobileDestination, paybillTillDestination } from '../utils/transactionDestination.js';
 
 const FRONTEND_URL = process.env.MERCHANT_DASHBOARD_URL || 'https://app.paychain.co.ke';
 
@@ -1230,6 +1231,7 @@ export const initiateB2C = async (req, res) => {
           reference: transactionId,
           sender: { name: merchant.businessName, id: merchant.ncbaMerchantCode },
           recipient: { name: beneficiaryName, id: phone },
+          destination: mobileDestination(provider),
           mobileNetwork: provider,
         });
         return res.status(202).json({
@@ -1271,6 +1273,7 @@ export const initiateB2C = async (req, res) => {
       reference: transactionId,
       sender: { name: merchant.businessName, id: merchant.ncbaMerchantCode },
       recipient: { name: beneficiaryName, id: phone },
+      destination: mobileDestination(provider),
       mobileNetwork: provider,
     });
 
@@ -1350,6 +1353,7 @@ export const initiateB2C = async (req, res) => {
               reference: ncbaConfirmedContext.transactionId,
               sender: { name: ncbaConfirmedContext.businessName, id: ncbaConfirmedContext.ncbaMerchantCode },
               recipient: { name: ncbaConfirmedContext.beneficiaryName, id: ncbaConfirmedContext.phone },
+              destination: mobileDestination(ncbaConfirmedContext.provider),
               mobileNetwork: ncbaConfirmedContext.provider,
             },
           },
@@ -1570,6 +1574,7 @@ export const initiateB2B = async (req, res) => {
           reference: transactionId,
           sender: { name: merchant.businessName, id: merchant.ncbaMerchantCode },
           recipient: { name: recipientName, id: partyB },
+          destination: paybillTillDestination(paymentType, accountReference),
         });
         return res.status(202).json({
           success: true,
@@ -1586,7 +1591,7 @@ export const initiateB2B = async (req, res) => {
     ncbaAcceptedContext = {
       transactionId, merchantId: merchant._id, amount: numericAmount,
       businessName: merchant.businessName, ncbaMerchantCode: merchant.ncbaMerchantCode,
-      recipientName, partyB, paybillAccountReference: paymentType === 'Paybill' ? accountReference : null,
+      recipientName, partyB, paymentType, paybillAccountReference: paymentType === 'Paybill' ? accountReference : null,
     };
 
     const tx = await Transaction.create({
@@ -1600,6 +1605,7 @@ export const initiateB2B = async (req, res) => {
       reference: transactionId,
       sender: { name: merchant.businessName, id: merchant.ncbaMerchantCode },
       recipient: { name: recipientName, id: partyB },
+      destination: paybillTillDestination(paymentType, accountReference),
       paybillAccountReference: paymentType === 'Paybill' ? accountReference : null,
     });
 
@@ -1639,6 +1645,7 @@ export const initiateB2B = async (req, res) => {
               reference: ncbaAcceptedContext.transactionId,
               sender: { name: ncbaAcceptedContext.businessName, id: ncbaAcceptedContext.ncbaMerchantCode },
               recipient: { name: ncbaAcceptedContext.recipientName, id: ncbaAcceptedContext.partyB },
+              destination: paybillTillDestination(ncbaAcceptedContext.paymentType, ncbaAcceptedContext.paybillAccountReference),
               paybillAccountReference: ncbaAcceptedContext.paybillAccountReference || null,
             },
           },

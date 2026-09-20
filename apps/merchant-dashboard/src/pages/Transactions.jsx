@@ -8,6 +8,7 @@ import { formatKES, formatUSDC } from '../utils/formatCurrency'
 import { formatAccountNumber } from '../utils/formatAccountNumber'
 import { formatPhoneDisplay, formatPhoneOrDash } from '../utils/formatPhoneDisplay'
 import { formatName } from '../utils/formatName'
+import { describeDestination } from '../utils/transactionDestination'
 import { drawBarcodePdf } from '../utils/barcode'
 import { getAmountSign, getAmountColorClass, isCreditTransaction, isDebitTransaction, netBalanceImpact, excludeReversedDuplicates, getCounterparty } from '../utils/transactionDirection'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
@@ -967,14 +968,40 @@ export default function Transactions() {
                     </div>
                   </div>
 
-                  {/* Counterparty Section */}
-                  <div className="space-y-3 pt-6 border-t border-outline-variant/5">
-                    <p className="text-[10px] text-on-surface-variant/60 font-bold uppercase tracking-[0.2em]">Counterparty</p>
-                    <div>
-                      <p className="text-lg font-bold text-primary">{formatName(getCounterparty(selectedTx)?.name) || 'Internal Treasury'}</p>
-                      <p className="text-[10px] text-on-surface-variant/40 font-bold mt-1 uppercase tracking-widest">{formatPhoneDisplay(getCounterparty(selectedTx)?.id) || 'SYSTEM'}</p>
+                  {/* Sender + Recipient — both parties, every transaction. A
+                      missing name/number is shown as an honest dash, never
+                      invented (some rails genuinely carry no sender identity). */}
+                  {[
+                    { label: 'Sender', party: selectedTx.sender },
+                    { label: 'Recipient', party: selectedTx.recipient },
+                  ].map(({ label, party }) => (
+                    <div key={label} className="space-y-3 pt-6 border-t border-outline-variant/5">
+                      <p className="text-[10px] text-on-surface-variant/60 font-bold uppercase tracking-[0.2em]">{label}</p>
+                      <div>
+                        <p className="text-lg font-bold text-primary">{formatName(party?.name) || '—'}</p>
+                        {(() => {
+                          // Payout: labeled destination details (bank + account
+                          // number, phone number, paybill/till...). Otherwise the
+                          // plain number line.
+                          const dest = label === 'Recipient' ? describeDestination(selectedTx) : null
+                          if (!dest) {
+                            return <p className="text-[10px] text-on-surface-variant/40 font-bold mt-1 uppercase tracking-widest">{formatPhoneDisplay(party?.id) || '—'}</p>
+                          }
+                          return (
+                            <div className="mt-3 space-y-1.5">
+                              <p className="text-[10px] text-primary/70 font-bold uppercase tracking-[0.2em]">{dest.label}</p>
+                              {dest.rows.map((r) => (
+                                <div key={r.label} className="flex items-baseline justify-between gap-4">
+                                  <span className="text-[10px] text-on-surface-variant/50 font-bold uppercase tracking-widest">{r.label}</span>
+                                  <span className="text-[13px] font-bold text-primary text-right break-all">{r.value}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )
+                        })()}
+                      </div>
                     </div>
-                  </div>
+                  ))}
 
                   {/* Timestamp Section */}
                   <div className="space-y-3 pt-6 border-t border-outline-variant/5">

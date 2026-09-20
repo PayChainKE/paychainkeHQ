@@ -86,7 +86,9 @@ export default function Pay() {
     setFormError(null);
 
     const digits = phone.replace(/\D/g, "");
-    if (digits.length < 9) {
+    // A masked prefill ("0712 *** 678") is left as-is; the server uses the
+    // number it already holds for this session.
+    if (!phone.includes("*") && digits.length < 9) {
       setFormError("Enter a valid M-Pesa phone number.");
       return;
     }

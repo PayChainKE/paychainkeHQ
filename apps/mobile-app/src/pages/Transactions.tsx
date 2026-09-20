@@ -15,6 +15,7 @@ import { formatTxDate, formatTxTime } from '../utils/formatDate';
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay';
 import { buildAuditReceiptHtml } from '../utils/auditReceiptHtml';
 import { formatName } from '../utils/formatName';
+import { describeDestination } from '../utils/transactionDestination';
 import { buildStatementHtml } from '../utils/statementHtml';
 import { InlineDatePicker } from '../components/InlineDatePicker';
 import TourTarget from '../components/TourTarget';
@@ -579,12 +580,6 @@ export default function Transactions({ navigation, route }: any) {
             const amountColor = isFailedTx ? '#9aa39c' : isInbound ? '#006c4e' : '#0c2010';
             const amountStr = `${isInbound ? '+' : '-'} ${formatKES(selectedTx.kesAmount || selectedTx.amount || 0)}`;
             const statusPillColor = isFailedTx ? '#f87171' : (selectedTx.status === 'completed' || selectedTx.status === 'verified') ? '#5efeb3' : '#fbbf24';
-            const counterpartyName = isInbound
-              ? (formatName(selectedTx.sender?.name) || 'Unknown')
-              : (formatName(selectedTx.recipient?.name) || formatName(selectedTx.sender?.name) || 'Internal Treasury');
-            const counterpartyPhone = isInbound
-              ? formatPhoneDisplay(selectedTx.sender?.id)
-              : formatPhoneDisplay(selectedTx.recipient?.id || selectedTx.sender?.id);
 
             return (
               <View className="w-full max-w-lg mx-auto bg-[#162723] rounded-t-[36px] px-6 pt-4 pb-8 mt-auto max-h-[85%]">
@@ -621,13 +616,37 @@ export default function Transactions({ navigation, route }: any) {
                     </View>
                   </View>
 
-                  <View className="mb-6 pt-5 border-t border-white/10">
-                    <Text className="text-white/40 text-[10px] font-jakarta-bold uppercase tracking-[0.15em] mb-2">Counterparty</Text>
-                    <Text className="text-white font-jakarta-bold text-[16px]">{counterpartyName}</Text>
-                    {!!counterpartyPhone && (
-                      <Text className="text-white/40 text-[10px] font-jakarta-bold mt-1 uppercase tracking-widest">{counterpartyPhone}</Text>
-                    )}
-                  </View>
+                  {/* Sender + Recipient — both parties, every transaction. A
+                      missing name/number is an honest dash, never invented. */}
+                  {([
+                    { label: 'Sender', party: selectedTx.sender },
+                    { label: 'Recipient', party: selectedTx.recipient },
+                  ] as const).map(({ label, party }) => (
+                    <View key={label} className="mb-6 pt-5 border-t border-white/10">
+                      <Text className="text-white/40 text-[10px] font-jakarta-bold uppercase tracking-[0.15em] mb-2">{label}</Text>
+                      <Text className="text-white font-jakarta-bold text-[16px]">{formatName(party?.name) || '—'}</Text>
+                      {(() => {
+                        // Payout: labeled destination details (bank + account
+                        // number, phone number, paybill/till...). Otherwise the
+                        // plain number line.
+                        const dest = label === 'Recipient' ? describeDestination(selectedTx) : null;
+                        if (!dest) {
+                          return <Text className="text-white/40 text-[10px] font-jakarta-bold mt-1 uppercase tracking-widest">{formatPhoneDisplay(party?.id) || '—'}</Text>;
+                        }
+                        return (
+                          <View className="mt-3 gap-2">
+                            <Text className="text-[#5efeb3] text-[10px] font-jakarta-bold uppercase tracking-[0.15em]">{dest.label}</Text>
+                            {dest.rows.map((r) => (
+                              <View key={r.label} className="flex-row items-baseline justify-between gap-4">
+                                <Text className="text-white/40 text-[10px] font-jakarta-bold uppercase tracking-widest">{r.label}</Text>
+                                <Text className="flex-1 text-right text-white font-jakarta-bold text-[13px]">{r.value}</Text>
+                              </View>
+                            ))}
+                          </View>
+                        );
+                      })()}
+                    </View>
+                  ))}
 
                   <View className="mb-6 pt-5 border-t border-white/10">
                     <Text className="text-white/40 text-[10px] font-jakarta-bold uppercase tracking-[0.15em] mb-2">Timestamp</Text>

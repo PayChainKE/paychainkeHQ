@@ -773,7 +773,7 @@ export const verifyMerchantOTP = async (req, res) => {
       message: 'Your account was just accessed with a verified sign-in code.',
     });
 
-    // Fires an SMS + email only when this device/IP fingerprint genuinely
+    // Fires an email only when this device/IP fingerprint genuinely
     // hasn't been seen on this account before — unlike the in-app
     // notification above (which fires on every login), this is the actual
     // "someone new is in your account" signal. Never awaited into the

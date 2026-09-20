@@ -9,6 +9,11 @@ if (!process.env.JWT_SECRET) {
   console.error('FATAL: JWT_SECRET is not set. Refusing to start.');
   process.exit(1);
 }
+// HS256 tokens are only as strong as the secret. Warn (don't refuse to boot —
+// that would take production down) so a weak value is visible in the logs.
+if (process.env.NODE_ENV === 'production' && process.env.JWT_SECRET.length < 32) {
+  console.warn('SECURITY WARNING: JWT_SECRET is shorter than 32 characters. Rotate it to a random 64+ character value.');
+}
 
 // Imported before everything else so Sentry.init() runs (or safely no-ops)
 // before any route module that might throw during its own module-load.
@@ -41,9 +46,11 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import connectDB, { isDbReady, startBackgroundDbRetry, disconnectDB, ensureModelIndexes } from './config/database.js';
 import { requireDb } from './middleware/requireDb.js';
+import { accountOrIpKey } from './middleware/rateLimitKey.js';
 import authRoutes from './routes/authRoutes.js';
 import waitlistRoutes from './routes/waitlistRoutes.js';
 import newsletterRoutes from './routes/newsletterRoutes.js';
+import cspReportRoutes from './routes/cspReportRoutes.js';
 import contactRoutes from './routes/contactRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import bulkPayRoutes from './routes/bulkPayRoutes.js';
@@ -246,7 +253,11 @@ app.get('/api/health', (req, res) => {
 // net, not the primary defense.
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 600,
+  // Signed-in accounts are counted per account (see middleware/rateLimitKey.js)
+  // with more headroom, since a dashboard tab legitimately polls; anonymous
+  // traffic stays on the tighter per-IP budget.
+  keyGenerator: accountOrIpKey,
+  limit: (req) => (req.rateLimitedByAccount ? 1500 : 600),
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests. Please try again later.' },
@@ -262,6 +273,7 @@ app.use('/api/auth/merchant/sms', merchantSmsAuthRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/officer', officerRoutes);
 app.use('/api/waitlist', waitlistRoutes);
+app.use('/api/csp-report', cspReportRoutes);
 app.use('/api/newsletter', newsletterRoutes);
 app.use('/api/blog', blogRoutes);
 app.use('/api/automations', automationRoutes);

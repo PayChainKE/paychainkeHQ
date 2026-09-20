@@ -35,7 +35,11 @@ export const getPublicCheckoutSession = async (req, res) => {
         reference: session.reference,
         status: isCheckoutSessionExpired(session) ? 'expired' : session.status,
         merchantName: merchant?.businessName || (session.mode === 'test' ? 'PayChain Sandbox' : 'PayChain Merchant'),
-        prefillPhone: session.customer?.phone || null,
+        // Masked: the session id is the only credential on this public
+        // endpoint, so it must not hand out a customer's full number. When
+        // the customer leaves the masked value untouched, payCheckoutSession
+        // falls back to the stored number server-side.
+        prefillPhone: maskPhone(session.customer?.phone),
         // Encodes this exact page's own URL — lets a merchant display this
         // page on a desktop/kiosk screen and have the customer scan with
         // their own phone camera to open the identical payment page there,
@@ -48,6 +52,15 @@ export const getPublicCheckoutSession = async (req, res) => {
     res.status(500).json({ error: 'Server Error' });
   }
 };
+
+// "0712345678" -> "0712 *** 678". Anything containing '*' is a masked
+// placeholder from getPublicCheckoutSession, never a real number.
+const maskPhone = (phone) => {
+  const digits = String(phone || '').replace(/\D/g, '');
+  if (digits.length < 9) return null;
+  return `${digits.slice(0, 4)} *** ${digits.slice(-3)}`;
+};
+const usableBodyPhone = (phone) => (typeof phone === 'string' && phone.trim() && !phone.includes('*') ? phone : null);
 
 // @desc    Customer submits their phone number here to trigger the STK
 //          push for this session.
@@ -79,7 +92,7 @@ export const payCheckoutSession = async (req, res) => {
         merchantId: claimed.merchantId,
         mode: claimed.mode,
         amount: claimed.amount,
-        phone: req.body?.phone,
+        phone: usableBodyPhone(req.body?.phone) || claimed.customer?.phone,
         reference: claimed.reference || `checkout-${claimed._id}`,
         // Generated fresh per attempt, not derived from the session id —
         // the session-status claim above is what prevents a double

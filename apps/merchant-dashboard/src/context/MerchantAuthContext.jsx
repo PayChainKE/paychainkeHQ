@@ -132,8 +132,17 @@ export function MerchantAuthProvider({ children }) {
   // (network hiccup, proxy timeout) without the browser noticing yet.
   useEffect(() => {
     if (!merchant?._id) return;
-    const interval = setInterval(refreshSession, 5000);
-    return () => clearInterval(interval);
+    // 15s, and skipped while the tab is hidden (the SSE stream below is the
+    // primary path; this only covers a dropped stream).
+    const interval = setInterval(() => {
+      if (!document.hidden) refreshSession();
+    }, 15000);
+    const onVisible = () => { if (!document.hidden) refreshSession(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [merchant?._id]);
 
   // Live push — the instant PayChain changes anything on this merchant's

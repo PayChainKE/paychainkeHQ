@@ -111,6 +111,19 @@ const transactionSchema = new mongoose.Schema({
     name: String,
     id: String
   },
+  // Descriptive record of WHERE an outgoing payment went — see
+  // utils/transactionDestination.js. recipient.id keeps the number/account;
+  // this says what kind of destination it was (and which bank / network /
+  // Paybill account reference). Display-only: never read by payout logic.
+  // Absent on transactions recorded before this field existed.
+  destination: {
+    kind: { type: String, enum: ['mobile', 'paybill', 'till', 'bank', 'utility'] },
+    network: String,
+    bankCode: String,
+    bankName: String,
+    accountReference: String,
+    provider: String,
+  },
   // For an ncba_lipa_na_mpesa payout specifically: the destination paybill's
   // account-reference field (e.g. a merchant's own ncbaMerchantCode when
   // paying into PayChain's own shared paybill, NCBA_STK_BUSINESS_NUMBER) —
