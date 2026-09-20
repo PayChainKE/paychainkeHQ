@@ -15,6 +15,8 @@ export const nav: NavGroup[] = [
     items: [
       { title: "Introduction", path: "/", description: "What the PayChain API does and how the pieces fit together." },
       { title: "No-code integration", path: "/no-code-integration", description: "Add a working payment button to Wix, Shopify, or WordPress. No code, no developer account." },
+      { title: "WooCommerce plugin", path: "/woocommerce", description: "Take M-PESA payments in a WooCommerce shop. Install a plugin, paste a key." },
+      { title: "Shopify app", path: "/shopify", description: "Take M-PESA payments in a Shopify store with a small service you run. Orders are marked paid for you." },
       { title: "Integration guide", path: "/integration-guide", description: "The account model, the sandbox, and the full path from signup to live traffic." },
       { title: "Authentication", path: "/authentication", description: "Test vs. live API keys, and how to send them." },
     ],

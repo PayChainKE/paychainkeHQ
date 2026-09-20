@@ -23,6 +23,12 @@ export default function NoCodeIntegration() {
         already.
       </Callout>
 
+      <Callout variant="info" title="Running WooCommerce?">
+        Use the <Link to="/woocommerce">WooCommerce plugin</Link> instead: it adds PayChain as a real payment
+        method at checkout and marks orders paid automatically. On Shopify, the{" "}
+        <Link to="/shopify">Shopify app</Link> marks orders paid automatically too.
+      </Callout>
+
       <h2>What you end up with</h2>
       <p>
         A real "Pay with PayChain" button, sitting on your own page, that opens a small secure

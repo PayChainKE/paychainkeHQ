@@ -8,6 +8,8 @@ import { DeveloperAuthProvider } from "@/context/DeveloperAuthContext";
 import Introduction from "@/pages/Introduction";
 import IntegrationGuide from "@/pages/IntegrationGuide";
 import NoCodeIntegration from "@/pages/NoCodeIntegration";
+import WooCommerce from "@/pages/WooCommerce";
+import Shopify from "@/pages/Shopify";
 import Authentication from "@/pages/Authentication";
 import PaymentCollection from "@/pages/PaymentCollection";
 import SendMoney from "@/pages/SendMoney";
@@ -57,6 +59,8 @@ export default function App() {
               <Route path="/" element={<Introduction />} />
               <Route path="/integration-guide" element={<IntegrationGuide />} />
               <Route path="/no-code-integration" element={<NoCodeIntegration />} />
+              <Route path="/woocommerce" element={<WooCommerce />} />
+              <Route path="/shopify" element={<Shopify />} />
               <Route path="/authentication" element={<Authentication />} />
               <Route path="/payment-collection" element={<PaymentCollection />} />
               <Route path="/send-money" element={<SendMoney />} />
