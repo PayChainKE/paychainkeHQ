@@ -2,9 +2,6 @@ import crypto from 'crypto';
 import MerchantLoginDevice from '../models/MerchantLoginDevice.js';
 import { extractIp, clipUa, logAudit } from './auditLog.js';
 import { sendNewDeviceLoginEmail } from './resend.js';
-import { buildNewDeviceLoginSms } from './accountSmsTemplates.js';
-import { safeSendSMS } from './smsSanitizer.js';
-import { toE164Kenyan } from './notificationService.js';
 
 // Call once per completed login — after password + OTP (or the app-review
 // bypass), never after just a password check, since the alert is meant to
@@ -53,13 +50,8 @@ export async function checkAndRecordLoginDevice(merchant, req) {
         console.error('New-device login email failed:', err)
       );
     }
-    const phone = toE164Kenyan(merchant.phone);
-    if (phone) {
-      const { message } = buildNewDeviceLoginSms();
-      safeSendSMS({ to: phone, message }).catch((err) =>
-        console.error('New-device login SMS failed:', err)
-      );
-    }
+    // No SMS here on purpose: the "PayChain Security: New sign-in..." text was
+    // removed (2026-09-20). The email above and the audit log remain.
   } catch (err) {
     console.error('checkAndRecordLoginDevice failed:', err);
   }

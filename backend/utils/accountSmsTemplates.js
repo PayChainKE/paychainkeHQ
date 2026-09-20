@@ -120,26 +120,11 @@ export function buildInstallReminderSms({ businessName, loginUrl }) {
 }
 
 /**
- * Fired the moment utils/newDeviceLoginAlert.js sees a successful login
- * from a device+IP fingerprint it hasn't recorded for this merchant before
- * — the SMS companion to sendNewDeviceLoginEmail (utils/resend.js). No
- * business name or IP/device string here (that detail is in the email) —
- * SMS segment budget is precious and fixed-text needs no truncation logic,
- * so this one skips buildStrictSms entirely.
- *
- * @returns {{ message: string, truncated: false, length: number }}
- */
-export function buildNewDeviceLoginSms() {
-  const message = "PayChain Security: New sign-in to your account from a device we haven't seen before. Wasn't you? Contact support@paychain.co.ke now.";
-  return { message, truncated: false, length: message.length };
-}
-
-/**
  * Sent to a phone number entered in the signup wizard, before an
  * application (or a Merchant document) exists at all — proves the
  * applicant controls that number. See models/PhoneVerification.js. Fixed
  * text plus a 6-digit code, no truncatable content, so this skips
- * buildStrictSms entirely — same reasoning as buildNewDeviceLoginSms above.
+ * buildStrictSms entirely — fixed text, so no truncation logic is needed.
  *
  * @param {{ otp: string }} params
  * @returns {{ message: string, truncated: false, length: number }}
