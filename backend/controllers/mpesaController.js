@@ -33,6 +33,7 @@ import { publicDeveloperPayment } from '../utils/developerPaymentView.js';
 import { dispatchDeveloperEvent } from '../services/webhookDeliveryService.js';
 import { wasAlreadyCreditedByOtherNcbaFeed } from '../services/ncbaLedgerService.js';
 import { debitAvailableBalance } from '../utils/availableBalance.js';
+import { scheduleSettlementSplit } from '../services/stellarSettlementService.js';
 import { mobileDestination, paybillTillDestination } from '../utils/transactionDestination.js';
 
 const FRONTEND_URL = process.env.MERCHANT_DASHBOARD_URL || 'https://app.paychain.co.ke';
@@ -342,6 +343,8 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
               { $inc: { kesBalance: merchantNetSettlement } },
               { returnDocument: 'after' }
             );
+            // Stellar pilot merchants only — detached, after the credit.
+            scheduleSettlementSplit(updatedMerchant, merchantNetSettlement, receipt);
 
             // kesAmount is deliberately the BASE bill, not the inflated
             // total — this is the same basis the automatic Transaction
@@ -594,6 +597,10 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
               { $inc: { paychainFee: customerFee, customerSurchargeFee: customerFee } }
             );
           }
+
+          // Stellar pilot merchants only — detached, after the credit. A
+          // merchant topping up their own wallet is not an incoming payment.
+          if (!isSelfFunding) scheduleSettlementSplit(updatedMerchant, merchantCredit, receipt);
 
           createNotification({
             merchantId: merchant._id,

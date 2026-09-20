@@ -67,9 +67,12 @@ const merchantSchema = new mongoose.Schema({
   // documentReuseDetection.js's photo-hash comparison. Required for new
   // (web) signups only — see registerMerchant's own doc comment on the
   // legacy mobile request shape this isn't enforced against yet.
+  // No `default: null` on purpose: a sparse unique index still indexes an
+  // explicit null, so the second merchant created without a national ID (e.g.
+  // through the admin "create merchant" form, which never sets one) was
+  // rejected as a duplicate. Left unset it is simply absent and skipped.
   nationalId: {
     type: String,
-    default: null,
     unique: true,
     sparse: true,
     set: (v) => normalizeNationalId(v),
@@ -837,6 +840,14 @@ const merchantSchema = new mongoose.Schema({
   usdcBalance: {
     type: Number,
     default: 0,
+  },
+  // Stellar pilot merchants only (isDemoMerchant): how each incoming M-Pesa
+  // payment is routed. stellarSharePercent of the net credit is auto-converted
+  // to testnet USDC in the merchant's Stellar wallet; the rest stays liquid in
+  // KES. Ignored for everyone else. See services/stellarSettlementService.js.
+  settlementRule: {
+    enabled: { type: Boolean, default: false },
+    stellarSharePercent: { type: Number, default: 0, min: 0, max: 100 },
   },
   // WebAuthn Passkeys — each device gets its own entry.
   // credentialID is base64url, publicKey is base64.

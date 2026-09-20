@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { scheduleSettlementSplit } from './stellarSettlementService.js';
 import Merchant from '../models/Merchant.js';
 import Transaction from '../models/Transaction.js';
 import STKRequest from '../models/STKRequest.js';
@@ -238,6 +239,11 @@ export async function creditNcbaCollection({ merchant, grossAmount, bankRef, cus
       payer: { name: customerName || null, phone: customerPhone || null },
       receivedAt: result.transaction.createdAt || new Date(),
     });
+
+    // Stellar pilot merchants only: route the configured share to their
+    // Stellar wallet. Detached and after the credit, so it can never delay or
+    // fail the payment (see services/stellarSettlementService.js).
+    scheduleSettlementSplit(result.merchant, netAmount, bankRef);
 
     return result;
   } finally {
