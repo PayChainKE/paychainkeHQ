@@ -77,17 +77,31 @@ if (!liveCallsEnabled && ncbaStkUsername && ncbaStkPassword) {
   }));
 }
 
+// Both errors carry what went wrong for staff, separately from `message`
+// (which is safe to show a merchant). `detail` is NCBA's own wording or the
+// network error, `stage` says where it failed ('auth' | 'request' |
+// 'rejected'), and `notSent` is true only when we KNOW no prompt reached the
+// customer: a timeout or dropped connection leaves that unknown, because NCBA
+// may have sent it before the reply was lost.
 export class NcbaStkAuthError extends Error {
-  constructor(message) {
+  constructor(message, { detail, status } = {}) {
     super(message);
     this.name = 'NcbaStkAuthError';
+    this.stage = 'auth';
+    this.detail = detail;
+    this.status = status;
+    this.notSent = true;
   }
 }
 
 export class NcbaStkRequestError extends Error {
-  constructor(message) {
+  constructor(message, { detail, status, stage = 'request', notSent = false } = {}) {
     super(message);
     this.name = 'NcbaStkRequestError';
+    this.stage = stage;
+    this.detail = detail;
+    this.status = status;
+    this.notSent = notSent;
   }
 }
 
@@ -178,8 +192,9 @@ async function fetchNewToken() {
     // Full upstream error detail goes to the server log only — never bake
     // a raw upstream response body into a message that reaches the client
     // (see the identical fix in ncbaOpenBankingService.js's fetchNewToken).
-    logEvent('error', 'ncba_stk_token_fetch_failed', { error: unwrapAxiosError(err) });
-    throw new NcbaStkAuthError('Failed to obtain an STK Push access token.');
+    const detail = unwrapAxiosError(err);
+    logEvent('error', 'ncba_stk_token_fetch_failed', { error: detail });
+    throw new NcbaStkAuthError('Failed to obtain an STK Push access token.', { detail, status: err.response?.status });
   }
 }
 
@@ -211,8 +226,15 @@ async function ncbaStkPost(path, body, { retrying = false } = {}) {
     }
     // Full upstream error detail goes to the server log only — never bake a
     // raw upstream response body into a message that reaches the client.
-    logEvent('error', 'ncba_stk_request_failed', { path, error: unwrapAxiosError(err) });
-    throw new NcbaStkRequestError('STK Push request failed. Please try again.');
+    const detail = unwrapAxiosError(err);
+    logEvent('error', 'ncba_stk_request_failed', { path, error: detail });
+    // A 4xx means NCBA looked at the request and refused it, so nothing was
+    // sent. No reply at all (timeout, dropped connection) or a 5xx leaves it
+    // unknown.
+    const status = err.response?.status;
+    throw new NcbaStkRequestError('STK Push request failed. Please try again.', {
+      detail, status, notSent: Boolean(status && status >= 400 && status < 500),
+    });
   }
 }
 
@@ -255,7 +277,9 @@ export async function initiateStkPush({ phone, amount, accountNo }) {
   });
 
   if (!result?.TransactionID) {
-    throw new NcbaStkRequestError(result?.StatusDescription || 'The STK Push request was rejected. Please try again.');
+    throw new NcbaStkRequestError(result?.StatusDescription || 'The STK Push request was rejected. Please try again.', {
+      stage: 'rejected', notSent: true, detail: JSON.stringify(result ?? null).slice(0, 500),
+    });
   }
 
   return { transactionId: result.TransactionID, referenceId: result.ReferenceID || result.TransactionID };

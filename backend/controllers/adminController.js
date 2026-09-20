@@ -5,6 +5,7 @@ import Admin from '../models/Admin.js';
 import Transaction from '../models/Transaction.js';
 import PayoutBatch from '../models/PayoutBatch.js';
 import STKRequest from '../models/STKRequest.js';
+import StkSendFailure from '../models/StkSendFailure.js';
 import Payee from '../models/Payee.js';
 import PaymentLink from '../models/PaymentLink.js';
 import RetiredMerchantCode from '../models/RetiredMerchantCode.js';
@@ -2830,6 +2831,25 @@ export const getStkRequests = async (req, res) => {
     res.json({ success: true, count: requests.length, data: requests });
   } catch (error) {
     console.error('Get STK Requests Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    STK Pushes that could not be SENT (NCBA refused, could not be
+//          reached, or the merchant's account wasn't ready). These never get
+//          an STKRequest, so they show up only here. Newest first, kept 60 days.
+// @route   GET /api/admin/stk-send-failures
+// @access  Private (Admin)
+export const getStkSendFailures = async (req, res) => {
+  try {
+    const rows = await StkSendFailure.find({})
+      .sort('-createdAt')
+      .limit(200)
+      .populate('merchantId', 'businessName email')
+      .lean();
+    res.json({ success: true, count: rows.length, data: rows });
+  } catch (error) {
+    console.error('Get STK Send Failures Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };
