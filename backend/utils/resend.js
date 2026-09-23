@@ -731,7 +731,13 @@ export const sendMerchantInvite = async (email, name, businessName, setupLink, n
 
   // Same gating as sendWelcomeEmail: only attach once the real 12-digit
   // account number exists, and never let a PDF bug block the invite itself.
+  // Both the sticker AND the QR flyer go out right here, at approval —
+  // this used to be the sticker only, with the QR held back until the
+  // merchant also set a password (sendWelcomeEmail below), which could be
+  // days later or never if they let the setup link expire. Approval is the
+  // actual "you're allowed to take payments now" moment, so both belong here.
   let stickerAttachment = null;
+  let qrAttachment = null;
   if (ncbaVirtualAccountNumber) {
     try {
       const pdfBytes = await generateMerchantStickerPdf({ businessName, accountNumber: ncbaVirtualAccountNumber });
@@ -743,14 +749,35 @@ export const sendMerchantInvite = async (email, name, businessName, setupLink, n
     } catch (err) {
       console.error('❌ Failed to generate invite-email sticker attachment:', err.message);
     }
+
+    try {
+      const checkoutUrl = `${FRONTEND_URL.replace(/\/$/, '')}/pay/account/${ncbaMerchantCode}`;
+      const qrCodeDataUri = await generateBrandedQrDataUri(checkoutUrl);
+      if (qrCodeDataUri) {
+        const qrPngBytes = Buffer.from(qrCodeDataUri.replace(/^data:image\/png;base64,/, ''), 'base64');
+        const qrPdfBytes = await generateMerchantQrFlyerPdf({
+          businessName,
+          accountNumber: ncbaVirtualAccountNumber,
+          qrPngBytes,
+        });
+        qrAttachment = {
+          filename: 'PayChain-QR-Code.pdf',
+          content: Buffer.from(qrPdfBytes),
+          content_type: 'application/pdf',
+        };
+      }
+    } catch (err) {
+      console.error('❌ Failed to generate invite-email QR attachment:', err.message);
+    }
   }
+  const inviteAttachments = [stickerAttachment, qrAttachment].filter(Boolean);
 
   try {
     const emailPayload = {
       from: 'PayChain Onboarding <info@paychain.co.ke>',
       to: [email],
       subject: 'Your PayChain application has been approved — Set up your account',
-      ...(stickerAttachment ? { attachments: [stickerAttachment] } : {}),
+      ...(inviteAttachments.length ? { attachments: inviteAttachments } : {}),
       html: `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; border-radius: 16px; overflow: hidden; background: #fff;">
           <div style="background: linear-gradient(135deg, #06201B 0%, #0a3029 100%); padding: 44px 30px 46px; text-align: center; color: #fff;">
@@ -766,7 +793,7 @@ export const sendMerchantInvite = async (email, name, businessName, setupLink, n
               <a href="${setupLink}" style="background: #00351D; color: #fff; padding: 14px 32px; text-decoration: none; border-radius: 10px; font-weight: 700; font-size: 15px; display: inline-block;">Set Up My Password</a>
             </div>
 
-            <p style="color: #666; font-size: 13px; line-height: 1.6; text-align: center; margin: 0;">This link will expire in <strong>24 hours</strong>. If the button doesn't work, paste this URL into your browser:</p>
+            <p style="color: #666; font-size: 13px; line-height: 1.6; text-align: center; margin: 0;">This link will expire in <strong>48 hours</strong>. If the button doesn't work, paste this URL into your browser:</p>
             <p style="word-break: break-all; color: #0066FF; font-size: 12px; text-align: center; margin: 8px 0 0;"><a href="${setupLink}" style="color: #0066FF; text-decoration: none;">${setupLink}</a></p>
 
             <div style="margin-top: 35px; padding: 22px; background: #f0fdf4; border-radius: 12px; border: 1px solid #bbf7d0;">
@@ -780,9 +807,9 @@ export const sendMerchantInvite = async (email, name, businessName, setupLink, n
                 : 'Share these with your customers to receive M-PESA payments directly into your PayChain wallet.'}</p>
             </div>
 
-            ${stickerAttachment ? `
+            ${inviteAttachments.length ? `
             <div style="margin-top: 20px; padding: 16px; background: #ECFDF5; border-radius: 10px; border: 1px solid #A7F3D0;">
-              <p style="margin: 0; color: #065F46; font-size: 12px; line-height: 1.6;">&#128206; We've attached a printable paybill sticker pre-filled with your account number — download, print, and stick it at your counter.</p>
+              <p style="margin: 0; color: #065F46; font-size: 12px; line-height: 1.6;">&#128206; We've attached${stickerAttachment ? ' a <strong>printable paybill sticker</strong>' : ''}${stickerAttachment && qrAttachment ? ' and a' : qrAttachment ? ' a' : ''}${qrAttachment ? ' <strong>QR code flyer</strong>' : ''}, both pre-filled with your account number — download, print, and display them at your counter so customers can pay without asking for your details.</p>
             </div>
             ` : ''}
 

@@ -1802,7 +1802,7 @@ export const validateSetupToken = async (req, res) => {
     const merchant = await Merchant.findOne({
       passwordResetToken: hashed,
       passwordResetExpires: { $gt: new Date() },
-    }).select('+passwordResetToken +passwordResetExpires email name businessName');
+    }).select('+passwordResetToken +passwordResetExpires email name businessName phone');
 
     if (!merchant) {
       return res.status(400).json({ error: 'This setup link is invalid or has expired.' });
@@ -1814,6 +1814,7 @@ export const validateSetupToken = async (req, res) => {
         email: merchant.email,
         name: merchant.name,
         businessName: merchant.businessName,
+        maskedPhone: maskPhone(merchant.phone),
       },
     });
   } catch (error) {
@@ -1822,15 +1823,66 @@ export const validateSetupToken = async (req, res) => {
   }
 };
 
-// @desc    Consume a password-setup token and set the merchant's password.
-//          Pre-save bcrypt hook handles hashing (12 rounds). The reset token
-//          is cleared on success — single-use semantics.
+// @desc    Send a one-time code to the merchant's registered phone — required
+//          before setupPassword below will accept a new password. Closes a
+//          real gap: the setup link alone (email, or the same link the
+//          approval SMS also carries) used to be enough for WHOEVER clicked
+//          it to set the password — a shared/forwarded inbox, a colleague
+//          checking mail on the owner's behalf, anyone. Requiring the phone
+//          OTP means the caller must also control the registered device, not
+//          just have seen the link. Reuses the same Merchant.otp/otpExpires
+//          fields and lockout machinery as forgotPassword/verifyResetOTP
+//          above — the setup token already narrows this to one specific
+//          merchant, so there's no ambiguity in reusing them here too.
+// @route   POST /api/auth/merchant/setup-password/send-otp
+// @access  Public
+export const sendSetupPasswordOtp = async (req, res) => {
+  try {
+    const { token } = req.body || {};
+    if (!token) return res.status(400).json({ error: 'Token required' });
+
+    const hashed = crypto.createHash('sha256').update(String(token)).digest('hex');
+    const merchant = await Merchant.findOne({
+      passwordResetToken: hashed,
+      passwordResetExpires: { $gt: new Date() },
+    }).select('+passwordResetToken +passwordResetExpires +otp +otpExpires');
+    if (!merchant) {
+      return res.status(400).json({ error: 'This setup link is invalid or has expired.' });
+    }
+
+    try {
+      await assertOtpNotLocked(Merchant, merchant._id);
+    } catch (e) {
+      if (e instanceof OtpLockedError) return res.status(429).json({ error: e.message });
+      throw e;
+    }
+
+    const otp = crypto.randomInt(100000, 1000000).toString();
+    merchant.otp = otp;
+    merchant.otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+    await merchant.save();
+
+    const { maskedPhone } = await dispatchOtp(merchant, { viaPhone: true, otp, label: 'account setup' });
+
+    res.json({ success: true, maskedPhone });
+  } catch (error) {
+    console.error('Send Setup Password OTP Error:', error?.message || error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Consume a password-setup token + phone OTP and set the merchant's
+//          password. Pre-save bcrypt hook handles hashing (12 rounds). The
+//          reset token and OTP are both cleared on success — single-use
+//          semantics. OTP is required (see sendSetupPasswordOtp above) so
+//          having the link alone is never enough to set the password.
 // @route   POST /api/auth/merchant/setup-password
 // @access  Public
 export const setupPassword = async (req, res) => {
   try {
-    const { token, password } = req.body || {};
+    const { token, otp, password } = req.body || {};
     if (!token || !password) return res.status(400).json({ error: 'Token and password are required.' });
+    if (!otp) return res.status(400).json({ error: 'Enter the verification code sent to your phone.' });
     if (String(password).length < 8) {
       return res.status(400).json({ error: 'Password must be at least 8 characters.' });
     }
@@ -1839,15 +1891,33 @@ export const setupPassword = async (req, res) => {
     const merchant = await Merchant.findOne({
       passwordResetToken: hashed,
       passwordResetExpires: { $gt: new Date() },
-    }).select('+passwordResetToken +passwordResetExpires +password');
+    }).select('+passwordResetToken +passwordResetExpires +password +otp +otpExpires');
 
     if (!merchant) {
       return res.status(400).json({ error: 'This setup link is invalid or has expired.' });
     }
 
+    try {
+      await assertOtpNotLocked(Merchant, merchant._id);
+    } catch (e) {
+      if (e instanceof OtpLockedError) return res.status(429).json({ error: e.message });
+      throw e;
+    }
+
+    if (!merchant.otp || !timingSafeStringEqual(merchant.otp, String(otp))) {
+      await recordFailedOtpAttempt(Merchant, merchant._id);
+      return res.status(401).json({ error: 'Incorrect verification code.' });
+    }
+    if (!merchant.otpExpires || new Date() > merchant.otpExpires) {
+      return res.status(401).json({ error: 'That code has expired. Request a new one.' });
+    }
+    await resetOtpAttempts(Merchant, merchant._id);
+
     merchant.password = password;
     merchant.passwordResetToken = null;
     merchant.passwordResetExpires = null;
+    merchant.otp = null;
+    merchant.otpExpires = null;
     merchant.isVerified = true;
     await merchant.save();
 

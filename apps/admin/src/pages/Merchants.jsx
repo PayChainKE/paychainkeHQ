@@ -1325,6 +1325,13 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
     street: merchant?.street || null,
   });
   const [editSignupDetailsOpen, setEditSignupDetailsOpen] = React.useState(false);
+  // Local override for the setup-link expiry so a successful "Resend"
+  // reflects the fresh 24h expiry immediately, same reasoning as
+  // businessName/contactName above — no full drawer refetch needed.
+  const [setupLinkExpiresAt, setSetupLinkExpiresAt] = React.useState(merchant?.setupLinkExpiresAt || null);
+  const [resendingSetupLink, setResendingSetupLink] = React.useState(false);
+  const [resendSetupLinkStatus, setResendSetupLinkStatus] = React.useState('');
+  const [resendSetupLinkError, setResendSetupLinkError] = React.useState('');
 
   React.useEffect(() => {
     if (merchant?.features) {
@@ -1345,7 +1352,26 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
       ward: merchant?.ward || null,
       street: merchant?.street || null,
     });
+    setSetupLinkExpiresAt(merchant?.setupLinkExpiresAt || null);
+    setResendSetupLinkStatus('');
+    setResendSetupLinkError('');
   }, [merchant]);
+
+  const handleResendSetupLink = async () => {
+    if (!merchant?._id) return;
+    setResendingSetupLink(true);
+    setResendSetupLinkStatus('');
+    setResendSetupLinkError('');
+    try {
+      const res = await api.post(`/api/admin/merchants/${merchant._id}/resend-setup-link`);
+      setSetupLinkExpiresAt(res.data?.data?.passwordResetExpires || null);
+      setResendSetupLinkStatus('New setup link sent.');
+    } catch (err) {
+      setResendSetupLinkError(err.response?.data?.error || 'Could not resend the setup link.');
+    } finally {
+      setResendingSetupLink(false);
+    }
+  };
 
   const startEditBusinessName = () => {
     setBusinessNameDraft(businessName);
@@ -2270,7 +2296,36 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
 
             {/* Security flags */}
             <Section title="Security & Access" icon="shield">
-              <Row label="Dashboard Password" value={<Badge tone={m.hasPassword ? 'emerald' : 'amber'} icon={m.hasPassword ? 'check' : 'pending'}>{m.hasPassword ? 'Set' : 'Not set (pending setup)'}</Badge>} />
+              <Row
+                label="Dashboard Password"
+                value={
+                  m.hasPassword ? (
+                    <Badge tone="emerald" icon="check">Set</Badge>
+                  ) : (
+                    <div className="flex flex-col items-end gap-1.5">
+                      {(() => {
+                        const expired = setupLinkExpiresAt && new Date(setupLinkExpiresAt) <= new Date();
+                        return expired ? (
+                          <Badge tone="red" icon="error">Setup link expired ({fmtDate(setupLinkExpiresAt)})</Badge>
+                        ) : setupLinkExpiresAt ? (
+                          <Badge tone="amber" icon="pending">Awaiting setup — link expires {fmtDate(setupLinkExpiresAt)}</Badge>
+                        ) : (
+                          <Badge tone="amber" icon="pending">Not set (pending setup)</Badge>
+                        );
+                      })()}
+                      <button
+                        onClick={handleResendSetupLink}
+                        disabled={resendingSetupLink}
+                        className="text-[10px] font-bold uppercase tracking-widest text-primary hover:underline disabled:opacity-50"
+                      >
+                        {resendingSetupLink ? 'Sending…' : 'Resend setup link'}
+                      </button>
+                      {resendSetupLinkStatus && <p className="text-[10px] text-emerald-600">{resendSetupLinkStatus}</p>}
+                      {resendSetupLinkError && <p className="text-[10px] text-red-600">{resendSetupLinkError}</p>}
+                    </div>
+                  )
+                }
+              />
               <Row label="Mobile App PIN" value={<Badge tone={m.hasAppPin ? 'emerald' : 'gray'} icon={m.hasAppPin ? 'check' : 'remove'}>{m.hasAppPin ? 'Configured' : 'Not set'}</Badge>} />
               <Row label="Bulk Pay PIN" value={<Badge tone={m.hasBulkPayPin ? 'emerald' : 'gray'} icon={m.hasBulkPayPin ? 'check' : 'remove'}>{m.hasBulkPayPin ? 'Configured' : 'Not set'}</Badge>} />
               <Row label="Biometrics" value={<Badge tone={m.biometricsEnabled ? 'emerald' : 'gray'} icon={m.biometricsEnabled ? 'check' : 'remove'}>{m.biometricsEnabled ? 'Enabled' : 'Disabled'}</Badge>} />

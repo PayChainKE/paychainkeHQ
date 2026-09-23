@@ -9,6 +9,7 @@ import {
   getMerchantStatementData,
   getMerchantAnalytics,
   createMerchant,
+  resendMerchantSetupLink,
   requestMerchantAction,
   confirmMerchantAction,
   flagMerchant,
@@ -175,6 +176,7 @@ router.get('/merchants', protect, excludeOfficer, getMerchants);
 router.get('/merchants/balances', protect, excludeOfficer, getMerchantBalances);
 router.get('/merchants/balances/export', protect, excludeOfficer, exportMerchantBalances);
 router.post('/merchants', protect, requireMutator, merchantCreateLimiter, createMerchant);
+router.post('/merchants/:id/resend-setup-link', protect, requireMutator, sensitiveActionLimiter, resendMerchantSetupLink);
 router.get('/merchants/analytics', protect, excludeOfficer, getMerchantAnalytics);
 // Same reason as /merchants/analytics above — literal paths before :id.
 router.get('/merchants/map', protect, excludeOfficer, getMerchantsMap);

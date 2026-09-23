@@ -736,7 +736,7 @@ export async function finalizeApproval(application, req, meta = {}) {
   if (needsCredentials) {
     const rawToken = crypto.randomBytes(32).toString('hex');
     const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
-    const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+    const expires = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48h
     application.passwordResetToken = hashedToken;
     application.passwordResetExpires = expires;
     setupLink = `${MERCHANT_DASHBOARD_URL.replace(/\/$/, '')}/setup-password?token=${rawToken}`;

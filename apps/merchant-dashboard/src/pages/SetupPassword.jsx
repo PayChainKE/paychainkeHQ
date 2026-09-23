@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../api/config'
 import mainLogo from '../assets/signin-logo.png'
@@ -25,6 +25,16 @@ export default function SetupPassword() {
   const [show, setShow] = useState(false)
   const [err, setErr] = useState('')
   const [submitting, setSubmitting] = useState(false)
+
+  // Phone verification — required so the link alone (email, or the same
+  // link the approval SMS also carries) is never enough for whoever opened
+  // it to set the password. The caller must also control the registered
+  // phone. Sent automatically once the token validates.
+  const otpAutoSentRef = useRef(false)
+  const [otp, setOtp] = useState('')
+  const [otpSending, setOtpSending] = useState(false)
+  const [otpSent, setOtpSent] = useState(false)
+  const [otpError, setOtpError] = useState('')
 
   const strength = {
     length: password.length >= 8,
@@ -55,14 +65,40 @@ export default function SetupPassword() {
     return () => { cancelled = true }
   }, [token])
 
+  const sendOtp = async () => {
+    setOtpSending(true)
+    setOtpError('')
+    try {
+      const res = await api.post('/api/auth/merchant/setup-password/send-otp', { token })
+      if (res.data?.success) {
+        setOtpSent(true)
+      } else {
+        setOtpError(res.data?.error || 'Could not send the verification code.')
+      }
+    } catch (e) {
+      setOtpError(e?.response?.data?.error || 'Could not send the verification code.')
+    } finally {
+      setOtpSending(false)
+    }
+  }
+
+  useEffect(() => {
+    if (phase === 'ready' && !otpAutoSentRef.current) {
+      otpAutoSentRef.current = true
+      sendOtp()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase])
+
   async function handleSubmit(e) {
     e.preventDefault()
     setErr('')
+    if (!otp.trim()) return setErr('Enter the verification code sent to your phone.')
     if (!allMet) return setErr('Password does not meet all requirements.')
     if (!matches) return setErr('Passwords do not match.')
     setSubmitting(true)
     try {
-      const res = await api.post('/api/auth/merchant/setup-password', { token, password })
+      const res = await api.post('/api/auth/merchant/setup-password', { token, otp: otp.trim(), password })
       if (res.data?.success) {
         setPhase('done')
       } else {
@@ -129,7 +165,39 @@ export default function SetupPassword() {
               </p>
               <p className="mt-3 text-xs text-gray-400">Account email: {merchant.email}</p>
 
-              <form onSubmit={handleSubmit} className="mt-6 space-y-4" autoComplete="off">
+              <div className="mt-5 p-3 bg-emerald-50 border border-emerald-100 rounded-lg">
+                <p className="text-[11px] font-bold uppercase tracking-widest text-emerald-700 mb-1">Verify it's you</p>
+                {otpSending && !otpSent ? (
+                  <p className="text-xs text-emerald-700/80">Sending a code to {merchant.maskedPhone || 'your registered phone'}…</p>
+                ) : otpSent ? (
+                  <p className="text-xs text-emerald-700/80">
+                    Code sent to {merchant.maskedPhone || 'your registered phone'}.{' '}
+                    <button type="button" onClick={sendOtp} disabled={otpSending} className="font-bold underline disabled:opacity-50">
+                      {otpSending ? 'Resending…' : 'Resend code'}
+                    </button>
+                  </p>
+                ) : (
+                  <p className="text-xs text-emerald-700/80">
+                    <button type="button" onClick={sendOtp} disabled={otpSending} className="font-bold underline disabled:opacity-50">Send verification code</button> to {merchant.maskedPhone || 'your registered phone'}.
+                  </p>
+                )}
+                {otpError && <p className="mt-1.5 text-[11px] font-semibold text-red-600">{otpError}</p>}
+              </div>
+
+              <form onSubmit={handleSubmit} className="mt-4 space-y-4" autoComplete="off">
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-widest text-gray-500 mb-1.5">Verification Code</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    autoComplete="one-time-code"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:border-[#06201B] focus:ring-2 focus:ring-emerald-100 outline-none text-sm font-medium tracking-[0.3em]"
+                    placeholder="6-digit code"
+                  />
+                </div>
+
                 <div>
                   <label className="block text-[11px] font-bold uppercase tracking-widest text-gray-500 mb-1.5">New Password</label>
                   <div className="relative">
@@ -175,7 +243,7 @@ export default function SetupPassword() {
 
                 <button
                   type="submit"
-                  disabled={submitting || !allMet || !matches}
+                  disabled={submitting || otp.trim().length !== 6 || !allMet || !matches}
                   className="w-full py-3 rounded-lg bg-[#06201B] text-white font-bold text-sm tracking-wide hover:bg-[#0a3029] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {submitting ? 'Setting password…' : 'Set Password & Continue'}
