@@ -20,6 +20,7 @@ import { verifyNcbaHashVal } from '../utils/ncbaHashVal.js';
 import { timingSafeStringEqual } from '../utils/timingSafeCompare.js';
 import { buildNcbaOkResult, buildNcbaFailResult } from '../utils/ncbaSoapResponses.js';
 import { creditNcbaCollection, DuplicateCollectionError, wasAlreadySettledByStkPush, findFalselyFailedStkRequest, wasAlreadyCreditedByOtherNcbaFeed } from '../services/ncbaLedgerService.js';
+import { requestAdminApproval } from '../services/adminApprovalService.js';
 import { resolveStkOutcome } from './mpesaController.js';
 import STKRequest from '../models/STKRequest.js';
 import { NcbaTariffBoundsError } from '../config/ncbaTariffCard.js';
@@ -525,6 +526,13 @@ export const handleNcbaAccountNotification = async (req, res) => {
 // @route   POST /admin/ncba-collections/manual-credit
 // @access  Private (admin, requireMutator + sensitiveActionLimiter — a
 //          direct, real-money ledger credit)
+//
+// Maker-checker: this endpoint no longer credits anything itself. It
+// validates the request and queues an AdminApproval — a *different*
+// owner/admin must approve it (adminApprovalController.js) before
+// executeNcbaManualCredit below actually runs. Real hours can pass between
+// the two steps, so the dedup checks here are only a fast fail for the
+// requester; executeNcbaManualCredit re-runs them fresh at approval time.
 export const adminManualCreditNcbaCollection = async (req, res) => {
   try {
     const { merchantId, grossAmount, bankRef, customerName, date, time } = req.body || {};
@@ -550,94 +558,125 @@ export const adminManualCreditNcbaCollection = async (req, res) => {
       return res.status(409).json({ error: 'This looks like it was already credited through another path (STK or a separate NCBA feed) — check the merchant\'s transaction history before crediting again.' });
     }
 
-    let ledgerResult;
-    try {
-      ledgerResult = await creditNcbaCollection({
-        merchant,
-        grossAmount: amount,
-        bankRef: ref,
-        customerName: customerName ? String(customerName).trim() : null,
-      });
-    } catch (err) {
-      if (err instanceof DuplicateCollectionError) {
-        return res.status(409).json({ error: `Reference "${ref}" was already used for a transaction — this collection may already be credited.` });
-      }
-      throw err;
-    }
-
-    createNotification({
-      merchantId: merchant._id,
-      kind: 'payment',
-      title: 'Payment received',
-      message: `You received KES ${ledgerResult.netAmount.toLocaleString()} via your PayChain Virtual Account. Ref: ${ref}.`,
-    }).catch((e) => logEvent('error', 'ncba_manual_credit_notification_failed', { ref, error: e.message }));
-
-    // date/time are the admin's own plain "YYYY-MM-DD"/"HH:mm" typed
-    // values off the bank statement, treated as literal Nairobi wall-clock
-    // (matching how every other NCBA/M-Pesa timestamp in this codebase is
-    // handled — see transactionDateFormat.js's header comment) — NOT run
-    // through a Date object, so this can't drift with server timezone.
-    // Converted into NCBA's own YYMMDDhhmm wire format so it reuses that
-    // same formatter other credits build their SMS from, rather than a
-    // second date-formatting implementation.
-    let smsDateTime;
-    if (/^\d{4}-\d{2}-\d{2}$/.test(date || '') && /^\d{2}:\d{2}$/.test(time || '')) {
-      const ncbaFormat = `${date.slice(2, 4)}${date.slice(5, 7)}${date.slice(8, 10)}${time.slice(0, 2)}${time.slice(3, 5)}`;
-      smsDateTime = formatTransactionDateTime(ncbaFormat);
-    } else {
-      smsDateTime = formatTransactionDateTime(null); // falls back to current Nairobi time
-    }
-
-    if (merchant.phone) {
-      const sms = buildPaymentReceivedSms({
-        ref,
-        amount: ledgerResult.netAmount,
-        payerName: customerName || null,
-        payerPhone: null,
-        date: smsDateTime.date,
-        time: smsDateTime.time,
-        balance: ledgerResult.merchant.kesBalance,
-      });
-      sendStaggeredSms([{ to: merchant.phone, message: sms.message }]).then((results) => {
-        const result = results[0];
-        if (result.success) logEvent('info', 'ncba_manual_credit_sms_sent', { ref, merchantId: merchant._id.toString(), messageId: result.messageId });
-        else logEvent('error', 'ncba_manual_credit_sms_failed', { ref, merchantId: merchant._id.toString(), error: result.error });
-      });
-    }
-
-    logAudit({
-      action: 'admin.ncba_collection.manual_credit', category: 'wallet', severity: 'critical',
-      message: `Manually credited a missed NCBA collection for ${merchant.businessName} — confirmed on NCBA's real statement (ref ${ref}) but this webhook never fired for it.`,
-      merchant, actor: adminActor(req.admin), req,
-      metadata: { bankRef: ref, grossAmount: amount, netAmount: ledgerResult.netAmount, customerName: customerName || null, transactionId: ledgerResult.transaction._id.toString() },
+    const payload = { merchantId: String(merchant._id), grossAmount: amount, bankRef: ref, customerName: customerName ? String(customerName).trim() : null, date: date || null, time: time || null };
+    const approval = await requestAdminApproval({
+      actionType: 'ncba_manual_credit',
+      summary: `Manually credit KES ${amount.toLocaleString()} to ${merchant.businessName} (ref ${ref})`,
+      payload,
+      admin: req.admin,
+      req,
+      auditAction: 'admin.ncba_collection.manual_credit_requested',
+      auditMessage: `${req.admin.name || req.admin.email} requested a manual credit of KES ${amount} for ${merchant.businessName} (ref ${ref}) — awaiting a second admin's approval.`,
     });
 
-    // If this credit was raised by the reconciliation sweep, close out the
-    // matching candidate so it stops showing as pending — matched by
-    // reference, not just "any pending candidate for this merchant", so
-    // crediting one candidate never accidentally closes a different one.
-    MissedNcbaCollectionCandidate.findOneAndUpdate(
-      { statementReference: ref, status: 'pending' },
-      { $set: { status: 'credited', resolvedBy: req.admin._id, resolvedAt: new Date() } }
-    ).catch((e) => logEvent('error', 'ncba_manual_credit_candidate_close_failed', { ref, error: e.message }));
-
-    res.json({
-      success: true,
-      data: {
-        transactionId: ledgerResult.transaction._id,
-        reference: ledgerResult.transaction.reference,
-        netAmount: ledgerResult.netAmount,
-        newBalance: ledgerResult.merchant.kesBalance,
-      },
-    });
+    res.status(202).json({ success: true, pendingApproval: true, approvalId: approval._id });
   } catch (err) {
     if (err instanceof NcbaTariffBoundsError) {
       return res.status(400).json({ error: err.message });
     }
     logEvent('error', 'ncba_manual_credit_error', { error: err.message, stack: err.stack });
-    res.status(500).json({ error: 'Failed to credit this collection.' });
+    res.status(500).json({ error: 'Failed to queue this credit for approval.' });
   }
 };
+
+// Runs the actual credit once a second admin has approved it. Called only
+// from adminApprovalController.js#approveApproval — never reachable
+// directly. Re-validates the merchant and dedup guards fresh, since the
+// request may have been made hours earlier.
+export async function executeNcbaManualCredit(payload, { req, requestedByAdmin } = {}) {
+  const { merchantId, grossAmount: amount, bankRef: ref, customerName, date, time } = payload;
+
+  const merchant = await Merchant.findById(merchantId);
+  if (!merchant) throw new Error('Merchant not found.');
+
+  const viaStk = await wasAlreadySettledByStkPush(merchant, amount);
+  const viaOtherFeed = await wasAlreadyCreditedByOtherNcbaFeed(merchant, amount, ref);
+  if (viaStk || viaOtherFeed) {
+    throw new Error('This looks like it was already credited through another path (STK or a separate NCBA feed) since the request was made — check the merchant\'s transaction history.');
+  }
+
+  let ledgerResult;
+  try {
+    ledgerResult = await creditNcbaCollection({
+      merchant,
+      grossAmount: amount,
+      bankRef: ref,
+      customerName: customerName || null,
+    });
+  } catch (err) {
+    if (err instanceof DuplicateCollectionError) {
+      throw new Error(`Reference "${ref}" was already used for a transaction — this collection may already be credited.`);
+    }
+    throw err;
+  }
+
+  createNotification({
+    merchantId: merchant._id,
+    kind: 'payment',
+    title: 'Payment received',
+    message: `You received KES ${ledgerResult.netAmount.toLocaleString()} via your PayChain Virtual Account. Ref: ${ref}.`,
+  }).catch((e) => logEvent('error', 'ncba_manual_credit_notification_failed', { ref, error: e.message }));
+
+  // date/time are the admin's own plain "YYYY-MM-DD"/"HH:mm" typed
+  // values off the bank statement, treated as literal Nairobi wall-clock
+  // (matching how every other NCBA/M-Pesa timestamp in this codebase is
+  // handled — see transactionDateFormat.js's header comment) — NOT run
+  // through a Date object, so this can't drift with server timezone.
+  // Converted into NCBA's own YYMMDDhhmm wire format so it reuses that
+  // same formatter other credits build their SMS from, rather than a
+  // second date-formatting implementation.
+  let smsDateTime;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(date || '') && /^\d{2}:\d{2}$/.test(time || '')) {
+    const ncbaFormat = `${date.slice(2, 4)}${date.slice(5, 7)}${date.slice(8, 10)}${time.slice(0, 2)}${time.slice(3, 5)}`;
+    smsDateTime = formatTransactionDateTime(ncbaFormat);
+  } else {
+    smsDateTime = formatTransactionDateTime(null); // falls back to current Nairobi time
+  }
+
+  if (merchant.phone) {
+    const sms = buildPaymentReceivedSms({
+      ref,
+      amount: ledgerResult.netAmount,
+      payerName: customerName || null,
+      payerPhone: null,
+      date: smsDateTime.date,
+      time: smsDateTime.time,
+      balance: ledgerResult.merchant.kesBalance,
+    });
+    sendStaggeredSms([{ to: merchant.phone, message: sms.message }]).then((results) => {
+      const result = results[0];
+      if (result.success) logEvent('info', 'ncba_manual_credit_sms_sent', { ref, merchantId: merchant._id.toString(), messageId: result.messageId });
+      else logEvent('error', 'ncba_manual_credit_sms_failed', { ref, merchantId: merchant._id.toString(), error: result.error });
+    });
+  }
+
+  logAudit({
+    action: 'admin.ncba_collection.manual_credit', category: 'wallet', severity: 'critical',
+    message: `Manually credited a missed NCBA collection for ${merchant.businessName} — confirmed on NCBA's real statement (ref ${ref}) but this webhook never fired for it. Requested by ${requestedByAdmin?.name || requestedByAdmin?.email || 'an admin'}, approved by ${req?.admin?.name || req?.admin?.email || 'a second admin'}.`,
+    merchant, actor: adminActor(req?.admin), req,
+    metadata: {
+      bankRef: ref, grossAmount: amount, netAmount: ledgerResult.netAmount, customerName: customerName || null,
+      transactionId: ledgerResult.transaction._id.toString(),
+      requestedByAdminId: requestedByAdmin?._id ? String(requestedByAdmin._id) : null,
+    },
+  });
+
+  // If this credit was raised by the reconciliation sweep, close out the
+  // matching candidate so it stops showing as pending — matched by
+  // reference, not just "any pending candidate for this merchant", so
+  // crediting one candidate never accidentally closes a different one.
+  MissedNcbaCollectionCandidate.findOneAndUpdate(
+    { statementReference: ref, status: 'pending' },
+    { $set: { status: 'credited', resolvedBy: req?.admin?._id || null, resolvedAt: new Date() } }
+  ).catch((e) => logEvent('error', 'ncba_manual_credit_candidate_close_failed', { ref, error: e.message }));
+
+  return {
+    transactionId: ledgerResult.transaction._id,
+    reference: ledgerResult.transaction.reference,
+    netAmount: ledgerResult.netAmount,
+    newBalance: ledgerResult.merchant.kesBalance,
+  };
+}
 
 // @desc    List pending "missed collection" candidates —
 //          services/ncbaCollectionReconciliationService.js's hourly sweep

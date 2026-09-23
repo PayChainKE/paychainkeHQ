@@ -3,6 +3,7 @@ import DeletedRecord from '../models/DeletedRecord.js';
 import { restoreFromTrash, RestoreError } from '../utils/trash.js';
 import { logAudit } from '../utils/auditLog.js';
 import { adminActor } from './adminController.js';
+import { purgeMerchantCloudinaryAssets } from '../services/trashRetentionService.js';
 
 // @desc    List trashed records — the handful of significant, admin-
 //          initiated deletions (Merchant, Transaction/stuck-payout, Admin/
@@ -93,6 +94,13 @@ export const permanentlyDeleteTrashItem = async (req, res) => {
     if (!record) return res.status(404).json({ error: 'Not found, or already restored.' });
 
     const { collectionName, label, originalId } = record;
+    // Restore is off the table the instant this is deleted for good, so a
+    // Merchant's KYC/certificate/business-photo images can safely leave
+    // Cloudinary right now instead of waiting out the rest of the 90-day
+    // window (see services/trashRetentionService.js).
+    if (collectionName === 'Merchant' && !record.cloudinaryPurged) {
+      await purgeMerchantCloudinaryAssets(record.snapshot).catch((e) => console.error('Cloudinary purge on permanent delete failed (non-fatal):', e?.message || e));
+    }
     await record.deleteOne();
 
     logAudit({

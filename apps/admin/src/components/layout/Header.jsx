@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { triggerSync } from '../../utils/syncBus';
+import GlobalSearch from './GlobalSearch';
+import NotificationBell from './NotificationBell';
 
 export { triggerSync };
 
@@ -39,16 +41,20 @@ const Header = ({ onToggleSidebar }) => {
 
   return (
     <header className="sticky top-0 w-full h-[56px] bg-surface/80 backdrop-blur-md border-b border-outline-variant/30 flex justify-between items-center px-4 md:px-6 z-40 font-body">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-1 min-w-0">
         <button
           onClick={onToggleSidebar}
           className="lg:hidden text-on-surface-variant hover:bg-surface-container-low p-2 rounded-lg transition-colors"
         >
           <span className="material-symbols-outlined">menu</span>
         </button>
+        <div className="hidden md:block">
+          <GlobalSearch />
+        </div>
       </div>
 
       <div className="flex items-center gap-2 md:gap-3">
+        <NotificationBell />
         <button
           onClick={handleSync}
           disabled={syncing}

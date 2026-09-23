@@ -30,6 +30,7 @@ import { formatPhoneDisplay } from '../utils/formatPhoneDisplay.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 import { claimPayoutSubmission, DuplicateSubmissionError } from '../utils/idempotencyGuard.js';
 import { assertOutboundVelocityOk, OutboundVelocityLockedError } from '../utils/outboundVelocityGuard.js';
+import { alertIfLargePayout } from '../utils/securityAlerts.js';
 import { requiresPayoutStepUp, issuePayoutStepUpOtp, verifyPayoutStepUpOtp, PayoutStepUpInvalidError } from '../utils/payoutStepUpGuard.js';
 import { debitAvailableBalance } from '../utils/availableBalance.js';
 import { KENYAN_BANK_CODES } from '../config/kenyanBankCodes.js';
@@ -293,6 +294,8 @@ export async function executeNcbaBankPayout({
     );
   }
 
+  alertIfLargePayout({ amountKes: numericAmount, merchant: reservedMerchant, rail: `Bank payout (${actualRail})`, recipientLabel: accountName || accountNumber, metadata: { transactionId: transaction._id.toString() } });
+
   return { transaction, hostResponse, merchant: reservedMerchant, fee: transferFee };
 }
 
@@ -398,6 +401,8 @@ export async function executeNcbaMobileMoneyPayout({ merchantId, phone, network,
     );
   }
 
+  alertIfLargePayout({ amountKes: numericAmount, merchant: reservedMerchant, rail: 'Mobile money payout', recipientLabel: phone, metadata: { transactionId: transaction._id.toString() } });
+
   return { transaction, merchant: reservedMerchant, fee: totalFee };
 }
 
@@ -491,6 +496,8 @@ export async function executeNcbaLipaNaMpesaPayout({ merchantId, paymentType, pa
       { reference: transactionId }
     );
   }
+
+  alertIfLargePayout({ amountKes: numericAmount, merchant: reservedMerchant, rail: `Lipa na M-Pesa (${resolvedPaymentType})`, recipientLabel: payBillTillNo, metadata: { transactionId: transaction._id.toString() } });
 
   return { transaction, merchant: reservedMerchant, fee: totalFee, resolvedType: resolvedPaymentType };
 }

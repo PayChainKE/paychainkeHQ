@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import mongoose from 'mongoose';
 import Merchant from '../models/Merchant.js';
+import DeletedRecord from '../models/DeletedRecord.js';
 import Admin from '../models/Admin.js';
 import Transaction from '../models/Transaction.js';
 import PayoutBatch from '../models/PayoutBatch.js';
@@ -1322,6 +1323,78 @@ export const updateMerchantKycDocument = async (req, res) => {
   }
 };
 
+// @desc    Admin removes a single KYC document — no replacement, unlike
+//          updateMerchantKycDocument above. The Cloudinary file is deleted
+//          immediately (not left for the 90-day retention sweep, which only
+//          covers documents on REJECTED applications — this can be called
+//          on any merchant, so nothing else ever cleans this one up).
+// @route   DELETE /api/admin/merchants/:id/kyc-documents/:type
+// @access  Private (Admin, requireMutator + sensitiveActionLimiter)
+export const deleteMerchantKycDocument = async (req, res) => {
+  try {
+    const { id, type } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: 'Invalid merchant id.' });
+
+    const merchant = await Merchant.findById(id);
+    if (!merchant) return res.status(404).json({ error: 'Merchant not found' });
+
+    const index = merchant.kybDocuments.findIndex((d) => d.type === type);
+    if (index === -1) return res.status(404).json({ error: 'That document is not on file for this merchant.' });
+
+    const [removed] = merchant.kybDocuments.splice(index, 1);
+    await merchant.save();
+
+    if (removed.url && removed.url !== 'purged') deleteCloudinaryAsset(removed.url);
+
+    logAudit({
+      action: 'admin.merchant.kyc_document_deleted', category: 'admin', severity: 'info',
+      message: `Deleted KYC document (${type})`,
+      merchant, actor: adminActor(req.admin), req,
+      metadata: { type },
+    });
+
+    res.json({ success: true, kybDocuments: merchant.kybDocuments });
+  } catch (error) {
+    console.error('Delete Merchant KYC Document Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Admin removes one business premises photo — no replacement.
+//          Cloudinary file deleted immediately, same reasoning as
+//          deleteMerchantKycDocument above (these are optional/informal,
+//          never covered by any retention sweep).
+// @route   DELETE /api/admin/merchants/:id/business-photos/:photoId
+// @access  Private (Admin, requireMutator + sensitiveActionLimiter)
+export const deleteMerchantBusinessPhoto = async (req, res) => {
+  try {
+    const { id, photoId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: 'Invalid merchant id.' });
+
+    const merchant = await Merchant.findById(id);
+    if (!merchant) return res.status(404).json({ error: 'Merchant not found' });
+
+    const index = (merchant.businessPhotos || []).findIndex((p) => String(p._id) === photoId);
+    if (index === -1) return res.status(404).json({ error: 'That photo is not on file for this merchant.' });
+
+    const [removed] = merchant.businessPhotos.splice(index, 1);
+    await merchant.save();
+
+    if (removed.url) deleteCloudinaryAsset(removed.url);
+
+    logAudit({
+      action: 'admin.merchant.business_photo_deleted', category: 'admin', severity: 'info',
+      message: 'Deleted a business premises photo',
+      merchant, actor: adminActor(req.admin), req,
+    });
+
+    res.json({ success: true, businessPhotos: merchant.businessPhotos });
+  } catch (error) {
+    console.error('Delete Merchant Business Photo Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
 // @desc    Admin corrects/updates the business name displayed for a
 //          merchant's account — the same field shown on their dashboard,
 //          paybill sticker, receipts, and outbound SMS (all read
@@ -1581,6 +1654,38 @@ export const updateMerchantCertificate = async (req, res) => {
     res.json({ success: true, certificateUrl: merchant.certificateUrl, message: `Certificate ${isReplace ? 'replaced' : 'uploaded'} successfully.` });
   } catch (error) {
     console.error('Update Merchant Certificate Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Admin removes the merchant's certificate — no replacement.
+//          Cloudinary file deleted immediately.
+// @route   DELETE /api/admin/merchants/:id/certificate
+// @access  Private (Admin, requireMutator + sensitiveActionLimiter)
+export const deleteMerchantCertificate = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: 'Invalid merchant id.' });
+
+    const merchant = await Merchant.findById(id);
+    if (!merchant) return res.status(404).json({ error: 'Merchant not found' });
+    if (!merchant.certificateUrl) return res.status(404).json({ error: 'No certificate is on file for this merchant.' });
+
+    const previousUrl = merchant.certificateUrl;
+    merchant.certificateUrl = null;
+    await merchant.save();
+
+    deleteCloudinaryAsset(previousUrl);
+
+    logAudit({
+      action: 'admin.merchant.certificate_deleted', category: 'admin', severity: 'info',
+      message: 'Deleted business certificate',
+      merchant, actor: adminActor(req.admin), req,
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete Merchant Certificate Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };
@@ -2749,6 +2854,14 @@ export const getMerchantAnalytics = async (req, res) => {
     // countDocuments({ status: 'locked' }) getSystemStatus already uses.
     const lockedMerchants = await Merchant.countDocuments({ ...notDemo, status: 'locked' });
 
+    // Every real merchant account PayChain has ever had, including ones
+    // since deleted — totalMerchants above only ever reflects who's live
+    // right now. See PlatformSettings.js's merchantsEverCreated doc comment.
+    const settings = await getOrCreatePlatformSettings();
+    const deletedMerchantsInTrash = await DeletedRecord.countDocuments({
+      collectionName: 'Merchant', status: 'trashed', 'snapshot.isDemoMerchant': { $ne: true },
+    });
+
     res.json({
       success: true,
       data: {
@@ -2759,7 +2872,9 @@ export const getMerchantAnalytics = async (req, res) => {
         activeMerchants30d,
         activeWallets,
         totalUsdcLocked,
-        lockedMerchants
+        lockedMerchants,
+        merchantsEverCreated: settings.merchantsEverCreated,
+        deletedMerchantsInTrash,
       }
     });
   } catch (error) {

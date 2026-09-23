@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import api from '../api/api';
 import TablePagination from '../components/ui/TablePagination';
@@ -120,6 +121,11 @@ const Merchants = () => {
   const [detailMerchant, setDetailMerchant] = useState(null); // full record from /merchants/:id
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState('');
+
+  // Deep-link from the header's global search (?open=<merchantId>) —
+  // opens the same drawer a row click would, fetched independently of
+  // whatever page/filter the list is currently on.
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // Onboarding modal
   const [showModal, setShowModal] = useState(false);
@@ -413,6 +419,15 @@ const Merchants = () => {
     }
   }
   function closeDetail() { setDetailMerchant(null); setDetailError(''); }
+
+  useEffect(() => {
+    const openId = searchParams.get('open');
+    if (openId) {
+      openDetail(openId);
+      setSearchParams((p) => { p.delete('open'); return p; }, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [generatingAllReport, setGeneratingAllReport] = useState(false);
 
@@ -1704,6 +1719,23 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
     }
   };
 
+  const handleDeleteKycDocument = async (type) => {
+    if (!window.confirm('Delete this document? This removes the file for good — there is no undo.')) return;
+    setDocUploadError('');
+    setUploadingDocType(type);
+    try {
+      const res = await api.delete(`/api/admin/merchants/${merchant._id}/kyc-documents/${type}`);
+      if (res.data.success) {
+        setKybDocuments(res.data.kybDocuments);
+      }
+    } catch (err) {
+      console.error('Failed to delete KYC document', err);
+      setDocUploadError(err.response?.data?.error || 'Failed to delete document. Please try again.');
+    } finally {
+      setUploadingDocType(null);
+    }
+  };
+
   const handleToggleFeature = async (featureName, value) => {
     try {
       setUpdatingFeatures(true);
@@ -1874,6 +1906,10 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
                     });
                     setCertificateUrl(res.data.certificateUrl);
                   }}
+                  onDelete={async () => {
+                    await api.delete(`/api/admin/merchants/${m._id}/certificate`);
+                    setCertificateUrl(null);
+                  }}
                 />
               } />
             </Section>
@@ -1916,6 +1952,18 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
                             onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; handleUploadKycDocument(type, f); }}
                           />
                         </label>
+                        {doc && !doc.purgedAt && (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => handleDeleteKycDocument(type)}
+                            title="Delete document"
+                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-widest border border-red-200 text-red-700 hover:bg-red-50 transition-all ${busy ? 'opacity-50 pointer-events-none' : ''}`}
+                          >
+                            <span className="material-symbols-outlined text-[13px]">delete</span>
+                            Delete
+                          </button>
+                        )}
                       </div>
                     }
                   />

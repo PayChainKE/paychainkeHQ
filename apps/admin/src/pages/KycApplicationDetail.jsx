@@ -307,6 +307,10 @@ const KycApplicationDetail = () => {
                   });
                   setApp((a) => ({ ...a, certificateUrl: res.data.certificateUrl }));
                 }}
+                onDelete={async () => {
+                  await api.delete(`/api/admin/merchants/${app._id}/certificate`);
+                  setApp((a) => ({ ...a, certificateUrl: null }));
+                }}
               />
             </div>
           </div>
@@ -344,6 +348,10 @@ const KycApplicationDetail = () => {
                         });
                         setApp((a) => ({ ...a, kybDocuments: res.data.kybDocuments }));
                       }}
+                      onDelete={async () => {
+                        const res = await api.delete(`/api/admin/merchants/${app._id}/kyc-documents/${type}`);
+                        setApp((a) => ({ ...a, kybDocuments: res.data.kybDocuments }));
+                      }}
                     />
                     {doc && canDecide && (
                       <>
@@ -365,9 +373,25 @@ const KycApplicationDetail = () => {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {app.businessPhotos.map((p, i) => (
-                <a key={i} href={p.url} target="_blank" rel="noreferrer" className="block aspect-square rounded-lg overflow-hidden border border-outline-variant/20 hover:opacity-80 transition-opacity">
-                  <img src={p.url} alt={`Business photo ${i + 1}`} className="w-full h-full object-cover" />
-                </a>
+                <div key={p._id || i} className="relative group aspect-square rounded-lg overflow-hidden border border-outline-variant/20">
+                  <a href={p.url} target="_blank" rel="noreferrer" className="block w-full h-full hover:opacity-80 transition-opacity">
+                    <img src={p.url} alt={`Business photo ${i + 1}`} className="w-full h-full object-cover" />
+                  </a>
+                  <button
+                    type="button"
+                    title="Delete photo"
+                    onClick={async () => {
+                      if (!window.confirm('Delete this photo? This removes the file for good — there is no undo.')) return;
+                      try {
+                        const res = await api.delete(`/api/admin/merchants/${app._id}/business-photos/${p._id}`);
+                        setApp((a) => ({ ...a, businessPhotos: res.data.businessPhotos }));
+                      } catch (e) { showToast(e?.response?.data?.error || 'Could not delete this photo.'); }
+                    }}
+                    className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">delete</span>
+                  </button>
+                </div>
               ))}
             </div>
           )}

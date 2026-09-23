@@ -76,12 +76,14 @@ import { ensurePrimaryOwner } from './migrations/ensurePrimaryOwner.js';
 import { backfillTransactionFees } from './migrations/backfillTransactionFees.js';
 import { seedTariffCards } from './migrations/seedTariffCards.js';
 import { backfillMerchantTariffLocks } from './migrations/backfillMerchantTariffLocks.js';
+import { backfillMerchantsEverCreated } from './migrations/backfillMerchantsEverCreated.js';
 import { loadTariffCache, startTariffCacheRefreshInterval } from './services/tariffCardCache.js';
 import { loadSanctionsList, startSanctionsListRefreshInterval } from './services/sanctionsListCache.js';
 import { backfillNcbaMerchantCodes } from './migrations/backfillNcbaMerchantCodes.js';
 import { checkAndSendDormancyReminders } from './services/dormancyReminderService.js';
 import { checkAndSendTaxDeadlineReminders } from './services/taxDeadlineReminderService.js';
 import { purgeExpiredRejectedKycDocuments } from './services/kycDocumentRetentionService.js';
+import { purgeExpiringTrashCloudinaryAssets } from './services/trashRetentionService.js';
 import { reconcileStuckOpenBankingPayouts } from './services/ncbaOpenBankingReconciliationService.js';
 import { reconcileMissedNcbaCollections } from './services/ncbaCollectionReconciliationService.js';
 import { reconcileUnrecordedBankCharges } from './services/bankChargeReconciliationService.js';
@@ -346,6 +348,7 @@ async function bootstrap() {
     await seedTariffCards();
     await loadTariffCache();
     await backfillMerchantTariffLocks();
+    await backfillMerchantsEverCreated();
     startTariffCacheRefreshInterval();
 
     // Not awaited, unlike the tariff cache above — pricing must be loaded
@@ -445,6 +448,14 @@ async function bootstrap() {
   purgeExpiredRejectedKycDocuments().catch((e) => console.error('KYC document retention sweep failed:', e));
   setInterval(() => {
     purgeExpiredRejectedKycDocuments().catch((e) => console.error('KYC document retention sweep failed:', e));
+  }, 24 * 60 * 60 * 1000);
+
+  // Daily sweep purging Cloudinary files (KYC documents, certificate,
+  // business photos) for deleted-merchant trash entries whose 90-day
+  // restore window is about to close — see services/trashRetentionService.js.
+  purgeExpiringTrashCloudinaryAssets().catch((e) => console.error('Trash retention sweep failed:', e));
+  setInterval(() => {
+    purgeExpiringTrashCloudinaryAssets().catch((e) => console.error('Trash retention sweep failed:', e));
   }, 24 * 60 * 60 * 1000);
 
   // Weekly PayChain revenue sweep now runs as a standalone Render Cron Job

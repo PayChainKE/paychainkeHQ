@@ -141,6 +141,12 @@ export default function Login({ route }: any) {
   // captureIdPhoto) is wired to the same two boxes.
   const [nationalIdMode, setNationalIdMode] = useState<'upload' | 'camera' | null>(null);
   const [docErrors, setDocErrors] = useState<Record<string, string>>({});
+  // Holds a just-captured photo for the merchant to look at and confirm
+  // (or retake) before it's accepted into signupDocs — the camera returning
+  // control to the app doesn't mean the shot is actually good (cut-off
+  // corners, glare, a thumb in frame), so nothing is committed until they
+  // explicitly say "Use This Photo".
+  const [docCapturePreview, setDocCapturePreview] = useState<{ side: 'national_id_front' | 'national_id_back'; label: string; asset: PickedFile } | null>(null);
   const [showDocTypeModal, setShowDocTypeModal] = useState(false);
   // Flipped true the first time Continue is pressed with an invalid field —
   // forces every ValidatedTextInput on this step to show its own inline
@@ -434,6 +440,11 @@ export default function Login({ route }: any) {
   // canvas API in React Native, and the backend already independently
   // re-checks sharpness on every upload (the real gate even on web); a
   // blurry shot surfaces as a server error after submit, prompting retake.
+  //
+  // The captured photo is NOT committed straight into signupDocs — it's
+  // held in docCapturePreview so the merchant sees exactly what the camera
+  // took and taps "Use This Photo" (or "Retake") before it counts as their
+  // submitted document. See the confirm modal near the end of this file.
   const captureIdPhoto = async (side: 'national_id_front' | 'national_id_back') => {
     setDocErrors(prev => ({ ...prev, [side]: '' }));
     try {
@@ -445,14 +456,29 @@ export default function Login({ route }: any) {
       const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.8 });
       if (result.canceled || !result.assets?.[0]) return;
       const asset = result.assets[0];
-      setSignupDocs(prev => ({
-        ...prev,
-        [side]: { uri: asset.uri, name: asset.fileName || `${side}.jpg`, mimeType: asset.mimeType || 'image/jpeg', size: asset.fileSize },
-      }));
+      setDocCapturePreview({
+        side,
+        label: KYB_DOC_LABELS[side] || 'National ID',
+        asset: { uri: asset.uri, name: asset.fileName || `${side}.jpg`, mimeType: asset.mimeType || 'image/jpeg', size: asset.fileSize },
+      });
     } catch {
       setDocErrors(prev => ({ ...prev, [side]: 'Could not open the camera. Please try again.' }));
     }
   };
+
+  const confirmDocCapture = () => {
+    if (!docCapturePreview) return;
+    setSignupDocs(prev => ({ ...prev, [docCapturePreview.side]: docCapturePreview.asset }));
+    setDocCapturePreview(null);
+  };
+
+  const retakeDocCapture = () => {
+    const side = docCapturePreview?.side;
+    setDocCapturePreview(null);
+    if (side) captureIdPhoto(side);
+  };
+
+  const cancelDocCapture = () => setDocCapturePreview(null);
 
   // Resets both National ID slots, so switching between "Upload Files" and
   // "Take Photos" (or retaking after a mistake) never leaves a stale file
@@ -1435,6 +1461,38 @@ export default function Login({ route }: any) {
                 <Text className="text-[16px] font-jakarta-bold text-[#0c2010]">{type}</Text>
               </TouchableOpacity>
             ))}
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={!!docCapturePreview} animationType="slide" transparent={true} onRequestClose={cancelDocCapture}>
+        <View className="flex-1 justify-end bg-black/50">
+          <View className="bg-white rounded-t-3xl p-6">
+            <View className="flex-row justify-between items-center mb-1">
+              <Text className="text-[11px] font-jakarta-bold text-primary/60 uppercase tracking-widest">Confirm your photo</Text>
+              <TouchableOpacity onPress={cancelDocCapture}><Feather name="x" size={22} color="#0c2010" /></TouchableOpacity>
+            </View>
+            <Text className="text-[18px] font-jakarta-bold text-[#0c2010] mb-4">{docCapturePreview?.label}</Text>
+            {docCapturePreview && (
+              <Image
+                source={{ uri: docCapturePreview.asset.uri }}
+                style={{ width: '100%', aspectRatio: 4 / 3, borderRadius: 16, backgroundColor: '#f3f4f6' }}
+                resizeMode="contain"
+              />
+            )}
+            <Text className="text-[12px] font-jakarta-bold text-[#6b7280] text-center mt-4 mb-2">
+              Make sure all four corners are visible and the text is readable before continuing.
+            </Text>
+            <View className="flex-row mt-3" style={{ gap: 12 }}>
+              <TouchableOpacity onPress={retakeDocCapture} className="flex-1 border border-[#d1d5db] rounded-2xl py-4 items-center flex-row justify-center" style={{ gap: 6 }}>
+                <Feather name="rotate-ccw" size={16} color="#0c2010" />
+                <Text className="text-[13px] font-jakarta-bold text-[#0c2010] uppercase tracking-widest">Retake</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={confirmDocCapture} className="flex-1 bg-primary rounded-2xl py-4 items-center flex-row justify-center" style={{ gap: 6 }}>
+                <Feather name="check" size={16} color="#fff" />
+                <Text className="text-[13px] font-jakarta-bold text-white uppercase tracking-widest">Use This Photo</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>

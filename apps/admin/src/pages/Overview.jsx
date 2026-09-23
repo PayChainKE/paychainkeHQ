@@ -329,6 +329,17 @@ const Overview = () => {
                 <span className="text-xs font-bold text-secondary tracking-tight">Live</span>
               </div>
             </div>
+            <div className="bg-surface-container-lowest p-3 md:p-5 rounded-xl border border-outline-variant/20 flex flex-col gap-1 transition-all hover:scale-[1.01] hover:shadow-premium-glow" title="Every real merchant account PayChain has ever had, including ones since deleted — Total Merchants above only counts who's live right now.">
+              <span className="text-xs font-medium text-on-surface-variant/60">All-Time Accounts</span>
+              <div className="flex items-baseline gap-2">
+                {loading
+                  ? <Skel className="w-14 h-7" />
+                  : <span className="text-xl md:text-3xl font-semibold text-on-surface tracking-tighter">{merchantAnalytics?.merchantsEverCreated ?? 0}</span>}
+                {(merchantAnalytics?.deletedMerchantsInTrash ?? 0) > 0 && (
+                  <span className="text-xs font-bold text-on-surface-variant/50 tracking-tight">{merchantAnalytics.deletedMerchantsInTrash} in trash</span>
+                )}
+              </div>
+            </div>
             <div className="bg-surface-container-lowest p-3 md:p-5 rounded-xl border border-outline-variant/20 flex flex-col gap-1 transition-all hover:scale-[1.01] hover:shadow-sm">
               <span className="text-xs font-medium text-on-surface-variant/60">New This Week</span>
               <div className="flex items-baseline gap-2">

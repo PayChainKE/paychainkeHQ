@@ -4,6 +4,7 @@ import ApiKey from '../models/ApiKey.js';
 import { linkedMerchantIds, liveAccessFor, liveAccessSummary } from '../utils/developerMerchants.js';
 import { migrateLegacyLink } from '../services/developerMerchantLinkService.js';
 import DeveloperPayment from '../models/DeveloperPayment.js';
+import STKRequest from '../models/STKRequest.js';
 import { initiateCollectPayment, syncLiveCollectFromStkRequest, CollectValidationError } from '../services/developerCollectService.js';
 import { validatePhoneNumber } from '../utils/ncbaValidators.js';
 import { publicDeveloperPayment } from '../utils/developerPaymentView.js';
@@ -389,8 +390,8 @@ export const sendDeveloperEmail = async (req, res) => {
 // bypass the merchant's payout PIN and limits.
 //
 // Guardrails: owner/admin only, a hard amount cap, a phone chosen from three
-// known parties (the admin's own, the developer's, or the merchant's) rather
-// than typed in, one test at a time per merchant, rate limited, and audited.
+// known parties (the admin's own, the developer's, or the merchant's) or typed
+// in directly, one test at a time per merchant, rate limited, and audited.
 // By default no webhook is sent to the developer's endpoints, so their system
 // never mistakes it for a real customer payment.
 const LIVE_TEST_MAX_KES = () => Math.max(1, Number(process.env.ADMIN_LIVE_TEST_MAX_KES) || 50);
@@ -398,17 +399,29 @@ const LIVE_TEST_MAX_KES = () => Math.max(1, Number(process.env.ADMIN_LIVE_TEST_M
 // 254733444555 -> 0733***555. Never send a full number to the browser.
 const maskPhone = (p) => (p ? (() => { const local = `0${String(p).replace(/^\+?254/, '')}`; return `${local.slice(0, 4)}${'*'.repeat(Math.max(0, local.length - 7))}${local.slice(-3)}`; })() : null);
 
-// Resolves the three phones an admin may send a test to.
-async function livePhoneChoices(developer, admin, merchantId) {
+// Resolves the phones an admin may send a test to: three known parties, plus
+// "custom" — always offered, so an admin can type any Kenyan number (e.g. a
+// tester's phone that isn't the developer's or merchant's contact on file).
+async function livePhoneChoices(developer, admin, merchantId, customPhone) {
   const merchant = merchantId ? await Merchant.findById(merchantId).select('businessName phone') : null;
   const raw = { admin: admin?.phone, developer: developer?.phone, merchant: merchant?.phone };
-  const labels = { admin: 'My phone', developer: 'The developer\'s phone', merchant: `The merchant's phone (${merchant?.businessName || 'merchant'})` };
+  const labels = { admin: 'My phone', developer: 'The developer\'s phone', merchant: `The merchant's phone (${merchant?.businessName || 'merchant'})`, custom: 'Another number' };
   const out = [];
   for (const source of ['admin', 'developer', 'merchant']) {
     let normalized = null;
     try { normalized = raw[source] ? validatePhoneNumber(raw[source]) : null; } catch { normalized = null; }
     out.push({ source, label: labels[source], hint: maskPhone(normalized), available: !!normalized, normalized });
   }
+  let customNormalized = null;
+  let customError = null;
+  if (customPhone) {
+    try { customNormalized = validatePhoneNumber(customPhone); }
+    catch { customError = 'Not a valid Kenyan phone number.'; }
+  }
+  out.push({
+    source: 'custom', label: labels.custom, hint: customNormalized ? maskPhone(customNormalized) : (customError || 'type a number'),
+    available: !!customNormalized, normalized: customNormalized, freeText: true,
+  });
   return { merchant, choices: out };
 }
 
@@ -421,7 +434,7 @@ export const getLiveTestOptions = async (req, res) => {
     if (!developer) return res.status(404).json({ error: 'Developer not found.' });
     const merchantId = resolveTargetMerchant(developer, req.query?.merchantId);
     if (!merchantId) return res.status(400).json({ error: 'Choose one of the developer\'s merchants.', code: 'MERCHANT_REQUIRED' });
-    const { merchant, choices } = await livePhoneChoices(developer, req.admin, merchantId);
+    const { merchant, choices } = await livePhoneChoices(developer, req.admin, merchantId, null);
     res.json({
       success: true,
       merchant: { merchantId, businessName: merchant?.businessName || null },
@@ -433,6 +446,22 @@ export const getLiveTestOptions = async (req, res) => {
     res.status(500).json({ error: 'Server Error' });
   }
 };
+
+// The raw NCBA/Daraja result behind a live test — what an admin copies into a
+// message to the developer so they're not just told "it failed," they see the
+// actual reason. ncbaReason is only ever meaningful once the push resolves,
+// so it's left out while still pending or once it resolved successfully.
+async function buildDiagnostic(payment) {
+  if (!payment.linkedStkCheckoutId) return null;
+  const stk = await STKRequest.findOne({ checkoutRequestId: payment.linkedStkCheckoutId })
+    .select('checkoutRequestId status resultDesc ncbaReason');
+  if (!stk) return null;
+  return {
+    checkoutRequestId: stk.checkoutRequestId,
+    resultDesc: stk.resultDesc || null,
+    ncbaReason: stk.status === 'failed' ? (stk.ncbaReason || null) : null,
+  };
+}
 
 // @desc    Start a small real STK push into one of the developer's merchants.
 // @route   POST /api/admin/developers/:id/live-test   body: { merchantId, phoneSource, amount, deliverWebhook }
@@ -452,10 +481,15 @@ export const startLiveTest = async (req, res) => {
       return res.status(400).json({ error: `Amount must be a whole number of KES between 1 and ${max}.`, code: 'AMOUNT_OUT_OF_RANGE' });
     }
 
-    const { merchant, choices } = await livePhoneChoices(developer, req.admin, merchantId);
+    const { merchant, choices } = await livePhoneChoices(developer, req.admin, merchantId, req.body?.customPhone);
     const choice = choices.find((c) => c.source === req.body?.phoneSource);
     if (!choice) return res.status(400).json({ error: 'Choose whose phone receives the M-PESA prompt.', code: 'PHONE_SOURCE_REQUIRED' });
-    if (!choice.available) return res.status(400).json({ error: `There is no valid phone number on file for that choice.`, code: 'PHONE_UNAVAILABLE' });
+    if (!choice.available) {
+      return res.status(400).json({
+        error: choice.freeText ? 'Enter a valid Kenyan phone number.' : 'There is no valid phone number on file for that choice.',
+        code: 'PHONE_UNAVAILABLE',
+      });
+    }
 
     // One at a time per merchant: a double-click must not send two prompts.
     const recent = await DeveloperPayment.findOne({
@@ -494,6 +528,7 @@ export const startLiveTest = async (req, res) => {
     res.status(201).json({
       success: true,
       payment: { ...publicDeveloperPayment(payment), webhooksSent: deliverWebhook },
+      diagnostic: await buildDiagnostic(payment),
       sentTo: choice.hint,
       merchant: { merchantId, businessName: merchant?.businessName || null },
     });
@@ -512,9 +547,45 @@ export const getLiveTest = async (req, res) => {
     const payment = await DeveloperPayment.findOne({ _id: req.params.paymentId, developerId: req.params.id, origin: 'admin_test' });
     if (!payment) return res.status(404).json({ error: 'Test not found.' });
     await syncLiveCollectFromStkRequest(payment);
-    res.json({ success: true, payment: { ...publicDeveloperPayment(payment), webhooksSent: !payment.suppressWebhooks } });
+    res.json({
+      success: true,
+      payment: { ...publicDeveloperPayment(payment), webhooksSent: !payment.suppressWebhooks },
+      diagnostic: await buildDiagnostic(payment),
+    });
   } catch (error) {
     console.error('Get Live Test Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    The last few live tests run for this developer, across all its
+//          merchants — so an admin re-opening this page can see whether it's
+//          already been verified, without starting a new real payment.
+// @route   GET /api/admin/developers/:id/live-test/history
+// @access  Private (Admin — owner/admin)
+export const getLiveTestHistory = async (req, res) => {
+  try {
+    const developer = await Developer.findById(req.params.id);
+    if (!developer) return res.status(404).json({ error: 'Developer not found.' });
+    const payments = await DeveloperPayment.find({ developerId: developer._id, origin: 'admin_test' })
+      .sort({ createdAt: -1 }).limit(15)
+      .populate('merchantId', 'businessName')
+      .populate('testedBy', 'name email');
+    res.json({
+      success: true,
+      tests: payments.map((p) => ({
+        id: p._id,
+        merchant: p.merchantId ? { merchantId: p.merchantId._id, businessName: p.merchantId.businessName } : null,
+        amount: p.amount,
+        status: p.status,
+        failureReason: p.failureReason,
+        webhooksSent: !p.suppressWebhooks,
+        testedBy: p.testedBy ? (p.testedBy.name || p.testedBy.email) : null,
+        createdAt: p.createdAt,
+      })),
+    });
+  } catch (error) {
+    console.error('Live Test History Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };
