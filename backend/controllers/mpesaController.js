@@ -15,6 +15,7 @@ import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 import { claimPayoutSubmission, DuplicateSubmissionError } from '../utils/idempotencyGuard.js';
 import { assertOutboundVelocityOk, OutboundVelocityLockedError } from '../utils/outboundVelocityGuard.js';
+import { alertIfLargePayout } from '../utils/securityAlerts.js';
 import { requiresPayoutStepUp, issuePayoutStepUpOtp, verifyPayoutStepUpOtp, PayoutStepUpInvalidError } from '../utils/payoutStepUpGuard.js';
 import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard.js';
 import { getLipaNaMpesaTariff } from '../config/lipaNaMpesaTariffCard.js';
@@ -33,6 +34,7 @@ import { publicDeveloperPayment } from '../utils/developerPaymentView.js';
 import { dispatchDeveloperEvent } from '../services/webhookDeliveryService.js';
 import { wasAlreadyCreditedByOtherNcbaFeed } from '../services/ncbaLedgerService.js';
 import { debitAvailableBalance } from '../utils/availableBalance.js';
+import { scheduleSettlementSplit } from '../services/stellarSettlementService.js';
 import { mobileDestination, paybillTillDestination } from '../utils/transactionDestination.js';
 
 const FRONTEND_URL = process.env.MERCHANT_DASHBOARD_URL || 'https://app.paychain.co.ke';
@@ -342,6 +344,8 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
               { $inc: { kesBalance: merchantNetSettlement } },
               { returnDocument: 'after' }
             );
+            // Stellar pilot merchants only — detached, after the credit.
+            scheduleSettlementSplit(updatedMerchant, merchantNetSettlement, receipt);
 
             // kesAmount is deliberately the BASE bill, not the inflated
             // total — this is the same basis the automatic Transaction
@@ -594,6 +598,10 @@ export async function resolveStkOutcome(stkReq, { succeeded, receipt, resultDesc
               { $inc: { paychainFee: customerFee, customerSurchargeFee: customerFee } }
             );
           }
+
+          // Stellar pilot merchants only — detached, after the credit. A
+          // merchant topping up their own wallet is not an incoming payment.
+          if (!isSelfFunding) scheduleSettlementSplit(updatedMerchant, merchantCredit, receipt);
 
           createNotification({
             merchantId: merchant._id,
@@ -1277,6 +1285,8 @@ export const initiateB2C = async (req, res) => {
       mobileNetwork: provider,
     });
 
+    alertIfLargePayout({ amountKes: totalDebit, merchant, rail: 'M-Pesa B2C', recipientLabel: beneficiaryName || phone, metadata: { transactionId: tx._id.toString() } });
+
     // Fire-and-forget, matching bulkPayController.js's identical pattern —
     // never blocks the response on an SMS provider hiccup.
     const { date: txDate, time: txTime } = formatTransactionDateTime();
@@ -1608,6 +1618,8 @@ export const initiateB2B = async (req, res) => {
       destination: paybillTillDestination(paymentType, accountReference),
       paybillAccountReference: paymentType === 'Paybill' ? accountReference : null,
     });
+
+    alertIfLargePayout({ amountKes: numericAmount, merchant, rail: 'Lipa na M-Pesa (Paybill/Till)', recipientLabel: recipientName || partyB, metadata: { transactionId: tx._id.toString() } });
 
     res.status(200).json({ success: true, message: 'Transfer initiated successfully', transaction: tx });
 

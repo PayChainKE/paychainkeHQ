@@ -37,6 +37,14 @@ const DeletedRecordSchema = new mongoose.Schema({
   // (the audit log is the permanent record of the deletion itself); this
   // is a working undo window, not a permanent archive.
   expiresAt: { type: Date, default: () => new Date(Date.now() + 90 * 24 * 60 * 60 * 1000) },
+  // Set once services/trashRetentionService.js (a Merchant snapshot only)
+  // has deleted the snapshot's Cloudinary images (KYC documents,
+  // certificate, business photos) — either because an admin permanently
+  // deleted this trash entry, or because it's about to auto-expire.
+  // Restoring a merchant before this is true brings back working image
+  // links; restoring after would not, which is exactly why the sweep only
+  // purges once restore is no longer realistically coming (see that file).
+  cloudinaryPurged: { type: Boolean, default: false },
 }, { timestamps: true });
 
 DeletedRecordSchema.index({ status: 1, deletedAt: -1 });

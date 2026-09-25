@@ -35,6 +35,7 @@ import {
   resetAppPin,
   verifyPaymentPin,
   validateSetupToken,
+  sendSetupPasswordOtp,
   setupPassword,
   completeOnboardingWalkthrough,
   completeAccountsWalkthrough,
@@ -262,6 +263,7 @@ router.post('/merchant/forgot-password',  merchantLoginLimiter, forgotPasswordAc
 router.post('/merchant/verify-reset-otp', merchantOtpLimiter,   verifyResetOTP);
 router.post('/merchant/reset-password',   merchantOtpLimiter,   resetPassword);
 router.get('/merchant/setup-password/:token', validateSetupToken);
+router.post('/merchant/setup-password/send-otp', merchantOtpLimiter, sendSetupPasswordOtp);
 router.post('/merchant/setup-password', merchantOtpLimiter, setupPassword);
 router.put('/merchant/change-password', protectMerchant, passwordChangeLimiter, changeMerchantPassword);
 router.get('/merchant/security-questions', protectMerchant, getSecurityQuestions);

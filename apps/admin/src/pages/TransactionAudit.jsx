@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import Layout from '../components/layout/Layout';
@@ -85,6 +86,18 @@ const TransactionAudit = () => {
     searchTimer.current = setTimeout(() => { setPage(1); setSearch(searchInput); }, 350);
     return () => searchTimer.current && clearTimeout(searchTimer.current);
   }, [searchInput]);
+
+  // Deep-link from the header's global search (?q=<reference>) — pre-fills
+  // this page's own search box, same as typing it in by hand.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const q = searchParams.get('q');
+    if (q) {
+      setSearchInput(q);
+      setSearchParams((p) => { p.delete('q'); return p; }, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Shared by the interactive table and "Generate Report" below — the
   // report must always match whatever's currently filtered/on screen, same

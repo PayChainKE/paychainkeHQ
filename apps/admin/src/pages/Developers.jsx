@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import api from '../api/api';
 import { useAuth } from '../context/AuthContext';
@@ -154,6 +155,18 @@ const Developers = () => {
   const [search, setSearch] = useState('');
   const [liveFilter, setLiveFilter] = useState('all');
   const [toast, setToast] = useState('');
+
+  // Deep-link from the header's global search (?q=<company or email>) —
+  // pre-fills this page's own search box, same as typing it in by hand.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const q = searchParams.get('q');
+    if (q) {
+      setSearch(q);
+      setSearchParams((p) => { p.delete('q'); return p; }, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [page, setPage] = useState(1);
   const [busyId, setBusyId] = useState(null);
   const [webhooksDeveloper, setWebhooksDeveloper] = useState(null);
@@ -938,12 +951,17 @@ const LiveTestDrawer = ({ developer, merchant, onClose }) => {
   const [options, setOptions] = useState(null);
   const [loadError, setLoadError] = useState('');
   const [phoneSource, setPhoneSource] = useState('');
+  const [customPhone, setCustomPhone] = useState('');
+  const customPhoneRef = useRef(null);
   const [amount, setAmount] = useState(10);
   const [deliverWebhook, setDeliverWebhook] = useState(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState('');
-  const [test, setTest] = useState(null); // { payment, sentTo }
+  const [test, setTest] = useState(null); // { payment, sentTo, diagnostic }
   const [waited, setWaited] = useState(0);
+  const [history, setHistory] = useState(null);
+  const [historyError, setHistoryError] = useState('');
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -958,6 +976,15 @@ const LiveTestDrawer = ({ developer, merchant, onClose }) => {
     return () => { cancelled = true; };
   }, [developer._id, merchant.merchantId]);
 
+  // Recent tests for this developer (any merchant), so an admin reopening
+  // this drawer can see it's already been verified instead of guessing.
+  const refreshHistory = useCallback(() => {
+    api.get(`/api/admin/developers/${developer._id}/live-test/history`)
+      .then((res) => setHistory(res.data.tests || []))
+      .catch((e) => setHistoryError(e?.response?.data?.error || 'Could not load past tests.'));
+  }, [developer._id]);
+  useEffect(() => { refreshHistory(); }, [refreshHistory]);
+
   // Poll the payment while the M-PESA prompt is open (up to 2.5 minutes).
   const paymentId = test?.payment?.id;
   const status = test?.payment?.status;
@@ -968,7 +995,8 @@ const LiveTestDrawer = ({ developer, merchant, onClose }) => {
     const tick = async () => {
       try {
         const res = await api.get(`/api/admin/developers/${developer._id}/live-test/${paymentId}`);
-        if (!cancelled && res.data?.payment) setTest((t) => ({ ...t, payment: res.data.payment }));
+        if (!cancelled && res.data?.payment) setTest((t) => ({ ...t, payment: res.data.payment, diagnostic: res.data.diagnostic || t.diagnostic }));
+        if (!cancelled && res.data?.payment?.status !== 'pending') refreshHistory();
       } catch { /* keep polling */ }
       if (!cancelled) setWaited(Math.round((Date.now() - startedAt) / 1000));
     };
@@ -976,21 +1004,63 @@ const LiveTestDrawer = ({ developer, merchant, onClose }) => {
     return () => { cancelled = true; clearInterval(id); };
   }, [paymentId, status, developer._id]);
 
+  useEffect(() => { if (phoneSource === 'custom') customPhoneRef.current?.focus(); }, [phoneSource]);
+
   const max = options?.maxAmount || 50;
   const amountNum = Number(amount);
   const amountOk = Number.isInteger(amountNum) && amountNum >= 1 && amountNum <= max;
   const chosen = options?.phones?.find((p) => p.source === phoneSource);
+  // Light client-side check only, so the button can enable as the admin types;
+  // the server re-validates and normalizes the number before sending anything.
+  const customPhoneValid = /^(0|\+?254)[17]\d{8}$/.test(String(customPhone).replace(/[\s-]/g, ''));
+  const phoneReady = phoneSource === 'custom' ? customPhoneValid : !!chosen?.available;
 
   async function start() {
     setError('');
     setStarting(true);
     try {
-      const res = await api.post(`/api/admin/developers/${developer._id}/live-test`, { merchantId: merchant.merchantId, phoneSource, amount: amountNum, deliverWebhook });
-      setTest({ payment: res.data.payment, sentTo: res.data.sentTo });
+      const res = await api.post(`/api/admin/developers/${developer._id}/live-test`, {
+        merchantId: merchant.merchantId, phoneSource, amount: amountNum, deliverWebhook,
+        ...(phoneSource === 'custom' ? { customPhone } : {}),
+      });
+      setTest({ payment: res.data.payment, sentTo: res.data.sentTo, diagnostic: res.data.diagnostic || null });
       setWaited(0);
+      setCopied(false);
+      refreshHistory();
     } catch (e) {
       setError(e?.response?.data?.error || 'Could not start the test.');
     } finally { setStarting(false); }
+  }
+
+  // A plain-text block an admin can paste straight into a message to the
+  // developer — the actual NCBA/Daraja result, not just "it failed," so they
+  // aren't left guessing whether the problem is on their side or PayChain's.
+  function diagnosticSnippet() {
+    if (!test?.payment) return '';
+    const p = test.payment;
+    const d = test.diagnostic;
+    const lines = [
+      `PayChain live test — ${developer.companyName}`,
+      `Merchant: ${merchant.businessName || merchant.merchantId}`,
+      `When: ${new Date(p.createdAt || Date.now()).toLocaleString('en-KE')}`,
+      `Amount: KES ${p.amount}`,
+      `Sent to: ${test.sentTo || '—'}`,
+      `Status: ${p.status}`,
+    ];
+    if (p.status === 'failed') lines.push(`Reason: ${p.failureReason || 'Unknown'}`);
+    if (d?.resultDesc) lines.push(`NCBA result: ${d.resultDesc}`);
+    if (d?.ncbaReason) lines.push(`NCBA said: ${d.ncbaReason}`);
+    lines.push(`Reference: ${p.reference}`);
+    lines.push(`Webhook: ${p.webhooksSent ? 'sent to your endpoint' : 'not sent (admin left it off for this test)'}`);
+    return lines.join('\n');
+  }
+
+  async function copyDiagnostic() {
+    try {
+      await navigator.clipboard.writeText(diagnosticSnippet());
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch { setError('Could not copy — your browser blocked clipboard access.'); }
   }
 
   const timedOut = status === 'pending' && waited >= 150;
@@ -1024,17 +1094,61 @@ const LiveTestDrawer = ({ developer, merchant, onClose }) => {
                 </p>
               </div>
 
+              {historyError && <p className="text-2xs text-red-600">{historyError}</p>}
+              {history && history.length > 0 && (
+                <div>
+                  <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/50 mb-2">Recent tests for this developer</p>
+                  <div className="rounded-xl border border-outline-variant/20 divide-y divide-outline-variant/10 max-h-40 overflow-y-auto">
+                    {history.map((h) => (
+                      <div key={h.id} className="flex items-center gap-2 px-3 py-2 text-2xs">
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${h.status === 'success' ? 'bg-emerald-500' : h.status === 'failed' ? 'bg-red-500' : 'bg-amber-500'}`} />
+                        <span className="flex-1 truncate text-on-surface-variant/80">
+                          KES {h.amount} into {h.merchant?.businessName || 'a merchant'} {h.testedBy ? `by ${h.testedBy}` : ''}
+                        </span>
+                        <span className="text-on-surface-variant/40 shrink-0" title={new Date(h.createdAt).toLocaleString()}>{relTime(h.createdAt)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div>
                 <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/50 mb-2">Send the prompt to</p>
                 <div className="space-y-2">
-                  {options.phones.map((p) => (
-                    <label key={p.source} className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 ${p.available ? 'cursor-pointer border-outline-variant/30 hover:bg-surface-container-low' : 'opacity-40 border-outline-variant/20'} ${phoneSource === p.source ? 'ring-2 ring-amber-300' : ''}`}>
+                  {options.phones.map((p) => p.source === 'custom' ? (
+                    <label key={p.source} className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 cursor-pointer border-outline-variant/30 hover:bg-surface-container-low ${phoneSource === p.source ? 'ring-2 ring-amber-300' : ''}`}>
+                      <input type="radio" name="phoneSource" checked={phoneSource === p.source} onChange={() => setPhoneSource(p.source)} />
+                      <span className="flex-1 text-xs font-bold text-on-surface">{p.label}</span>
+                      <input
+                        ref={customPhoneRef}
+                        type="tel"
+                        inputMode="tel"
+                        placeholder="0712345678"
+                        value={customPhone}
+                        onFocus={() => setPhoneSource('custom')}
+                        onChange={(e) => { setCustomPhone(e.target.value); setPhoneSource('custom'); }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-32 rounded-lg border border-outline-variant/30 px-2 py-1 text-2xs font-mono text-on-surface"
+                      />
+                    </label>
+                  ) : (
+                    // Even when this party has no valid number on file, the row stays
+                    // clickable: tapping it drops straight into "type a number" instead
+                    // of sitting there disabled and doing nothing.
+                    <label
+                      key={p.source}
+                      onClick={() => { if (!p.available) setPhoneSource('custom'); }}
+                      className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 cursor-pointer border-outline-variant/30 hover:bg-surface-container-low ${(phoneSource === p.source && p.available) ? 'ring-2 ring-amber-300' : ''}`}
+                    >
                       <input type="radio" name="phoneSource" disabled={!p.available} checked={phoneSource === p.source} onChange={() => setPhoneSource(p.source)} />
                       <span className="flex-1 text-xs font-bold text-on-surface">{p.label}</span>
-                      <span className="text-2xs font-mono text-on-surface-variant/60">{p.available ? p.hint : 'no number on file'}</span>
+                      <span className="text-2xs font-mono text-on-surface-variant/60">{p.available ? p.hint : 'no number on file — tap to type one'}</span>
                     </label>
                   ))}
                 </div>
+                {phoneSource === 'custom' && customPhone && !customPhoneValid && (
+                  <p className="text-2xs text-red-600 mt-1.5">Enter a valid Kenyan number, e.g. 0712345678.</p>
+                )}
               </div>
 
               <div>
@@ -1052,8 +1166,8 @@ const LiveTestDrawer = ({ developer, merchant, onClose }) => {
 
               {error && <div className="bg-red-50 border border-red-100 rounded-xl p-3 text-xs text-red-700">{error}</div>}
 
-              <button onClick={start} disabled={starting || !chosen?.available || !amountOk} className="w-full px-4 py-3 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-white text-xs font-bold uppercase tracking-widest">
-                {starting ? 'Sending…' : `Send real KES ${amountOk ? amountNum : '…'} prompt${chosen?.available ? ` to ${chosen.hint}` : ''}`}
+              <button onClick={start} disabled={starting || !phoneReady || !amountOk} className="w-full px-4 py-3 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-white text-xs font-bold uppercase tracking-widest">
+                {starting ? 'Sending…' : `Send real KES ${amountOk ? amountNum : '…'} prompt${phoneReady ? ` to ${phoneSource === 'custom' ? customPhone : chosen.hint}` : ''}`}
               </button>
             </>
           )}
@@ -1082,9 +1196,26 @@ const LiveTestDrawer = ({ developer, merchant, onClose }) => {
                 <div className="bg-red-50 border border-red-100 rounded-xl p-4">
                   <p className="text-sm font-bold text-red-700 flex items-center gap-1.5"><span className="material-symbols-outlined text-lg">error</span>Payment failed</p>
                   <p className="text-xs text-red-800 mt-1">{test.payment.failureReason || 'The prompt was cancelled or timed out.'}</p>
+                  {test.diagnostic?.ncbaReason && <p className="text-2xs text-red-700/80 mt-1">NCBA said: {test.diagnostic.ncbaReason}</p>}
                 </div>
               )}
               <p className="text-2xs text-on-surface-variant/40 font-mono">Reference {test.payment.reference}</p>
+
+              {status !== 'pending' && (
+                <div className="rounded-xl border border-outline-variant/20 bg-surface-container-low/50 p-3">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <p className="text-2xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/50">
+                      {status === 'success' ? 'Share the result' : 'Share with the developer'}
+                    </p>
+                    <button onClick={copyDiagnostic} className="text-2xs font-bold text-amber-700 hover:text-amber-600 flex items-center gap-1">
+                      <span className="material-symbols-outlined text-sm">{copied ? 'check' : 'content_copy'}</span>
+                      {copied ? 'Copied' : 'Copy'}
+                    </button>
+                  </div>
+                  <pre className="text-2xs font-mono text-on-surface-variant/70 whitespace-pre-wrap leading-relaxed">{diagnosticSnippet()}</pre>
+                </div>
+              )}
+
               {status !== 'pending' && (
                 <button onClick={() => { setTest(null); setError(''); }} className="w-full px-4 py-2.5 rounded-lg border border-outline-variant/30 text-on-surface-variant/70 hover:bg-surface-container-low text-2xs font-bold uppercase tracking-widest">
                   Run another test

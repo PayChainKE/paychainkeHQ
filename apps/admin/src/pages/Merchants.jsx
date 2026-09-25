@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import api from '../api/api';
 import TablePagination from '../components/ui/TablePagination';
@@ -120,6 +121,11 @@ const Merchants = () => {
   const [detailMerchant, setDetailMerchant] = useState(null); // full record from /merchants/:id
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState('');
+
+  // Deep-link from the header's global search (?open=<merchantId>) —
+  // opens the same drawer a row click would, fetched independently of
+  // whatever page/filter the list is currently on.
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // Onboarding modal
   const [showModal, setShowModal] = useState(false);
@@ -413,6 +419,15 @@ const Merchants = () => {
     }
   }
   function closeDetail() { setDetailMerchant(null); setDetailError(''); }
+
+  useEffect(() => {
+    const openId = searchParams.get('open');
+    if (openId) {
+      openDetail(openId);
+      setSearchParams((p) => { p.delete('open'); return p; }, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [generatingAllReport, setGeneratingAllReport] = useState(false);
 
@@ -1310,6 +1325,13 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
     street: merchant?.street || null,
   });
   const [editSignupDetailsOpen, setEditSignupDetailsOpen] = React.useState(false);
+  // Local override for the setup-link expiry so a successful "Resend"
+  // reflects the fresh 24h expiry immediately, same reasoning as
+  // businessName/contactName above — no full drawer refetch needed.
+  const [setupLinkExpiresAt, setSetupLinkExpiresAt] = React.useState(merchant?.setupLinkExpiresAt || null);
+  const [resendingSetupLink, setResendingSetupLink] = React.useState(false);
+  const [resendSetupLinkStatus, setResendSetupLinkStatus] = React.useState('');
+  const [resendSetupLinkError, setResendSetupLinkError] = React.useState('');
 
   React.useEffect(() => {
     if (merchant?.features) {
@@ -1330,7 +1352,26 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
       ward: merchant?.ward || null,
       street: merchant?.street || null,
     });
+    setSetupLinkExpiresAt(merchant?.setupLinkExpiresAt || null);
+    setResendSetupLinkStatus('');
+    setResendSetupLinkError('');
   }, [merchant]);
+
+  const handleResendSetupLink = async () => {
+    if (!merchant?._id) return;
+    setResendingSetupLink(true);
+    setResendSetupLinkStatus('');
+    setResendSetupLinkError('');
+    try {
+      const res = await api.post(`/api/admin/merchants/${merchant._id}/resend-setup-link`);
+      setSetupLinkExpiresAt(res.data?.data?.passwordResetExpires || null);
+      setResendSetupLinkStatus('New setup link sent.');
+    } catch (err) {
+      setResendSetupLinkError(err.response?.data?.error || 'Could not resend the setup link.');
+    } finally {
+      setResendingSetupLink(false);
+    }
+  };
 
   const startEditBusinessName = () => {
     setBusinessNameDraft(businessName);
@@ -1704,6 +1745,23 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
     }
   };
 
+  const handleDeleteKycDocument = async (type) => {
+    if (!window.confirm('Delete this document? This removes the file for good — there is no undo.')) return;
+    setDocUploadError('');
+    setUploadingDocType(type);
+    try {
+      const res = await api.delete(`/api/admin/merchants/${merchant._id}/kyc-documents/${type}`);
+      if (res.data.success) {
+        setKybDocuments(res.data.kybDocuments);
+      }
+    } catch (err) {
+      console.error('Failed to delete KYC document', err);
+      setDocUploadError(err.response?.data?.error || 'Failed to delete document. Please try again.');
+    } finally {
+      setUploadingDocType(null);
+    }
+  };
+
   const handleToggleFeature = async (featureName, value) => {
     try {
       setUpdatingFeatures(true);
@@ -1874,6 +1932,10 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
                     });
                     setCertificateUrl(res.data.certificateUrl);
                   }}
+                  onDelete={async () => {
+                    await api.delete(`/api/admin/merchants/${m._id}/certificate`);
+                    setCertificateUrl(null);
+                  }}
                 />
               } />
             </Section>
@@ -1916,6 +1978,18 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
                             onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; handleUploadKycDocument(type, f); }}
                           />
                         </label>
+                        {doc && !doc.purgedAt && (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => handleDeleteKycDocument(type)}
+                            title="Delete document"
+                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-widest border border-red-200 text-red-700 hover:bg-red-50 transition-all ${busy ? 'opacity-50 pointer-events-none' : ''}`}
+                          >
+                            <span className="material-symbols-outlined text-[13px]">delete</span>
+                            Delete
+                          </button>
+                        )}
                       </div>
                     }
                   />
@@ -2222,7 +2296,36 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
 
             {/* Security flags */}
             <Section title="Security & Access" icon="shield">
-              <Row label="Dashboard Password" value={<Badge tone={m.hasPassword ? 'emerald' : 'amber'} icon={m.hasPassword ? 'check' : 'pending'}>{m.hasPassword ? 'Set' : 'Not set (pending setup)'}</Badge>} />
+              <Row
+                label="Dashboard Password"
+                value={
+                  m.hasPassword ? (
+                    <Badge tone="emerald" icon="check">Set</Badge>
+                  ) : (
+                    <div className="flex flex-col items-end gap-1.5">
+                      {(() => {
+                        const expired = setupLinkExpiresAt && new Date(setupLinkExpiresAt) <= new Date();
+                        return expired ? (
+                          <Badge tone="red" icon="error">Setup link expired ({fmtDate(setupLinkExpiresAt)})</Badge>
+                        ) : setupLinkExpiresAt ? (
+                          <Badge tone="amber" icon="pending">Awaiting setup — link expires {fmtDate(setupLinkExpiresAt)}</Badge>
+                        ) : (
+                          <Badge tone="amber" icon="pending">Not set (pending setup)</Badge>
+                        );
+                      })()}
+                      <button
+                        onClick={handleResendSetupLink}
+                        disabled={resendingSetupLink}
+                        className="text-[10px] font-bold uppercase tracking-widest text-primary hover:underline disabled:opacity-50"
+                      >
+                        {resendingSetupLink ? 'Sending…' : 'Resend setup link'}
+                      </button>
+                      {resendSetupLinkStatus && <p className="text-[10px] text-emerald-600">{resendSetupLinkStatus}</p>}
+                      {resendSetupLinkError && <p className="text-[10px] text-red-600">{resendSetupLinkError}</p>}
+                    </div>
+                  )
+                }
+              />
               <Row label="Mobile App PIN" value={<Badge tone={m.hasAppPin ? 'emerald' : 'gray'} icon={m.hasAppPin ? 'check' : 'remove'}>{m.hasAppPin ? 'Configured' : 'Not set'}</Badge>} />
               <Row label="Bulk Pay PIN" value={<Badge tone={m.hasBulkPayPin ? 'emerald' : 'gray'} icon={m.hasBulkPayPin ? 'check' : 'remove'}>{m.hasBulkPayPin ? 'Configured' : 'Not set'}</Badge>} />
               <Row label="Biometrics" value={<Badge tone={m.biometricsEnabled ? 'emerald' : 'gray'} icon={m.biometricsEnabled ? 'check' : 'remove'}>{m.biometricsEnabled ? 'Enabled' : 'Disabled'}</Badge>} />

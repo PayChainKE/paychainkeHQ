@@ -171,6 +171,15 @@ const Team = () => {
       showToast(e?.response?.data?.error || e?.message || 'Could not resend.');
     }
   }
+  async function handleForceSignOut(member) {
+    try {
+      const res = await api.post(`/api/admin/team/${member._id}/force-signout`);
+      if (res.data?.success) showToast(`${member.name || member.email} was signed out on every device.`);
+      else throw new Error(res.data?.error);
+    } catch (e) {
+      showToast(e?.response?.data?.error || e?.message || 'Could not force sign-out.');
+    }
+  }
 
   return (
     <Layout>
@@ -343,6 +352,7 @@ const Team = () => {
             onSave={(patch) => handleUpdate(editing._id, patch)}
             onRemove={() => handleRemove(editing)}
             onResend={() => handleResend(editing)}
+            onForceSignOut={() => handleForceSignOut(editing)}
           />
         )}
 
@@ -421,11 +431,12 @@ const InviteModal = ({ onClose, onInvited }) => {
 };
 
 // ── Edit drawer ─────────────────────────────────────────────────────
-const EditDrawer = ({ member, isSelf, isOwner, onClose, onSave, onRemove, onResend }) => {
+const EditDrawer = ({ member, isSelf, isOwner, onClose, onSave, onRemove, onResend, onForceSignOut }) => {
   const [name, setName] = useState(member.name || '');
   const [role, setRole] = useState(member.role);
   const [status, setStatus] = useState(member.status);
   const [confirmingRemove, setConfirmingRemove] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
   const dirty = name !== (member.name || '') || role !== member.role || status !== member.status;
 
@@ -458,6 +469,18 @@ const EditDrawer = ({ member, isSelf, isOwner, onClose, onSave, onRemove, onRese
             <DetailPill label="Last login" value={fmtDate(member.lastLogin)} />
             <DetailPill label="Joined"    value={fmtDate(member.createdAt, true)} />
           </div>
+
+          {isOwner && !isSelf && member.status !== 'pending' && (
+            <button
+              onClick={async () => { setSigningOut(true); await onForceSignOut(); setSigningOut(false); }}
+              disabled={signingOut}
+              title="Bumps their session — every device they're signed in on is signed out on its next request. There's no per-device list; this ends all of them at once."
+              className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 text-2xs font-bold uppercase tracking-widest transition-all disabled:opacity-50"
+            >
+              <span className="material-symbols-outlined text-base">phonelink_erase</span>
+              {signingOut ? 'Signing out…' : 'Force sign out (all devices)'}
+            </button>
+          )}
 
           {member.status === 'pending' && isOwner && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-3">

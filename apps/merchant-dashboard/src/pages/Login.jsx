@@ -276,6 +276,14 @@ export default function Login() {
   const [docPreviews, setDocPreviews] = useState({})
   const [docChecking, setDocChecking] = useState({})
   const [docErrors, setDocErrors] = useState({})
+  // A camera-captured document (National ID or any other KYC doc) is held
+  // here instead of being committed straight into signupDocs — the
+  // merchant sees exactly what the camera captured and either confirms it
+  // or retakes it, rather than a photo they never actually looked at
+  // silently becoming their submitted document. Not used for the "Upload
+  // Files" path: a file consciously picked from the gallery doesn't need
+  // this same re-confirm. { type, label, file, dataUrl, checking, blurry, reason } | null
+  const [docCapturePreview, setDocCapturePreview] = useState(null)
   // Flipped true the first time Continue is pressed with an invalid field —
   // forces every ValidatedInput on this step to show its own inline error
   // immediately (via forceTouched), not just the ones the user happened to
@@ -593,43 +601,88 @@ export default function Login() {
     return signupDocs[type] ? [type] : []
   }
 
-  async function handleDocFileChange(docType, e) {
+  // Final accept — used both by the plain upload path below and by the
+  // capture-preview modal's "Use This Photo" button.
+  function commitDoc(docType, file, dataUrl) {
+    setSignupDocs(prev => ({ ...prev, [docType]: file }))
+    setDocPreviews(prev => ({ ...prev, [docType]: dataUrl || '' }))
+  }
+
+  async function handleDocFileChange(docType, label, e, { capture } = {}) {
     const file = e.target.files?.[0] || null
     const clearInput = () => { if (docInputRefs.current[docType]) docInputRefs.current[docType].value = '' }
     setDocErrors(prev => ({ ...prev, [docType]: '' }))
-    setSignupDocs(prev => ({ ...prev, [docType]: file }))
+    setSignupDocs(prev => ({ ...prev, [docType]: null }))
     setDocPreviews(prev => ({ ...prev, [docType]: '' }))
     if (!file) return
 
     const typeError = unsupportedDocumentTypeReason(file)
     if (typeError) {
       setDocErrors(prev => ({ ...prev, [docType]: typeError }))
-      setSignupDocs(prev => ({ ...prev, [docType]: null }))
       clearInput()
       return
     }
     if (file.size > 10 * 1024 * 1024) {
       setDocErrors(prev => ({ ...prev, [docType]: 'File is too large — the limit is 10MB.' }))
-      setSignupDocs(prev => ({ ...prev, [docType]: null }))
       clearInput()
       return
     }
-    if (!isImageFile(file)) return // PDF — nothing to preview/blur-check client-side
 
-    setDocChecking(prev => ({ ...prev, [docType]: true }))
+    if (!capture || !isImageFile(file)) {
+      // "Upload Files" path, or a PDF from either path (nothing to usefully
+      // preview/blur-check for a PDF) — commit straight through as before.
+      setSignupDocs(prev => ({ ...prev, [docType]: file }))
+      if (!isImageFile(file)) { clearInput(); return }
+      setDocChecking(prev => ({ ...prev, [docType]: true }))
+      try {
+        const result = await estimateImageSharpness(file)
+        setDocPreviews(prev => ({ ...prev, [docType]: result.dataUrl || '' }))
+        if (result.blurry) {
+          setDocErrors(prev => ({ ...prev, [docType]: result.reason }))
+          setSignupDocs(prev => ({ ...prev, [docType]: null }))
+          clearInput()
+        }
+      } catch {
+        // Couldn't read the image client-side — let the server's own check decide.
+      } finally {
+        setDocChecking(prev => ({ ...prev, [docType]: false }))
+      }
+      return
+    }
+
+    // Camera capture of an image — hold it for the merchant to see and
+    // confirm (or retake) rather than committing the instant the device
+    // camera hands the photo back.
+    clearInput()
+    setDocCapturePreview({ type: docType, label, file, dataUrl: '', checking: true, blurry: false, reason: '' })
     try {
       const result = await estimateImageSharpness(file)
-      setDocPreviews(prev => ({ ...prev, [docType]: result.dataUrl || '' }))
-      if (result.blurry) {
-        setDocErrors(prev => ({ ...prev, [docType]: result.reason }))
-        setSignupDocs(prev => ({ ...prev, [docType]: null }))
-        clearInput()
-      }
+      setDocCapturePreview(prev => (prev && prev.type === docType && prev.file === file)
+        ? { ...prev, checking: false, blurry: result.blurry, reason: result.reason || '', dataUrl: result.dataUrl || prev.dataUrl }
+        : prev)
     } catch {
-      // Couldn't read the image client-side — let the server's own check decide.
-    } finally {
-      setDocChecking(prev => ({ ...prev, [docType]: false }))
+      // Couldn't read the image client-side — let the merchant confirm on
+      // just the raw capture; the server's own check still runs on submit.
+      const reader = new FileReader()
+      reader.onload = () => setDocCapturePreview(prev => (prev && prev.type === docType && prev.file === file) ? { ...prev, checking: false, dataUrl: reader.result } : prev)
+      reader.readAsDataURL(file)
     }
+  }
+
+  function confirmDocCapture() {
+    if (!docCapturePreview || docCapturePreview.blurry || docCapturePreview.checking) return
+    commitDoc(docCapturePreview.type, docCapturePreview.file, docCapturePreview.dataUrl)
+    setDocCapturePreview(null)
+  }
+
+  function retakeDocCapture() {
+    const type = docCapturePreview?.type
+    setDocCapturePreview(null)
+    if (type) setTimeout(() => docInputRefs.current[type]?.click(), 50)
+  }
+
+  function cancelDocCapture() {
+    setDocCapturePreview(null)
   }
 
   // One upload box per required document type — reused for both a
@@ -680,7 +733,7 @@ export default function Login() {
             type="file"
             accept="image/*,application/pdf"
             {...(capture ? { capture: 'environment' } : {})}
-            onChange={e => handleDocFileChange(type, e)}
+            onChange={e => handleDocFileChange(type, label, e, { capture })}
             className="hidden"
           />
         </label>
@@ -780,7 +833,7 @@ export default function Login() {
                   type="file"
                   accept="image/*,application/pdf"
                   {...(capture ? { capture: 'environment' } : {})}
-                  onChange={e => handleDocFileChange('national_id_back', e)}
+                  onChange={e => handleDocFileChange('national_id_back', `${label} — Back of ID`, e, { capture })}
                   className="hidden"
                 />
               </div>
@@ -2128,6 +2181,60 @@ export default function Login() {
 
         </div>
       </div>
+
+      {docCapturePreview && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={cancelDocCapture}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="p-5 pb-3">
+              <p className="text-2xs font-bold uppercase tracking-[0.2em] text-primary/60 mb-1">Confirm your photo</p>
+              <h3 className="text-base font-bold text-on-surface">{docCapturePreview.label}</h3>
+            </div>
+            <div className="px-5">
+              <div className="aspect-[4/3] w-full rounded-xl overflow-hidden bg-slate-100 border border-outline-variant/20 flex items-center justify-center">
+                {docCapturePreview.dataUrl ? (
+                  <img src={docCapturePreview.dataUrl} alt="Captured document" className="w-full h-full object-contain" />
+                ) : (
+                  <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+                )}
+              </div>
+            </div>
+            <div className="p-5">
+              {docCapturePreview.checking ? (
+                <p className="text-xs text-on-surface-variant/60 text-center flex items-center justify-center gap-2">
+                  <span className="w-3.5 h-3.5 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
+                  Checking image quality…
+                </p>
+              ) : docCapturePreview.blurry ? (
+                <p className="text-xs font-bold text-red-600 text-center flex items-center justify-center gap-1.5">
+                  <span className="material-symbols-outlined text-sm">error</span>
+                  {docCapturePreview.reason || 'This photo looks blurry — please retake it.'}
+                </p>
+              ) : (
+                <p className="text-xs text-on-surface-variant/60 text-center">Make sure all four corners are visible and the text is readable before continuing.</p>
+              )}
+              <div className="flex gap-3 mt-4">
+                <button
+                  type="button"
+                  onClick={retakeDocCapture}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl border border-outline-variant/30 text-on-surface text-xs font-bold uppercase tracking-widest hover:bg-surface-container-low transition-all"
+                >
+                  <span className="material-symbols-outlined text-sm">refresh</span>
+                  Retake
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmDocCapture}
+                  disabled={docCapturePreview.checking || docCapturePreview.blurry}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl bg-primary text-white text-xs font-bold uppercase tracking-widest hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                >
+                  <span className="material-symbols-outlined text-sm">check</span>
+                  Use This Photo
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

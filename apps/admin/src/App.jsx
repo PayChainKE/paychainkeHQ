@@ -5,6 +5,7 @@ import { ToastProvider } from './context/ToastContext';
 import Login from './pages/Login';
 import SetupPassword from './pages/SetupPassword';
 import Overview from './pages/Overview';
+import OpsHealth from './pages/OpsHealth';
 import Waitlist from './pages/Waitlist';
 import Merchants from './pages/Merchants';
 import Analytics from './pages/Analytics';
@@ -40,6 +41,7 @@ import EmailLog from './pages/EmailLog';
 import KycVerification from './pages/KycVerification';
 import KycApplicationDetail from './pages/KycApplicationDetail';
 import Trash from './pages/Trash';
+import Approvals from './pages/Approvals';
 import ToastHost from './components/ui/Toast';
 import { Analytics as VercelAnalytics } from "@vercel/analytics/react";
 
@@ -60,6 +62,7 @@ export default function App(){
             <Route path="/setup-password" element={<SetupPassword/>} />
             <Route path="/" element={<Navigate to="/overview" replace />} />
             <Route path="/overview" element={<Protected><Overview/></Protected>} />
+            <Route path="/ops-health" element={<Protected><OpsHealth/></Protected>} />
             <Route path="/waitlist" element={<Protected><Waitlist/></Protected>} />
             <Route path="/newsletter" element={<Protected><Newsletter/></Protected>} />
             <Route path="/blog-posts" element={<Protected><BlogPosts/></Protected>} />
@@ -88,6 +91,7 @@ export default function App(){
             <Route path="/wallet-audit" element={<Protected><WalletAudit/></Protected>} />
             <Route path="/invoices" element={<Protected><Invoices/></Protected>} />
             <Route path="/audit-log" element={<Protected><AuditLog/></Protected>} />
+            <Route path="/approvals" element={<Protected><Approvals/></Protected>} />
             <Route path="/trash" element={<Protected><Trash/></Protected>} />
             <Route path="/transaction-audit" element={<Protected><TransactionAudit/></Protected>} />
             <Route path="/payment-link-audit" element={<Protected><PaymentLinkAudit/></Protected>} />

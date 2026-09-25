@@ -14,9 +14,10 @@ import { BUSINESS_TYPES, EMPLOYEE_BANDS } from './merchantAuthController.js';
 import { buildAccountApprovedSms } from '../utils/accountSmsTemplates.js';
 import { computePrechecks } from '../utils/applicationPrechecks.js';
 import { applyFieldApproval, FieldApprovalError } from '../services/fieldApprovalService.js';
-import { deleteCloudinaryAsset } from '../utils/cloudinary.js';
+import { deleteCloudinaryAsset, uploadBufferToCloudinary } from '../utils/cloudinary.js';
 import { safeSendSMS } from '../utils/smsSanitizer.js';
 import { toE164Kenyan } from '../utils/notificationService.js';
+import { hashDocumentBuffer, checkDocumentReuse } from '../utils/documentReuseDetection.js';
 
 // Onboarding-officer application pipeline. Officers originate new merchant
 // applications (business details + KYC documents) and drive them through a
@@ -219,18 +220,33 @@ export const createApplication = async (req, res) => {
     }
 
     const files = req.files || {};
-    const kybDocuments = ALL_OFFICER_DOC_TYPES.flatMap((t) => resolveDocTypes(t, files)).map((t) => ({
-      type: t,
-      url: files[t][0].path,
-      uploadedAt: new Date(),
-      status: 'pending',
-    }));
-    // Optional proof-of-existence photos (e.g. shopfront) — no type/status,
-    // purely supplementary evidence for admin due diligence.
-    const businessPhotos = (files.business_photos || []).map((f) => ({
-      url: f.path,
-      uploadedAt: new Date(),
-    }));
+    // Uploaded as buffers (uploadMemory, not CloudinaryStorage) so each
+    // document's contentHash can be computed here — the same fraud signal
+    // self-serve signup already checks (see checkDocumentReuse below); an
+    // officer-submitted application used to store these with no hash at
+    // all, so the exact-same-photo-on-two-accounts check silently never
+    // ran against anything an officer onboarded in the field.
+    let kybDocuments, businessPhotos;
+    try {
+      kybDocuments = await Promise.all(
+        ALL_OFFICER_DOC_TYPES.flatMap((t) => resolveDocTypes(t, files)).map(async (t) => {
+          const file = files[t][0];
+          const uploaded = await uploadBufferToCloudinary(file.buffer, 'paychain_certificates');
+          return { type: t, url: uploaded.secure_url, uploadedAt: new Date(), status: 'pending', contentHash: hashDocumentBuffer(file.buffer) };
+        })
+      );
+      // Optional proof-of-existence photos (e.g. shopfront) — no type/status,
+      // purely supplementary evidence for admin due diligence.
+      businessPhotos = await Promise.all(
+        (files.business_photos || []).map(async (f) => {
+          const uploaded = await uploadBufferToCloudinary(f.buffer, 'paychain_certificates');
+          return { url: uploaded.secure_url, uploadedAt: new Date() };
+        })
+      );
+    } catch (e) {
+      console.error('KYB document upload to Cloudinary failed:', e);
+      return res.status(500).json({ error: 'We could not upload the document(s) right now. Please try again.' });
+    }
 
     const merchant = await Merchant.create({
       name,
@@ -271,6 +287,13 @@ export const createApplication = async (req, res) => {
     });
 
     const missingDocs = QUEUE_DOC_TYPES.filter((t) => !isDocProvided(t, files));
+
+    // See documentReuseDetection.js's own doc comment — checks the hashes
+    // just stored on this merchant against every OTHER merchant's
+    // kybDocuments. Fire-and-forget, same as registerMerchant's call.
+    if (kybDocuments.length) {
+      checkDocumentReuse(merchant, kybDocuments.map((d) => d.contentHash));
+    }
 
     res.status(201).json({
       success: true,
@@ -713,7 +736,7 @@ export async function finalizeApproval(application, req, meta = {}) {
   if (needsCredentials) {
     const rawToken = crypto.randomBytes(32).toString('hex');
     const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
-    const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+    const expires = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48h
     application.passwordResetToken = hashedToken;
     application.passwordResetExpires = expires;
     setupLink = `${MERCHANT_DASHBOARD_URL.replace(/\/$/, '')}/setup-password?token=${rawToken}`;
@@ -952,18 +975,30 @@ export const resubmitDocuments = async (req, res) => {
     const files = req.files || {};
     let replaced = 0;
     const replacedUrls = [];
+    const newHashes = [];
     for (const t of ALL_OFFICER_DOC_TYPES) {
       if (!files[t]?.[0]) continue;
+      const file = files[t][0];
+      let uploaded;
+      try {
+        uploaded = await uploadBufferToCloudinary(file.buffer, 'paychain_certificates');
+      } catch (e) {
+        console.error('KYB document upload to Cloudinary failed:', e);
+        return res.status(500).json({ error: 'We could not upload the document(s) right now. Please try again.' });
+      }
+      const contentHash = hashDocumentBuffer(file.buffer);
+      newHashes.push(contentHash);
       const existing = application.kybDocuments.find((d) => d.type === t);
       if (existing) {
         if (existing.url && existing.url !== 'purged') replacedUrls.push(existing.url);
-        existing.url = files[t][0].path;
+        existing.url = uploaded.secure_url;
         existing.uploadedAt = new Date();
         existing.status = 'pending';
         existing.note = null;
         existing.purgedAt = null;
+        existing.contentHash = contentHash;
       } else {
-        application.kybDocuments.push({ type: t, url: files[t][0].path, uploadedAt: new Date(), status: 'pending' });
+        application.kybDocuments.push({ type: t, url: uploaded.secure_url, uploadedAt: new Date(), status: 'pending', contentHash });
       }
       replaced += 1;
     }
@@ -987,6 +1022,10 @@ export const resubmitDocuments = async (req, res) => {
       merchant: application, actor: { type: 'self', id: application._id, email: application.email, name: application.name }, req,
       metadata: { replaced },
     });
+
+    if (newHashes.length) {
+      checkDocumentReuse(application, newHashes);
+    }
 
     res.json({ success: true, data: { kybStatus: application.kybStatus } });
   } catch (error) {

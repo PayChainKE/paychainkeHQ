@@ -15,6 +15,7 @@ import { formatTransactionDateTime } from '../utils/transactionDateFormat.js';
 import { assertPinNotLocked, recordFailedPinAttempt, resetPinAttempts, PinLockedError } from '../utils/pinLockout.js';
 import { claimPayoutSubmission, DuplicateSubmissionError } from '../utils/idempotencyGuard.js';
 import { assertOutboundVelocityOk, OutboundVelocityLockedError } from '../utils/outboundVelocityGuard.js';
+import { alertIfLargePayout } from '../utils/securityAlerts.js';
 import { requiresPayoutStepUp, issuePayoutStepUpOtp, verifyPayoutStepUpOtp, PayoutStepUpInvalidError } from '../utils/payoutStepUpGuard.js';
 import { debitAvailableBalance } from '../utils/availableBalance.js';
 import { getB2cTariff, B2cTariffBoundsError } from '../config/mpesaB2cTariffCard.js';
@@ -1023,6 +1024,13 @@ export const authorizeBatch = async (req, res) => {
           lnmFee: payoutStatus !== 'failed' ? row.lnmFee : 0,
           bankFee: payoutStatus !== 'failed' ? row.bankFee : 0,
         });
+
+        // One row within an otherwise-ordinary payroll batch can still be
+        // the one worth an admin's attention — same threshold every other
+        // payout rail alerts on, just per-row here rather than per-batch.
+        if (payoutStatus !== 'failed') {
+          alertIfLargePayout({ amountKes: row.netAmount, merchant, rail: `Bulk Pay (${payee.paymentMethod})`, recipientLabel: payee.name, metadata: { transactionId: transaction._id.toString(), payoutBatchId } });
+        }
       } catch (recordErr) {
         // The row's own NCBA outcome (payoutStatus, above) already happened
         // and is final — only the local bookkeeping for it failed. If NCBA

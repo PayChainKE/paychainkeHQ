@@ -9,6 +9,7 @@ import {
   getMerchantStatementData,
   getMerchantAnalytics,
   createMerchant,
+  resendMerchantSetupLink,
   requestMerchantAction,
   confirmMerchantAction,
   flagMerchant,
@@ -19,10 +20,13 @@ import {
   sendInstallReminder,
   updateMerchantVerification,
   updateMerchantKycDocument,
+  deleteMerchantKycDocument,
+  deleteMerchantBusinessPhoto,
   updateMerchantBusinessName,
   updateMerchantContactName,
   updateMerchantSignupDetails,
   updateMerchantCertificate,
+  deleteMerchantCertificate,
   downloadMerchantQrCode,
   getMerchantsMap,
   geocodeSearch,
@@ -66,6 +70,7 @@ import {
   getLiveTestOptions,
   startLiveTest,
   getLiveTest,
+  getLiveTestHistory,
   getDeveloperMessages,
   sendDeveloperEmail,
 } from '../controllers/developerAdminController.js';
@@ -75,6 +80,7 @@ import {
   updateTeamMember,
   removeTeamMember,
   resendInvite,
+  forceSignOutTeamMember,
 } from '../controllers/teamController.js';
 import {
   listOfficers,
@@ -94,6 +100,9 @@ import { getTariffs, requestTariffUpdate, confirmTariffUpdate, requestMerchantTa
 import { adminListStuckOpenBankingPayouts, adminResolveStuckOpenBankingPayout, adminDeleteStuckOpenBankingPayout } from '../controllers/ncbaOpenBankingController.js';
 import { adminManualCreditNcbaCollection, adminListMissedNcbaCollections, adminDismissMissedNcbaCollection } from '../controllers/ncbaAccountNotificationController.js';
 import { getTrash, restoreTrashItem, permanentlyDeleteTrashItem } from '../controllers/trashController.js';
+import { listApprovals, approveApproval, rejectApproval } from '../controllers/adminApprovalController.js';
+import { getOpsHealth } from '../controllers/opsHealthController.js';
+import { globalSearch } from '../controllers/adminSearchController.js';
 import { adminListCashAdvanceRequests, adminUpdateCashAdvanceRequest } from '../controllers/cashAdvanceController.js';
 import {
   listExpenses,
@@ -167,6 +176,7 @@ router.get('/merchants', protect, excludeOfficer, getMerchants);
 router.get('/merchants/balances', protect, excludeOfficer, getMerchantBalances);
 router.get('/merchants/balances/export', protect, excludeOfficer, exportMerchantBalances);
 router.post('/merchants', protect, requireMutator, merchantCreateLimiter, createMerchant);
+router.post('/merchants/:id/resend-setup-link', protect, requireMutator, sensitiveActionLimiter, resendMerchantSetupLink);
 router.get('/merchants/analytics', protect, excludeOfficer, getMerchantAnalytics);
 // Same reason as /merchants/analytics above — literal paths before :id.
 router.get('/merchants/map', protect, excludeOfficer, getMerchantsMap);
@@ -186,10 +196,13 @@ router.get('/platform-settings', protect, excludeOfficer, getPlatformSettings);
 router.patch('/platform-settings', protect, requireMutator, sensitiveActionLimiter, updatePlatformSettings);
 router.patch('/merchants/:id/verification', protect, requireMutator, sensitiveActionLimiter, updateMerchantVerification);
 router.patch('/merchants/:id/kyc-documents', protect, requireMutator, sensitiveActionLimiter, uploadMemory.single('document'), updateMerchantKycDocument);
+router.delete('/merchants/:id/kyc-documents/:type', protect, requireMutator, sensitiveActionLimiter, deleteMerchantKycDocument);
+router.delete('/merchants/:id/business-photos/:photoId', protect, requireMutator, sensitiveActionLimiter, deleteMerchantBusinessPhoto);
 router.patch('/merchants/:id/business-name', protect, requireMutator, sensitiveActionLimiter, updateMerchantBusinessName);
 router.patch('/merchants/:id/contact-name', protect, requireMutator, sensitiveActionLimiter, updateMerchantContactName);
 router.patch('/merchants/:id/signup-details', protect, requireMutator, sensitiveActionLimiter, updateMerchantSignupDetails);
 router.patch('/merchants/:id/certificate', protect, requireMutator, sensitiveActionLimiter, upload.single('certificate'), updateMerchantCertificate);
+router.delete('/merchants/:id/certificate', protect, requireMutator, sensitiveActionLimiter, deleteMerchantCertificate);
 router.patch('/merchants/:id/location', protect, requireMutator, sensitiveActionLimiter, setMerchantLocation);
 router.delete('/merchants/:id/location', protect, requireMutator, sensitiveActionLimiter, removeMerchantLocation);
 router.get('/merchants/:id/sticker', protect, excludeOfficer, downloadMerchantSticker);
@@ -274,6 +287,21 @@ router.get('/trash', protect, requireMutator, getTrash);
 router.post('/trash/:id/restore', protect, requireMutator, sensitiveActionLimiter, restoreTrashItem);
 router.delete('/trash/:id', protect, requireMutator, sensitiveActionLimiter, permanentlyDeleteTrashItem);
 
+// Maker-checker approval queue — gated money-moving actions (manual NCBA
+// credits, revenue write-offs) land here instead of executing immediately;
+// a different owner/admin must approve before anything actually runs.
+// Read-only "is everything working right now" summary — rail reachability,
+// STK/webhook failure rates, stuck-payment backlogs. Safe for analysts too.
+router.get('/ops-health', protect, excludeOfficer, getOpsHealth);
+
+// One search box across merchants/transactions/developers — jump straight
+// to a record instead of navigating into the right page to filter.
+router.get('/search', protect, excludeOfficer, globalSearch);
+
+router.get('/approvals', protect, requireMutator, listApprovals);
+router.post('/approvals/:id/approve', protect, requireMutator, sensitiveActionLimiter, approveApproval);
+router.post('/approvals/:id/reject', protect, requireMutator, sensitiveActionLimiter, rejectApproval);
+
 // Stellar Wallet Audit (live Horizon cross-reference)
 router.get('/wallet-audit', protect, excludeOfficer, runWalletAudit);
 
@@ -356,6 +384,7 @@ const liveTestLimiter = rateLimit({
   message: { error: 'Too many live tests this hour. Try again later.' },
 });
 router.get('/developers/:id/live-test/options', protect, requireMutator, getLiveTestOptions);
+router.get('/developers/:id/live-test/history', protect, requireMutator, getLiveTestHistory);
 router.post('/developers/:id/live-test', protect, requireMutator, liveTestLimiter, startLiveTest);
 router.get('/developers/:id/live-test/:paymentId', protect, requireMutator, getLiveTest);
 
@@ -427,6 +456,7 @@ router.post('/team',                         protect, requireRole('owner'), sens
 router.patch('/team/:id',                    protect, requireRole('owner'), updateTeamMember);
 router.delete('/team/:id',                   protect, requireRole('owner'), removeTeamMember);
 router.post('/team/:id/resend-invite',       protect, requireRole('owner'), sensitiveActionLimiter, resendInvite);
+router.post('/team/:id/force-signout',       protect, requireRole('owner'), sensitiveActionLimiter, forceSignOutTeamMember);
 
 // Onboarding officer account management (owner/admin only — officers can
 // never manage their own or each other's accounts).

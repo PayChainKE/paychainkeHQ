@@ -17,6 +17,16 @@ const platformSettingsSchema = new mongoose.Schema({
   // still null" can't be used as the idempotency check here, unlike every
   // other boot-time backfill in this codebase).
   merchantTariffBackfillCompletedAt: { type: Date, default: null },
+  // Every non-demo Merchant document ever created, counted once at creation
+  // (models/Merchant.js's post-save hook) and never decremented — survives
+  // a merchant being deleted, unlike Merchant.countDocuments() (only live
+  // accounts) or DeletedRecord (only the last 90 days of deletions, then
+  // its own TTL erases the snapshot). This is the only number in the system
+  // that answers "how many merchant accounts has PayChain had, ever" — see
+  // migrations/backfillMerchantsEverCreated.js for the one-time seed of
+  // everyone who existed (live or still-trashed) before this field existed.
+  merchantsEverCreated: { type: Number, default: 0 },
+  merchantsEverCreatedSeededAt: { type: Date, default: null },
   updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null },
 }, { timestamps: true });
 
@@ -28,6 +38,17 @@ export async function getOrCreatePlatformSettings() {
   let doc = await PlatformSettings.findOne({ singleton: 'global' });
   if (!doc) doc = await PlatformSettings.create({ singleton: 'global' });
   return doc;
+}
+
+// Atomic — safe to call concurrently from many requests at once (unlike
+// getOrCreatePlatformSettings().save(), which could race and lose a count
+// under real concurrent signups).
+export async function incrementMerchantsEverCreated() {
+  await PlatformSettings.findOneAndUpdate(
+    { singleton: 'global' },
+    { $inc: { merchantsEverCreated: 1 } },
+    { upsert: true }
+  );
 }
 
 export default PlatformSettings;

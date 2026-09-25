@@ -3,6 +3,7 @@ import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import { getTransactions, getFeePreview, simulateIncomingPayment, swapKesToUsdc, activateWallet, getLiveRate, sendMoney, syncWalletBalance, generatePaymentLink, listPaymentLinks, getPaymentLink, processPaymentLink, getMerchantByAccount, payToMerchantAccount, emailStatement, downloadSticker, getPublicSTKStatus, getCheckoutPreview, createCheckoutPage, listCheckoutPages, getCheckoutPageForMerchant, updateCheckoutPage, deleteCheckoutPage, getCheckoutPagePublic, checkoutPageCheckout } from '../controllers/transactionController.js';
 import { protectMerchant } from '../middleware/authMiddleware.js';
+import { getRule, updateRule, redeem, getReconciliation, downloadReconciliationCsv } from '../controllers/stellarSettlementController.js';
 
 const router = express.Router();
 
@@ -125,6 +126,21 @@ router.post('/statement/email', protectMerchant, emailStatement);
 router.get('/sticker', protectMerchant, downloadSticker);
 
 router.get('/live-rate', protectMerchant, getLiveRate);
+
+// Stellar Instaward round two — pilot (isDemoMerchant) accounts only, testnet
+// + simulated M-Pesa B2C. See services/stellarSettlementService.js.
+const redeemLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many payout requests. Please wait a minute.' },
+});
+router.get('/settlement-rule', protectMerchant, getRule);
+router.put('/settlement-rule', protectMerchant, updateRule);
+router.post('/wallet/redeem', protectMerchant, redeemLimiter, redeem);
+router.get('/wallet/reconciliation', protectMerchant, getReconciliation);
+router.get('/wallet/reconciliation.csv', protectMerchant, downloadReconciliationCsv);
 router.get('/', protectMerchant, getTransactions);
 
 export default router;

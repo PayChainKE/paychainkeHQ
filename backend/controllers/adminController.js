@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import mongoose from 'mongoose';
 import Merchant from '../models/Merchant.js';
+import DeletedRecord from '../models/DeletedRecord.js';
 import Admin from '../models/Admin.js';
 import Transaction from '../models/Transaction.js';
 import PayoutBatch from '../models/PayoutBatch.js';
@@ -77,9 +78,15 @@ const computeRiskSignals = (merchant, agg) => {
   const txn24 = agg?.txnCount24h || 0;
   const dailyAvg = txn30 / 30;
 
-  // Always set: incomplete onboarding signals.
-  if (merchant.passwordResetExpires && new Date(merchant.passwordResetExpires) > new Date()) {
-    signals.push({ id: 'pending_setup', label: 'Setup incomplete', severity: 'low' });
+  // Always set: incomplete onboarding signals. Gated on `!merchant.password`
+  // so this never fires for an existing merchant's own abandoned "Forgot
+  // Password" attempt (which reuses these same two fields) — only a
+  // merchant who has NEVER set a password counts as "setup incomplete".
+  if (!merchant.password && merchant.passwordResetExpires) {
+    const expired = new Date(merchant.passwordResetExpires) <= new Date();
+    signals.push(expired
+      ? { id: 'setup_link_expired', label: 'Setup link expired — no password set', severity: 'medium' }
+      : { id: 'pending_setup', label: 'Setup incomplete', severity: 'low' });
   }
   if (!merchant.kraPin || !merchant.isKRAVerified) {
     signals.push({ id: 'no_kra', label: 'KRA not verified', severity: 'medium' });
@@ -143,11 +150,14 @@ const USDC_VOL_REAL = {
 
 export const getMerchants = async (req, res) => {
   try {
-    // Include passwordResetExpires (select:false by default) so we can compute
-    // the "setup incomplete" risk signal. We strip it before responding.
+    // Include password + passwordResetExpires (both select:false by default)
+    // so we can compute the "setup incomplete"/"setup link expired" risk
+    // signal — needs to know both the expiry AND whether a password was
+    // ever actually set (see computeRiskSignals). Both are stripped from
+    // every row before responding.
     const merchants = await Merchant.find({})
       .sort('-createdAt')
-      .select('-password -otp -otpExpires +passwordResetExpires')
+      .select('-otp -otpExpires +passwordResetExpires +password')
       .populate('flaggedBy', 'email')
       .lean();
 
@@ -206,9 +216,14 @@ export const getMerchants = async (req, res) => {
         .reduce((max, ts) => Math.max(max, ts), 0);
       const lastActivityDate = lastActivityAt ? new Date(lastActivityAt) : null;
       const riskSignals = computeRiskSignals(m, t);
+      const hasPassword = !!m.password;
+      const setupLinkExpiresAt = !hasPassword ? (m.passwordResetExpires || null) : null;
       delete m.passwordResetExpires;
+      delete m.password;
       return {
         ...m,
+        hasPassword,
+        setupLinkExpiresAt,
         ncbaVirtualAccountNumber: getNcbaVirtualAccountNumber(m.ncbaMerchantCode),
         txnCount30d:  t?.txnCount30d  || 0,
         txnCount24h:  t?.txnCount24h  || 0,
@@ -1322,6 +1337,78 @@ export const updateMerchantKycDocument = async (req, res) => {
   }
 };
 
+// @desc    Admin removes a single KYC document — no replacement, unlike
+//          updateMerchantKycDocument above. The Cloudinary file is deleted
+//          immediately (not left for the 90-day retention sweep, which only
+//          covers documents on REJECTED applications — this can be called
+//          on any merchant, so nothing else ever cleans this one up).
+// @route   DELETE /api/admin/merchants/:id/kyc-documents/:type
+// @access  Private (Admin, requireMutator + sensitiveActionLimiter)
+export const deleteMerchantKycDocument = async (req, res) => {
+  try {
+    const { id, type } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: 'Invalid merchant id.' });
+
+    const merchant = await Merchant.findById(id);
+    if (!merchant) return res.status(404).json({ error: 'Merchant not found' });
+
+    const index = merchant.kybDocuments.findIndex((d) => d.type === type);
+    if (index === -1) return res.status(404).json({ error: 'That document is not on file for this merchant.' });
+
+    const [removed] = merchant.kybDocuments.splice(index, 1);
+    await merchant.save();
+
+    if (removed.url && removed.url !== 'purged') deleteCloudinaryAsset(removed.url);
+
+    logAudit({
+      action: 'admin.merchant.kyc_document_deleted', category: 'admin', severity: 'info',
+      message: `Deleted KYC document (${type})`,
+      merchant, actor: adminActor(req.admin), req,
+      metadata: { type },
+    });
+
+    res.json({ success: true, kybDocuments: merchant.kybDocuments });
+  } catch (error) {
+    console.error('Delete Merchant KYC Document Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Admin removes one business premises photo — no replacement.
+//          Cloudinary file deleted immediately, same reasoning as
+//          deleteMerchantKycDocument above (these are optional/informal,
+//          never covered by any retention sweep).
+// @route   DELETE /api/admin/merchants/:id/business-photos/:photoId
+// @access  Private (Admin, requireMutator + sensitiveActionLimiter)
+export const deleteMerchantBusinessPhoto = async (req, res) => {
+  try {
+    const { id, photoId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: 'Invalid merchant id.' });
+
+    const merchant = await Merchant.findById(id);
+    if (!merchant) return res.status(404).json({ error: 'Merchant not found' });
+
+    const index = (merchant.businessPhotos || []).findIndex((p) => String(p._id) === photoId);
+    if (index === -1) return res.status(404).json({ error: 'That photo is not on file for this merchant.' });
+
+    const [removed] = merchant.businessPhotos.splice(index, 1);
+    await merchant.save();
+
+    if (removed.url) deleteCloudinaryAsset(removed.url);
+
+    logAudit({
+      action: 'admin.merchant.business_photo_deleted', category: 'admin', severity: 'info',
+      message: 'Deleted a business premises photo',
+      merchant, actor: adminActor(req.admin), req,
+    });
+
+    res.json({ success: true, businessPhotos: merchant.businessPhotos });
+  } catch (error) {
+    console.error('Delete Merchant Business Photo Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
 // @desc    Admin corrects/updates the business name displayed for a
 //          merchant's account — the same field shown on their dashboard,
 //          paybill sticker, receipts, and outbound SMS (all read
@@ -1585,6 +1672,38 @@ export const updateMerchantCertificate = async (req, res) => {
   }
 };
 
+// @desc    Admin removes the merchant's certificate — no replacement.
+//          Cloudinary file deleted immediately.
+// @route   DELETE /api/admin/merchants/:id/certificate
+// @access  Private (Admin, requireMutator + sensitiveActionLimiter)
+export const deleteMerchantCertificate = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: 'Invalid merchant id.' });
+
+    const merchant = await Merchant.findById(id);
+    if (!merchant) return res.status(404).json({ error: 'Merchant not found' });
+    if (!merchant.certificateUrl) return res.status(404).json({ error: 'No certificate is on file for this merchant.' });
+
+    const previousUrl = merchant.certificateUrl;
+    merchant.certificateUrl = null;
+    await merchant.save();
+
+    deleteCloudinaryAsset(previousUrl);
+
+    logAudit({
+      action: 'admin.merchant.certificate_deleted', category: 'admin', severity: 'info',
+      message: 'Deleted business certificate',
+      merchant, actor: adminActor(req.admin), req,
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete Merchant Certificate Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
 // @desc    Get a single merchant's full profile for KYB review. Returns every
 //          submitted field plus computed activity metrics. Sensitive material
 //          (password hash, stellar secret, PIN hashes) is converted to
@@ -1770,6 +1889,11 @@ export const getMerchantDetail = async (req, res) => {
         kesBalance: merchant.kesBalance,
         // Security flags (boolean, never the secret)
         hasPassword: !!merchant.password,
+        // Only meaningful while hasPassword is false — when they still have
+        // an outstanding (or expired) password-setup invite. See
+        // computeRiskSignals' setup_link_expired/pending_setup signals,
+        // which this same field drives.
+        setupLinkExpiresAt: !merchant.password ? (merchant.passwordResetExpires || null) : null,
         // The single Payment PIN, used for every money-movement flow
         // including bulk-pay authorization — there's no separate bulk-pay
         // PIN anymore.
@@ -2013,7 +2137,7 @@ export const createMerchant = async (req, res) => {
     // Generate a 32-byte raw token (URL-safe) and store only its sha256.
     const rawToken = crypto.randomBytes(32).toString('hex');
     const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
-    const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+    const expires = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48h
 
     const merchant = await Merchant.create({
       name,
@@ -2103,6 +2227,56 @@ export const createMerchant = async (req, res) => {
       const messages = Object.values(error.errors).map((v) => v.message);
       return res.status(400).json({ error: messages.join(', ') });
     }
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Re-send a merchant's password-setup link — for a merchant who was
+//          approved (or admin-created) but never used their original invite
+//          before it expired (48h TTL, see finalizeApproval in
+//          officerController.js / createMerchant above). Mints a fresh
+//          token with the same 48h TTL, same as the original. Blocked once
+//          the merchant actually has a password — at that point there's
+//          nothing to "resend", they use their own Forgot Password instead
+//          (mirrors teamController.js's resendInvite for team members,
+//          which has the same "already active" guard).
+// @route   POST /api/admin/merchants/:id/resend-setup-link
+// @access  Private (Admin)
+export const resendMerchantSetupLink = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid merchant id.' });
+    }
+    const merchant = await Merchant.findById(id).select('+password');
+    if (!merchant) return res.status(404).json({ error: 'Merchant not found.' });
+    if (merchant.password) {
+      return res.status(400).json({ error: 'This merchant already has a password set. They can use "Forgot Password" on the sign-in page to reset it.' });
+    }
+    if (merchant.kybStatus && merchant.kybStatus !== 'approved') {
+      return res.status(400).json({ error: 'This merchant has not been approved yet — nothing to send.' });
+    }
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    merchant.passwordResetToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+    merchant.passwordResetExpires = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48h — same TTL as the original invite
+    await merchant.save();
+
+    const setupLink = `${MERCHANT_DASHBOARD_URL.replace(/\/$/, '')}/setup-password?token=${rawToken}`;
+    sendMerchantInvite(
+      merchant.email, merchant.name, merchant.businessName, setupLink,
+      getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode), merchant.ncbaMerchantCode
+    ).catch((err) => console.error(`📧 Resend setup link failed for ${merchant.email}:`, err));
+
+    logAudit({
+      action: 'admin.merchant.setup_link_resent', category: 'admin', severity: 'info',
+      message: `Resent password-setup link to ${merchant.email}`,
+      merchant, actor: adminActor(req.admin), req,
+    });
+
+    res.json({ success: true, data: { passwordResetExpires: merchant.passwordResetExpires } });
+  } catch (error) {
+    console.error('Resend Merchant Setup Link Error:', error?.message || error);
     res.status(500).json({ error: 'Server Error' });
   }
 };
@@ -2749,6 +2923,14 @@ export const getMerchantAnalytics = async (req, res) => {
     // countDocuments({ status: 'locked' }) getSystemStatus already uses.
     const lockedMerchants = await Merchant.countDocuments({ ...notDemo, status: 'locked' });
 
+    // Every real merchant account PayChain has ever had, including ones
+    // since deleted — totalMerchants above only ever reflects who's live
+    // right now. See PlatformSettings.js's merchantsEverCreated doc comment.
+    const settings = await getOrCreatePlatformSettings();
+    const deletedMerchantsInTrash = await DeletedRecord.countDocuments({
+      collectionName: 'Merchant', status: 'trashed', 'snapshot.isDemoMerchant': { $ne: true },
+    });
+
     res.json({
       success: true,
       data: {
@@ -2759,7 +2941,9 @@ export const getMerchantAnalytics = async (req, res) => {
         activeMerchants30d,
         activeWallets,
         totalUsdcLocked,
-        lockedMerchants
+        lockedMerchants,
+        merchantsEverCreated: settings.merchantsEverCreated,
+        deletedMerchantsInTrash,
       }
     });
   } catch (error) {

@@ -13,6 +13,7 @@ import { reversedTransactionExclusionMatch } from '../utils/reversedTransactions
 import { excludeDemoMerchantsMatch } from '../utils/demoMerchantExclusion.js';
 import { logAudit } from '../utils/auditLog.js';
 import { adminActor } from './adminController.js';
+import { requestAdminApproval } from '../services/adminApprovalService.js';
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 const RANGES = ['24h', '7d', '30d', '90d', 'ytd', 'all'];
@@ -786,6 +787,12 @@ export const getExpectedPoolBalance = async (req, res) => {
 //          actually outstanding.
 // @route   POST /api/admin/revenue/pool-account/write-off-deficit
 // @access  Private (Admin, owner/admin only)
+// Maker-checker: no longer writes anything off itself. Validates there IS a
+// deficit right now (fast fail for the requester) and queues an
+// AdminApproval — a different owner/admin must approve
+// (adminApprovalController.js) before executeRevenueWriteOff below actually
+// runs it. The executor recomputes the deficit fresh at approval time rather
+// than trusting this snapshot, since it can change in the meantime.
 export const writeOffRevenueDeficit = async (req, res) => {
   try {
     const before = await computeExpectedPoolBalance();
@@ -795,31 +802,54 @@ export const writeOffRevenueDeficit = async (req, res) => {
     }
 
     const { reason } = req.body || {};
-    const record = await RevenueWriteOff.create({
-      amount,
-      reason: reason && String(reason).trim() ? String(reason).trim() : 'Historical bank/tax charges deficit, written off per admin decision.',
-      snapshotGrossUnswept: before.grossUnsweptRevenue,
-      snapshotTotalCharges: before.totalBankCharges,
-      writtenOffBy: req.admin._id,
-    });
+    const cleanReason = reason && String(reason).trim() ? String(reason).trim() : null;
 
-    logAudit({
-      action: 'admin.revenue.deficit_written_off',
-      category: 'admin',
-      severity: 'critical',
-      message: `Admin wrote off KES ${amount} in accumulated bank/tax-charges deficit against unswept revenue`,
-      actor: adminActor(req.admin),
+    const approval = await requestAdminApproval({
+      actionType: 'revenue_write_off',
+      summary: `Write off KES ${amount.toLocaleString()} accumulated bank/tax-charges deficit`,
+      payload: { reason: cleanReason },
+      admin: req.admin,
       req,
-      metadata: { writeOffId: record._id, amount, snapshot: before },
+      auditAction: 'admin.revenue.deficit_write_off_requested',
+      auditMessage: `${req.admin.name || req.admin.email} requested writing off KES ${amount} in accumulated bank/tax-charges deficit — awaiting a second admin's approval.`,
     });
 
-    const after = await computeExpectedPoolBalance();
-    res.json({ success: true, data: after });
+    res.status(202).json({ success: true, pendingApproval: true, approvalId: approval._id, previewAmount: amount });
   } catch (error) {
     console.error('Write Off Revenue Deficit Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };
+
+// Runs the actual write-off once a second admin has approved it. Called
+// only from adminApprovalController.js#approveApproval.
+export async function executeRevenueWriteOff(payload, { req, requestedByAdmin } = {}) {
+  const before = await computeExpectedPoolBalance();
+  const amount = before.bankChargesDeficit;
+  if (!amount || amount <= 0) {
+    throw new Error('There is no outstanding deficit to write off anymore — it may have already been resolved since this was requested.');
+  }
+
+  const record = await RevenueWriteOff.create({
+    amount,
+    reason: payload?.reason || 'Historical bank/tax charges deficit, written off per admin decision.',
+    snapshotGrossUnswept: before.grossUnsweptRevenue,
+    snapshotTotalCharges: before.totalBankCharges,
+    writtenOffBy: req?.admin?._id,
+  });
+
+  logAudit({
+    action: 'admin.revenue.deficit_written_off',
+    category: 'admin',
+    severity: 'critical',
+    message: `Wrote off KES ${amount} in accumulated bank/tax-charges deficit against unswept revenue. Requested by ${requestedByAdmin?.name || requestedByAdmin?.email || 'an admin'}, approved by ${req?.admin?.name || req?.admin?.email || 'a second admin'}.`,
+    actor: adminActor(req?.admin),
+    req,
+    metadata: { writeOffId: record._id, amount, snapshot: before, requestedByAdminId: requestedByAdmin?._id ? String(requestedByAdmin._id) : null },
+  });
+
+  return computeExpectedPoolBalance();
+}
 
 // @desc    Live pooled-account balance straight from NCBA's AccountDetails
 //          endpoint — confirmed working live 2026-08-29 (see

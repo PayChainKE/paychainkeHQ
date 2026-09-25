@@ -530,7 +530,9 @@ const PoolReconciliation = () => {
         date: manualCreditDate || undefined,
         time: manualCreditTime || undefined,
       });
-      showToast(`Credited KES ${Number(manualCreditAmount).toLocaleString()} — new balance KES ${res.data?.data?.newBalance?.toLocaleString?.() ?? '—'}.`);
+      showToast(res.data?.pendingApproval
+        ? `Submitted for approval — a different admin must approve KES ${Number(manualCreditAmount).toLocaleString()} before it's credited. See Approvals.`
+        : `Credited KES ${Number(manualCreditAmount).toLocaleString()} — new balance KES ${res.data?.data?.newBalance?.toLocaleString?.() ?? '—'}.`);
       setShowManualCredit(false);
       fetchMerchantBalances();
     } catch (e) {

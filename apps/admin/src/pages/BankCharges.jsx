@@ -100,8 +100,10 @@ const BankCharges = () => {
     setWriteOffBusy(true);
     setWriteOffError('');
     try {
-      await api.post('/api/admin/revenue/pool-account/write-off-deficit', { reason: writeOffReason || undefined });
-      showToast('Deficit written off — unswept revenue no longer carries it.');
+      const res = await api.post('/api/admin/revenue/pool-account/write-off-deficit', { reason: writeOffReason || undefined });
+      showToast(res.data?.pendingApproval
+        ? `Submitted for approval — a different admin must approve writing off KES ${res.data.previewAmount?.toLocaleString?.() ?? ''}. See Approvals.`
+        : 'Deficit written off — unswept revenue no longer carries it.');
       setShowWriteOff(false);
       setWriteOffReason('');
       fetchDeficit();

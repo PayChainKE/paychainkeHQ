@@ -7,6 +7,8 @@ import Communication from '../models/Communication.js';
 import { sendTeamInvite } from '../utils/resend.js';
 import { notifyAdmins, escapeHtml } from '../utils/securityAlerts.js';
 import { recordDeletion } from '../utils/trash.js';
+import { logAudit } from '../utils/auditLog.js';
+import { adminActor } from './adminController.js';
 
 const ADMIN_DASHBOARD_URL =
   process.env.ADMIN_DASHBOARD_URL || 'https://admin.paychain.co.ke';
@@ -250,6 +252,44 @@ export const resendInvite = async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('Resend Invite Error:', error?.message || error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    End every session a team member currently has open — bumps
+//          tokenVersion (same mechanism as a self-service password change),
+//          so any JWT already issued to them, on any device, fails its next
+//          request and they're bounced back to sign-in. There's no session
+//          store to list individual devices/IPs from (stateless JWTs), so
+//          this is coarse by design: all-or-nothing, not per-device.
+//          Useful for a lost/stolen device or an admin who's just left.
+// @route   POST /api/admin/team/:id/force-signout
+// @access  Private (Owner)
+export const forceSignOutTeamMember = async (req, res) => {
+  if (!requireOwner(req, res)) return;
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: 'Invalid id.' });
+    }
+    if (String(req.params.id) === String(req.admin._id)) {
+      return res.status(400).json({ error: 'Use "Sign out" from your own profile menu instead.' });
+    }
+    const target = await Admin.findById(req.params.id);
+    if (!target) return res.status(404).json({ error: 'Member not found.' });
+
+    target.tokenVersion = (target.tokenVersion || 0) + 1;
+    await target.save();
+
+    logAudit({
+      action: 'admin.team.force_signout', category: 'admin', severity: 'warning',
+      message: `${req.admin.name || req.admin.email} force-signed-out ${target.name || target.email} on every device`,
+      actor: adminActor(req.admin), req,
+      metadata: { targetAdminId: String(target._id) },
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Force Sign Out Team Member Error:', error?.message || error);
     res.status(500).json({ error: 'Server Error' });
   }
 };

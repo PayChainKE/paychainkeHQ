@@ -5,6 +5,7 @@ import RetiredMerchantCode from './RetiredMerchantCode.js';
 import { normalizeKraPin, isValidKraPin, KRA_PIN_FORMAT_HINT } from '../utils/kraPinValidator.js';
 import { normalizeNationalId, isValidNationalId, NATIONAL_ID_FORMAT_HINT } from '../utils/nationalIdValidator.js';
 import { broadcastMerchantEvent } from '../utils/merchantEventStream.js';
+import { incrementMerchantsEverCreated } from './PlatformSettings.js';
 
 const merchantSchema = new mongoose.Schema({
   name: {
@@ -67,9 +68,12 @@ const merchantSchema = new mongoose.Schema({
   // documentReuseDetection.js's photo-hash comparison. Required for new
   // (web) signups only — see registerMerchant's own doc comment on the
   // legacy mobile request shape this isn't enforced against yet.
+  // No `default: null` on purpose: a sparse unique index still indexes an
+  // explicit null, so the second merchant created without a national ID (e.g.
+  // through the admin "create merchant" form, which never sets one) was
+  // rejected as a duplicate. Left unset it is simply absent and skipped.
   nationalId: {
     type: String,
-    default: null,
     unique: true,
     sparse: true,
     set: (v) => normalizeNationalId(v),
@@ -838,6 +842,14 @@ const merchantSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  // Stellar pilot merchants only (isDemoMerchant): how each incoming M-Pesa
+  // payment is routed. stellarSharePercent of the net credit is auto-converted
+  // to testnet USDC in the merchant's Stellar wallet; the rest stays liquid in
+  // KES. Ignored for everyone else. See services/stellarSettlementService.js.
+  settlementRule: {
+    enabled: { type: Boolean, default: false },
+    stellarSharePercent: { type: Number, default: 0, min: 0, max: 100 },
+  },
   // WebAuthn Passkeys — each device gets its own entry.
   // credentialID is base64url, publicKey is base64.
   // `select: false` keeps passkey data out of every normal query.
@@ -1038,6 +1050,26 @@ merchantSchema.post('save', function(doc) {
   } catch (err) {
     console.error('Merchant event broadcast failed:', err?.message || err);
   }
+});
+
+// Captures whether this document was brand new BEFORE Mongoose flips
+// isNew to false partway through save() — post('save') below can't read
+// doc.isNew directly for that reason. Scratch instance property, not a
+// schema path, so it's never persisted to Mongo.
+merchantSchema.pre('save', function(next) {
+  this.$wasNew = this.isNew;
+  next();
+});
+
+// Permanent, never-decremented tally of every real merchant account this
+// platform has ever had — see PlatformSettings.js's merchantsEverCreated
+// doc comment for why this exists (Merchant.countDocuments() and the Trash
+// page both undercount "since day one" once an account is deleted and/or
+// its 90-day trash window lapses). Demo/pilot merchants (isDemoMerchant)
+// are deliberately excluded — they were never a real onboarded business.
+merchantSchema.post('save', function(doc) {
+  if (!doc.$wasNew || doc.isDemoMerchant) return;
+  incrementMerchantsEverCreated().catch((err) => console.error('merchantsEverCreated increment failed:', err?.message || err));
 });
 
 const Merchant = mongoose.model('Merchant', merchantSchema);

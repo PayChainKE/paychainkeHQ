@@ -12,6 +12,7 @@ const NAV_SECTIONS = [
     title: 'Business Core',
     items: [
       { icon: 'dashboard',    label: 'Overview', path: '/overview' },
+      { icon: 'monitor_heart', label: 'Platform Health', path: '/ops-health' },
       { icon: 'analytics',    label: 'Insights', path: '/analytics' },
       { icon: 'trending_up',  label: 'Revenue',  path: '/revenue'  },
     ],
@@ -42,6 +43,7 @@ const NAV_SECTIONS = [
       { icon: 'savings',         label: 'Cash Advance Requests', path: '/cash-advance-requests' },
       { icon: 'security',        label: 'Wallet Audit',           path: '/wallet-audit'           },
       { icon: 'fact_check',      label: 'Audit Log',              path: '/audit-log'              },
+      { icon: 'gpp_maybe',       label: 'Approvals',              path: '/approvals'              },
       { icon: 'restore_from_trash', label: 'Trash',               path: '/trash'                  },
       { icon: 'shield_lock',     label: 'Security',               path: '/security'               },
     ],

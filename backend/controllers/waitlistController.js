@@ -224,7 +224,7 @@ export const deleteWaitlistEntry = async (req, res) => {
 };
 
 // @desc    Convert a waitlist entry to a real Merchant — mints a unique
-//          5-digit account number + a 24h password-setup token, emails the
+//          5-digit account number + a 48h password-setup token, emails the
 //          merchant the secure setup link, and marks the entry as
 //          'converted' with a reference to the new Merchant.
 // @route   POST /api/waitlist/:id/convert
@@ -277,7 +277,7 @@ export const convertWaitlistEntry = async (req, res) => {
     // the Merchant model's pre-save hook.
     const rawToken = crypto.randomBytes(32).toString('hex');
     const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
-    const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const expires = new Date(Date.now() + 48 * 60 * 60 * 1000);
 
     const merchant = await Merchant.create({
       name: entry.fullName,
