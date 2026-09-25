@@ -1056,9 +1056,8 @@ merchantSchema.post('save', function(doc) {
 // isNew to false partway through save() — post('save') below can't read
 // doc.isNew directly for that reason. Scratch instance property, not a
 // schema path, so it's never persisted to Mongo.
-merchantSchema.pre('save', function(next) {
+merchantSchema.pre('save', async function() {
   this.$wasNew = this.isNew;
-  next();
 });
 
 // Permanent, never-decremented tally of every real merchant account this
