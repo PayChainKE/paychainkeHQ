@@ -16,6 +16,16 @@ const MODEL_REGISTRY = { Merchant, Transaction, Admin, Expense };
 // two. Never throws into the caller's delete flow: a failed snapshot means
 // this particular deletion won't be undoable, which is unfortunate but far
 // better than a snapshotting bug blocking a real admin action outright.
+//
+// expiresAt is still set to the normal 90-day-out date for every collection
+// (Merchant included) — that date still drives the Cloudinary-image purge
+// sweep (trashRetentionService.js) and the restore-window UX, unchanged.
+// What's different for Merchant is the TTL *index* itself (see
+// DeletedRecord.js) excludes collectionName: 'Merchant' via a partial
+// filter, so Mongo never actually deletes the metadata once that date
+// passes — only Transaction/Admin/Expense snapshots really expire. Merchant
+// snapshots survive forever as the platform's permanent "every merchant
+// that ever existed" record for admin KPIs, not just a short undo window.
 export async function recordDeletion({ collectionName, doc, label, deletedBy }) {
   try {
     await DeletedRecord.create({

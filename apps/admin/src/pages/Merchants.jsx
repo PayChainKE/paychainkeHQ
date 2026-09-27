@@ -109,7 +109,7 @@ function relativeTime(iso) {
 const Merchants = () => {
   const [merchantsData, setMerchantsData] = useState([]);
   const [merchantStats, setMerchantStats] = useState({
-    active: 0, locked: 0, dormant: 0, total: 0, kycVerified: 0, flagged: 0,
+    active: 0, locked: 0, dormant: 0, total: 0, kycVerified: 0, flagged: 0, deleted: 0,
   });
 
   // Flag-merchant modal — { merchant, reason, busy, error }. Reuses the same
@@ -180,11 +180,17 @@ const Merchants = () => {
         const textMatch = haystack.some((s) => s.includes(q));
         if (!phoneMatch && !textMatch) return false;
       }
-      // Status
-      if (filters.status !== 'all') {
+      // Status. "All" stays "every current account" (deleted merchants are
+      // history, not something you're routinely managing) — pick "Deleted"
+      // explicitly to see who's been removed. The Total stat card counts
+      // deleted merchants regardless of this filter, since that's the KPI.
+      if (filters.status === 'all') {
+        if (m.isDeleted) return false;
+      } else {
         const isLocked = m.status === 'locked';
         if (filters.status === 'locked' && !isLocked) return false;
-        if (filters.status === 'active' && isLocked) return false;
+        if (filters.status === 'active' && (isLocked || m.isDeleted)) return false;
+        if (filters.status === 'deleted' && !m.isDeleted) return false;
       }
       // Activity
       if (filters.activity !== 'all' && m.activityTier !== filters.activity) return false;
@@ -221,12 +227,16 @@ const Merchants = () => {
         const mData = res.data.data;
         setMerchantsData(mData);
         setMerchantStats({
+          // Total is deliberately every merchant that ever existed (live +
+          // deleted, see backend getMerchants) — the platform-lifetime KPI.
+          // Every other bucket below is scoped to current accounts only.
           total: mData.length,
-          active: mData.filter((m) => m.status !== 'locked' && m.activityTier === 'active').length,
-          locked: mData.filter((m) => m.status === 'locked').length,
-          dormant: mData.filter((m) => m.activityTier === 'dormant').length,
-          kycVerified: mData.filter((m) => m.isVerified).length,
-          flagged: mData.filter((m) => m.flagged).length,
+          active: mData.filter((m) => !m.isDeleted && m.status !== 'locked' && m.activityTier === 'active').length,
+          locked: mData.filter((m) => !m.isDeleted && m.status === 'locked').length,
+          dormant: mData.filter((m) => !m.isDeleted && m.activityTier === 'dormant').length,
+          kycVerified: mData.filter((m) => !m.isDeleted && m.isVerified).length,
+          flagged: mData.filter((m) => !m.isDeleted && m.flagged).length,
+          deleted: mData.filter((m) => m.isDeleted).length,
         });
       }
     } catch (err) {
@@ -501,7 +511,7 @@ const Merchants = () => {
           m.name || '—',
           m.phone || '—',
           m.county || '—',
-          m.status === 'locked' ? 'Locked' : 'Active',
+          m.isDeleted ? 'Deleted' : m.status === 'locked' ? 'Locked' : 'Active',
           m.isVerified ? 'Verified' : 'Unverified',
           isPilot ? 'PILOT' : '',
           new Date(m.createdAt).toLocaleDateString('en-KE', { day: '2-digit', month: 'short', year: 'numeric' }),
@@ -625,12 +635,21 @@ const Merchants = () => {
         </div>
 
         {/* Stats Strip */}
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 md:gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
           <StatCard label="Active" value={merchantStats.active} icon="bolt" tone="emerald" />
           <StatCard label="Locked" value={merchantStats.locked} icon="lock" tone="amber" />
           <StatCard label="Flagged" value={merchantStats.flagged} icon="flag" tone="red" />
           <StatCard label="Dormant" value={merchantStats.dormant} icon="schedule" tone="gray" />
-          <StatCard label="Total" value={merchantStats.total} icon="storefront" tone="primary" className="col-span-2 md:col-span-1" />
+          <StatCard
+            label="Deleted"
+            value={merchantStats.deleted}
+            icon="person_off"
+            tone="gray"
+            onClick={() => { setFilters((f) => ({ ...f, status: 'deleted' })); setShowFilters(false); }}
+          />
+          {/* Every merchant that ever existed — live + deleted. The one KPI
+              on this page that never changes with the status filter. */}
+          <StatCard label="Total Ever" value={merchantStats.total} icon="storefront" tone="primary" className="col-span-2 md:col-span-1" />
         </div>
 
         {viewMode === 'map' ? (
@@ -749,11 +768,12 @@ const Merchants = () => {
                 {pagedMerchants.map((m, i) => {
                   const tier = ACTIVITY_STYLE[m.activityTier] || ACTIVITY_STYLE.dormant;
                   const locked = m.status === 'locked';
+                  const deleted = !!m.isDeleted;
                   const flagged = !!m.flagged;
                   const riskSignals = m.riskSignals || [];
                   const highSeverity = riskSignals.some((s) => s.severity === 'high');
                   return (
-                    <tr key={m._id || i} className={`hover:bg-secondary-container/5 transition-colors group cursor-pointer ${locked ? 'opacity-70' : ''} ${flagged ? 'bg-red-50/30' : ''}`} onClick={() => openDetail(m._id)}>
+                    <tr key={m._id || i} className={`hover:bg-secondary-container/5 transition-colors group cursor-pointer ${locked ? 'opacity-70' : ''} ${deleted ? 'opacity-50 grayscale-[60%]' : ''} ${flagged ? 'bg-red-50/30' : ''}`} onClick={() => openDetail(m._id)}>
                       <td className="py-2 px-3 text-on-surface-variant/40 border-b border-outline-variant/5 text-[11px] tabular-nums">{String((page - 1) * PAGE_SIZE + i + 1).padStart(2, '0')}</td>
                       <td className="py-2 px-3 border-b border-outline-variant/5">
                         <div className="flex items-center gap-2.5">
@@ -810,7 +830,11 @@ const Merchants = () => {
                         </div>
                       </td>
                       <td className="py-2 px-3 border-b border-outline-variant/5">
-                        {locked ? (
+                        {deleted ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border tracking-tight uppercase bg-gray-200 text-gray-600 border-gray-300">
+                            <span className="material-symbols-outlined text-[12px]">person_off</span> Deleted
+                          </span>
+                        ) : locked ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border tracking-tight uppercase bg-amber-100 text-amber-800 border-amber-200">
                             <span className="material-symbols-outlined text-[12px]">lock</span> Locked
                           </span>
@@ -834,23 +858,29 @@ const Merchants = () => {
                         </button>
                         {openMenuId === m._id && (
                           <div ref={menuRef} className="absolute right-3 top-10 z-20 w-56 bg-white rounded-xl shadow-xl border border-outline-variant/20 overflow-hidden">
-                            <MenuItem icon="visibility" tone="blue" onClick={() => { setOpenMenuId(null); openDetail(m._id); }}>View KYB details</MenuItem>
-                            <MenuItem icon="location_on" tone="blue" onClick={() => { setOpenMenuId(null); setLocationPickerMerchant(m); }}>
-                              {m.mapLocation?.lat != null ? 'Edit map location' : 'Set map location'}
+                            <MenuItem icon="visibility" tone="blue" onClick={() => { setOpenMenuId(null); openDetail(m._id); }}>
+                              {deleted ? 'View deleted record' : 'View KYB details'}
                             </MenuItem>
-                            <div className="h-px bg-outline-variant/20"></div>
-                            {flagged ? (
-                              <MenuItem icon="outlined_flag" tone="emerald" onClick={() => unflag(m)}>Clear suspicious flag</MenuItem>
-                            ) : (
-                              <MenuItem icon="flag" tone="red" onClick={() => startFlag(m)}>Flag as suspicious</MenuItem>
+                            {!deleted && (
+                              <>
+                                <MenuItem icon="location_on" tone="blue" onClick={() => { setOpenMenuId(null); setLocationPickerMerchant(m); }}>
+                                  {m.mapLocation?.lat != null ? 'Edit map location' : 'Set map location'}
+                                </MenuItem>
+                                <div className="h-px bg-outline-variant/20"></div>
+                                {flagged ? (
+                                  <MenuItem icon="outlined_flag" tone="emerald" onClick={() => unflag(m)}>Clear suspicious flag</MenuItem>
+                                ) : (
+                                  <MenuItem icon="flag" tone="red" onClick={() => startFlag(m)}>Flag as suspicious</MenuItem>
+                                )}
+                                {locked ? (
+                                  <MenuItem icon="lock_open" tone="emerald" onClick={() => startAction(m, 'unlock')}>Unlock account</MenuItem>
+                                ) : (
+                                  <MenuItem icon="lock" tone="amber" onClick={() => startAction(m, 'lock')}>Lock account</MenuItem>
+                                )}
+                                <div className="h-px bg-outline-variant/20"></div>
+                                <MenuItem icon="delete_forever" tone="red" onClick={() => startAction(m, 'delete')}>Delete account</MenuItem>
+                              </>
                             )}
-                            {locked ? (
-                              <MenuItem icon="lock_open" tone="emerald" onClick={() => startAction(m, 'unlock')}>Unlock account</MenuItem>
-                            ) : (
-                              <MenuItem icon="lock" tone="amber" onClick={() => startAction(m, 'lock')}>Lock account</MenuItem>
-                            )}
-                            <div className="h-px bg-outline-variant/20"></div>
-                            <MenuItem icon="delete_forever" tone="red" onClick={() => startAction(m, 'delete')}>Delete account</MenuItem>
                           </div>
                         )}
                       </td>
@@ -1011,7 +1041,7 @@ const Field = ({ label, required, children }) => (
   </div>
 );
 
-const StatCard = ({ label, value, icon, tone, className = '' }) => {
+const StatCard = ({ label, value, icon, tone, className = '', onClick }) => {
   const toneMap = {
     emerald:   'bg-emerald-50 text-emerald-600',
     amber:     'bg-amber-50 text-amber-600',
@@ -1020,8 +1050,12 @@ const StatCard = ({ label, value, icon, tone, className = '' }) => {
     secondary: 'bg-secondary-container/20 text-secondary',
     primary:   'bg-primary/10 text-primary',
   };
+  const Wrapper = onClick ? 'button' : 'div';
   return (
-    <div className={`bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/20 flex items-center justify-between shadow-premium-glow transition-all hover:scale-[1.02] ${className}`}>
+    <Wrapper
+      onClick={onClick}
+      className={`bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/20 flex items-center justify-between shadow-premium-glow transition-all hover:scale-[1.02] ${onClick ? 'text-left cursor-pointer' : ''} ${className}`}
+    >
       <div>
         <p className="text-[10px] md:text-[11px] font-bold uppercase tracking-widest text-on-surface-variant/40 mb-1">{label}</p>
         <h3 className="text-xl md:text-2xl font-bold text-on-surface tracking-tight">{value}</h3>
@@ -1029,7 +1063,7 @@ const StatCard = ({ label, value, icon, tone, className = '' }) => {
       <div className={`hidden sm:flex w-10 h-10 rounded-full items-center justify-center ${toneMap[tone] || toneMap.gray}`}>
         <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>{icon}</span>
       </div>
-    </div>
+    </Wrapper>
   );
 };
 
@@ -1198,7 +1232,7 @@ const FlagModal = ({ state, onChange, onSubmit, onClose }) => {
 // ── Filter UI ───────────────────────────────────────────────────────────
 const FILTER_GROUPS = [
   { key: 'status',       label: 'Account Status', opts: [
-    { v: 'all', l: 'All' }, { v: 'active', l: 'Active' }, { v: 'locked', l: 'Locked' },
+    { v: 'all', l: 'All' }, { v: 'active', l: 'Active' }, { v: 'locked', l: 'Locked' }, { v: 'deleted', l: 'Deleted' },
   ]},
   { key: 'activity',     label: 'Activity', opts: [
     { v: 'all', l: 'All' }, { v: 'active', l: 'Active (≤7d)' }, { v: 'idle', l: 'Idle (≤30d)' }, { v: 'dormant', l: 'Dormant' },
@@ -1820,11 +1854,37 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
           </div>
         ) : !ready ? null : (
           <div className="p-6 space-y-6">
+            {/* Deleted banner — this is a permanent historical snapshot, not
+                a live account. No mutation on this page can succeed against
+                it (the backend endpoints all require a live merchant), so
+                every editable/action affordance below stays visible but
+                read-only context, not something to click. */}
+            {m.isDeleted && (
+              <div className="bg-gray-100 border border-gray-300 rounded-xl p-4">
+                <div className="flex items-start gap-3">
+                  <span className="material-symbols-outlined text-gray-500 text-xl">person_off</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] font-bold uppercase tracking-widest text-gray-600 mb-1">Account deleted</p>
+                    <p className="text-sm text-gray-800 leading-relaxed">
+                      This merchant no longer has a live account. Kept here as a permanent historical record so platform totals reflect everyone who ever signed up.
+                    </p>
+                    <p className="text-[11px] text-gray-600/80 mt-2">
+                      Deleted {fmtDate(m.deletedAt)}{m.deletedByEmail ? ` by ${m.deletedByEmail}` : ''}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Top-line status badges */}
             <div className="flex flex-wrap gap-2">
-              <Badge tone={m.status === 'locked' ? 'amber' : 'emerald'} icon={m.status === 'locked' ? 'lock' : 'check_circle'}>
-                {m.status === 'locked' ? 'Locked' : 'Active'}
-              </Badge>
+              {m.isDeleted ? (
+                <Badge tone="gray" icon="person_off">Deleted</Badge>
+              ) : (
+                <Badge tone={m.status === 'locked' ? 'amber' : 'emerald'} icon={m.status === 'locked' ? 'lock' : 'check_circle'}>
+                  {m.status === 'locked' ? 'Locked' : 'Active'}
+                </Badge>
+              )}
               {m.flagged && <Badge tone="red" icon="flag">Flagged</Badge>}
               <Badge tone={m.isVerified ? 'emerald' : 'gray'} icon={m.isVerified ? 'verified' : 'pending'}>
                 {m.isVerified ? 'Account Verified' : 'Unverified'}
@@ -1906,13 +1966,15 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
                   ) : (
                     <div className="flex items-center gap-2">
                       <span>{businessName}</span>
-                      <button
-                        onClick={startEditBusinessName}
-                        className="p-1 rounded-md text-on-surface-variant/50 hover:text-primary hover:bg-primary/10 transition-all"
-                        title="Edit business name"
-                      >
-                        <span className="material-symbols-outlined text-[15px]">edit</span>
-                      </button>
+                      {!m.isDeleted && (
+                        <button
+                          onClick={startEditBusinessName}
+                          className="p-1 rounded-md text-on-surface-variant/50 hover:text-primary hover:bg-primary/10 transition-all"
+                          title="Edit business name"
+                        >
+                          <span className="material-symbols-outlined text-[15px]">edit</span>
+                        </button>
+                      )}
                     </div>
                   )
                 }
@@ -2313,13 +2375,15 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
                           <Badge tone="amber" icon="pending">Not set (pending setup)</Badge>
                         );
                       })()}
-                      <button
-                        onClick={handleResendSetupLink}
-                        disabled={resendingSetupLink}
-                        className="text-[10px] font-bold uppercase tracking-widest text-primary hover:underline disabled:opacity-50"
-                      >
-                        {resendingSetupLink ? 'Sending…' : 'Resend setup link'}
-                      </button>
+                      {!m.isDeleted && (
+                        <button
+                          onClick={handleResendSetupLink}
+                          disabled={resendingSetupLink}
+                          className="text-[10px] font-bold uppercase tracking-widest text-primary hover:underline disabled:opacity-50"
+                        >
+                          {resendingSetupLink ? 'Sending…' : 'Resend setup link'}
+                        </button>
+                      )}
                       {resendSetupLinkStatus && <p className="text-[10px] text-emerald-600">{resendSetupLinkStatus}</p>}
                       {resendSetupLinkError && <p className="text-[10px] text-red-600">{resendSetupLinkError}</p>}
                     </div>
