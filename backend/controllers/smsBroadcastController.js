@@ -53,7 +53,17 @@ export const sendSmsBroadcast = async (req, res) => {
       return res.status(400).json({ error: 'Select at least one merchant.' });
     }
 
-    const query = audience === 'selected' ? { _id: { $in: merchantIds } } : {};
+    // "All Merchants" deliberately excludes locked accounts and demo/pilot
+    // accounts — a locked merchant can't act on a payout-outage notice
+    // anyway, and a demo account was never a real business to notify. A
+    // deleted merchant is never a concern here: deleteMerchant hard-removes
+    // the document (see adminController.js), so it can never match this
+    // query in the first place. An admin can still explicitly pick a
+    // locked merchant via "Select Specific" if they have a real reason to
+    // (e.g. explaining why the account is locked).
+    const query = audience === 'selected'
+      ? { _id: { $in: merchantIds } }
+      : { status: { $ne: 'locked' }, isDemoMerchant: { $ne: true } };
     const merchants = await Merchant.find(query).select('phone').lean();
     const recipients = merchants.filter((m) => !!m.phone);
     if (recipients.length === 0) {

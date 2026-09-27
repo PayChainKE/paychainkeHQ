@@ -36,6 +36,7 @@ import BankCharges from './pages/BankCharges';
 import Bookkeeping from './pages/Bookkeeping';
 import TaxCompliance from './pages/TaxCompliance';
 import SmsBroadcast from './pages/SmsBroadcast';
+import EmailBroadcast from './pages/EmailBroadcast';
 import DormantAccounts from './pages/DormantAccounts';
 import EmailLog from './pages/EmailLog';
 import KycVerification from './pages/KycVerification';
@@ -68,6 +69,7 @@ export default function App(){
             <Route path="/blog-posts" element={<Protected><BlogPosts/></Protected>} />
             <Route path="/automations" element={<Protected><Automations/></Protected>} />
             <Route path="/sms-broadcast" element={<Protected><SmsBroadcast/></Protected>} />
+            <Route path="/email-broadcast" element={<Protected><EmailBroadcast/></Protected>} />
             <Route path="/dormant-accounts" element={<Protected><DormantAccounts/></Protected>} />
             <Route path="/email-log" element={<Protected><EmailLog/></Protected>} />
             <Route path="/team" element={<Protected><Team/></Protected>} />
