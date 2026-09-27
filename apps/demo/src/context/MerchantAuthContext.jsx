@@ -93,6 +93,38 @@ export function MerchantAuthProvider({ children }){
     setRealMerchant(null)
   }
 
+  // Forgot-password, 3 steps — mirrors merchant-dashboard/src/pages/Login.jsx's
+  // own forgotPassword/verifyResetOTP/resetPassword exactly (same endpoints,
+  // same shapes), for whoever is producing the grant evidence and has lost
+  // the shared demo-merchant password. Additive, same as realLogin/
+  // realVerifyOtp above — nothing else in this app touches these.
+  async function realForgotPassword(identifier) {
+    try {
+      const res = await api.post('/api/auth/merchant/forgot-password', { email: identifier })
+      return { success: true, maskedEmail: res.data?.maskedEmail }
+    } catch (err) {
+      return { success: false, error: err.response?.data?.error || 'Could not start password reset.' }
+    }
+  }
+
+  async function realVerifyResetOtp(identifier, otp) {
+    try {
+      const res = await api.post('/api/auth/merchant/verify-reset-otp', { email: identifier, otp })
+      return { success: true, resetToken: res.data?.resetToken }
+    } catch (err) {
+      return { success: false, error: err.response?.data?.error || 'Invalid or expired code.' }
+    }
+  }
+
+  async function realResetPassword(resetToken, newPassword) {
+    try {
+      await api.post('/api/auth/merchant/reset-password', { resetToken, newPassword })
+      return { success: true }
+    } catch (err) {
+      return { success: false, error: err.response?.data?.error || 'Could not reset password.' }
+    }
+  }
+
   useEffect(()=>{
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw){
@@ -177,6 +209,7 @@ export function MerchantAuthProvider({ children }){
       // see the block comment above REAL_STORAGE_KEY for why this is separate
       // from everything above.
       realMerchant, realLoading, refreshRealMerchant, realLogin, realVerifyOtp, realLogout,
+      realForgotPassword, realVerifyResetOtp, realResetPassword,
     }}>
       {children}
     </MerchantAuthContext.Provider>
