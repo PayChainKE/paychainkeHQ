@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { notifyAdmins, escapeHtml } from '../utils/securityAlerts.js';
 
 // ── NCBA Open Banking configuration ────────────────────────────────────────
 // Same "never derive from NODE_ENV" rule as ncbaBulkPaymentService.js /
@@ -119,6 +120,57 @@ function unwrapAxiosError(err) {
   return JSON.stringify(detail);
 }
 
+// True for a genuine infrastructure-level failure (no response at all —
+// timeout/DNS/connection-refused — or a 5xx from NCBA's own gateway, e.g.
+// the Azure Front Door 502/503/504s seen live). False for an ordinary
+// business rejection (400 "Amount below minimum", a stale 401, etc.) —
+// those are NCBA working normally and saying no, not NCBA being down, and
+// must never trigger the "NCBA is down" alert below.
+function isNcbaUnreachable(err) {
+  if (!err.response) return true;
+  return err.response.status >= 500;
+}
+
+// Fires once when NCBA Open Banking first becomes unreachable — not on
+// every failed request during a prolonged outage, which could otherwise be
+// dozens of emails an hour (see the live 504-storm this was built for).
+// Deliberately addressed to admins, not merchants: an admin decides whether
+// and how to broadcast an SMS to merchants that payouts are temporarily
+// down, rather than the system auto-texting every merchant on the first
+// blip. Covers every rail this service powers (PesaLink, Mobile B2W, Lipa
+// na M-Pesa, KPLC/KPLC-prepaid/NCWSC, Bulk Pay, developer API payouts,
+// pool balance/statement) — M-Pesa STK/collections run on a separate NCBA
+// rail and are unaffected, which the alert says explicitly so an admin
+// doesn't broadcast wider than necessary.
+let ncbaOpenBankingOutageAlerted = false;
+function reportNcbaOpenBankingDown(context, err) {
+  if (ncbaOpenBankingOutageAlerted) return;
+  ncbaOpenBankingOutageAlerted = true;
+  notifyAdmins({
+    type: 'ncba_openbanking_down',
+    severity: 'critical',
+    subject: 'NCBA Open Banking is unreachable',
+    heading: 'NCBA Open Banking Down',
+    details: `PayChain could not reach NCBA's Open Banking gateway (${escapeHtml(context)}): <strong>${escapeHtml(err?.message || 'unknown error')}</strong>. Bank transfers, Mobile B2W, Lipa na M-Pesa, bill payments (KPLC/NCWSC) and Bulk Pay are all affected until this clears — M-Pesa STK Push and customer collections run on a separate NCBA rail and are <strong>not</strong> affected. Consider sending merchants an SMS broadcast that payouts are temporarily under maintenance.`,
+    metadata: { context, error: err?.message || null, status: err?.response?.status ?? null },
+  });
+}
+
+// Mirrors reportNcbaOpenBankingDown above — fires once, the first time a
+// call succeeds after an alerted outage, so admins get an explicit all-clear
+// instead of having to keep checking Platform Health themselves.
+function reportNcbaOpenBankingRecovered() {
+  if (!ncbaOpenBankingOutageAlerted) return;
+  ncbaOpenBankingOutageAlerted = false;
+  notifyAdmins({
+    type: 'ncba_openbanking_recovered',
+    severity: 'info',
+    subject: 'NCBA Open Banking is back up',
+    heading: 'NCBA Open Banking Recovered',
+    details: 'PayChain successfully reached NCBA\'s Open Banking gateway again. Bank transfers, Mobile B2W, Lipa na M-Pesa, bill payments and Bulk Pay should be working normally — if you sent merchants a maintenance notice, this is the all-clear to follow up.',
+  });
+}
+
 // Module-scope token cache — NCBA's Auth/generate-token flow has no
 // precedent elsewhere in this codebase (M-Pesa's `generateToken` re-fetches
 // per-request as Express middleware, which isn't suitable here since Open
@@ -170,12 +222,14 @@ async function fetchNewToken() {
     cachedTokenType = tokenType;
     tokenExpiresAt = Date.now() + TOKEN_TTL_MS;
     logEvent('info', 'ncba_openbanking_token_refreshed', {});
+    reportNcbaOpenBankingRecovered();
     return { accessToken, tokenType };
   } catch (err) {
     if (err instanceof NcbaOpenBankingAuthError) throw err;
     // Full upstream error detail goes to the server log only — never bake a
     // raw upstream response body into a message that reaches the client.
     logEvent('error', 'ncba_openbanking_token_fetch_failed', { error: unwrapAxiosError(err) });
+    if (isNcbaUnreachable(err)) reportNcbaOpenBankingDown('token fetch', err);
     throw new NcbaOpenBankingAuthError('Failed to obtain an Open Banking access token.');
   }
 }
@@ -221,6 +275,7 @@ async function ncbaOpenBankingPost(path, body, { retrying = false } = {}) {
       // of that same flakiness).
       timeout: 45000,
     });
+    reportNcbaOpenBankingRecovered();
     return response.data;
   } catch (err) {
     if (err.response?.status === 401 && !retrying) {
@@ -231,6 +286,7 @@ async function ncbaOpenBankingPost(path, body, { retrying = false } = {}) {
     // response body (headers, stack traces, HTML error pages) must never
     // reach the client verbatim.
     logEvent('error', 'ncba_openbanking_request_failed', { path, error: unwrapAxiosError(err) });
+    if (isNcbaUnreachable(err)) reportNcbaOpenBankingDown('API request', err);
     // But when NCBA rejected the request with an HTTP error status (not a
     // clean 200 + succeeded:false, which already surfaces its own message
     // below) AND that error body carries a short, plain-string reason in a
