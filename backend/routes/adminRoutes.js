@@ -92,6 +92,7 @@ import {
 import { runWalletAudit } from '../controllers/walletAuditController.js';
 import { adminListInvoices } from '../controllers/invoiceController.js';
 import { sendSmsBroadcast, getSmsBroadcasts, deleteSmsBroadcast, clearSmsBroadcasts } from '../controllers/smsBroadcastController.js';
+import { sendEmailBroadcast, getEmailBroadcasts, deleteEmailBroadcast, clearEmailBroadcasts } from '../controllers/emailBroadcastController.js';
 import { getDormantMerchants, sendDormantReminders } from '../controllers/dormantAccountsController.js';
 import { getEmailLogs, getEmailLogDetail, clearEmailLogs } from '../controllers/emailLogController.js';
 import { getRevenue, getRevenueSweeps, archiveRevenueSweep, unarchiveRevenueSweep, exportRevenueSweeps, triggerRevenueSweep, getReconciliations, submitReconciliation, archiveReconciliation, unarchiveReconciliation, bulkArchiveReconciliations, getExpectedPoolBalance, getLivePoolBalance, getPoolAccountStatement, getBankCharges, recordBankCharge, updateBankCharge, archiveBankCharge, writeOffRevenueDeficit, getRevenueTransactions } from '../controllers/revenueController.js';
@@ -395,6 +396,10 @@ router.get('/sms-broadcasts',        protect, excludeOfficer, getSmsBroadcasts);
 router.post('/sms-broadcasts',       protect, requireMutator, sensitiveActionLimiter, sendSmsBroadcast);
 router.delete('/sms-broadcasts/:id', protect, requireMutator, sensitiveActionLimiter, deleteSmsBroadcast);
 router.post('/sms-broadcasts/clear', protect, requireMutator, sensitiveActionLimiter, clearSmsBroadcasts);
+router.get('/email-broadcasts',        protect, excludeOfficer, getEmailBroadcasts);
+router.post('/email-broadcasts',       protect, requireMutator, sensitiveActionLimiter, sendEmailBroadcast);
+router.delete('/email-broadcasts/:id', protect, requireMutator, sensitiveActionLimiter, deleteEmailBroadcast);
+router.post('/email-broadcasts/clear', protect, requireMutator, sensitiveActionLimiter, clearEmailBroadcasts);
 
 // Dormant-account re-engagement — admin-triggered email/SMS reminder to
 // merchants with no recent login/transaction activity, personalized with

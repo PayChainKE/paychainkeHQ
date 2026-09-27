@@ -1,11 +1,11 @@
-import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import Layout from '../components/layout/Layout';
-import api from '../api/api';
-import TablePagination from '../components/ui/TablePagination';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
+import Layout from '../components/layout/Layout'
+import api from '../api/api'
+import TablePagination from '../components/ui/TablePagination'
 
-const PAGE_SIZE = 20;
-const PAYCHAIN_PHONE = '+254 743 283 782';
-const MAX_LEN = 918;
+const PAGE_SIZE = 20
+const PAYCHAIN_PHONE = '+254 743 283 782'
+const MAX_LEN = 5000
 
 const CATEGORY_META = {
   maintenance: { label: 'Maintenance', icon: 'build', color: 'bg-amber-50 text-amber-700 border-amber-200' },
@@ -13,263 +13,216 @@ const CATEGORY_META = {
   security:    { label: 'Security',    icon: 'shield', color: 'bg-red-50 text-red-700 border-red-200' },
   general:     { label: 'General',     icon: 'campaign', color: 'bg-blue-50 text-blue-700 border-blue-200' },
   tips:        { label: 'Tips & Features', icon: 'insights', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-};
+}
 
-// "Tips & Features" copy is deliberately plain, benefit-first language — a
-// kiosk or village-shop owner reading this on a basic phone should
-// understand it on the first read, no banking/tech jargon. Fixed,
-// {{merge-tag}}-free copy sent identically to every recipient — for a
-// per-recipient personalized/editable SMS blast, see the Dormant Accounts
-// page (dormantAccountsController.js's {{business}}/{{days}} tags).
+// Same fixed, {{merge-tag}}-free copy convention as SmsBroadcast.jsx's own
+// TEMPLATES — quick-fill starting points an admin edits before sending, not
+// an automated per-recipient mail merge.
 const TEMPLATES = [
   {
     category: 'maintenance',
     label: 'System Maintenance',
-    body: `Dear Merchant, PayChain is currently undergoing scheduled maintenance and some services may be temporarily unavailable. We apologise for the inconvenience and are working to restore full service shortly. For urgent help, call ${PAYCHAIN_PHONE}. – Team PayChain`,
+    subject: 'PayChain — Scheduled Maintenance Notice',
+    body: `Dear Merchant,\n\nPayChain is currently undergoing scheduled maintenance and some services may be temporarily unavailable. We apologise for the inconvenience and are working to restore full service shortly.\n\nFor urgent help, call ${PAYCHAIN_PHONE}.\n\n– Team PayChain`,
   },
   {
     category: 'maintenance',
     label: 'Payouts Temporarily Unavailable',
-    body: `Dear Merchant, our banking partner is experiencing a temporary outage. You can still receive customer payments as normal, but sending money out (bank transfers, Mobile B2W, Lipa na M-Pesa, bill payments, Bulk Pay) is delayed until service is restored. We're monitoring closely and apologise for the inconvenience. For urgent help, call ${PAYCHAIN_PHONE}. – Team PayChain`,
+    subject: 'PayChain — Payouts Temporarily Delayed',
+    body: `Dear Merchant,\n\nOur banking partner is experiencing a temporary outage. You can still receive customer payments as normal, but sending money out (bank transfers, Mobile B2W, Lipa na M-Pesa, bill payments, Bulk Pay) is delayed until service is restored.\n\nWe're monitoring this closely and will notify you as soon as it clears. We apologise for the inconvenience.\n\nFor urgent help, call ${PAYCHAIN_PHONE}.\n\n– Team PayChain`,
   },
   {
     category: 'holiday',
     label: 'Public Holiday Greeting',
-    body: `Wishing you and your business a joyful holiday! Thank you for trusting PayChain to collect, pay, protect and grow with you all year round. Season's greetings from all of us at PayChain Kenya.`,
+    subject: 'Season’s Greetings from PayChain',
+    body: `Wishing you and your business a joyful holiday!\n\nThank you for trusting PayChain to collect, pay, protect and grow with you all year round.\n\nSeason's greetings from all of us at PayChain Kenya.`,
   },
   {
     category: 'security',
     label: 'Security Reminder',
-    body: `Dear Merchant, protect your PayChain PIN and OTP — never share them with anyone, even someone claiming to call from PayChain. We will never ask for your PIN over a call or SMS. Noticed suspicious activity on your account? Call ${PAYCHAIN_PHONE} immediately. – Team PayChain`,
-  },
-  {
-    category: 'tips',
-    label: 'Automatic Sales Tracking',
-    body: `Collect payments on your PayChain Paybill without worry! PayChain confirms every customer payment and counts your daily sales automatically so you never lose track of money. Check sales: https://paychain.co.ke`,
-  },
-  {
-    category: 'tips',
-    label: 'Cash Advance',
-    body: `Need extra money to restock your shop? PayChain gives trusted merchants a Cash Advance based on your own sales — no paperwork, no long queues at the bank. Open your PayChain app to see if you qualify.`,
-  },
-  {
-    category: 'tips',
-    label: 'Your Money Is Safe',
-    body: `Your money is safe with PayChain. Every coin your customers pay goes straight to your account, and you can move it to M-PESA anytime you need it. Karibu PayChain — collect with confidence!`,
-  },
-  {
-    category: 'tips',
-    label: 'Referral / Grow Together',
-    body: `Do you know another shop owner who still writes sales in a notebook? Tell them about PayChain! Free to join, instant payment alerts, and automatic sales records. Asante for growing with us.`,
-  },
-  {
-    category: 'tips',
-    label: 'Bulk Pay (Suppliers & Staff)',
-    body: `Paying many suppliers or workers at once? Use PayChain Bulk Pay to send money to everyone in one go, straight from your phone — no more standing in line at the bank.`,
-  },
-  {
-    category: 'tips',
-    label: 'STK Push',
-    body: `Want an easier way to get paid? With PayChain STK Push, just enter your customer's phone number and the amount — they get a prompt to enter their M-PESA PIN, and the money lands in your account instantly. Try it today!`,
-  },
-  {
-    category: 'tips',
-    label: 'Payment Link',
-    body: `Have a customer who isn't near your shop? Create a PayChain Payment Link and send it via WhatsApp or SMS. They tap it, pay instantly, and you get notified — no Paybill number needed!`,
-  },
-  {
-    category: 'tips',
-    label: 'Invoices (Credit Sales)',
-    body: `Selling on credit? Send your customer a PayChain Invoice on their phone and get paid on time, every time — no more forgotten debts. Try it in your PayChain app today.`,
+    subject: 'PayChain — Keep Your Account Secure',
+    body: `Dear Merchant,\n\nProtect your PayChain PIN and OTP — never share them with anyone, even someone claiming to call from PayChain. We will never ask for your PIN over a call, SMS or email.\n\nNoticed suspicious activity on your account? Call ${PAYCHAIN_PHONE} immediately.\n\n– Team PayChain`,
   },
   {
     category: 'general',
     label: 'Blank / Custom',
+    subject: '',
     body: '',
   },
-];
+]
 
 function relativeTime(iso) {
-  if (!iso) return '—';
-  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (s < 60) return 'Just now';
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  const days = Math.floor(s / 86400);
-  if (days < 30) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString();
+  if (!iso) return '—'
+  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
+  if (s < 60) return 'Just now'
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`
+  const days = Math.floor(s / 86400)
+  if (days < 30) return `${days}d ago`
+  return new Date(iso).toLocaleDateString()
 }
-function fmtDate(iso) { return iso ? new Date(iso).toLocaleString() : '—'; }
+function fmtDate(iso) { return iso ? new Date(iso).toLocaleString() : '—' }
 
-// SMS segment estimate: 160 chars for a single GSM-7 message, 153/segment
-// once concatenated across multiple parts — the same math carriers use to
-// decide how many parts (and how much) a long SMS actually costs.
-function smsSegments(len) {
-  if (len === 0) return 0;
-  if (len <= 160) return 1;
-  return Math.ceil(len / 153);
-}
+export default function EmailBroadcast() {
+  const [subject, setSubject] = useState('')
+  const [message, setMessage] = useState('')
+  const [category, setCategory] = useState('general')
 
-export default function SmsBroadcast() {
-  const [message, setMessage] = useState('');
-  const [category, setCategory] = useState('general');
+  const [audience, setAudience] = useState('all') // 'all' | 'selected'
+  const [merchants, setMerchants] = useState([])
+  const [merchantsLoading, setMerchantsLoading] = useState(true)
+  const [merchantSearch, setMerchantSearch] = useState('')
+  const [selectedIds, setSelectedIds] = useState(new Set())
 
-  const [audience, setAudience] = useState('all'); // 'all' | 'selected'
-  const [merchants, setMerchants] = useState([]);
-  const [merchantsLoading, setMerchantsLoading] = useState(true);
-  const [merchantSearch, setMerchantSearch] = useState('');
-  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [history, setHistory] = useState([])
+  const [historyLoading, setHistoryLoading] = useState(true)
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [selectedHistoryIds, setSelectedHistoryIds] = useState(new Set())
+  const [clearState, setClearState] = useState(null) // { mode: 'selected'|'all', busy, error } | null
 
-  const [history, setHistory] = useState([]);
-  const [historyLoading, setHistoryLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [selectedHistoryIds, setSelectedHistoryIds] = useState(new Set());
-  const [clearState, setClearState] = useState(null); // { mode: 'selected'|'all', busy, error } | null
-
-  const [pendingSend, setPendingSend] = useState(false);
-  const [sending, setSending] = useState(false);
-  const sendingRef = useRef(false);
-  const [error, setError] = useState('');
-  const [toast, setToast] = useState('');
-  const showToast = useCallback((msg) => { setToast(msg); setTimeout(() => setToast(''), 3000); }, []);
+  const [pendingSend, setPendingSend] = useState(false)
+  const [sending, setSending] = useState(false)
+  const sendingRef = useRef(false)
+  const [error, setError] = useState('')
+  const [toast, setToast] = useState('')
+  const showToast = useCallback((msg) => { setToast(msg); setTimeout(() => setToast(''), 3000) }, [])
 
   const fetchMerchants = useCallback(async () => {
-    setMerchantsLoading(true);
+    setMerchantsLoading(true)
     try {
-      const res = await api.get('/api/admin/merchants');
-      setMerchants(res.data?.data || []);
+      const res = await api.get('/api/admin/merchants')
+      setMerchants(res.data?.data || [])
     } catch (e) {
-      // Non-fatal — "All Merchants" audience still works without this list.
+      // Non-fatal — "All Active Merchants" audience still works without this list.
     } finally {
-      setMerchantsLoading(false);
+      setMerchantsLoading(false)
     }
-  }, []);
+  }, [])
 
   const fetchHistory = useCallback(async (p = 1) => {
-    setHistoryLoading(true);
+    setHistoryLoading(true)
     try {
-      const res = await api.get('/api/admin/sms-broadcasts', { params: { page: p, limit: PAGE_SIZE } });
-      setHistory(res.data?.data || []);
-      setTotal(res.data?.pagination?.total || 0);
-      setPage(p);
+      const res = await api.get('/api/admin/email-broadcasts', { params: { page: p, limit: PAGE_SIZE } })
+      setHistory(res.data?.data || [])
+      setTotal(res.data?.pagination?.total || 0)
+      setPage(p)
     } catch (e) {
-      setError(e?.response?.data?.error || 'Could not load broadcast history.');
+      setError(e?.response?.data?.error || 'Could not load broadcast history.')
     } finally {
-      setHistoryLoading(false);
+      setHistoryLoading(false)
     }
-  }, []);
+  }, [])
 
-  useEffect(() => { fetchMerchants(); fetchHistory(1); }, [fetchMerchants, fetchHistory]);
+  useEffect(() => { fetchMerchants(); fetchHistory(1) }, [fetchMerchants, fetchHistory])
 
   const toggleHistorySelected = (id) => {
     setSelectedHistoryIds((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  };
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
   const toggleAllHistorySelected = () => {
-    setSelectedHistoryIds((prev) => (prev.size === history.length ? new Set() : new Set(history.map((h) => h._id))));
-  };
+    setSelectedHistoryIds((prev) => (prev.size === history.length ? new Set() : new Set(history.map((h) => h._id))))
+  }
 
   async function confirmClearHistory() {
-    if (!clearState) return;
-    setClearState((s) => ({ ...s, busy: true, error: '' }));
+    if (!clearState) return
+    setClearState((s) => ({ ...s, busy: true, error: '' }))
     try {
       if (clearState.mode === 'selected') {
-        const res = await api.post('/api/admin/sms-broadcasts/clear', { ids: Array.from(selectedHistoryIds) });
-        showToast(res.data?.message || 'Removed.');
+        const res = await api.post('/api/admin/email-broadcasts/clear', { ids: Array.from(selectedHistoryIds) })
+        showToast(res.data?.message || 'Removed.')
       } else {
-        const res = await api.post('/api/admin/sms-broadcasts/clear', {});
-        showToast(res.data?.message || 'History cleared.');
+        const res = await api.post('/api/admin/email-broadcasts/clear', {})
+        showToast(res.data?.message || 'History cleared.')
       }
-      setSelectedHistoryIds(new Set());
-      setClearState(null);
-      fetchHistory(1);
+      setSelectedHistoryIds(new Set())
+      setClearState(null)
+      fetchHistory(1)
     } catch (e) {
-      setClearState((s) => ({ ...s, busy: false, error: e?.response?.data?.error || 'Could not clear history.' }));
+      setClearState((s) => ({ ...s, busy: false, error: e?.response?.data?.error || 'Could not clear history.' }))
     }
   }
 
-  const merchantsWithPhone = useMemo(() => merchants.filter((m) => !!m.phone), [merchants]);
-  // What "All Merchants" actually reaches — locked accounts and demo/pilot
-  // accounts are excluded server-side (see smsBroadcastController.js), so
-  // the button's count must match that or it overstates who gets texted.
-  // "Select Specific" below still shows every merchant (locked ones tagged),
-  // since an admin may have a real reason to message one directly.
-  const activeMerchantsWithPhone = useMemo(
-    () => merchantsWithPhone.filter((m) => m.status !== 'locked' && !m.isDemoMerchant),
-    [merchantsWithPhone]
-  );
+  const merchantsWithEmail = useMemo(() => merchants.filter((m) => !!m.email), [merchants])
+  // What "All Active Merchants" actually reaches — locked and demo/pilot
+  // accounts are excluded server-side (see emailBroadcastController.js), so
+  // this count must match that or it overstates who gets emailed.
+  // "Select Specific" below still shows every merchant (locked ones
+  // tagged), since an admin may have a real reason to message one directly.
+  const activeMerchantsWithEmail = useMemo(
+    () => merchantsWithEmail.filter((m) => m.status !== 'locked' && !m.isDemoMerchant),
+    [merchantsWithEmail]
+  )
   const filteredMerchants = useMemo(() => {
-    const q = merchantSearch.trim().toLowerCase();
-    if (!q) return merchantsWithPhone;
-    return merchantsWithPhone.filter((m) =>
+    const q = merchantSearch.trim().toLowerCase()
+    if (!q) return merchantsWithEmail
+    return merchantsWithEmail.filter((m) =>
       (m.businessName || '').toLowerCase().includes(q) ||
       (m.name || '').toLowerCase().includes(q) ||
-      (m.phone || '').toLowerCase().includes(q)
-    );
-  }, [merchantsWithPhone, merchantSearch]);
+      (m.email || '').toLowerCase().includes(q)
+    )
+  }, [merchantsWithEmail, merchantSearch])
 
-  const recipientCount = audience === 'all' ? activeMerchantsWithPhone.length : selectedIds.size;
+  const recipientCount = audience === 'all' ? activeMerchantsWithEmail.length : selectedIds.size
 
   const toggleMerchant = (id) => {
     setSelectedIds((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  };
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
 
   const applyTemplate = (tpl) => {
-    setCategory(tpl.category);
-    setMessage(tpl.body);
-  };
+    setCategory(tpl.category)
+    setSubject(tpl.subject)
+    setMessage(tpl.body)
+  }
 
   const openConfirm = () => {
-    setError('');
-    if (message.trim().length < 5) { setError('Message is too short.'); return; }
-    if (audience === 'selected' && selectedIds.size === 0) { setError('Select at least one merchant.'); return; }
-    setPendingSend(true);
-  };
+    setError('')
+    if (!subject.trim()) { setError('Subject is required.'); return }
+    if (message.trim().length < 5) { setError('Message is too short.'); return }
+    if (audience === 'selected' && selectedIds.size === 0) { setError('Select at least one merchant.'); return }
+    setPendingSend(true)
+  }
 
   const confirmSend = async () => {
-    // Synchronous ref guard, not just the `sending` state — a state update
-    // isn't guaranteed to have committed to the DOM (disabling the button)
-    // before a near-simultaneous second click/Enter-key fires this again.
-    // Same fix as DormantAccounts.jsx's confirmSend, after a broadcast bug
-    // there turned out to need a real per-recipient send guard.
-    if (sendingRef.current) return;
-    sendingRef.current = true;
-    setSending(true);
-    setError('');
+    // Synchronous ref guard, not just the `sending` state — mirrors
+    // SmsBroadcast.jsx's confirmSend, same double-submit risk.
+    if (sendingRef.current) return
+    sendingRef.current = true
+    setSending(true)
+    setError('')
     try {
       const payload = {
+        subject: subject.trim(),
         message: message.trim(),
         category,
         audience,
         merchantIds: audience === 'selected' ? Array.from(selectedIds) : undefined,
-      };
-      const res = await api.post('/api/admin/sms-broadcasts', payload);
+      }
+      const res = await api.post('/api/admin/email-broadcasts', payload)
       if (res.data?.success) {
-        showToast(res.data.message || 'SMS sent.');
-        setMessage('');
-        setSelectedIds(new Set());
-        fetchHistory(1);
+        showToast(res.data.message || 'Email sent.')
+        setSubject('')
+        setMessage('')
+        setSelectedIds(new Set())
+        fetchHistory(1)
       } else {
-        setError(res.data?.error || 'Send failed.');
+        setError(res.data?.error || 'Send failed.')
       }
     } catch (e) {
-      setError(e?.response?.data?.error || 'Send failed.');
+      setError(e?.response?.data?.error || 'Send failed.')
     } finally {
-      sendingRef.current = false;
-      setSending(false);
-      setPendingSend(false);
+      sendingRef.current = false
+      setSending(false)
+      setPendingSend(false)
     }
-  };
-
-  const segments = smsSegments(message.trim().length);
+  }
 
   return (
     <Layout>
@@ -278,11 +231,11 @@ export default function SmsBroadcast() {
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="material-symbols-outlined text-primary text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>sms</span>
+              <span className="material-symbols-outlined text-primary text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>mail</span>
               <p className="text-2xs font-bold uppercase tracking-[0.2em] text-primary">Merchant Notifications</p>
             </div>
-            <h2 className="text-3xl md:text-4xl font-bold text-on-surface tracking-tighter font-headline">SMS Broadcast</h2>
-            <p className="text-on-surface-variant/60 mt-1 text-xs md:text-sm font-body">Send a short SMS notice to merchants — maintenance notices, holiday wishes, security reminders.</p>
+            <h2 className="text-3xl md:text-4xl font-bold text-on-surface tracking-tighter font-headline">Email Broadcast</h2>
+            <p className="text-on-surface-variant/60 mt-1 text-xs md:text-sm font-body">Send a branded email notice to merchants — maintenance notices, holiday wishes, security reminders.</p>
           </div>
         </div>
 
@@ -312,18 +265,29 @@ export default function SmsBroadcast() {
             </div>
 
             <div>
+              <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50 mb-2">Subject</p>
+              <input
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                maxLength={200}
+                placeholder="Email subject line..."
+                className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-medium text-on-surface focus:ring-2 focus:ring-primary/30 focus:border-primary/40 outline-none"
+              />
+            </div>
+
+            <div>
               <div className="flex items-center justify-between mb-2">
                 <p className="text-2xs font-bold uppercase tracking-widest text-on-surface-variant/50">Message</p>
                 <p className={`text-2xs font-bold tabular-nums ${message.length > MAX_LEN ? 'text-red-600' : 'text-on-surface-variant/40'}`}>
-                  {message.length} / {MAX_LEN} · {segments} SMS
+                  {message.length} / {MAX_LEN}
                 </p>
               </div>
               <textarea
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                rows={7}
+                rows={10}
                 maxLength={MAX_LEN}
-                placeholder="Write the notification merchants will receive..."
+                placeholder="Write the notification merchants will receive... (blank lines start a new paragraph)"
                 className="w-full bg-white border border-outline-variant/20 rounded-xl px-4 py-3 text-sm font-medium text-on-surface focus:ring-2 focus:ring-primary/30 focus:border-primary/40 outline-none resize-none"
               />
             </div>
@@ -338,7 +302,7 @@ export default function SmsBroadcast() {
                   }`}
                 >
                   <span className="material-symbols-outlined text-sm">groups</span>
-                  All Active Merchants ({merchantsLoading ? '…' : activeMerchantsWithPhone.length})
+                  All Active Merchants ({merchantsLoading ? '…' : activeMerchantsWithEmail.length})
                 </button>
                 <button
                   onClick={() => setAudience('selected')}
@@ -359,7 +323,7 @@ export default function SmsBroadcast() {
                   <input
                     value={merchantSearch}
                     onChange={(e) => setMerchantSearch(e.target.value)}
-                    placeholder="Search merchants by name or phone..."
+                    placeholder="Search merchants by name or email..."
                     className="w-full px-4 py-2.5 text-xs font-medium border-b border-outline-variant/10 outline-none"
                   />
                   <div className="max-h-56 overflow-y-auto">
@@ -383,7 +347,7 @@ export default function SmsBroadcast() {
                                 <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-red-50 text-red-700 border border-red-200">Locked</span>
                               )}
                             </p>
-                            <p className="text-2xs text-on-surface-variant/50">{m.phone}</p>
+                            <p className="text-2xs text-on-surface-variant/50">{m.email}</p>
                           </div>
                         </label>
                       ))
@@ -399,7 +363,7 @@ export default function SmsBroadcast() {
 
             <button
               onClick={openConfirm}
-              disabled={message.trim().length < 5 || sending}
+              disabled={!subject.trim() || message.trim().length < 5 || sending}
               className="w-full py-3.5 rounded-xl bg-primary text-white font-bold text-sm uppercase tracking-widest shadow-md hover:shadow-lg disabled:opacity-40 transition-all flex items-center justify-center gap-2"
             >
               <span className="material-symbols-outlined text-lg">send</span>
@@ -450,7 +414,7 @@ export default function SmsBroadcast() {
                 <p className="text-2xs text-on-surface-variant/40 px-5 py-8 text-center">No broadcasts sent yet.</p>
               ) : (
                 history.map((h) => {
-                  const meta = CATEGORY_META[h.category] || CATEGORY_META.general;
+                  const meta = CATEGORY_META[h.category] || CATEGORY_META.general
                   return (
                     <div key={h._id} className="px-5 py-3.5 flex gap-3 group">
                       <input
@@ -468,7 +432,7 @@ export default function SmsBroadcast() {
                           <div className="flex items-center gap-2 shrink-0">
                             <span className="text-[10px] text-on-surface-variant/40 font-bold" title={fmtDate(h.sentAt)}>{relativeTime(h.sentAt)}</span>
                             <button
-                              onClick={() => { setSelectedHistoryIds(new Set([h._id])); setClearState({ mode: 'selected', busy: false, error: '' }); }}
+                              onClick={() => { setSelectedHistoryIds(new Set([h._id])); setClearState({ mode: 'selected', busy: false, error: '' }) }}
                               className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-on-surface-variant/40 hover:text-red-600 hover:bg-red-50 transition-all"
                               title="Delete this entry"
                             >
@@ -476,9 +440,10 @@ export default function SmsBroadcast() {
                             </button>
                           </div>
                         </div>
-                        <p className="text-xs text-on-surface/80 line-clamp-2 mb-2">{h.message}</p>
+                        <p className="text-xs font-bold text-on-surface/90 mb-0.5 truncate">{h.subject}</p>
+                        <p className="text-xs text-on-surface/70 line-clamp-2 mb-2">{h.message}</p>
                         <div className="flex items-center justify-between text-[10px] text-on-surface-variant/50 font-bold">
-                          <span>{h.audience === 'all' ? 'All merchants' : `${h.merchantIds?.length || 0} selected`} · {h.recipientCount} recipient{h.recipientCount === 1 ? '' : 's'}</span>
+                          <span>{h.audience === 'all' ? 'All active merchants' : `${h.merchantIds?.length || 0} selected`} · {h.recipientCount} recipient{h.recipientCount === 1 ? '' : 's'}</span>
                           <span className={h.status === 'sending' ? 'text-primary' : h.failureCount ? 'text-amber-600' : 'text-emerald-600'}>
                             {h.status === 'sending'
                               ? 'Sending…'
@@ -487,7 +452,7 @@ export default function SmsBroadcast() {
                         </div>
                       </div>
                     </div>
-                  );
+                  )
                 })
               )}
             </div>
@@ -502,14 +467,15 @@ export default function SmsBroadcast() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                <span className="material-symbols-outlined text-primary">sms</span>
+                <span className="material-symbols-outlined text-primary">mail</span>
               </div>
               <div>
-                <p className="font-bold text-on-surface text-sm">Send this SMS?</p>
-                <p className="text-2xs text-on-surface-variant/60">To {recipientCount} merchant{recipientCount === 1 ? '' : 's'} — real SMS cost applies.</p>
+                <p className="font-bold text-on-surface text-sm">Send this email?</p>
+                <p className="text-2xs text-on-surface-variant/60">To {recipientCount} merchant{recipientCount === 1 ? '' : 's'}.</p>
               </div>
             </div>
             <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-xl p-3 mb-5 max-h-40 overflow-y-auto">
+              <p className="text-xs font-bold text-on-surface mb-1.5">{subject}</p>
               <p className="text-xs text-on-surface-variant whitespace-pre-wrap">{message}</p>
             </div>
             <div className="flex gap-2">
@@ -544,8 +510,8 @@ export default function SmsBroadcast() {
             </h3>
             <p className="text-sm text-on-surface-variant mb-5">
               {clearState.mode === 'all'
-                ? 'Permanently removes every SMS broadcast history record. This does not un-send any SMS already delivered — only the history record.'
-                : 'Permanently removes the selected broadcast history record(s). This does not un-send any SMS already delivered.'}
+                ? 'Permanently removes every email broadcast history record. This does not un-send any email already delivered — only the history record.'
+                : 'Permanently removes the selected broadcast history record(s). This does not un-send any email already delivered.'}
             </p>
             {clearState.error && <div className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-medium mb-4">{clearState.error}</div>}
             <div className="flex gap-3">
@@ -558,5 +524,5 @@ export default function SmsBroadcast() {
         </div>
       )}
     </Layout>
-  );
+  )
 }

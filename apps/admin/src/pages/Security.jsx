@@ -20,6 +20,8 @@ const ALERT_TYPE_META = {
   new_admin_account:    { label: 'New Admin Account',      icon: 'admin_panel_settings' },
   new_officer_account:  { label: 'New Officer Account',    icon: 'how_to_reg' },
   developer_live_access_requested: { label: 'Developer Live Access Requested', icon: 'api' },
+  ncba_openbanking_down:      { label: 'NCBA Open Banking Down',      icon: 'cloud_off' },
+  ncba_openbanking_recovered: { label: 'NCBA Open Banking Recovered', icon: 'cloud_done' },
 };
 
 const SEVERITY_TONE = {
@@ -37,6 +39,8 @@ const TYPE_OPTIONS = [
   { v: 'new_admin_account',    l: 'New Admin Account' },
   { v: 'new_officer_account',  l: 'New Officer Account' },
   { v: 'developer_live_access_requested', l: 'Developer Live Access Requested' },
+  { v: 'ncba_openbanking_down',      l: 'NCBA Open Banking Down' },
+  { v: 'ncba_openbanking_recovered', l: 'NCBA Open Banking Recovered' },
 ];
 
 const SEVERITY_OPTIONS = [
