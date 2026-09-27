@@ -192,7 +192,11 @@ export default function SmsBroadcast() {
     }
   }
 
-  const merchantsWithPhone = useMemo(() => merchants.filter((m) => !!m.phone), [merchants]);
+  // Deleted merchants (the admin Merchants page now surfaces these
+  // permanently, see adminController.js#getMerchants) never belong here —
+  // there's no live account to text, so they're dropped before anything
+  // else even sees this list, not just filtered out of "All Active".
+  const merchantsWithPhone = useMemo(() => merchants.filter((m) => !!m.phone && !m.isDeleted), [merchants]);
   // What "All Merchants" actually reaches — locked accounts and demo/pilot
   // accounts are excluded server-side (see smsBroadcastController.js), so
   // the button's count must match that or it overstates who gets texted.

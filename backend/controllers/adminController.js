@@ -155,11 +155,33 @@ export const getMerchants = async (req, res) => {
     // signal — needs to know both the expiry AND whether a password was
     // ever actually set (see computeRiskSignals). Both are stripped from
     // every row before responding.
-    const merchants = await Merchant.find({})
+    const liveMerchants = await Merchant.find({})
       .sort('-createdAt')
       .select('-otp -otpExpires +passwordResetExpires +password')
       .populate('flaggedBy', 'email')
       .lean();
+
+    // Every merchant ever deleted by an admin, permanently snapshotted (see
+    // DeletedRecord.js's partial TTL index) — merged into the same list so
+    // the Merchants page's "Total" figure and its "Deleted" filter reflect
+    // every account that ever existed, not just currently-live ones. Their
+    // transaction history was never cascade-deleted (see confirmMerchantAction's
+    // 'delete' branch), so the txn aggregations below naturally pick up
+    // their lifetime activity too.
+    const deletedMerchantRecords = await DeletedRecord.find({ collectionName: 'Merchant', status: 'trashed' })
+      .select('originalId snapshot deletedAt deletedBy')
+      .populate('deletedBy', 'email')
+      .lean();
+    const deletedMerchants = deletedMerchantRecords.map((rec) => ({
+      ...rec.snapshot,
+      _id: rec.originalId,
+      status: 'deleted',
+      isDeleted: true,
+      deletedAt: rec.deletedAt,
+      deletedByEmail: rec.deletedBy?.email || null,
+    }));
+
+    const merchants = [...liveMerchants, ...deletedMerchants];
 
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const oneDayAgo    = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -215,7 +237,10 @@ export const getMerchants = async (req, res) => {
         .map((d) => new Date(d).getTime())
         .reduce((max, ts) => Math.max(max, ts), 0);
       const lastActivityDate = lastActivityAt ? new Date(lastActivityAt) : null;
-      const riskSignals = computeRiskSignals(m, t);
+      // Risk signals (setup incomplete, no KRA, etc.) are about accounts an
+      // admin might need to act on — meaningless noise on an account that
+      // no longer exists, so a deleted merchant always reads clean.
+      const riskSignals = m.isDeleted ? [] : computeRiskSignals(m, t);
       const hasPassword = !!m.password;
       const setupLinkExpiresAt = !hasPassword ? (m.passwordResetExpires || null) : null;
       delete m.passwordResetExpires;
@@ -1718,14 +1743,31 @@ export const getMerchantDetail = async (req, res) => {
       return res.status(400).json({ error: 'Invalid merchant id.' });
     }
 
-    const merchant = await Merchant.findById(id)
+    let merchant = await Merchant.findById(id)
       .select('+password +appPin +stellarEncryptedSecretKey +passwordResetExpires')
       .populate('lockedBy', 'email')
       .populate('invitedBy', 'email')
       .populate('flaggedBy', 'email')
       .populate('onboardingOfficerId', 'name email')
       .lean();
-    if (!merchant) return res.status(404).json({ error: 'Merchant not found.' });
+
+    // Not a live merchant — check whether this id belongs to one an admin
+    // deleted. Their snapshot has no live document to .populate() against
+    // (invitedBy/lockedBy/flaggedBy/onboardingOfficerId stay raw ids below,
+    // degrading gracefully), and secrets are stripped the same way logAudit
+    // strips them, since this snapshot was taken verbatim at deletion time.
+    let deletedInfo = { isDeleted: false, deletedAt: null, deletedByEmail: null };
+    if (!merchant) {
+      const record = await DeletedRecord.findOne({ collectionName: 'Merchant', originalId: id, status: 'trashed' })
+        .populate('deletedBy', 'email')
+        .lean();
+      if (!record) return res.status(404).json({ error: 'Merchant not found.' });
+      merchant = { ...record.snapshot, _id: record.originalId };
+      for (const secret of ['password', 'appPin', 'stellarEncryptedSecretKey', 'otp', 'otpExpires', 'passwordResetToken', 'passwordResetExpires']) {
+        delete merchant[secret];
+      }
+      deletedInfo = { isDeleted: true, deletedAt: record.deletedAt, deletedByEmail: record.deletedBy?.email || null };
+    }
 
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const oneDayAgo    = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -1806,7 +1848,7 @@ export const getMerchantDetail = async (req, res) => {
       .map((d) => new Date(d).getTime())
       .reduce((max, ts) => Math.max(max, ts), 0) || null;
 
-    const riskSignals = computeRiskSignals(merchant, { txnCount30d, txnCount24h });
+    const riskSignals = deletedInfo.isDeleted ? [] : computeRiskSignals(merchant, { txnCount30d, txnCount24h });
 
     res.json({
       success: true,
@@ -1942,6 +1984,7 @@ export const getMerchantDetail = async (req, res) => {
           : null,
         kybDocuments: merchant.kybDocuments || [],
         businessPhotos: merchant.businessPhotos || [],
+        ...deletedInfo,
       },
     });
   } catch (error) {

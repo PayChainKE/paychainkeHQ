@@ -33,9 +33,13 @@ const DeletedRecordSchema = new mongoose.Schema({
   status: { type: String, enum: ['trashed', 'restored'], default: 'trashed' },
   restoredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null },
   restoredAt: { type: Date, default: null },
-  // Auto-purged after 90 days — a snapshot sitting forever isn't the point
-  // (the audit log is the permanent record of the deletion itself); this
-  // is a working undo window, not a permanent archive.
+  // Still set 90 days out for every collection, Merchant included — this
+  // date keeps driving the Cloudinary-image purge sweep and the "how long
+  // is this realistically undoable" UX exactly as before. Whether it
+  // actually causes Mongo to delete the document depends on the TTL index
+  // below, which now excludes Merchant snapshots: those are the platform's
+  // permanent "every merchant that ever existed" record (admin KPIs), not
+  // just a working undo window like Transaction/Admin/Expense snapshots are.
   expiresAt: { type: Date, default: () => new Date(Date.now() + 90 * 24 * 60 * 60 * 1000) },
   // Set once services/trashRetentionService.js (a Merchant snapshot only)
   // has deleted the snapshot's Cloudinary images (KYC documents,
@@ -48,7 +52,15 @@ const DeletedRecordSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 DeletedRecordSchema.index({ status: 1, deletedAt: -1 });
-DeletedRecordSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+// Merchant snapshots are excluded from this TTL index (partialFilterExpression)
+// so a deleted merchant is never actually removed from the database — the
+// Merchants page merges these in (status: 'deleted') so an admin's merchant
+// count reflects everyone who ever signed up, not just current accounts.
+// Transaction/Admin/Expense snapshots still auto-purge at their expiresAt.
+DeletedRecordSchema.index(
+  { expiresAt: 1 },
+  { expireAfterSeconds: 0, partialFilterExpression: { collectionName: { $ne: 'Merchant' } } }
+);
 
 const DeletedRecord = mongoose.model('DeletedRecord', DeletedRecordSchema);
 export default DeletedRecord;
