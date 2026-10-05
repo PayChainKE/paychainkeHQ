@@ -22,6 +22,7 @@ const ALERT_TYPE_META = {
   developer_live_access_requested: { label: 'Developer Live Access Requested', icon: 'api' },
   ncba_openbanking_down:      { label: 'NCBA Open Banking Down',      icon: 'cloud_off' },
   ncba_openbanking_recovered: { label: 'NCBA Open Banking Recovered', icon: 'cloud_done' },
+  ncba_unattributed_credit:  { label: 'Unattributed NCBA Credit',    icon: 'help' },
 };
 
 const SEVERITY_TONE = {
@@ -41,6 +42,7 @@ const TYPE_OPTIONS = [
   { v: 'developer_live_access_requested', l: 'Developer Live Access Requested' },
   { v: 'ncba_openbanking_down',      l: 'NCBA Open Banking Down' },
   { v: 'ncba_openbanking_recovered', l: 'NCBA Open Banking Recovered' },
+  { v: 'ncba_unattributed_credit',   l: 'Unattributed NCBA Credit' },
 ];
 
 const SEVERITY_OPTIONS = [

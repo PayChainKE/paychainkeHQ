@@ -31,6 +31,8 @@ import { buildPaymentReceivedSms, buildPaybillPaymentReceiptSms } from '../utils
 import { toTitleCase } from '../utils/smsSanitizer.js';
 import NcbaDebitNotificationSample from '../models/NcbaDebitNotificationSample.js';
 import NcbaPhoneExtractionMiss from '../models/NcbaPhoneExtractionMiss.js';
+import NcbaUnattributedCredit from '../models/NcbaUnattributedCredit.js';
+import { notifyAdmins, escapeHtml } from '../utils/securityAlerts.js';
 
 const respondOk = (res, detail) => res.status(200).type('application/xml').send(buildNcbaOkResult(detail));
 const respondFail = (res, detail) => res.status(200).type('application/xml').send(buildNcbaFailResult(detail));
@@ -189,7 +191,7 @@ export const handleNcbaAccountNotification = async (req, res) => {
       return respondOk(res);
     }
 
-    const merchantCodeMatch = extractMerchantCode({ narrative: rawNarrative, customerName: rawCustomerName, transId });
+    const merchantCodeMatch = extractMerchantCode({ accountNr: rawAccountNr, narrative: rawNarrative, customerName: rawCustomerName, transId });
     const merchantCode = merchantCodeMatch?.code ?? null;
 
     // A generic transfer type (PesaLink/Internal Transfer — see
@@ -231,6 +233,26 @@ export const handleNcbaAccountNotification = async (req, res) => {
       if (!virtualAccountsLive) {
         return respondOk(res, 'Notification received — virtual accounts not yet provisioned');
       }
+      // Real go-live, real money, no merchant found — this used to only
+      // reach a console log, so finding out meant waiting for a merchant to
+      // complain and someone remembering to check Render's log retention
+      // window. Persisted so it's queryable after the fact, and alerted
+      // immediately rather than waiting for the next hourly reconciliation
+      // sweep (which only re-derives the same thing from NCBA's statement,
+      // slower, and never for the full set — see
+      // ncbaCollectionReconciliationService.js).
+      NcbaUnattributedCredit.create({
+        transId, txnType: rawTransType, amount: transAmount,
+        rawAccountNr, rawNarrative, rawCustomerName, rawPhoneNr,
+      }).catch((e) => logEvent('error', 'ncba_unattributed_credit_log_failed', { transId, error: e.message }));
+      notifyAdmins({
+        type: 'ncba_unattributed_credit',
+        severity: 'critical',
+        subject: `NCBA credit of KES ${transAmount.toLocaleString()} could not be attributed to a merchant`,
+        heading: 'Unattributed NCBA Credit',
+        details: `A real KES ${transAmount.toLocaleString()} credit (ref ${escapeHtml(transId)}) landed on PayChain's NCBA account, but no merchant code could be found in it — so no merchant was credited or notified. This usually means a customer paid the paybill directly and the account/reference they entered didn't resolve to a merchant. Check admin Pool Reconciliation's "Missed Collections" section once the next hourly sweep runs, or trace it manually from NCBA's statement using ref ${escapeHtml(transId)}.`,
+        metadata: { transId, txnType: rawTransType, amount: transAmount, accountNr: rawAccountNr || null, narrative: rawNarrative || null, customerName: rawCustomerName || null },
+      });
       return respondFail(res, 'Could not attribute this credit to a merchant');
     }
 

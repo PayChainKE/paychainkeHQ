@@ -347,7 +347,14 @@ const Revenue = () => {
   const { admin: currentAdmin } = useAuth();
   const canRunSweep = currentAdmin?.role === 'owner' || currentAdmin?.role === 'admin';
 
-  const [range, setRange] = useState('30d');
+  // Defaults to 'all' (lifetime, "never shrinks" — see the Platform Revenue
+  // card's own doc comment below) rather than a rolling window. '30d' is a
+  // real last-30-days sum that legitimately drops as old high-revenue days
+  // roll out of the window — correct behaviour for trend analysis, but
+  // confusing as the first number an admin sees on load, since a lower
+  // figure than yesterday reads as "revenue disappeared" rather than "the
+  // window moved." An admin can still pick a rolling range deliberately.
+  const [range, setRange] = useState('all');
   const [granularity, setGranularity] = useState('daily');
   const [channelFilter, setChannelFilter] = useState('all');
   const [chartMetric, setChartMetric] = useState('gmv');
