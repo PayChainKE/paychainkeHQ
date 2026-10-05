@@ -67,7 +67,20 @@ function logStructuralConflict(fields) {
  * Best-effort extraction of an 8-digit PayChain merchant code from NCBA's
  * notification.
  *
- * `Narrative` is the primary, authoritative source and wins outright
+ * `AccountNr` — NCBA's own dedicated "which account received this" field —
+ * is checked first and wins outright when it structurally resolves (the
+ * institution prefix + 8-digit code, or a bare 12-digit run). This was
+ * added later than Narrative/CustomerName below: this is the one field
+ * NCBA documents as existing specifically to carry the paid-into account
+ * number, so it should need no scraping out of free text at all — unlike
+ * Narrative, which can carry anything a sender typed. Previously this field
+ * was received and logged but never actually checked for a merchant code,
+ * which is a real gap for payments where the customer typed the virtual
+ * account number directly (e.g. paying the paybill from the M-Pesa menu
+ * without going through PayChain's own STK/QR flow) and NCBA echoed it
+ * here rather than in Narrative.
+ *
+ * `Narrative` is the next, authoritative source and wins outright
  * whenever it structurally resolves to a valid 8-digit code — per NCBA's
  * guide it's the field meant to carry "Paybill account number, Customer
  * Name etc." (it may also be blank).
@@ -103,26 +116,39 @@ function logStructuralConflict(fields) {
  * means and why callers should check it before auto-crediting a generic
  * (non-payment-specific) transaction type.
  */
-export function extractMerchantCode({ narrative, customerName, transId } = {}) {
+export function extractMerchantCode({ accountNr, narrative, customerName, transId } = {}) {
+  // allowTwelveDigitFallback is safe here the same way it's safe for
+  // Narrative (see findEightDigitCode's doc comment) — AccountNr is never
+  // a phone number field by NCBA's own design, so a bare 12-digit run in
+  // it isn't at risk of being an MSISDN misread as an account number the
+  // way PhoneNr was.
+  const accountNrMatch = findEightDigitCode(accountNr, { allowTwelveDigitFallback: true });
   const narrativeMatch = findEightDigitCode(narrative, { allowTwelveDigitFallback: true });
   const customerNameMatch = findEightDigitCode(customerName);
 
-  const distinctCandidates = new Set([narrativeMatch?.code, customerNameMatch?.code].filter(Boolean));
+  const distinctCandidates = new Set([accountNrMatch?.code, narrativeMatch?.code, customerNameMatch?.code].filter(Boolean));
   if (distinctCandidates.size > 1) {
     logStructuralConflict({
       transId: transId ?? null,
+      accountNrCode: accountNrMatch?.code ?? null,
       narrativeCode: narrativeMatch?.code ?? null,
       customerNameCode: customerNameMatch?.code ?? null,
     });
   }
 
-  // Primary: Narrative is authoritative and wins outright when valid.
+  // Primary: AccountNr is NCBA's own purpose-built field for this and wins
+  // outright when valid.
+  if (accountNrMatch) {
+    return accountNrMatch;
+  }
+
+  // Secondary: Narrative, authoritative when AccountNr didn't resolve.
   if (narrativeMatch) {
     return narrativeMatch;
   }
 
-  // Secondary checkpoint: only reached because Narrative was empty/blank
-  // or structurally invalid (no 8-digit run found).
+  // Tertiary checkpoint: only reached because neither AccountNr nor
+  // Narrative was usable.
   if (customerNameMatch) {
     return customerNameMatch;
   }
