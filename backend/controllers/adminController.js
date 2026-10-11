@@ -265,7 +265,14 @@ export const getMerchants = async (req, res) => {
           settlement: l?.settlement || 0,
         },
         lastActivityAt: lastActivityDate,
-        activityTier:   tierFor(lastActivityDate),
+        // Demo/pilot accounts (Stellar grant evidence, Play Store review)
+        // exist to be shown, not to be "used" in the way a real merchant's
+        // login/transaction cadence implies — they'd otherwise drift to
+        // Idle/Dormant between demos and show up confusingly on this list
+        // (and the automated dormancy-reminder email would try to re-engage
+        // an account that was never "away" in the first place). Always
+        // reads Active instead.
+        activityTier:   (m.isDemoMerchant || m.isAppReviewAccount) ? 'active' : tierFor(lastActivityDate),
         riskSignals,
       };
     });
@@ -1953,7 +1960,9 @@ export const getMerchantDetail = async (req, res) => {
         lastLogin: merchant.lastLogin,
         loginCount: merchant.loginCount,
         lastActivityAt: lastActivityAt ? new Date(lastActivityAt) : null,
-        activityTier: tierFor(lastActivityAt ? new Date(lastActivityAt) : null),
+        // See getMerchants' identical override — demo/pilot accounts always
+        // read Active, never Idle/Dormant.
+        activityTier: (merchant.isDemoMerchant || merchant.isAppReviewAccount) ? 'active' : tierFor(lastActivityAt ? new Date(lastActivityAt) : null),
         txnCount30d,
         txnCount24h,
         volume30d: t30.volume30d || 0,

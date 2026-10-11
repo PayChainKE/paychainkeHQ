@@ -27,7 +27,11 @@ export async function checkAndSendDormancyReminders() {
   try {
     const now = new Date();
 
-    const merchants = await Merchant.find({ status: { $ne: 'locked' } })
+    // Demo/pilot accounts (Stellar grant evidence, Play Store review) exist
+    // to be shown on demand, not used continuously — they'd otherwise drift
+    // "dormant" between demos and get an automated "we miss you" email that
+    // makes no sense for an account that was never really away.
+    const merchants = await Merchant.find({ status: { $ne: 'locked' }, isDemoMerchant: { $ne: true }, isAppReviewAccount: { $ne: true } })
       .select('email name businessName createdAt lastLogin dormancyReminderSentAt dormancyFinalWarningSentAt')
       .lean();
 
