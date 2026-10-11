@@ -76,7 +76,11 @@ function tierFor(daysSinceActivity) {
 }
 
 async function computeDormantMerchants() {
-  const merchants = await Merchant.find({ status: { $ne: 'locked' } })
+  // Demo/pilot accounts (Stellar grant evidence, Play Store review) are
+  // never real merchants to re-engage — excluded the same way the
+  // automated dormancyReminderService.js now is, so they never show up as
+  // a candidate for an admin's manual outreach campaign either.
+  const merchants = await Merchant.find({ status: { $ne: 'locked' }, isDemoMerchant: { $ne: true }, isAppReviewAccount: { $ne: true } })
     .select('email phone name businessName createdAt lastLogin')
     .lean();
 

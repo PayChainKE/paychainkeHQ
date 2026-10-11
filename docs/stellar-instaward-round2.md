@@ -4,6 +4,26 @@ All of this is **Stellar testnet** and a **simulated** M-PESA B2C leg. No real m
 It is available only to Stellar pilot merchants (the admin-created `isDemoMerchant` accounts) and the UI lives in the demo app
 (`apps/demo`, Inflation Shield page). The real merchant dashboard and mobile app are unchanged.
 
+## Pilot merchants (closed-beta roster)
+
+Five realistic (invented) Kenyan SMEs, each a flagged `isDemoMerchant` account with its own Stellar testnet wallet and a
+pre-configured settlement rule, created via `backend/scripts/create-stellar-pilot-merchants.js`. They sign in on the demo app
+like a real merchant would. One (Lakeside Hardware) is a deliberate control account with the settlement rule switched off, to
+prove the engine never touches a merchant who hasn't opted in.
+
+| Merchant | County | Business type | Settlement rule |
+|---|---|---|---|
+| Wanjiku Fresh Greens Ltd | Nairobi (Kawangware) | Limited Liability Company | 20% to Stellar — keeps most float liquid |
+| Kilimani Brew House | Nairobi (Kilimani) | Limited Liability Company | 50% to Stellar |
+| Pwani Fresh Fish Traders | Mombasa (Nyali) | Partnership | 80% to Stellar — reserve-heavy |
+| Rift Valley Dairy Cooperative | Nakuru | Cooperative Society | 20% to Stellar |
+| Lakeside Hardware & Building Supplies | Kisumu | Sole Proprietorship | **Off** — control account |
+
+Per-pilot real testnet activity (generated against these named accounts specifically, via
+`backend/scripts/generate-pilot-demo-activity.js` — distinct from the throwaway local accounts the stress test below uses):
+
+<!-- generate-pilot-demo-activity.js prints a ready-to-paste block for this section -->
+
 ## Deliverable 1 — Settlement rule configuration
 
 | Requirement | Where |
