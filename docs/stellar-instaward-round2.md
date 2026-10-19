@@ -172,3 +172,37 @@ Unit tests: `backend/__tests__/stellarSettlement.test.js`.
 - Pilot 4 · redemption · 17.4808 USDC · [9dc0202f635b9199d29f697e376f7b74808b2fb6f92dc7baafbba77895a08bdd](https://stellar.expert/explorer/testnet/tx/9dc0202f635b9199d29f697e376f7b74808b2fb6f92dc7baafbba77895a08bdd)
 - Pilot 4 · redemption · 13.1106 USDC · [0e4c5a074eb71bcf10f3f52cae313c064f5e6e223476b9a5d54092f00b750f41](https://stellar.expert/explorer/testnet/tx/0e4c5a074eb71bcf10f3f52cae313c064f5e6e223476b9a5d54092f00b750f41)
 - Pilot 4 · redemption · 9.8329 USDC · [395ab4c274745131492fd66b944dccffbe121a1e67c3bc2e671091f497315623](https://stellar.expert/explorer/testnet/tx/395ab4c274745131492fd66b944dccffbe121a1e67c3bc2e671091f497315623)
+
+## Demo video — walkthrough script
+
+Recorded against **Wanjiku Fresh Greens Ltd** (paychain58@gmail.com), which already has a real split settlement and a real
+redemption on testnet to point at — no live transaction needs to succeed on camera. Total run time ~4-5 minutes.
+
+**1. Intro (15-20s).** *"This is PayChain's Stellar settlement engine — Round Two of our Instaward. It lets a Kenyan
+merchant automatically route a percentage of every M-Pesa payment they receive into a Stellar testnet wallet as USDC, and
+withdraw it back to M-Pesa on demand. I'll walk through both directions using one of our real pilot merchants, Wanjiku Fresh
+Greens Ltd."*
+
+**2. Sign in (20s).** Demo app → Digital Wallet (or Inflation Shield) → "Connect the demo Stellar wallet" →
+paychain58@gmail.com / SomeStrongPassword123!. *"This logs in a real backend-connected merchant account — no OTP needed
+for our test pilots. Everything from here is real Stellar testnet activity, not a mockup."*
+
+**3. Settlement rule (30-40s).** Digital Wallet → Inflation Shield → point at the Settlement Rule card. *"Wanjiku has set
+20% — so for every payment they receive, 80% stays liquid for daily operations, and 20% automatically converts to USDC on
+Stellar as an inflation hedge. This is merchant-configurable and saved per account."*
+
+**4. Real settlement history (40-50s).** Scroll to the reconciliation table, point at the 3.8461538 USDC split-settlement
+entry. *"This isn't simulated data — this is a real transaction."* Click the hash, let StellarExpert load on screen:
+[42199ec5e82bc312d83b11cbf1c5580b7b32d9a110905a7bb2158e8b991cfcde](https://stellar.expert/explorer/testnet/tx/42199ec5e82bc312d83b11cbf1c5580b7b32d9a110905a7bb2158e8b991cfcde).
+*"Anyone can independently verify this happened, on a public testnet explorer."*
+
+**5. Withdraw/Redeem (60-90s).** Click "Request Payout." *"Now the reverse direction — pulling USDC back out to M-Pesa on
+demand."* Show loading then success. *"Behind the scenes this verifies the on-chain balance, signs a real debit transaction
+on Wanjiku's Stellar wallet, generates a receipt hash, and triggers a simulated M-Pesa B2C payout — simulated because this
+is testnet, so no real money moves, but the Stellar side is 100% real."* Point at the 3 USDC redemption entry, click its
+hash too:
+[c0c0b3b87ef8e500f344c76ab05d8c659ce7503bb07f91920097fb57d4a578c2](https://stellar.expert/explorer/testnet/tx/c0c0b3b87ef8e500f344c76ab05d8c659ce7503bb07f91920097fb57d4a578c2).
+
+**6. Wrap-up (15-20s).** *"That's the full loop — M-Pesa in, automatic Stellar settlement, and withdrawal back to M-Pesa
+on demand, fully verifiable on a public testnet explorer. This same flow ran under stress testing across five pilot
+merchants with 50 operations and 36 confirmed transactions, documented in our submission evidence."*
