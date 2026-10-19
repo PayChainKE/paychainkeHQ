@@ -40,6 +40,11 @@ export default function StellarConnectPanel({
     const res = await realLogin(email.trim(), password)
     setLoading(false)
     if (!res.success) return setError(res.error)
+    // Demo/pilot accounts skip OTP server-side (realLogin already
+    // established the session in that case) — no code was sent, so there's
+    // nothing to wait for. The parent page stops rendering this panel the
+    // moment realMerchant is set, same as after a normal OTP verify.
+    if (res.completed) return
     setChannel(res.channel || 'email')
     setStage('otp')
   }

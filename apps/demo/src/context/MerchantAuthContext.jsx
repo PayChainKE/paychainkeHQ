@@ -58,12 +58,30 @@ export function MerchantAuthProvider({ children }){
     return null
   }, [])
 
-  // Stage 1: password. Mirrors merchant-dashboard's real login exactly —
-  // always returns mfaRequired:true (see loginMerchant in
-  // merchantAuthController.js), never a token directly.
+  // Shared by both places a real session actually gets established below —
+  // OTP verification, and login itself when the backend skips OTP (demo/
+  // pilot accounts; see loginMerchant's isDemoMerchant bypass).
+  function establishSession(userData, jwt) {
+    api.defaults.headers.common['Authorization'] = `Bearer ${jwt}`
+    setRealMerchant(userData)
+    localStorage.setItem(REAL_STORAGE_KEY, JSON.stringify(userData))
+    localStorage.setItem(REAL_TOKEN_KEY, jwt)
+  }
+
+  // Stage 1: password. For a real merchant this always returns
+  // mfaRequired:true (see loginMerchant in merchantAuthController.js),
+  // never a token directly — proceed to realVerifyOtp. Demo/pilot accounts
+  // are the one exception: the backend skips OTP for them entirely and
+  // returns a completed session right here, so `completed: true` tells the
+  // caller to skip the OTP stage rather than wait for a code that was
+  // never sent.
   async function realLogin(email, password) {
     try {
       const res = await api.post('/api/auth/merchant/login', { email, password })
+      if (res.data?.mfaRequired === false && res.data?.token) {
+        establishSession(res.data.merchant, res.data.token)
+        return { success: true, completed: true }
+      }
       return { success: true, mfaRequired: res.data?.mfaRequired, channel: res.data?.channel, maskedPhone: res.data?.maskedPhone }
     } catch (err) {
       return { success: false, error: err.response?.data?.error || 'Login failed' }
@@ -75,11 +93,7 @@ export function MerchantAuthProvider({ children }){
   async function realVerifyOtp(email, otp) {
     try {
       const res = await api.post('/api/auth/merchant/verify-otp', { email, otp })
-      const { merchant: userData, token: jwt } = res.data
-      api.defaults.headers.common['Authorization'] = `Bearer ${jwt}`
-      setRealMerchant(userData)
-      localStorage.setItem(REAL_STORAGE_KEY, JSON.stringify(userData))
-      localStorage.setItem(REAL_TOKEN_KEY, jwt)
+      establishSession(res.data.merchant, res.data.token)
       return { success: true }
     } catch (err) {
       return { success: false, error: err.response?.data?.error || 'Invalid or expired code' }

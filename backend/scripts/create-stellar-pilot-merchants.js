@@ -7,11 +7,18 @@
 // or business registration number is set, so nothing here can collide with a
 // real taxpayer or company.
 //
-// Sign-in codes and payment SMS go to each pilot's phone, so the phones MUST
-// be numbers your team controls (e.g. sales / onboarding staff) — never made-up
-// numbers, which could belong to a stranger.
+// Demo/pilot accounts (isDemoMerchant) skip OTP entirely on login — see
+// merchantAuthController.js#loginMerchant — so the phone/email below aren't
+// needed to sign in. They're still used for payment SMS/email, settlement
+// notifications and (if PayChain's recovery flows are ever exercised on
+// these) password resets, so give real addresses/numbers you or your team
+// actually control rather than made-up ones that could belong to a stranger.
 //
-//   Preview (writes nothing):
+//   Preview (writes nothing) — one email per pilot:
+//     PILOT_PASSWORD='...' node backend/scripts/create-stellar-pilot-merchants.js \
+//       --phones=0712000001,0712000002,0712000003,0712000004,0712000005 \
+//       --emails=a@x.com,b@x.com,c@x.com,d@x.com,e@x.com
+//   ...or one inbox for all five, plus-aliased:
 //     PILOT_PASSWORD='...' node backend/scripts/create-stellar-pilot-merchants.js \
 //       --phones=0712000001,0712000002,0712000003,0712000004,0712000005 \
 //       --email-base=you@gmail.com
@@ -77,10 +84,26 @@ if (phones.length !== PILOTS.length || phones.some((p) => !p)) {
 }
 if (new Set(phones).size !== phones.length) die('Each pilot needs a different phone number.');
 
-const emailBase = String(args['email-base'] || '');
-const m = emailBase.match(/^([^@+\s]+)@([^@\s]+\.[^@\s]+)$/);
-if (!m) die('Give an inbox you own as --email-base=you@gmail.com — each pilot gets a "you+slug@…" alias that delivers to it.');
-const emailFor = (slug) => `${m[1]}+${slug}@${m[2]}`;
+// Two ways to supply emails: --emails=a@x.com,b@x.com,... (one real inbox
+// per pilot — what you want when each pilot has its own owner/phone, e.g.
+// real team members' accounts) or --email-base=you@gmail.com (one inbox,
+// each pilot gets a "you+slug@…" alias — simpler when one person is
+// managing all five). --emails takes priority if both are given.
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+let emailFor;
+if (args.emails) {
+  const emails = String(args.emails).split(',').map((e) => e.trim());
+  if (emails.length !== PILOTS.length || emails.some((e) => !EMAIL_RE.test(e))) {
+    die(`Give exactly ${PILOTS.length} valid email addresses, one per pilot in order: --emails=a@x.com,b@x.com,...`);
+  }
+  if (new Set(emails.map((e) => e.toLowerCase())).size !== emails.length) die('Each pilot needs a different email.');
+  emailFor = (i) => emails[i];
+} else {
+  const emailBase = String(args['email-base'] || '');
+  const m = emailBase.match(/^([^@+\s]+)@([^@\s]+\.[^@\s]+)$/);
+  if (!m) die('Give either --emails=a@x.com,b@x.com,... (one per pilot) or an inbox you own as --email-base=you@gmail.com (each pilot gets a "you+slug@…" alias).');
+  emailFor = (i) => `${m[1]}+${PILOTS[i].slug}@${m[2]}`;
+}
 
 const password = process.env.PILOT_PASSWORD || '';
 if (password.length < 12 || !/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/\d/.test(password)) {
@@ -94,7 +117,7 @@ console.log(`\nStellar pilot merchants — ${args.yes ? 'CREATE' : 'PREVIEW (not
 PILOTS.forEach((p, i) => {
   console.log(`  ${i + 1}. ${p.businessName}`);
   console.log(`     ${p.first} ${p.other} ${p.surname} · ${p.businessType} · ${p.ward}, ${p.county} · ${p.employees} staff`);
-  console.log(`     ${emailFor(p.slug)} · ${phones[i]} · rule: ${p.rule.enabled ? `${p.rule.stellarSharePercent}% to Stellar` : 'OFF (control)'}`);
+  console.log(`     ${emailFor(i)} · ${phones[i]} · rule: ${p.rule.enabled ? `${p.rule.stellarSharePercent}% to Stellar` : 'OFF (control)'}`);
 });
 if (!args.yes) {
   console.log('\nPreview only. Re-run with --yes to create these accounts.\n');
@@ -113,7 +136,7 @@ const failed = [];
 
 for (let i = 0; i < PILOTS.length; i++) {
   const p = PILOTS[i];
-  const email = emailFor(p.slug);
+  const email = emailFor(i);
   if (await Merchant.exists({ email })) { console.log(`\n  ↷ ${p.businessName}: ${email} already exists — skipped`); continue; }
   if (await Merchant.exists({ phone: phones[i] })) { console.log(`\n  ↷ ${p.businessName}: ${phones[i]} is already used by another merchant — skipped`); continue; }
 

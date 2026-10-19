@@ -872,12 +872,17 @@ export const loginMerchant = async (req, res) => {
       return res.status(403).json({ error: 'This account has been locked. Please contact PayChain support.' });
     }
 
-    // App-store-reviewer exception — see APP_REVIEW_BYPASS_EMAIL above.
-    // Skips OTP entirely and returns a completed session in the exact same
-    // shape verifyMerchantOTP would, which both frontends already know how
-    // to handle (mfaRequired: false was the shape the old "remembered
-    // device" 3-day bypass used, before it was removed).
-    if (APP_REVIEW_BYPASS_EMAIL && merchant.email === APP_REVIEW_BYPASS_EMAIL) {
+    // App-store-reviewer exception (APP_REVIEW_BYPASS_EMAIL) and demo/pilot
+    // accounts (isDemoMerchant) both skip OTP entirely — neither is a real
+    // merchant with real money on the line, and Brandon's explicit call for
+    // the Stellar pilots: no restriction, since they're test accounts and
+    // whoever is producing grant evidence (or an evaluator) shouldn't need
+    // access to 5 different phones/inboxes just to sign into a demo wallet.
+    // Returns a completed session in the exact same shape verifyMerchantOTP
+    // would, which both frontends already know how to handle (mfaRequired:
+    // false was the shape the old "remembered device" 3-day bypass used,
+    // before it was removed).
+    if (merchant.isDemoMerchant || (APP_REVIEW_BYPASS_EMAIL && merchant.email === APP_REVIEW_BYPASS_EMAIL)) {
       merchant.isVerified = true;
       merchant.loginCount = (merchant.loginCount || 0) + 1;
       merchant.lastLogin = new Date();
@@ -885,9 +890,9 @@ export const loginMerchant = async (req, res) => {
 
       logAudit({
         action: 'merchant.login.success', category: 'auth', severity: 'success',
-        message: 'Signed in successfully — app store review account (OTP bypassed)',
+        message: `Signed in successfully — ${merchant.isDemoMerchant ? 'demo/pilot' : 'app store review'} account (OTP bypassed)`,
         merchant, req,
-        metadata: { loginCount: merchant.loginCount, method: 'password+review_bypass' },
+        metadata: { loginCount: merchant.loginCount, method: merchant.isDemoMerchant ? 'password+demo_bypass' : 'password+review_bypass' },
       });
 
       const payload = await buildMerchantSessionPayload(merchant);
