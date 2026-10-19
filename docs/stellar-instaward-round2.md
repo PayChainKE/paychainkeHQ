@@ -20,9 +20,15 @@ prove the engine never touches a merchant who hasn't opted in.
 | Lakeside Hardware & Building Supplies | Kisumu | Sole Proprietorship | **Off** — control account |
 
 Per-pilot real testnet activity (generated against these named accounts specifically, via
-`backend/scripts/generate-pilot-demo-activity.js` — distinct from the throwaway local accounts the stress test below uses):
+`backend/scripts/generate-pilot-demo-activity.js` — distinct from the throwaway local accounts the stress test below uses).
+Lakeside Hardware correctly produced no settlement entry (control account, rule off).
 
-<!-- generate-pilot-demo-activity.js prints a ready-to-paste block for this section -->
+- Wanjiku Fresh Greens Ltd · split_settlement · 3.8461538 USDC · [42199ec5e82bc312d83b11cbf1c5580b7b32d9a110905a7bb2158e8b991cfcde](https://stellar.expert/explorer/testnet/tx/42199ec5e82bc312d83b11cbf1c5580b7b32d9a110905a7bb2158e8b991cfcde)
+- Wanjiku Fresh Greens Ltd · redemption · 3 USDC · [c0c0b3b87ef8e500f344c76ab05d8c659ce7503bb07f91920097fb57d4a578c2](https://stellar.expert/explorer/testnet/tx/c0c0b3b87ef8e500f344c76ab05d8c659ce7503bb07f91920097fb57d4a578c2)
+- Kilimani Brew House · split_settlement · 18.4615385 USDC · [7824911b30f4406afcbaabf0fe16ff583a98474691d0a1428b5d3615d9cd8ebe](https://stellar.expert/explorer/testnet/tx/7824911b30f4406afcbaabf0fe16ff583a98474691d0a1428b5d3615d9cd8ebe)
+- Kilimani Brew House · redemption · 10 USDC · [3bedad6c3e39ba285a4f79db06191ad97b0507ce6b2d7c3cf1abb91539220760](https://stellar.expert/explorer/testnet/tx/3bedad6c3e39ba285a4f79db06191ad97b0507ce6b2d7c3cf1abb91539220760)
+- Pwani Fresh Fish Traders · split_settlement · 38.1538462 USDC · [0e05327547b8d40a7c3266cfc9e5599ebcf54cf0b7d2884da23820878161bb29](https://stellar.expert/explorer/testnet/tx/0e05327547b8d40a7c3266cfc9e5599ebcf54cf0b7d2884da23820878161bb29)
+- Rift Valley Dairy Cooperative · split_settlement · 4.7692308 USDC · [066804e61ff1034430b5fa5bc0eb1f77cf36ae4cd49f6c91279967243eeaefd6](https://stellar.expert/explorer/testnet/tx/066804e61ff1034430b5fa5bc0eb1f77cf36ae4cd49f6c91279967243eeaefd6)
 
 ## Deliverable 1 — Settlement rule configuration
 
