@@ -982,6 +982,27 @@ const maskEmail = (raw) => {
   return `${m(local)}@${m(base)}${tld}`;
 };
 
+// Every common storage shape of a Kenyan number (0712…, 712…, 254712…,
+// +254712…) — Merchant.phone isn't stored consistently across signup
+// generations, so an exact match on whatever the merchant typed missed most
+// phone-based reset lookups. Mirrors adminController.js#phoneVariations
+// (not imported — adminController already imports from this file).
+const phoneLookupVariants = (raw) => {
+  const cleaned = String(raw).replace(/[\s-]+/g, '');
+  let base = cleaned;
+  if (base.startsWith('+254')) base = base.substring(4);
+  else if (base.startsWith('254')) base = base.substring(3);
+  else if (base.startsWith('0')) base = base.substring(1);
+  return Array.from(new Set([cleaned, base, `0${base}`, `254${base}`, `+254${base}`]));
+};
+
+// Resolves a password-reset identifier (email or phone) to a merchant.
+const findMerchantByEmailOrPhone = (lookup) => (
+  lookup.includes('@')
+    ? Merchant.findOne({ email: lookup.toLowerCase() })
+    : Merchant.findOne({ phone: { $in: phoneLookupVariants(lookup) } })
+);
+
 // @desc    Forgot Password — step 1 of 3. Mints a 6-digit OTP (10 min TTL)
 //          and emails it to the merchant's registered address. Always
 //          responds 200 success to prevent account enumeration; the OTP
@@ -996,10 +1017,9 @@ export const forgotPassword = async (req, res) => {
       return res.status(400).json({ error: 'Enter your email or registered phone number.' });
     }
 
-    const merchant = await Merchant.findOne({
-      $or: [{ email: lookup.toLowerCase() }, { phone: lookup }],
-    });
+    const merchant = await findMerchantByEmailOrPhone(lookup);
 
+    let maskedPhone = null;
     if (merchant) {
       const otp = crypto.randomInt(100000, 1000000).toString();
       const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
@@ -1014,6 +1034,18 @@ export const forgotPassword = async (req, res) => {
           console.error(`📧 Reset OTP send failed for ${merchant.email}:`, err);
         }),
       ]);
+
+      // Also by SMS — most mobile-app merchants know their phone far better
+      // than which email they signed up with, and the mobile reset screen
+      // takes either. Same code, so whichever arrives first works.
+      const e164Phone = toE164Kenyan(merchant.phone);
+      if (e164Phone) {
+        safeSendSMS({
+          to: e164Phone,
+          message: `Your PayChain password reset code is ${otp}. It expires in 10 minutes. Do not share this code.`,
+        }).catch((err) => console.error('📱 Reset OTP SMS failed:', err));
+        maskedPhone = maskPhone(merchant.phone);
+      }
 
       logAudit({
         action: 'merchant.password.reset_requested', category: 'security', severity: 'warning',
@@ -1036,6 +1068,7 @@ export const forgotPassword = async (req, res) => {
       // Echoes the masked address ONLY when a real account matched, so the UI
       // can render "code sent to j••e@e••••e.com" without leaking unknowns.
       maskedEmail: merchant ? maskEmail(merchant.email) : null,
+      maskedPhone,
     });
   } catch (error) {
     console.error('Forgot Password Error:', error);
@@ -1055,12 +1088,10 @@ export const verifyResetOTP = async (req, res) => {
   try {
     const lookup = String(email || '').trim();
     if (!lookup || !/^\d{6}$/.test(String(otp || ''))) {
-      return res.status(400).json({ error: 'Email and 6-digit code are required.' });
+      return res.status(400).json({ error: 'Email or phone and the 6-digit code are required.' });
     }
 
-    const merchant = await Merchant.findOne({
-      $or: [{ email: lookup.toLowerCase() }, { phone: lookup }],
-    }).select('+otp +otpExpires');
+    const merchant = await findMerchantByEmailOrPhone(lookup).select('+otp +otpExpires');
 
     if (!merchant || !merchant.otp || !merchant.otpExpires) {
       return res.status(400).json({ error: 'Invalid code. Request a new one and try again.' });
@@ -1082,7 +1113,7 @@ export const verifyResetOTP = async (req, res) => {
     const stored   = Buffer.from(String(merchant.otp).padEnd(6));
     if (provided.length !== stored.length || !crypto.timingSafeEqual(provided, stored)) {
       await recordFailedOtpAttempt(Merchant, merchant._id);
-      return res.status(400).json({ error: 'Invalid code. Check your inbox and try again.' });
+      return res.status(400).json({ error: 'Invalid code. Check your SMS or inbox and try again.' });
     }
 
     if (new Date() > merchant.otpExpires) {
@@ -1150,8 +1181,7 @@ export const resetPassword = async (req, res) => {
       }
     } else if (email && otp) {
       // Legacy single-shot path (kept so older mobile builds keep working).
-      const lookup = String(email).trim().toLowerCase();
-      merchant = await Merchant.findOne({ email: lookup }).select('+password +otp +otpExpires');
+      merchant = await findMerchantByEmailOrPhone(String(email).trim()).select('+password +otp +otpExpires');
       if (!merchant) {
         return res.status(401).json({ error: 'Invalid verification code.' });
       }
@@ -2078,6 +2108,124 @@ export const resetAppPin = async (req, res) => {
     res.status(200).json({ success: true, message: 'Payment PIN updated successfully.' });
   } catch (error) {
     console.error('Reset App PIN Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Forgot PIN — step 1 of 2. For a signed-in merchant who doesn't
+//          remember their PIN (so can't use resetAppPin) and may not
+//          remember their password either (so can't use setAppPin's
+//          password-gated overwrite). Sends a 6-digit code to the phone and
+//          email on file — the session alone is never enough to replace the
+//          PIN, since the PIN exists precisely as a check beyond the session.
+// @route   POST /api/auth/merchant/forgot-pin/send-otp
+// @access  Private (Merchant)
+export const sendPinResetOtp = async (req, res) => {
+  try {
+    const merchant = await Merchant.findById(req.merchant._id).select('email phone name');
+    if (!merchant) return res.status(404).json({ error: 'Merchant not found.' });
+
+    const otp = crypto.randomInt(100000, 1000000).toString();
+    await Merchant.updateOne({ _id: merchant._id }, {
+      $set: {
+        pinResetOtpHash: crypto.createHash('sha256').update(otp).digest('hex'),
+        pinResetOtpExpires: new Date(Date.now() + 10 * 60 * 1000),
+      },
+    });
+
+    let maskedPhone = null;
+    const e164Phone = toE164Kenyan(merchant.phone);
+    if (e164Phone) {
+      safeSendSMS({
+        to: e164Phone,
+        message: `Your PayChain PIN reset code is ${otp}. It expires in 10 minutes. Do not share this code.`,
+      }).catch((err) => console.error('📱 PIN reset OTP SMS failed:', err));
+      maskedPhone = maskPhone(merchant.phone);
+    }
+    if (merchant.email) {
+      sendOTP(merchant.email, otp).catch((err) => console.error('📧 PIN reset OTP email failed:', err));
+    }
+
+    logAudit({
+      action: 'merchant.payment_pin.reset_requested', category: 'security', severity: 'warning',
+      message: 'Forgot-PIN code requested',
+      merchant, req,
+    });
+
+    res.json({
+      success: true,
+      maskedPhone,
+      maskedEmail: maskEmail(merchant.email),
+      message: 'We sent a 6-digit code to your phone and email.',
+    });
+  } catch (error) {
+    console.error('Send PIN Reset OTP Error:', error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Forgot PIN — step 2 of 2. Verifies the code and sets the new PIN.
+//          Also clears any server-side wrong-PIN lockout, since that lockout
+//          is usually why the merchant is here.
+// @route   POST /api/auth/merchant/forgot-pin/reset
+// @access  Private (Merchant)
+export const resetPinWithOtp = async (req, res) => {
+  try {
+    const { otp, pin } = req.body || {};
+    if (!/^\d{6}$/.test(String(otp || ''))) {
+      return res.status(400).json({ error: 'Enter the 6-digit code we sent you.' });
+    }
+    if (!/^\d{4}$/.test(String(pin || ''))) {
+      return res.status(400).json({ error: 'A valid 4-digit PIN is required.' });
+    }
+
+    const merchant = await Merchant.findById(req.merchant._id).select('+pinResetOtpHash +pinResetOtpExpires +appPin');
+    if (!merchant) return res.status(404).json({ error: 'Merchant not found.' });
+
+    try {
+      await assertOtpNotLocked(Merchant, merchant._id);
+    } catch (e) {
+      if (e instanceof OtpLockedError) return res.status(429).json({ error: e.message });
+      throw e;
+    }
+
+    if (!merchant.pinResetOtpHash || !merchant.pinResetOtpExpires) {
+      return res.status(400).json({ error: 'Request a new code and try again.', codeExpired: true });
+    }
+    const providedHash = crypto.createHash('sha256').update(String(otp)).digest('hex');
+    if (!timingSafeStringEqual(providedHash, merchant.pinResetOtpHash)) {
+      await recordFailedOtpAttempt(Merchant, merchant._id);
+      return res.status(400).json({ error: 'Invalid code. Check your SMS or inbox and try again.' });
+    }
+    if (new Date() > merchant.pinResetOtpExpires) {
+      return res.status(400).json({ error: 'That code has expired. Request a new one.', codeExpired: true });
+    }
+
+    await resetOtpAttempts(Merchant, merchant._id);
+
+    const salt = await bcrypt.genSalt(12);
+    const wasChange = !!merchant.appPin;
+    merchant.appPin = await bcrypt.hash(String(pin), salt);
+    merchant.pinResetOtpHash = null;
+    merchant.pinResetOtpExpires = null;
+    await merchant.save();
+    await resetPinAttempts(merchant._id);
+
+    logAudit({
+      action: 'merchant.payment_pin.reset_via_otp', category: 'security', severity: 'critical',
+      message: wasChange ? 'Payment PIN reset with a verification code (forgot PIN)' : 'Payment PIN set with a verification code',
+      merchant, req,
+    });
+    createNotification({
+      merchantId: merchant._id,
+      kind: 'security',
+      title: 'Payment PIN reset',
+      message: "Your payment PIN was just reset. If this wasn't you, contact support@paychain.co.ke immediately.",
+    });
+
+    res.json({ success: true, message: 'Payment PIN reset successfully.', hasAppPin: true });
+  } catch (error) {
+    console.error('Reset PIN With OTP Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };

@@ -123,6 +123,10 @@ import {
 import { protect, protectAdminSSE, requireRole } from '../middleware/authMiddleware.js';
 import { upload, uploadReceipt, uploadMemory } from '../utils/cloudinary.js';
 import { registerAdminEventClient } from '../utils/adminEventStream.js';
+import {
+  previewBalancePayout, requestBalancePayout, confirmBalancePayout,
+  previewBulkBalancePayout, requestBulkBalancePayout, confirmBulkBalancePayout, getBulkBalancePayout, listBulkBalancePayouts,
+} from '../controllers/merchantBalancePayoutController.js';
 
 const router = express.Router();
 
@@ -189,6 +193,17 @@ router.get('/merchants/stickers/bulk', protect, excludeOfficer, downloadBulkStic
 router.get('/merchants/:id', protect, excludeOfficer, getMerchantDetail);
 router.post('/merchants/:id/request-action', protect, requireMutator, sensitiveActionLimiter, requestMerchantAction);
 router.post('/merchants/:id/confirm-action', protect, requireMutator, sensitiveActionLimiter, confirmMerchantAction);
+// Send a merchant their remaining balance (e.g. pausing operations) —
+// OTP-gated with a 5-letter + 1-digit code; see merchantBalancePayoutController.js.
+router.get('/merchants/:id/balance-payout/preview', protect, requireMutator, previewBalancePayout);
+router.post('/merchants/:id/balance-payout/request', protect, requireMutator, sensitiveActionLimiter, requestBalancePayout);
+router.post('/merchants/:id/balance-payout/confirm', protect, requireMutator, sensitiveActionLimiter, confirmBalancePayout);
+// Batch: pay everyone / selected merchants to their primary phones.
+router.get('/merchants/balance-payout/bulk', protect, requireMutator, listBulkBalancePayouts);
+router.post('/merchants/balance-payout/bulk/preview', protect, requireMutator, previewBulkBalancePayout);
+router.post('/merchants/balance-payout/bulk/request', protect, requireMutator, sensitiveActionLimiter, requestBulkBalancePayout);
+router.post('/merchants/balance-payout/bulk/confirm', protect, requireMutator, sensitiveActionLimiter, confirmBulkBalancePayout);
+router.get('/merchants/balance-payout/bulk/:batchId', protect, requireMutator, getBulkBalancePayout);
 router.post('/merchants/:id/flag', protect, requireMutator, sensitiveActionLimiter, flagMerchant);
 router.post('/merchants/:id/unflag', protect, requireMutator, sensitiveActionLimiter, unflagMerchant);
 router.patch('/merchants/:id/features', protect, requireMutator, sensitiveActionLimiter, updateMerchantFeatures);

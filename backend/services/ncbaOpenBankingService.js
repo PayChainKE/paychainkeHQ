@@ -49,8 +49,8 @@ const MAX_TRANSFER_AMOUNT = 999999;
 // Per NCBA (Rose, email 2026-08-26) for MobileMoneyTransfer/Mobile B2W:
 // "Process Bank to Wallet Payments to recipient's Mpesa numbers for amounts
 // between KES. 50.00 – KES. 250,000.00 Per transaction."
-const MOBILE_B2W_MIN_AMOUNT = 50;
-const MOBILE_B2W_MAX_AMOUNT = 250000;
+export const MOBILE_B2W_MIN_AMOUNT = 50;
+export const MOBILE_B2W_MAX_AMOUNT = 250000;
 
 // Real network calls to NCBA (test or live) only happen when this is
 // explicitly 'true' — everything else simulates, so the payout flow is

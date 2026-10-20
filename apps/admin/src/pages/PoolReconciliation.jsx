@@ -4,6 +4,8 @@ import Layout from '../components/layout/Layout';
 import api from '../api/api';
 import { useAuth } from '../context/AuthContext';
 import { formatKES } from '../utils/formatCurrency';
+import SendBalanceModal from '../components/modals/SendBalanceModal';
+import BulkSendBalanceModal, { BatchHistoryModal } from '../components/modals/BulkSendBalanceModal';
 
 // Rounding noise across many independently-rounded transaction amounts can
 // add up to a few cents; anything past this is a real gap, not float drift.
@@ -60,6 +62,12 @@ const PoolReconciliation = () => {
   const [merchantBalances, setMerchantBalances] = useState([]);
   const [merchantBalancesTotal, setMerchantBalancesTotal] = useState(0);
   const [merchantBalancesLoading, setMerchantBalancesLoading] = useState(true);
+  const [sendBalanceFor, setSendBalanceFor] = useState(null);
+  // Batch payouts: selected merchant ids, the open batch modal
+  // ({ scope, merchantIds } or { batchId } for history), and history list.
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [bulkModal, setBulkModal] = useState(null);
+  const [batchHistoryOpen, setBatchHistoryOpen] = useState(false);
   const [merchantSearch, setMerchantSearch] = useState('');
   const [exportingBalances, setExportingBalances] = useState(false);
 
@@ -482,6 +490,10 @@ const PoolReconciliation = () => {
       (m.phone || '').toLowerCase().includes(q)
     );
   }, [merchantBalances, merchantSearch]);
+  const payableFiltered = useMemo(
+    () => filteredMerchantBalances.filter((m) => m.kesBalance > 0),
+    [filteredMerchantBalances]
+  );
 
   function resetManualCreditForm() {
     setManualCreditStep('form');
@@ -1024,7 +1036,7 @@ const PoolReconciliation = () => {
                 This is the record to check first if a merchant disputes what they're owed.
               </p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3 sm:justify-end">
               <input
                 type="text"
                 value={merchantSearch}
@@ -1032,6 +1044,35 @@ const PoolReconciliation = () => {
                 placeholder="Search merchant, email, phone…"
                 className="w-56 bg-surface-container border border-outline-variant/40 rounded-md px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary"
               />
+              {canSubmitCheck && (
+                <>
+                  <button
+                    onClick={() => setBulkModal({ scope: 'selected', merchantIds: [...selectedIds] })}
+                    disabled={selectedIds.size === 0}
+                    title="Pay the ticked merchants their remaining balance to their primary phones (OTP-verified)"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-2xs font-bold uppercase tracking-widest hover:bg-emerald-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+                  >
+                    <span className="material-symbols-outlined text-sm">checklist</span>
+                    Pay Selected ({selectedIds.size})
+                  </button>
+                  <button
+                    onClick={() => setBulkModal({ scope: 'all', merchantIds: [] })}
+                    title="Pay every merchant with a balance to their primary phone (OTP-verified)"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-emerald-700 border border-emerald-700 text-white text-2xs font-bold uppercase tracking-widest hover:bg-emerald-800 transition-colors whitespace-nowrap"
+                  >
+                    <span className="material-symbols-outlined text-sm">groups</span>
+                    Pay Everyone
+                  </button>
+                  <button
+                    onClick={() => setBatchHistoryOpen(true)}
+                    title="Past and running batch payouts"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-surface-container border border-outline-variant/40 text-on-surface text-2xs font-bold uppercase tracking-widest hover:bg-surface-container-high transition-colors whitespace-nowrap"
+                  >
+                    <span className="material-symbols-outlined text-sm">history</span>
+                    Batch History
+                  </button>
+                </>
+              )}
               <button
                 onClick={exportMerchantBalancesCsv}
                 disabled={exportingBalances}
@@ -1063,15 +1104,47 @@ const PoolReconciliation = () => {
                 <table className="w-full text-xs">
                   <thead className="bg-surface-container/70 border-b border-outline-variant/40 sticky top-0">
                     <tr className="text-2xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
+                      {canSubmitCheck && (
+                        <th className="pl-5 pr-1 py-3 w-8">
+                          <input
+                            type="checkbox"
+                            aria-label="Select all merchants with a balance"
+                            checked={payableFiltered.length > 0 && payableFiltered.every((m) => selectedIds.has(m._id))}
+                            onChange={(e) => {
+                              const next = new Set(selectedIds);
+                              payableFiltered.forEach((m) => (e.target.checked ? next.add(m._id) : next.delete(m._id)));
+                              setSelectedIds(next);
+                            }}
+                            className="accent-emerald-700"
+                          />
+                        </th>
+                      )}
                       <th className="text-left px-5 py-3">Business</th>
                       <th className="text-left px-3 py-3">Contact</th>
                       <th className="text-left px-3 py-3">Status</th>
                       <th className="text-right px-5 py-3">KES Balance</th>
+                      {canSubmitCheck && <th className="text-right px-5 py-3">Payout</th>}
                     </tr>
                   </thead>
                   <tbody>
                     {filteredMerchantBalances.map((m) => (
                       <tr key={m._id} className="border-b border-outline-variant/40 last:border-b-0 hover:bg-surface-container/70 transition-colors">
+                        {canSubmitCheck && (
+                          <td className="pl-5 pr-1 py-3.5 w-8">
+                            <input
+                              type="checkbox"
+                              aria-label={`Select ${m.businessName || 'merchant'}`}
+                              disabled={!(m.kesBalance > 0)}
+                              checked={selectedIds.has(m._id)}
+                              onChange={(e) => {
+                                const next = new Set(selectedIds);
+                                if (e.target.checked) next.add(m._id); else next.delete(m._id);
+                                setSelectedIds(next);
+                              }}
+                              className="accent-emerald-700 disabled:opacity-30"
+                            />
+                          </td>
+                        )}
                         <td className="px-5 py-3.5">
                           <div className="font-bold text-on-surface">{m.businessName || '—'}</div>
                           <div className="text-2xs text-on-surface-variant">{m.name || ''}</div>
@@ -1088,6 +1161,19 @@ const PoolReconciliation = () => {
                           </span>
                         </td>
                         <td className="px-5 py-3.5 text-right font-bold text-on-surface tabular-nums">{formatKES(m.kesBalance || 0)}</td>
+                        {canSubmitCheck && (
+                          <td className="px-5 py-3.5 text-right">
+                            <button
+                              onClick={() => setSendBalanceFor(m)}
+                              disabled={!(m.kesBalance > 0)}
+                              title="Send this merchant their remaining balance (OTP-verified)"
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-emerald-200 bg-emerald-50 text-emerald-800 text-2xs font-bold uppercase tracking-widest hover:bg-emerald-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+                            >
+                              <span className="material-symbols-outlined text-sm">payments</span>
+                              Send
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -1468,6 +1554,30 @@ const PoolReconciliation = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {bulkModal && (
+        <BulkSendBalanceModal
+          key={bulkModal.batchId || bulkModal.scope}
+          scope={bulkModal.scope}
+          merchantIds={bulkModal.merchantIds}
+          batchId={bulkModal.batchId}
+          onClose={() => { setBulkModal(null); fetchMerchantBalances(true); }}
+          onFinished={() => { setSelectedIds(new Set()); fetchMerchantBalances(true); }}
+        />
+      )}
+      {batchHistoryOpen && (
+        <BatchHistoryModal
+          onClose={() => setBatchHistoryOpen(false)}
+          onOpen={(batchId) => { setBatchHistoryOpen(false); setBulkModal({ batchId }); }}
+        />
+      )}
+      {sendBalanceFor && (
+        <SendBalanceModal
+          merchant={sendBalanceFor}
+          onClose={() => setSendBalanceFor(null)}
+          onSuccess={() => fetchMerchantBalances(true)}
+        />
       )}
 
       {toast && (

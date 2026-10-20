@@ -77,7 +77,7 @@ function SignupSectionHeader({ icon, title }: { icon: any; title: string }) {
 }
 
 export default function Login({ route }: any) {
-  const { login, biometricLogin, signup, sendSignupPhoneOtp, verifySignupPhoneOtp, verifyOTP, resendOTP, forgotPassword, resetPassword,
+  const { login, biometricLogin, signup, sendSignupPhoneOtp, verifySignupPhoneOtp, verifyOTP, resendOTP, forgotPassword, verifyResetOtp, resetPassword,
           isBiometricsEnabled, hasBiometricToken, logoutReason, clearLogoutReason } = useAuth();
   const { authenticate: authenticateBiometric } = useBiometrics();
 
@@ -202,6 +202,12 @@ export default function Login({ route }: any) {
   const [authEmail, setAuthEmail] = useState('');
   const [otpChannel, setOtpChannel] = useState('email'); // 'email' or 'sms' — which channel the current OTP went out on
   const [otpMaskedPhone, setOtpMaskedPhone] = useState('');
+  // Password reset: the single-use token verify-reset-otp returns (step 2),
+  // where the code went (for the OTP screen copy), and a success notice
+  // shown back on the login tab once the new password is set.
+  const [resetToken, setResetToken] = useState('');
+  const [resetSentTo, setResetSentTo] = useState('');
+  const [notice, setNotice] = useState('');
   const [resendTimer, setResendTimer] = useState(59);
 
   const [hasAccount, setHasAccount] = useState(false);
@@ -314,6 +320,21 @@ export default function Login({ route }: any) {
     const code = otp.join('');
     if (code.length < 6) return;
     
+    if (otpFlowType === 'reset') {
+      setLoading(true);
+      const resetRes = await verifyResetOtp(authEmail, code);
+      setLoading(false);
+      if (resetRes.success && resetRes.resetToken) {
+        setResetToken(resetRes.resetToken);
+        setIsOTPMode(false);
+        setIsResetMode(true);
+        setErr('');
+      } else {
+        setErr(resetRes.error || 'Code verification failed');
+      }
+      return;
+    }
+
     setLoading(true);
     const res = await verifyOTP(authEmail, code);
     setLoading(false);
@@ -344,6 +365,16 @@ export default function Login({ route }: any) {
   // nothing wired to trigger a resend once it hit zero.
   const handleResendOTP = async () => {
     if (resendTimer > 0) return;
+    if (otpFlowType === 'reset') {
+      // resend-otp is the login endpoint — a reset code is re-minted by
+      // asking for a new one through forgot-password instead.
+      setLoading(true);
+      const resetRes = await forgotPassword(authEmail);
+      setLoading(false);
+      if (resetRes.success) setResendTimer(59);
+      else setErr(resetRes.error);
+      return;
+    }
     setLoading(true);
     const res = await resendOTP(authEmail);
     setLoading(false);
@@ -362,10 +393,15 @@ export default function Login({ route }: any) {
       return;
     }
     setLoading(true);
-    const res = await forgotPassword(phone);
+    const res = await forgotPassword(phone.trim());
     setLoading(false);
     if (res.success) {
-      setAuthEmail(phone);
+      const sentTo = [res.maskedPhone, res.maskedEmail].filter(Boolean).join(' and ');
+      setResetSentTo(sentTo);
+      setOtp(['', '', '', '', '', '']);
+      setNotice('');
+      setErr('');
+      setAuthEmail(phone.trim());
       setOtpFlowType('reset');
       setIsOTPMode(true);
       setResendTimer(59);
@@ -386,8 +422,7 @@ export default function Login({ route }: any) {
     }
 
     setLoading(true);
-    const code = otp.join('');
-    const res = await resetPassword(authEmail, code, newPassword);
+    const res = await resetPassword(resetToken, newPassword);
     setLoading(false);
     
     if (res.success) {
@@ -396,8 +431,19 @@ export default function Login({ route }: any) {
       setPassword('');
       setNewPasswordInput('');
       setConfirmPassword('');
+      setResetToken('');
+      setOtp(['', '', '', '', '', '']);
+      setErr('');
+      setNotice('Password updated. Log in with your new password.');
     } else {
       setErr(res.error);
+      // The reset token is single-use with a 15-min TTL — once it's gone,
+      // the only way forward is a fresh code.
+      if (/expired|start the password reset/i.test(res.error || '')) {
+        setIsResetMode(false);
+        setResetToken('');
+        setActiveTab('reset');
+      }
     }
   };
 
@@ -737,6 +783,8 @@ export default function Login({ route }: any) {
             setAgreedToTerms(false);
             setOtpChannel('email');
             setOtpMaskedPhone('');
+            setResetToken('');
+            setNotice('');
             setErr('');
           }}
           className={`flex-1 py-3 px-2 rounded-xl items-center justify-center ${
@@ -868,6 +916,13 @@ export default function Login({ route }: any) {
               </View>
             ) : null}
 
+            {notice && !err ? (
+              <View className="bg-emerald-50 border border-emerald-200 p-4 rounded-xl flex-row items-center mb-6">
+                <Feather name="check-circle" size={18} color="#047857" />
+                <Text className="text-emerald-800 text-[12px] font-jakarta-bold ml-3 flex-1">{notice}</Text>
+              </View>
+            ) : null}
+
             {activeTab === 'login' && !isOTPMode && !isResetMode && (
               <View>
                 <Text className="text-[#0c2010] text-[24px] font-jakarta-bold mb-2">Log in</Text>
@@ -958,7 +1013,9 @@ export default function Login({ route }: any) {
               <View>
                 <Text className="text-[#0c2010] text-[24px] font-jakarta-bold mb-2">Enter OTP</Text>
                 <Text className="text-[#5b645c] text-[14px] font-jakarta-bold mb-6">
-                  {otpChannel === 'sms'
+                  {otpFlowType === 'reset'
+                    ? `Enter the 6-digit reset code sent to ${resetSentTo || 'your phone and email'}`
+                    : otpChannel === 'sms'
                     ? `Enter the code sent via SMS to ${otpMaskedPhone || 'your phone'}`
                     : `Enter the code sent to ${authEmail}`}
                 </Text>

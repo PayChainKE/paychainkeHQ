@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Dimensions, ActivityIndicator, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store';
 import { usePreventScreenCapture } from 'expo-screen-capture';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { showAlert } from '../utils/alert';
+import { OtpInput } from '../components/OtpInput';
 
 const { width } = Dimensions.get('window');
 
@@ -22,17 +24,27 @@ const WEAK_PINS = new Set([
   '9876', '8765', '7654', '6543', '5432', '4321', '3210',
 ]);
 
-export default function ForgotPin({ navigation }: any) {
+type Step = 'choose' | 'otp' | 'password' | 'setup' | 'confirm';
+
+// Two ways to prove it's really the merchant before a new PIN can be set:
+// a code sent to the phone + email on file (works even if they've also
+// forgotten their password — the common case), or their account password.
+// Reached from the lock screen (PinEntry) and from Security settings
+// (route.params.fromSettings), where it returns to settings instead of
+// unlocking the app.
+export default function ForgotPin({ navigation, route }: any) {
   usePreventScreenCapture(); // no-op on web
 
-  const { setAppPin, unlockApp } = useAuth();
+  const fromSettings = !!route?.params?.fromSettings;
+  const { setAppPin, resetPinWithOtp, sendPinResetOtp, unlockApp } = useAuth();
 
-  // password: prove it's really them (the one thing a stranger holding the
-  // unlocked phone wouldn't know) before letting a new PIN be set at all —
-  // setup/confirm: same 4-digit entry PinSetup.tsx uses for the first PIN.
-  const [step, setStep] = useState<'password' | 'setup' | 'confirm'>('password');
+  const [step, setStep] = useState<Step>('choose');
+  const [method, setMethod] = useState<'otp' | 'password'>('otp');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [code, setCode] = useState('');
+  const [sentTo, setSentTo] = useState('');
+  const [sending, setSending] = useState(false);
   const [checking, setChecking] = useState(false);
   const [err, setErr] = useState('');
   const [pin, setPin] = useState('');
@@ -40,12 +52,50 @@ export default function ForgotPin({ navigation }: any) {
 
   const currentPin = step === 'setup' ? pin : confirmPin;
 
+  // As a hidden tab (fromSettings) this screen stays mounted between visits
+  // — start fresh every time it's left, never mid-flow with an old code.
+  useFocusEffect(useCallback(() => () => {
+    if (!fromSettings) return;
+    setStep('choose'); setMethod('otp'); setPassword(''); setCode('');
+    setSentTo(''); setErr(''); setPin(''); setConfirmPin('');
+  }, [fromSettings]));
+
+  const leave = () => {
+    if (fromSettings) navigation.navigate('More');
+    else navigation.goBack();
+  };
+
+  const handleSendCode = async () => {
+    setSending(true);
+    setErr('');
+    const res = await sendPinResetOtp();
+    setSending(false);
+    if (!res.success) {
+      setErr(res.error);
+      return;
+    }
+    setSentTo([res.maskedPhone, res.maskedEmail].filter(Boolean).join(' and '));
+    setMethod('otp');
+    setCode('');
+    setStep('otp');
+  };
+
+  const handleContinueCode = () => {
+    if (code.length !== 6) {
+      setErr('Enter the 6-digit code we sent you.');
+      return;
+    }
+    setErr('');
+    setStep('setup');
+  };
+
   const handleContinuePassword = () => {
     if (!password) {
       setErr('Enter your account password to continue.');
       return;
     }
     setErr('');
+    setMethod('password');
     setStep('setup');
   };
 
@@ -90,7 +140,8 @@ export default function ForgotPin({ navigation }: any) {
 
     setChecking(true);
     try {
-      await setAppPin(pin, password);
+      if (method === 'otp') await resetPinWithOtp(code, pin);
+      else await setAppPin(pin, password);
       // expo-secure-store's web shim doesn't implement these calls (throws
       // "getValueWithKeyAsync is not a function") — same guard as
       // PinEntry.tsx's lockout helpers. Without it this throw happens AFTER
@@ -102,17 +153,28 @@ export default function ForgotPin({ navigation }: any) {
           SecureStore.deleteItemAsync(LOCKED_UNTIL_KEY),
         ]);
       }
-      unlockApp();
-    } catch (err: any) {
-      const message = err?.response?.data?.error || 'Could not reset your PIN. Please try again.';
+      if (fromSettings) {
+        showAlert('PIN Reset', 'Your payment PIN has been reset.');
+        navigation.navigate('More');
+      } else {
+        unlockApp();
+      }
+    } catch (e: any) {
+      const message = e?.response?.data?.error || 'Could not reset your PIN. Please try again.';
       showAlert('Could not reset PIN', message);
       setPin('');
       setConfirmPin('');
-      // A wrong/rejected password means going back to the setup step is
-      // pointless — send them back to re-enter the password instead.
-      if (err?.response?.status === 400 || err?.response?.status === 401) {
-        setStep('password');
-        setPassword('');
+      // A rejected code/password means re-entering the PIN is pointless —
+      // send them back to whichever proof failed.
+      const status = e?.response?.status;
+      if (status === 400 || status === 401 || status === 429) {
+        if (method === 'otp') {
+          setCode('');
+          setStep(e?.response?.data?.codeExpired || status === 429 ? 'choose' : 'otp');
+        } else {
+          setPassword('');
+          setStep('password');
+        }
       } else {
         setStep('setup');
       }
@@ -121,28 +183,82 @@ export default function ForgotPin({ navigation }: any) {
     }
   };
 
+  const errorBox = err ? (
+    <View className="bg-red-500/10 border border-red-400/30 p-4 rounded-xl flex-row items-center mb-6">
+      <Feather name="alert-circle" size={18} color="#f87171" />
+      <Text className="text-red-300 text-[12px] font-jakarta-bold ml-3 flex-1">{err}</Text>
+    </View>
+  ) : null;
+
+  const header = (icon: any, title: string, subtitle: string, onBack: () => void) => (
+    <>
+      <TouchableOpacity onPress={onBack} className="mb-8 w-9 h-9 items-center justify-center">
+        <Feather name="arrow-left" size={18} color="white" />
+      </TouchableOpacity>
+      <View className="w-16 h-16 bg-[#006c4e] rounded-full justify-center items-center mb-6">
+        <Feather name={icon} size={26} color="white" />
+      </View>
+      <Text className="text-white text-[24px] font-jakarta-bold mb-2">{title}</Text>
+      <Text className="text-[#68dbae] text-[14px] font-jakarta-bold mb-8">{subtitle}</Text>
+    </>
+  );
+
+  if (step === 'choose') {
+    return (
+      <SafeAreaView className="flex-1 bg-[#0b2114]" edges={['top', 'left', 'right', 'bottom']}>
+        <View className="flex-1 px-8 pt-12">
+          {header('key', 'Reset Your PIN', "First, confirm it's you. We'll send a 6-digit code to the phone number and email on your account.", leave)}
+          {errorBox}
+
+          <TouchableOpacity onPress={handleSendCode} disabled={sending} className="w-full bg-[#006c4e] py-4 rounded-2xl flex-row justify-center items-center mb-4">
+            {sending ? <ActivityIndicator color="white" /> : (
+              <>
+                <Feather name="message-square" size={18} color="white" />
+                <Text className="text-white font-jakarta-bold text-[16px] ml-2">Send Me a Code</Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => { setErr(''); setStep('password'); }} disabled={sending} className="w-full border border-white/15 py-4 rounded-2xl flex-row justify-center items-center">
+            <Feather name="lock" size={16} color="#68dbae" />
+            <Text className="text-[#68dbae] font-jakarta-bold text-[15px] ml-2">Use My Password Instead</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (step === 'otp') {
+    return (
+      <SafeAreaView className="flex-1 bg-[#0b2114]" edges={['top', 'left', 'right', 'bottom']}>
+        <View className="flex-1 px-8 pt-12">
+          {header('message-square', 'Enter Your Code', `We sent a 6-digit code to ${sentTo || 'your phone and email'}. It expires in 10 minutes.`, () => { setErr(''); setStep('choose'); })}
+          {errorBox}
+
+          <View className="mb-8">
+            <OtpInput value={code} onChange={setCode} autoFocus />
+          </View>
+
+          <TouchableOpacity onPress={handleContinueCode} disabled={code.length !== 6} style={{ opacity: code.length === 6 ? 1 : 0.5 }} className="w-full bg-[#006c4e] py-4 rounded-2xl flex-row justify-center items-center mb-4">
+            <Text className="text-white font-jakarta-bold text-[16px]">Continue</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={handleSendCode} disabled={sending} className="items-center py-2">
+            {sending ? <ActivityIndicator color="#68dbae" /> : (
+              <Text className="text-[#68dbae] font-jakarta-bold text-[13px]">Didn't get it? Send a new code</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   if (step === 'password') {
     return (
       <SafeAreaView className="flex-1 bg-[#0b2114]" edges={['top', 'left', 'right', 'bottom']}>
         <View className="flex-1 px-8 pt-12">
-          <TouchableOpacity onPress={() => navigation.goBack()} className="mb-8 w-9 h-9 items-center justify-center">
-            <Feather name="arrow-left" size={18} color="white" />
-          </TouchableOpacity>
-
-          <View className="w-16 h-16 bg-[#006c4e] rounded-full justify-center items-center mb-6">
-            <Feather name="key" size={26} color="white" />
-          </View>
-          <Text className="text-white text-[24px] font-jakarta-bold mb-2">Reset Your PIN</Text>
-          <Text className="text-[#68dbae] text-[14px] font-jakarta-bold mb-8">
-            Enter your account password to confirm it's you, then set a new 4-digit PIN.
-          </Text>
-
-          {err ? (
-            <View className="bg-red-500/10 border border-red-400/30 p-4 rounded-xl flex-row items-center mb-6">
-              <Feather name="alert-circle" size={18} color="#f87171" />
-              <Text className="text-red-300 text-[12px] font-jakarta-bold ml-3 flex-1">{err}</Text>
-            </View>
-          ) : null}
+          {header('key', 'Reset Your PIN', "Enter your account password to confirm it's you, then set a new 4-digit PIN.", () => { setErr(''); setStep('choose'); })}
+          {errorBox}
 
           <Text className="text-[#68dbae] text-[11px] font-jakarta-bold uppercase tracking-widest mb-2">Password</Text>
           <View className="flex-row items-center w-full bg-white/5 border border-white/10 rounded-2xl pr-4 mb-8">
@@ -160,8 +276,12 @@ export default function ForgotPin({ navigation }: any) {
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity onPress={handleContinuePassword} className="w-full bg-[#006c4e] py-4 rounded-2xl flex-row justify-center items-center">
+          <TouchableOpacity onPress={handleContinuePassword} className="w-full bg-[#006c4e] py-4 rounded-2xl flex-row justify-center items-center mb-4">
             <Text className="text-white font-jakarta-bold text-[16px]">Continue</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => { setErr(''); setStep('choose'); }} className="items-center py-2">
+            <Text className="text-[#68dbae] font-jakarta-bold text-[13px]">Forgot your password too? Get a code instead</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>

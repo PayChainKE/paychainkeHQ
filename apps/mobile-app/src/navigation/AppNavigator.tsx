@@ -143,6 +143,15 @@ function MainTabs() {
         component={Notifications}
         options={{ tabBarButton: () => null, tabBarItemStyle: { flex: 0, width: 0, padding: 0 } }}
       />
+      {/* Forgot PIN from Security settings (signed in + unlocked) — same
+          screen the lock screen uses, which returns to More instead of
+          unlocking. Tab bar hidden: it's a full-screen verification flow. */}
+      <Tab.Screen
+        name="ForgotPinSettings"
+        component={ForgotPin}
+        initialParams={{ fromSettings: true }}
+        options={{ tabBarButton: () => null, tabBarItemStyle: { flex: 0, width: 0, padding: 0 }, tabBarStyle: { display: 'none' } }}
+      />
     </Tab.Navigator>
   );
 }

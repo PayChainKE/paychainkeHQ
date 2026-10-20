@@ -5,6 +5,7 @@ import MerchantLayout from '../components/layout/MerchantLayout'
 import { useNotification } from '../context/NotificationContext'
 import { ValidatedInput } from '../components/ValidatedInput'
 import PinBoxes from '../components/PinBoxes'
+import ForgotPinModal from '../components/modals/ForgotPinModal'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { formatKES } from '../utils/formatCurrency'
 import { formatPhoneDisplay } from '../utils/formatPhoneDisplay'
@@ -69,6 +70,7 @@ export default function SendMoney() {
   const [confirmPin, setConfirmPin]         = useState('')
   const [isLoading, setIsLoading]           = useState(false)
   const [pinError, setPinError]             = useState('')
+  const [forgotPinOpen, setForgotPinOpen]   = useState(false)
   const [success, setSuccess]               = useState(false)
   const [completedTx, setCompletedTx]       = useState(null)
   // Locks the Confirm & Send step to a single attempt once submitted — a
@@ -831,6 +833,13 @@ export default function SendMoney() {
                     )}
                   </div>
                   <PinBoxes value={pin} onChange={setPin} autoFocus={!stepUpRequired} loading={isLoading} />
+                  <button
+                    type="button"
+                    onClick={() => setForgotPinOpen(true)}
+                    className="block mx-auto text-[11px] font-bold text-[#00351D] hover:underline"
+                  >
+                    Forgot PIN?
+                  </button>
                   {pinError && (
                     <div className="flex items-center justify-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 animate-shake">
                       <span className="material-symbols-outlined text-red-500 text-base shrink-0">error_outline</span>
@@ -911,6 +920,12 @@ export default function SendMoney() {
           Secured by PayChain KE · PIN-authorised payments
         </p>
       </div>
+      {forgotPinOpen && (
+        <ForgotPinModal
+          onClose={() => setForgotPinOpen(false)}
+          onSuccess={() => { setPin(''); setPinError('') }}
+        />
+      )}
     </MerchantLayout>
   )
 }

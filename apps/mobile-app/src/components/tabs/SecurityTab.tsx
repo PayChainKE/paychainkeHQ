@@ -408,6 +408,9 @@ export default function SecurityTab() {
                       <Text className="text-[#022415] font-jakarta-extrabold text-[11px] uppercase tracking-widest">Update Authorization PIN</Text>
                     )}
                   </TouchableOpacity>
+                  <TouchableOpacity onPress={() => navigation.navigate('ForgotPinSettings')} className="items-center pt-1">
+                    <Text className="text-[#68dbae] font-jakarta-bold text-[12px]">Forgot your current PIN?</Text>
+                  </TouchableOpacity>
                 </View>
               </TourTarget>
             )}

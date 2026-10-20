@@ -323,7 +323,7 @@ export async function executeNcbaBankPayout({
  * whatever ncbaOpenBankingService throws on a submission failure (after
  * refunding the reservation).
  */
-export async function executeNcbaMobileMoneyPayout({ merchantId, phone, network, beneficiaryName, amount, narration }) {
+export async function executeNcbaMobileMoneyPayout({ merchantId, phone, network, beneficiaryName, amount, narration, referencePrefix = 'PAYOUT-API' }) {
   const numericAmount = Number(amount);
   if (!phone || !Number.isFinite(numericAmount) || numericAmount <= 0) {
     throw new NcbaOpenBankingValidationError('phone and a positive amount are required for a mobile money payout');
@@ -343,7 +343,7 @@ export async function executeNcbaMobileMoneyPayout({ merchantId, phone, network,
     throw new InsufficientFundsError(merchantId, totalDebit, merchant?.kesBalance ?? 0);
   }
 
-  const transactionId = `PAYOUT-API-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  const transactionId = `${referencePrefix}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
   let ncbaConfirmed = true;
   try {
     await submitMobileB2wPayment({
