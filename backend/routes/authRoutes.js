@@ -33,6 +33,8 @@ import {
   reportPwaInstalled,
   setAppPin,
   resetAppPin,
+  sendPinResetOtp,
+  resetPinWithOtp,
   verifyPaymentPin,
   validateSetupToken,
   sendSetupPasswordOtp,
@@ -318,6 +320,9 @@ router.put('/merchant/transactions-walkthrough', protectMerchant, completeTransa
 // the M-Pesa/bank-style "old PIN → new PIN" change flow on top of it.
 router.post('/merchant/set-app-pin', protectMerchant, pinLimiter, setAppPin);
 router.put('/merchant/reset-app-pin', protectMerchant, pinLimiter, resetAppPin);
+// Forgot PIN — code to phone + email, then a new PIN (see sendPinResetOtp).
+router.post('/merchant/forgot-pin/send-otp', protectMerchant, pinLimiter, sendPinResetOtp);
+router.post('/merchant/forgot-pin/reset', protectMerchant, pinLimiter, resetPinWithOtp);
 router.post('/merchant/verify-payment-pin', protectMerchant, pinLimiter, verifyPaymentPin);
 
 // Developer-API payout authorization — a separate PIN from appPin above,

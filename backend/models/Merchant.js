@@ -445,6 +445,20 @@ const merchantSchema = new mongoose.Schema({
     select: false,
     default: 0,
   },
+  // "Forgot PIN" recovery code (merchantAuthController.js#sendPinResetOtp /
+  // resetPinWithOtp). Separate from the login otp/otpExpires fields for the
+  // same reason as developerLinkOtp/payoutStepUpOtp above. Stored as a
+  // sha256 hash, never the raw code.
+  pinResetOtpHash: {
+    type: String,
+    select: false,
+    default: null,
+  },
+  pinResetOtpExpires: {
+    type: Date,
+    select: false,
+    default: null,
+  },
   registrationSource: {
     type: String,
     enum: ['web', 'mobile'],

@@ -439,22 +439,65 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  async function forgotPassword(email: string) {
+  // Password reset is a 3-step flow (forgot-password -> verify-reset-otp ->
+  // reset-password with the returned resetToken), same as the web
+  // dashboard. The reset code must NOT go through verifyOTP above — that's
+  // the login endpoint, which either signs the merchant straight in (never
+  // reaching "set new password") or rejects a phone identifier outright.
+  async function forgotPassword(identifier: string) {
     try {
-      const res = await api.post('/api/auth/merchant/forgot-password', { email });
-      return { success: true, message: res.data.message };
+      const res = await api.post('/api/auth/merchant/forgot-password', { email: identifier });
+      return {
+        success: true,
+        message: res.data.message,
+        maskedEmail: res.data.maskedEmail as string | null,
+        maskedPhone: res.data.maskedPhone as string | null,
+      };
     } catch (err: any) {
       return { success: false, error: err.response?.data?.error || 'Failed to request reset' };
     }
   }
 
-  async function resetPassword(email: string, otp: string, newPassword: string) {
+  async function verifyResetOtp(identifier: string, otp: string) {
     try {
-      const res = await api.post('/api/auth/merchant/reset-password', { email, otp, newPassword });
+      const res = await api.post('/api/auth/merchant/verify-reset-otp', { email: identifier, otp });
+      return { success: true, resetToken: res.data.resetToken as string };
+    } catch (err: any) {
+      return { success: false, error: err.response?.data?.error || 'Code verification failed' };
+    }
+  }
+
+  async function resetPassword(resetToken: string, newPassword: string) {
+    try {
+      const res = await api.post('/api/auth/merchant/reset-password', { resetToken, newPassword });
       return { success: true, message: res.data.message };
     } catch (err: any) {
       return { success: false, error: err.response?.data?.error || 'Failed to reset password' };
     }
+  }
+
+  // Forgot PIN (signed in, PIN unknown) — code to the phone + email on file,
+  // then a new PIN. See sendPinResetOtp/resetPinWithOtp in
+  // merchantAuthController.js.
+  async function sendPinResetOtp() {
+    try {
+      const res = await api.post('/api/auth/merchant/forgot-pin/send-otp');
+      return {
+        success: true,
+        maskedPhone: res.data.maskedPhone as string | null,
+        maskedEmail: res.data.maskedEmail as string | null,
+      };
+    } catch (err: any) {
+      return { success: false, error: err.response?.data?.error || 'Could not send a code. Please try again.' };
+    }
+  }
+
+  // Throws like setAppPin does, so ForgotPin.tsx can tell a bad code apart
+  // from a network failure.
+  async function resetPinWithOtp(otp: string, pin: string) {
+    await api.post('/api/auth/merchant/forgot-pin/reset', { otp, pin });
+    await storeAppPin(pin);
+    setAppPinState(pin);
   }
 
   async function logout(reason?: string) {
@@ -565,7 +608,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       verifyOTP,
       resendOTP,
       forgotPassword,
+      verifyResetOtp,
       resetPassword,
+      sendPinResetOtp,
+      resetPinWithOtp,
       logout,
       refreshSession,
       updateToken,
