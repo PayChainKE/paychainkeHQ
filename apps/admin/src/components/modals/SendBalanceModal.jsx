@@ -179,7 +179,7 @@ export default function SendBalanceModal({ merchant, onClose, onSuccess }) {
               </button>
             </div>
             {quote && !quoteLoading && quote.amount <= 0 && (
-              <p className="text-[12px] text-on-surface-variant mt-3 text-center">Nothing to send — the balance is below M-PESA's KES 10 minimum after fees.</p>
+              <p className="text-[12px] text-on-surface-variant mt-3 text-center">Nothing to send — the balance is below the KES 50 mobile money minimum after fees.</p>
             )}
           </div>
         )}
