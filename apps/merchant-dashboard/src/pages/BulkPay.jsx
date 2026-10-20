@@ -4,6 +4,7 @@ import domtoimage from 'dom-to-image'
 import { ValidatedInput } from '../components/ValidatedInput'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import FundAccountModal from '../components/modals/FundAccountModal'
+import ForgotPinModal from '../components/modals/ForgotPinModal'
 import { useMerchantAuth } from '../context/MerchantAuthContext'
 import { formatKES } from '../utils/formatCurrency'
 import { formatAccountNumber } from '../utils/formatAccountNumber'
@@ -750,6 +751,7 @@ export default function BulkPay() {
   const [securityStep, setSecurityStep] = useState(1) // 1: OTP, 2: PIN
   const [otp, setOtp] = useState('')
   const [pin, setPin] = useState('')
+  const [forgotPinOpen, setForgotPinOpen] = useState(false)
   const [isSendingOtp, setIsSendingOtp] = useState(false)
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false)
   const [otpError, setOtpError] = useState('')
@@ -2514,6 +2516,13 @@ export default function BulkPay() {
                       placeholder="• • • •"
                       className="w-full bg-surface-container-low/30 border border-outline-variant/20 rounded-2xl px-5 py-4 text-center font-headline tracking-[1em] text-xl font-bold text-primary focus:ring-0 focus:border-[#00351D]/50 transition-all outline-none"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setForgotPinOpen(true)}
+                      className="block mx-auto -mt-3 text-[11px] font-bold text-[#00351D] hover:underline"
+                    >
+                      Forgot PIN?
+                    </button>
 
                     {/* Step-up challenge — only appears once
                         /api/bulkpay/authorize has responded 428 for this
@@ -3007,6 +3016,9 @@ export default function BulkPay() {
       </div>
 
       </div>
+      {forgotPinOpen && (
+        <ForgotPinModal onClose={() => setForgotPinOpen(false)} onSuccess={() => setPin('')} />
+      )}
     </MerchantLayout>
   )
 }

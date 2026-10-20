@@ -9,6 +9,7 @@ import { formatKES } from '../utils/formatCurrency'
 import { BiometricRegisterButton } from '../components/BiometricButton'
 import { useNavigate, useLocation } from 'react-router-dom'
 import axios from 'axios'
+import ForgotPinModal from '../components/modals/ForgotPinModal'
 
 const DEFAULT_SECURITY_QUESTIONS = [
   "What is the name of the first school you attended?",
@@ -64,6 +65,7 @@ export default function Profile() {
 
   // PIN Reset states
   const [currentPin, setCurrentPin] = useState('')
+  const [forgotPinOpen, setForgotPinOpen] = useState(false)
   const [newPin, setNewPin] = useState('')
   const [confirmNewPin, setConfirmNewPin] = useState('')
   const [isResettingPin, setIsResettingPin] = useState(false)
@@ -634,6 +636,13 @@ export default function Profile() {
                             >
                               {isResettingPin ? 'Updating...' : 'Update PIN'}
                             </button>
+                            <button
+                              type="button"
+                              onClick={() => setForgotPinOpen(true)}
+                              className="w-full text-center text-[11px] font-bold text-amber-400 hover:text-amber-300 transition-colors"
+                            >
+                              Forgot your current PIN?
+                            </button>
                           </div>
                         </div>
                       )}
@@ -1055,6 +1064,12 @@ export default function Profile() {
           </div>
         </div>
       </div>
+      {forgotPinOpen && (
+        <ForgotPinModal
+          onClose={() => setForgotPinOpen(false)}
+          onSuccess={() => toast.push({ message: 'Payment PIN reset successfully', type: 'success' })}
+        />
+      )}
     </MerchantLayout>
   )
 }
