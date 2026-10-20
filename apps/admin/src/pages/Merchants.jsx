@@ -9,6 +9,7 @@ import { formatAccountNumber } from '../utils/formatAccountNumber'
 import EditableField from '../components/modals/EditableField'
 import UploadableDocRow from '../components/modals/UploadableDocRow'
 import ResetContactModal from '../components/modals/ResetContactModal';
+import SendBalanceModal from '../components/modals/SendBalanceModal';
 import EditSignupDetailsModal from '../components/modals/EditSignupDetailsModal';
 import GenerateStatementModal from '../components/modals/GenerateStatementModal';
 import GenerateAuditReportModal from '../components/modals/GenerateAuditReportModal';
@@ -1343,6 +1344,7 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
   const [contactName, setContactName] = React.useState(merchant?.name || '');
   const [certificateUrl, setCertificateUrl] = React.useState(merchant?.certificateUrl || null);
   const [resetContactOpen, setResetContactOpen] = React.useState(false);
+  const [sendBalanceOpen, setSendBalanceOpen] = React.useState(false);
   const [contactOverride, setContactOverride] = React.useState(null); // { email, phone } after a reset_contact confirm
   // Signup-details fields (National ID, business type, county/area/ward/
   // street) — editable via EditSignupDetailsModal, mainly so an admin can
@@ -2082,6 +2084,16 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
                   Reset Contact
                 </button>
               } />
+              <Row label="Remaining Balance" value={
+                <button
+                  onClick={() => setSendBalanceOpen(true)}
+                  title="Pay out everything PayChain holds for this merchant to their phone (OTP-verified)"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 text-[11px] font-bold uppercase tracking-widest transition-all"
+                >
+                  <span className="material-symbols-outlined text-[14px]">payments</span>
+                  Send Balance
+                </button>
+              } />
               <Row
                 label="Newsletter"
                 value={
@@ -2451,6 +2463,12 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
           merchant={m}
           onClose={() => setResetContactOpen(false)}
           onSuccess={(data) => setContactOverride(data)}
+        />
+      )}
+      {sendBalanceOpen && (
+        <SendBalanceModal
+          merchant={{ ...m, phone: contactOverride?.phone ?? m.phone }}
+          onClose={() => setSendBalanceOpen(false)}
         />
       )}
       {editSignupDetailsOpen && (

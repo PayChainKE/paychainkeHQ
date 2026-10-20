@@ -4,6 +4,7 @@ import Layout from '../components/layout/Layout';
 import api from '../api/api';
 import { useAuth } from '../context/AuthContext';
 import { formatKES } from '../utils/formatCurrency';
+import SendBalanceModal from '../components/modals/SendBalanceModal';
 
 // Rounding noise across many independently-rounded transaction amounts can
 // add up to a few cents; anything past this is a real gap, not float drift.
@@ -60,6 +61,7 @@ const PoolReconciliation = () => {
   const [merchantBalances, setMerchantBalances] = useState([]);
   const [merchantBalancesTotal, setMerchantBalancesTotal] = useState(0);
   const [merchantBalancesLoading, setMerchantBalancesLoading] = useState(true);
+  const [sendBalanceFor, setSendBalanceFor] = useState(null);
   const [merchantSearch, setMerchantSearch] = useState('');
   const [exportingBalances, setExportingBalances] = useState(false);
 
@@ -1067,6 +1069,7 @@ const PoolReconciliation = () => {
                       <th className="text-left px-3 py-3">Contact</th>
                       <th className="text-left px-3 py-3">Status</th>
                       <th className="text-right px-5 py-3">KES Balance</th>
+                      {canSubmitCheck && <th className="text-right px-5 py-3">Payout</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -1088,6 +1091,19 @@ const PoolReconciliation = () => {
                           </span>
                         </td>
                         <td className="px-5 py-3.5 text-right font-bold text-on-surface tabular-nums">{formatKES(m.kesBalance || 0)}</td>
+                        {canSubmitCheck && (
+                          <td className="px-5 py-3.5 text-right">
+                            <button
+                              onClick={() => setSendBalanceFor(m)}
+                              disabled={!(m.kesBalance > 0)}
+                              title="Send this merchant their remaining balance (OTP-verified)"
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-emerald-200 bg-emerald-50 text-emerald-800 text-2xs font-bold uppercase tracking-widest hover:bg-emerald-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+                            >
+                              <span className="material-symbols-outlined text-sm">payments</span>
+                              Send
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -1468,6 +1484,14 @@ const PoolReconciliation = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {sendBalanceFor && (
+        <SendBalanceModal
+          merchant={sendBalanceFor}
+          onClose={() => setSendBalanceFor(null)}
+          onSuccess={() => fetchMerchantBalances(true)}
+        />
       )}
 
       {toast && (
