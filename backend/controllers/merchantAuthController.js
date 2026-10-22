@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { UnsupportedFileError } from '../utils/fileSignature.js';
 import { serverError } from '../utils/serverError.js';
 import Merchant from '../models/Merchant.js';
 import AuditLog from '../models/AuditLog.js';
@@ -32,6 +33,7 @@ import { getAvailableBalance } from '../utils/availableBalance.js';
 import { checkImageSharpness } from '../utils/imageBlurCheck.js';
 import { uploadBufferToCloudinary } from '../utils/cloudinary.js';
 import { dispatchOtp, maskPhone } from '../utils/otpDispatch.js';
+import { applyPayoutHold, notifyCredentialRecovery } from '../utils/payoutHold.js';
 import { screenMerchantForSanctions } from '../services/sanctionsListCache.js';
 
 // Canonical option sets for self-serve signup's business-details step —
@@ -500,6 +502,7 @@ export const registerMerchant = async (req, res) => {
         }
       }
     } catch (e) {
+      if (e instanceof UnsupportedFileError) return res.status(400).json({ error: e.message });
       console.error('KYB document upload to Cloudinary failed:', e);
       return res.status(500).json({ error: 'We could not upload your document(s) right now. Please try again.' });
     }
@@ -1215,7 +1218,11 @@ export const resetPassword = async (req, res) => {
     // signOutAllDevices below) invalidates any JWT issued before this
     // point, not just ones the merchant happens to know about.
     merchant.tokenVersion = (merchant.tokenVersion || 0) + 1;
+    // The reset code can arrive by SMS, so a stolen phone/SIM is enough to
+    // get here — pause payouts and alert the owner (utils/payoutHold.js).
+    const holdUntil = applyPayoutHold(merchant, 'password_reset');
     await merchant.save();
+    notifyCredentialRecovery(merchant, { what: 'Password', until: holdUntil });
 
     // Confirmation email — paper trail + recovery path if it wasn't them.
     const when = new Date().toLocaleString('en-KE', {
@@ -2208,6 +2215,8 @@ export const resetPinWithOtp = async (req, res) => {
     merchant.appPin = await bcrypt.hash(String(pin), salt);
     merchant.pinResetOtpHash = null;
     merchant.pinResetOtpExpires = null;
+    // Code may have come by SMS to a stolen phone — see utils/payoutHold.js.
+    const holdUntil = applyPayoutHold(merchant, 'pin_reset');
     await merchant.save();
     await resetPinAttempts(merchant._id);
 
@@ -2216,14 +2225,16 @@ export const resetPinWithOtp = async (req, res) => {
       message: wasChange ? 'Payment PIN reset with a verification code (forgot PIN)' : 'Payment PIN set with a verification code',
       merchant, req,
     });
-    createNotification({
-      merchantId: merchant._id,
-      kind: 'security',
-      title: 'Payment PIN reset',
-      message: "Your payment PIN was just reset. If this wasn't you, contact support@paychain.co.ke immediately.",
-    });
+    notifyCredentialRecovery(merchant, { what: 'Payment PIN', until: holdUntil });
 
-    res.json({ success: true, message: 'Payment PIN reset successfully.', hasAppPin: true });
+    res.json({
+      success: true,
+      message: holdUntil
+        ? 'Payment PIN reset. For your security, payouts are paused for a few hours.'
+        : 'Payment PIN reset successfully.',
+      hasAppPin: true,
+      payoutHoldUntil: holdUntil,
+    });
   } catch (error) {
     console.error('Reset PIN With OTP Error:', error);
     res.status(500).json({ error: 'Server Error' });

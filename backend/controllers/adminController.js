@@ -18,6 +18,8 @@ import AuditLog from '../models/AuditLog.js';
 import { sendMerchantInvite, sendAdminActionOTP, sendContactDetailsChangedEmail } from '../utils/resend.js';
 import { logAudit } from '../utils/auditLog.js';
 import { recordDeletion } from '../utils/trash.js';
+import { applyPayoutHold } from '../utils/payoutHold.js';
+import { UnsupportedFileError } from '../utils/fileSignature.js';
 import { getNcbaVirtualAccountNumber, generateRandomMerchantCode, validatePhoneNumber, isValidPhoneInputFormat, NcbaValidationError } from '../utils/ncbaValidators.js';
 import { generateMerchantStickerPdf, generateBulkStickerPdf, generateMerchantQrFlyerPdf } from '../utils/stickerGenerator.js';
 import { LIVE_DATA_CUTOFF } from '../config/liveDataCutoff.js';
@@ -56,7 +58,7 @@ const ACTION_LABELS = {
   unlock: 'Unlock merchant account',
   delete: 'Permanently delete merchant account',
   reset_contact: 'Reset merchant primary email/phone',
-  unlock_outbound: 'Unlock outbound transfers',
+  unlock_outbound: 'Unlock outbound transfers / lift payout hold',
 };
 
 // Derive an activity tier from a Date — used to colour-code merchant rows.
@@ -384,7 +386,7 @@ export const requestMerchantAction = async (req, res) => {
       return res.status(400).json({ error: 'Invalid merchant id.' });
     }
 
-    const merchant = await Merchant.findById(id).select('email phone businessName status outboundLocked');
+    const merchant = await Merchant.findById(id).select('email phone businessName status outboundLocked payoutHoldUntil');
     if (!merchant) return res.status(404).json({ error: 'Merchant not found.' });
 
     // No-op guards — also stops admin from racking up OTPs against a no-op.
@@ -394,8 +396,9 @@ export const requestMerchantAction = async (req, res) => {
     if (action === 'unlock' && merchant.status !== 'locked') {
       return res.status(409).json({ error: 'Account is not locked.' });
     }
-    if (action === 'unlock_outbound' && !merchant.outboundLocked) {
-      return res.status(409).json({ error: 'Outbound transfers are not locked on this account.' });
+    const holdActive = merchant.payoutHoldUntil && new Date(merchant.payoutHoldUntil) > new Date();
+    if (action === 'unlock_outbound' && !merchant.outboundLocked && !holdActive) {
+      return res.status(409).json({ error: 'Payouts are not locked or paused on this account.' });
     }
 
     // reset_contact carries its own payload (the new email/phone) which must
@@ -555,6 +558,11 @@ export const confirmMerchantAction = async (req, res) => {
       // tokenVersion check, same as lock, so a session opened under the old
       // identity can't keep riding on it after the reset.
       merchant.tokenVersion = (merchant.tokenVersion || 0) + 1;
+      // A contact change is the classic social-engineering route to a SIM
+      // swap / account takeover ("I lost my phone, please change my
+      // number") — pause payouts so the real owner, alerted on the OLD
+      // contacts below, has time to object (utils/payoutHold.js).
+      applyPayoutHold(merchant, 'admin_contact_reset');
       await merchant.save();
       logAudit({
         action: 'admin.merchant.contact_reset', category: 'admin', severity: 'critical',
@@ -632,14 +640,20 @@ export const confirmMerchantAction = async (req, res) => {
       await recordDeletion({ collectionName: 'Merchant', doc: merchant, label: merchant.businessName || merchant.email, deletedBy: admin._id });
       await Merchant.deleteOne({ _id: merchant._id });
     } else if (action === 'unlock_outbound') {
+      const liftedHold = merchant.payoutHoldUntil ? { until: merchant.payoutHoldUntil, reason: merchant.payoutHoldReason } : null;
+      merchant.payoutHoldUntil = null;
+      merchant.payoutHoldReason = null;
       merchant.outboundLocked = false;
       merchant.outboundLockedAt = null;
       merchant.outboundLockReason = null;
       await merchant.save();
       logAudit({
         action: 'admin.merchant.outbound_unlocked', category: 'admin', severity: 'success',
-        message: 'Outbound transfers unlocked by admin (OTP-verified)',
+        message: liftedHold
+          ? `Payouts unlocked by admin (OTP-verified) — lifted the "${liftedHold.reason}" hold early`
+          : 'Outbound transfers unlocked by admin (OTP-verified)',
         merchant, actor: adminActor(admin), req,
+        metadata: liftedHold ? { liftedHold } : undefined,
       });
     }
 
@@ -657,7 +671,7 @@ export const confirmMerchantAction = async (req, res) => {
           : action === 'reset_contact'
             ? 'Primary email/phone updated. The merchant has been signed out everywhere.'
             : action === 'unlock_outbound'
-              ? 'Outbound transfers unlocked.'
+              ? 'Payouts unlocked.'
               : 'Merchant account unlocked.',
       data: action === 'reset_contact' ? { email: merchant.email, phone: merchant.phone } : undefined,
     });
@@ -1322,7 +1336,13 @@ export const updateMerchantKycDocument = async (req, res) => {
     if (!merchant) return res.status(404).json({ error: 'Merchant not found' });
 
     const contentHash = hashDocumentBuffer(req.file.buffer);
-    const uploaded = await uploadBufferToCloudinary(req.file.buffer, 'paychain_certificates');
+    let uploaded;
+    try {
+      uploaded = await uploadBufferToCloudinary(req.file.buffer, 'paychain_certificates');
+    } catch (e) {
+      if (e instanceof UnsupportedFileError) return res.status(400).json({ error: e.message });
+      throw e;
+    }
 
     const existing = merchant.kybDocuments.find((d) => d.type === type);
     const isReplace = !!existing;

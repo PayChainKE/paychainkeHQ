@@ -2,6 +2,7 @@ import { v2 as cloudinary } from 'cloudinary';
 import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import multer from 'multer';
 import dotenv from 'dotenv';
+import { assertAllowedUpload } from './fileSignature.js';
 
 dotenv.config();
 
@@ -100,7 +101,15 @@ export function withMulterErrorHandling(multerMiddleware) {
 
 // Manual counterpart to CloudinaryStorage — uploads a buffer that's already
 // in memory (post fileFilter/blur-check) rather than a multipart stream.
+// Refuses anything that isn't really a JPEG, PNG or PDF (by file signature,
+// not the client-claimed type) — every memory-buffered upload funnels
+// through here: registration, KYC resubmission, officer and admin uploads.
 export function uploadBufferToCloudinary(buffer, folder) {
+  try {
+    assertAllowedUpload(buffer);
+  } catch (err) {
+    return Promise.reject(err);
+  }
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
       { folder, resource_type: 'image', transformation: [{ width: 1000, height: 1000, crop: 'limit' }] },

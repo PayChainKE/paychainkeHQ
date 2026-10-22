@@ -92,6 +92,7 @@ const ACTIVITY_STYLE = {
 const ACTION_META = {
   lock:   { label: 'Lock Account',   verb: 'lock',   tone: 'amber',   icon: 'lock',         copy: 'The merchant will be unable to sign in until unlocked. Funds and data remain intact.' },
   unlock: { label: 'Unlock Account', verb: 'unlock', tone: 'emerald', icon: 'lock_open',    copy: 'The merchant will regain access to their dashboard and mobile app.' },
+  unlock_outbound: { label: 'Resume Payouts', verb: 'resume payouts for', tone: 'emerald', icon: 'payments', copy: 'Lifts the anti-takeover payout hold (set after a password/PIN/contact reset) and any outbound lock. Only do this after confirming with the merchant on their known number that they made the change.' },
   delete: { label: 'Delete Account', verb: 'delete', tone: 'red',     icon: 'delete_forever', copy: 'The merchant record and ALL related transactions, payouts, payees and payment links will be permanently removed. This cannot be undone.' },
 };
 
@@ -874,6 +875,11 @@ const Merchants = () => {
                                 ) : (
                                   <MenuItem icon="flag" tone="red" onClick={() => startFlag(m)}>Flag as suspicious</MenuItem>
                                 )}
+                                {(m.outboundLocked || (m.payoutHoldUntil && new Date(m.payoutHoldUntil) > new Date())) && (
+                                  <MenuItem icon="payments" tone="emerald" onClick={() => startAction(m, 'unlock_outbound')}>
+                                    Resume payouts{m.payoutHoldUntil && new Date(m.payoutHoldUntil) > new Date() ? ` (paused until ${new Date(m.payoutHoldUntil).toLocaleString()})` : ''}
+                                  </MenuItem>
+                                )}
                                 {locked ? (
                                   <MenuItem icon="lock_open" tone="emerald" onClick={() => startAction(m, 'unlock')}>Unlock account</MenuItem>
                                 ) : (
@@ -1158,14 +1164,16 @@ const ActionModal = ({ state, onClose, onConfirm, onSubmitOtp, onOtpChange }) =>
               <span className="material-symbols-outlined text-3xl">check_circle</span>
             </div>
             <h3 className="text-xl font-bold text-on-surface mb-1">
-              {state.action === 'delete' ? 'Merchant deleted' : state.action === 'freeze' ? 'Account frozen' : 'Account reactivated'}
+              {state.action === 'delete' ? 'Merchant deleted' : state.action === 'freeze' ? 'Account frozen' : state.action === 'unlock_outbound' ? 'Payouts resumed' : 'Account reactivated'}
             </h3>
             <p className="text-sm text-on-surface-variant mb-5">
               {state.action === 'delete'
                 ? `${state.merchant.businessName} and all related records have been permanently removed.`
                 : state.action === 'freeze'
                   ? `${state.merchant.businessName} can no longer sign in until reactivated.`
-                  : `${state.merchant.businessName} has regained dashboard access.`}
+                  : state.action === 'unlock_outbound'
+                    ? `${state.merchant.businessName} can send payouts again.`
+                    : `${state.merchant.businessName} has regained dashboard access.`}
             </p>
             <button onClick={onClose} className="px-5 py-2.5 rounded-lg bg-primary text-white text-sm font-semibold uppercase tracking-widest hover:shadow-lg active:scale-95 transition-all">Done</button>
           </div>

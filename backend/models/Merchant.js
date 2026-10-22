@@ -459,6 +459,16 @@ const merchantSchema = new mongoose.Schema({
     select: false,
     default: null,
   },
+  // Payouts paused until this time after a credential recovery (password
+  // reset, PIN reset by code, admin contact change) — see utils/payoutHold.js.
+  payoutHoldUntil: {
+    type: Date,
+    default: null,
+  },
+  payoutHoldReason: {
+    type: String,
+    default: null,
+  },
   registrationSource: {
     type: String,
     enum: ['web', 'mobile'],
