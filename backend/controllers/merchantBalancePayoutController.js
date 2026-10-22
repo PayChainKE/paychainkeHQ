@@ -19,6 +19,7 @@ import { createNotification } from './notificationController.js';
 import { safeSendSMS, formatKes } from '../utils/smsSanitizer.js';
 import { notifyAdmins, escapeHtml } from '../utils/securityAlerts.js';
 import AdminBalancePayoutBatch from '../models/AdminBalancePayoutBatch.js';
+import { activePayoutHold } from '../utils/payoutHold.js';
 
 // Admin "send a merchant their remaining balance" — for winding down /
 // pausing operations without PayChain being left holding merchant money.
@@ -269,7 +270,7 @@ export const confirmBalancePayout = async (req, res) => {
       return res.status(400).json({ error: 'This request is missing its payout details. Request a new code.' });
     }
 
-    const merchant = await Merchant.findById(id).select('businessName email phone kesBalance');
+    const merchant = await Merchant.findById(id).select('businessName email phone kesBalance payoutHoldUntil');
     if (!merchant) return res.status(404).json({ error: 'Merchant not found.' });
 
     const outcome = await payOutBalance({ merchant, phone, network, destination, amount, fee, req, admin: req.admin });
@@ -313,6 +314,10 @@ export const confirmBalancePayout = async (req, res) => {
 // returns { ok:false, httpStatus, error } so the bulk loop can record it
 // and carry on to the next merchant.
 async function payOutBalance({ merchant, phone, network, destination = 'primary', amount, fee, req, admin }) {
+  const holdUntil = activePayoutHold(merchant);
+  if (holdUntil) {
+    return { ok: false, httpStatus: 423, error: `Payouts for this merchant are paused until ${holdUntil.toLocaleString('en-KE', { timeZone: 'Africa/Nairobi' })} after a password/PIN/contact reset (anti-takeover hold).` };
+  }
   let result;
   try {
     result = await executeNcbaMobileMoneyPayout({
@@ -401,7 +406,7 @@ async function buildBulkQuotes({ all, merchantIds }) {
     query = { _id: { $in: ids } };
   }
   const merchants = await Merchant.find(query)
-    .select('businessName email phone kesBalance status tariffLock isDemoMerchant isAppReviewAccount')
+    .select('businessName email phone kesBalance status tariffLock isDemoMerchant isAppReviewAccount payoutHoldUntil')
     .sort('-kesBalance');
   if (merchants.length > MAX_BULK) {
     return { error: `That's ${merchants.length} merchants — a batch can pay at most ${MAX_BULK}. Select fewer and run it in parts.` };
@@ -412,6 +417,7 @@ async function buildBulkQuotes({ all, merchantIds }) {
   for (const m of merchants) {
     const row = { merchantId: String(m._id), businessName: m.businessName || m.email || '—', kesBalance: Math.round((m.kesBalance || 0) * 100) / 100 };
     if (isTestAccount(m)) { skipped.push({ ...row, reason: 'Demo/test account (simulated balance)' }); continue; }
+    if (activePayoutHold(m)) { skipped.push({ ...row, reason: 'Payouts paused after a recent password/PIN/contact reset' }); continue; }
     if (!(m.kesBalance > 0)) { skipped.push({ ...row, reason: 'No balance' }); continue; }
     let phone;
     try { phone = validatePhoneNumber(m.phone); } catch { skipped.push({ ...row, reason: 'No valid primary phone — use the single payout to send to another number' }); continue; }
@@ -528,7 +534,7 @@ async function processBatch(batchId, { req, admin }) {
 
     let update;
     try {
-      const merchant = await Merchant.findById(item.merchantId).select('businessName email phone kesBalance');
+      const merchant = await Merchant.findById(item.merchantId).select('businessName email phone kesBalance payoutHoldUntil');
       if (!merchant) {
         update = { status: 'failed', error: 'Merchant no longer exists.' };
       } else {

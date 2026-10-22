@@ -37,7 +37,7 @@ import { KENYAN_BANK_CODES } from '../config/kenyanBankCodes.js';
 import { bankDestination, mobileDestination, paybillTillDestination } from '../utils/transactionDestination.js';
 import { getB2cTariff } from '../config/mpesaB2cTariffCard.js';
 import { getLipaNaMpesaTariff } from '../config/lipaNaMpesaTariffCard.js';
-import { getBankTransferTariff } from '../config/bankTransferTariffCard.js';
+import { getBankTransferTariff, MIN_BANK_TRANSFER_AMOUNT } from '../config/bankTransferTariffCard.js';
 import { withMerchantTariffLock } from '../services/tariffCardCache.js';
 import { logAudit } from '../utils/auditLog.js';
 import { recordDeletion } from '../utils/trash.js';
@@ -218,6 +218,9 @@ export async function executeNcbaBankPayout({
   }
   if (rail === 'rtgs' && !beneficiaryCountry) {
     throw new NcbaOpenBankingValidationError('beneficiaryCountry is required for an RTGS transfer');
+  }
+  if (numericAmount < MIN_BANK_TRANSFER_AMOUNT) {
+    throw new NcbaOpenBankingValidationError(`The minimum bank transfer is KES ${MIN_BANK_TRANSFER_AMOUNT}. For smaller amounts, send to M-PESA instead.`);
   }
 
   // Interbank Transfer Tariff (config/bankTransferTariffCard.js) — known

@@ -17,7 +17,38 @@ import Merchant from '../models/Merchant.js';
 // convention) in case this ever runs as more than one instance.
 let cache = new Map();
 
+// One-off reshapes of saved cards whose band structure the code changed.
+// getTariffBands only trusts a saved card whose band maxes exactly match
+// the code's, so without this a reshaped card would silently fall back to
+// code defaults and drop every fee an admin had set. Idempotent: only
+// touches a card still in its old shape.
+const LEGACY_SHAPE_MIGRATIONS = [
+  {
+    // 2026-10-22: PesaLink's "up to 500" band split into 100-200 (KES 50)
+    // and 200-500 (keeps whatever fee the old band had).
+    key: 'pesalink_service_fee',
+    fromMaxes: [500, 3500, 7000, 10000, 250000],
+    reshape: (bands) => [{ max: 200, fee: 50 }, ...bands],
+  },
+];
+
+async function migrateLegacyTariffShapes() {
+  for (const m of LEGACY_SHAPE_MIGRATIONS) {
+    const doc = await TariffCard.findOne({ key: m.key }).lean();
+    const maxes = (doc?.bands || []).map((b) => b.max);
+    if (!doc || doc.shape !== 'tiered' || maxes.join(',') !== m.fromMaxes.join(',')) continue;
+    const bands = m.reshape(doc.bands);
+    await TariffCard.updateOne({ _id: doc._id, 'bands.0.max': m.fromMaxes[0] }, { $set: { bands } });
+    console.log(`💳 Reshaped tariff card ${m.key}: ${maxes.join('/')} -> ${bands.map((b) => b.max).join('/')}`);
+  }
+}
+
 export async function loadTariffCache() {
+  try {
+    await migrateLegacyTariffShapes();
+  } catch (err) {
+    console.error('Tariff card reshape failed (pricing falls back to code defaults for that card):', err?.message || err);
+  }
   const docs = await TariffCard.find({}).lean();
   const next = new Map();
   for (const doc of docs) next.set(doc.key, doc);

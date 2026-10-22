@@ -5,7 +5,7 @@ import PayoutBatch from '../models/PayoutBatch.js';
 import Merchant from '../models/Merchant.js';
 import Transaction from '../models/Transaction.js';
 import { submitNcbaBankTransfer, NCBA_OWN_BANK_CODE } from './ncbaOpenBankingController.js';
-import { getBankTransferTariff } from '../config/bankTransferTariffCard.js';
+import { getBankTransferTariff, MIN_BANK_TRANSFER_AMOUNT } from '../config/bankTransferTariffCard.js';
 import { submitNcbaUtilityPayment } from '../services/ncbaBulkPaymentService.js';
 import bcrypt from 'bcryptjs';
 import { sendBatchReceiptEmail } from '../utils/resend.js';
@@ -610,6 +610,10 @@ export const authorizeBatch = async (req, res) => {
         // rail regardless (see submitNcbaBankTransfer), so it's excluded here
         // too rather than over-reserving a fee that won't actually apply.
         row.isBankRow = payee.paymentMethod === 'Bank';
+        if (row.isBankRow && row.netAmount < MIN_BANK_TRANSFER_AMOUNT) {
+          tariffBoundsError = `Payout to "${payee.name}" — the minimum bank transfer is KES ${MIN_BANK_TRANSFER_AMOUNT}. Pay smaller amounts to M-PESA instead.`;
+          return;
+        }
         if (row.isBankRow && payee.bankCode !== NCBA_OWN_BANK_CODE) {
           ({ totalFee: row.bankFee } = getBankTransferTariff('pesalink', row.netAmount));
         } else {

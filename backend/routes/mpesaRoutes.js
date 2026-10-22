@@ -1,7 +1,7 @@
 import express from 'express';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { initiateSTKPush, getSTKStatus, initiateB2C, initiateB2B, generateQrCheckout, generateAccountQr } from '../controllers/mpesaController.js';
-import { protectMerchant } from '../middleware/authMiddleware.js';
+import { protectMerchant, payoutAccountGuard } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
@@ -46,9 +46,9 @@ router.post('/generate-qr', protectMerchant, stkPushLimiter, generateQrCheckout)
 router.get('/account-qr', protectMerchant, stkPushLimiter, generateAccountQr);
 
 // B2C Routes (Outbound to a phone number, via NCBA Mobile B2W)
-router.post('/b2c-request', protectMerchant, pinLimiter, initiateB2C);
+router.post('/b2c-request', protectMerchant, payoutAccountGuard, pinLimiter, initiateB2C);
 
 // B2B Routes (Outbound to a Paybill/Till, via NCBA Lipa na M-Pesa)
-router.post('/b2b-request', protectMerchant, pinLimiter, initiateB2B);
+router.post('/b2b-request', protectMerchant, payoutAccountGuard, pinLimiter, initiateB2B);
 
 export default router;

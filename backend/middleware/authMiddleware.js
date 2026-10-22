@@ -4,6 +4,7 @@ import Admin from '../models/Admin.js';
 import Merchant from '../models/Merchant.js';
 import Developer from '../models/Developer.js';
 import ApiKey from '../models/ApiKey.js';
+import { activePayoutHold, payoutHoldMessage } from '../utils/payoutHold.js';
 
 // Auth guards. Always respond with { error, code } on failure so the admin/
 // merchant frontends can surface a useful message instead of the generic
@@ -243,3 +244,25 @@ const requireRole = (...allowedRoles) => (req, res, next) => {
 };
 
 export { protect, protectAdminSSE, protectMerchant, protectMerchantSSE, protectDeveloper, authenticateApiKey, extractApiKey, requireRole };
+
+// Real-money payout routes only. Gives the app a clear reason instead of
+// "insufficient balance" for the two account states that may not move money
+// out. The actual enforcement for both is in
+// utils/availableBalance.js#debitAvailableBalance (covers every rail,
+// including the developer API and admin payouts).
+//  - Test accounts (Stellar demo/pilot merchants, the Play Store reviewer
+//    account) hold SIMULATED balances and sign in without an OTP.
+//  - A payout hold after a password/PIN/contact recovery (utils/payoutHold.js).
+export const payoutAccountGuard = (req, res, next) => {
+  if (req.merchant?.isDemoMerchant || req.merchant?.isAppReviewAccount) {
+    return res.status(403).json({
+      error: 'This is a test account — its balance is simulated, so real payouts are turned off.',
+      testAccount: true,
+    });
+  }
+  const holdUntil = activePayoutHold(req.merchant);
+  if (holdUntil) {
+    return res.status(423).json({ error: payoutHoldMessage(holdUntil), payoutHoldUntil: holdUntil });
+  }
+  next();
+};

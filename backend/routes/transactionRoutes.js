@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import { getTransactions, getFeePreview, simulateIncomingPayment, swapKesToUsdc, activateWallet, getLiveRate, sendMoney, syncWalletBalance, generatePaymentLink, listPaymentLinks, getPaymentLink, processPaymentLink, getMerchantByAccount, payToMerchantAccount, emailStatement, downloadSticker, getPublicSTKStatus, getCheckoutPreview, createCheckoutPage, listCheckoutPages, getCheckoutPageForMerchant, updateCheckoutPage, deleteCheckoutPage, getCheckoutPagePublic, checkoutPageCheckout } from '../controllers/transactionController.js';
-import { protectMerchant } from '../middleware/authMiddleware.js';
+import { protectMerchant, payoutAccountGuard } from '../middleware/authMiddleware.js';
 import { getRule, updateRule, redeem, getReconciliation, downloadReconciliationCsv } from '../controllers/stellarSettlementController.js';
 
 const router = express.Router();
@@ -38,7 +38,7 @@ router.post('/simulate', protectMerchant, simulateIncomingPayment);
 router.post('/swap', protectMerchant, swapKesToUsdc);
 router.post('/activate-wallet', protectMerchant, activateWallet);
 router.post('/sync-wallet', protectMerchant, syncWalletBalance);
-router.post('/send-money', protectMerchant, pinLimiter, sendMoney);
+router.post('/send-money', protectMerchant, payoutAccountGuard, pinLimiter, sendMoney);
 router.get('/fee-preview', protectMerchant, getFeePreview);
 router.post('/payment-link', protectMerchant, generatePaymentLink);
 router.get('/payment-link', protectMerchant, listPaymentLinks);

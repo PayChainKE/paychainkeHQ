@@ -73,10 +73,27 @@ export async function getAvailableBalance(merchantId, kesBalance) {
 // idiom used by every payout controller — same atomicity, same null-means-
 // insufficient return convention, just checking against (amount + whatever
 // of the balance is still held) instead of the raw balance alone.
-export async function debitAvailableBalance(merchantId, amount) {
+//
+// Test accounts (Stellar demo/pilot merchants, the Play Store reviewer
+// account) hold SIMULATED balances and log in without an OTP. Every real
+// payout rail debits through here, so refusing them here is what stops a
+// leaked test-account password from paying real money out of PayChain's
+// NCBA pool. Returns null ("nothing debited"), the same as insufficient
+// funds — every caller already handles that safely, with no refund path.
+// `allowTestAccounts` is only for internal, no-money-out movements (the
+// demo's KES->USDC swap).
+export async function debitAvailableBalance(merchantId, amount, { allowTestAccounts = false } = {}) {
   const held = await getRecentlyCreditedHold(merchantId);
+  const testAccountGuard = allowTestAccounts ? {} : { isDemoMerchant: { $ne: true }, isAppReviewAccount: { $ne: true } };
   return Merchant.findOneAndUpdate(
-    { _id: merchantId, kesBalance: { $gte: amount + held } },
+    {
+      _id: merchantId,
+      kesBalance: { $gte: amount + held },
+      ...testAccountGuard,
+      // Post-recovery payout hold (utils/payoutHold.js); null also matches
+      // a missing field.
+      $or: [{ payoutHoldUntil: null }, { payoutHoldUntil: { $lte: new Date() } }],
+    },
     { $inc: { kesBalance: -amount } },
     { returnDocument: 'after' }
   );

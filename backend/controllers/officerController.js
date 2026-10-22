@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { UnsupportedFileError } from '../utils/fileSignature.js';
 import mongoose from 'mongoose';
 import Merchant from '../models/Merchant.js';
 import { logAudit } from '../utils/auditLog.js';
@@ -245,6 +246,7 @@ export const createApplication = async (req, res) => {
         })
       );
     } catch (e) {
+      if (e instanceof UnsupportedFileError) return res.status(400).json({ error: e.message });
       console.error('KYB document upload to Cloudinary failed:', e);
       return res.status(500).json({ error: 'We could not upload the document(s) right now. Please try again.' });
     }
@@ -1007,6 +1009,7 @@ export const resubmitDocuments = async (req, res) => {
       try {
         uploaded = await uploadBufferToCloudinary(file.buffer, 'paychain_certificates');
       } catch (e) {
+        if (e instanceof UnsupportedFileError) return res.status(400).json({ error: e.message });
         console.error('KYB document upload to Cloudinary failed:', e);
         return res.status(500).json({ error: 'We could not upload the document(s) right now. Please try again.' });
       }

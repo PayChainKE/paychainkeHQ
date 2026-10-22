@@ -291,7 +291,8 @@ export const swapKesToUsdc = async (req, res) => {
       // Atomic conditional deduct — avoids two concurrent swaps both
       // passing a stale in-memory balance check. Also holds back money
       // credited in the last 2 minutes (see utils/availableBalance.js).
-      const debited = await debitAvailableBalance(merchant._id, amount);
+      // Internal demo-only conversion, no money leaves PayChain.
+      const debited = await debitAvailableBalance(merchant._id, amount, { allowTestAccounts: true });
       if (!debited) {
         return res.status(400).json({ error: 'Insufficient available KES balance — a recent credit may still be briefly held.' });
       }

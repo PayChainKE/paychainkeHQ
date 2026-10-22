@@ -3,7 +3,7 @@ import rateLimit from 'express-rate-limit';
 import { handleNcbaReconciliationWebhook, handleInitiateBulkPayment } from '../controllers/ncbaController.js';
 import { handleNcbaAccountNotification } from '../controllers/ncbaAccountNotificationController.js';
 import { handleBankPayout, handlePesaLinkCallback, getBankCodes } from '../controllers/ncbaOpenBankingController.js';
-import { protectMerchant } from '../middleware/authMiddleware.js';
+import { protectMerchant, payoutAccountGuard } from '../middleware/authMiddleware.js';
 import { timingSafeStringEqual } from '../utils/timingSafeCompare.js';
 
 const router = express.Router();
@@ -88,11 +88,11 @@ router.post(
 );
 
 // Merchant-initiated NCBA bulk disbursements (suppliers + utility payouts).
-router.post('/bulk-payments', protectMerchant, pinLimiter, handleInitiateBulkPayment);
+router.post('/bulk-payments', protectMerchant, payoutAccountGuard, pinLimiter, handleInitiateBulkPayment);
 
 // Merchant-initiated single withdrawal to a bank account via NCBA Open
 // Banking's PesaLink rail — see controllers/ncbaOpenBankingController.js.
-router.post('/openbanking/bank-payout', protectMerchant, pinLimiter, handleBankPayout);
+router.post('/openbanking/bank-payout', protectMerchant, payoutAccountGuard, pinLimiter, handleBankPayout);
 router.get('/openbanking/bank-codes', protectMerchant, getBankCodes);
 
 // Public webhook — NCBA's Open Banking per-transaction result callback.

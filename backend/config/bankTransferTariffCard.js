@@ -27,7 +27,18 @@ import { getTariffBands, getTariffFlat } from '../services/tariffCardCache.js';
 // the admin-editable `serviceFee` side below. `serviceFee` values here are
 // only the fallback default; the live figure comes from getPesaLinkTariff's
 // cache lookup.
+// Smallest bank transfer PayChain accepts, on every rail (PesaLink, RTGS,
+// NCBA-to-NCBA). Below this a flat bank fee is more than the transfer
+// itself (a KES 50 PesaLink send on 2026-10-21 cost the merchant KES 62
+// in fees), so tiny sends belong on M-PESA instead. Brandon, 2026-10-22.
+export const MIN_BANK_TRANSFER_AMOUNT = 100;
+
+// The 100-200 band was split out of the old single "up to 500" band on
+// 2026-10-22 (Brandon: KES 50 for 100-200). Saved cards still in the old
+// 5-band shape are migrated automatically on boot — see
+// services/tariffCardCache.js#migrateLegacyTariffShapes.
 const PESALINK_BANDS_DEFAULT = [
+  { max: 200,      baseCost: 0,   serviceFee: 50  },
   { max: 500,      baseCost: 0,   serviceFee: 50  },
   { max: 3_500,    baseCost: 50,  serviceFee: 20  },
   { max: 7_000,    baseCost: 50,  serviceFee: 38  },
@@ -36,6 +47,7 @@ const PESALINK_BANDS_DEFAULT = [
 ];
 
 export const MAX_PESALINK_AMOUNT = 250_000;
+export const PESALINK_BAND_MAXES = PESALINK_BANDS_DEFAULT.map((b) => b.max);
 
 const round2 = (value) => Math.round((value + Number.EPSILON) * 100) / 100;
 

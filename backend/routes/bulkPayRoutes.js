@@ -1,7 +1,7 @@
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import { getPayees, getPayeeById, addPayee, updatePayee, deletePayee, getBatches, getBatchById, authorizeBatch, validateKplcMeter, validateNcwscMeter, validateKplcPrepaidMeter } from '../controllers/bulkPayController.js';
-import { protectMerchant } from '../middleware/authMiddleware.js';
+import { protectMerchant, payoutAccountGuard } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
@@ -51,6 +51,6 @@ router.route('/batches')
 router.route('/batches/:id')
   .get(getBatchById);
 
-router.post('/authorize', pinLimiter, authorizeBatch);
+router.post('/authorize', payoutAccountGuard, pinLimiter, authorizeBatch);
 
 export default router;

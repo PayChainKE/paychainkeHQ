@@ -1,4 +1,5 @@
 import sharp from 'sharp';
+import { assertAllowedUpload } from './fileSignature.js';
 
 // Same metric OpenCV's cv2.Laplacian(img, CV_64F).var() blur-detector uses:
 // convolve a grayscale image with a Laplacian (edge-detection) kernel, then
@@ -21,6 +22,9 @@ function getThreshold() {
 // can't analyze (corrupt, unsupported) is treated as a format problem
 // elsewhere, not silently accepted as "not blurry".
 export async function checkImageSharpness(buffer) {
+  // Only real JPEG/PNG bytes reach sharp (throws otherwise; callers treat
+  // that as "we couldn't read this photo").
+  assertAllowedUpload(buffer, ['jpeg', 'png']);
   const meta = await sharp(buffer).metadata();
   if ((meta.width || 0) < MIN_DIMENSION || (meta.height || 0) < MIN_DIMENSION) {
     return { blurry: true, reason: 'Image resolution is too low. Please upload a clearer, higher-resolution photo.' };

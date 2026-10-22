@@ -170,6 +170,9 @@ export default function SendMoney({ navigation }: any) {
   const isLipaNaMpesaBetaMerchant = LIPA_NA_MPESA_LIVE_TESTING_ENABLED && merchant?._id === LIPA_NA_MPESA_BETA_MERCHANT_ID;
   const selectedDest = DESTINATIONS.find((d) => d.id === destination);
   const isMobileDest = destination === 'mpesa-primary' || destination === 'mobile';
+  // Mirrors backend MIN_BANK_TRANSFER_AMOUNT (config/bankTransferTariffCard.js).
+  const MIN_BANK_TRANSFER = 100;
+  const bankBelowMin = destination === 'bank' && Number(amount) > 0 && Number(amount) < MIN_BANK_TRANSFER;
   const isB2bDest = destination === 'till' || destination === 'paybill';
   // Live fee, fetched from the same tariff functions/per-merchant lock the
   // backend uses to actually charge (GET /api/transactions/fee-preview) —
@@ -239,6 +242,7 @@ export default function SendMoney({ navigation }: any) {
         !!amount &&
         Number(amount) > 0 &&
         (!isMobileDest || (Number(amount) >= 50 && Number(amount) <= 250000)) &&
+        !bankBelowMin &&
         !!recipientAccount &&
         (destination !== 'bank' || !!bankCode) &&
         (destination !== 'bank' || bankRail !== 'rtgs' || !!beneficiaryCountry) &&
@@ -669,6 +673,16 @@ export default function SendMoney({ navigation }: any) {
               {isMobileDest && (
                 <Text className="text-[11px] font-jakarta-bold mt-2 text-[#a1a1aa]">
                   Mobile Money transfers: min KES 50, max KES 250,000 per transaction
+                </Text>
+              )}
+              {destination === 'bank' && (
+                <Text className="text-[11px] font-jakarta-bold mt-2 text-[#a1a1aa]">
+                  Bank transfers: min KES {MIN_BANK_TRANSFER}. For smaller amounts, send to M-PESA.
+                </Text>
+              )}
+              {bankBelowMin && (
+                <Text className="text-[11px] font-jakarta-bold mt-2 text-red-500">
+                  Amount must be at least KES {MIN_BANK_TRANSFER} for a bank transfer
                 </Text>
               )}
               {Number(amount) > 0 && isMobileDest && (Number(amount) < 50 || Number(amount) > 250000) && (
