@@ -1,4 +1,5 @@
 import React from 'react';
+import openDocument from '../../utils/openDocument';
 
 // Generic "view / upload / replace" control for a single document field —
 // shared by the Merchants page drawer's Certificate + KYC/KYB Documents
@@ -60,7 +61,7 @@ export default function UploadableDocRow({ url, onUpload, onDelete, label = 'Doc
         {purged
           ? <span className="text-on-surface-variant/50 text-sm italic">File purged (rejected 90+ days ago)</span>
           : url
-            ? <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 font-semibold underline text-sm">View document ↗</a>
+            ? <a href={url} target="_blank" rel="noopener noreferrer" onClick={(e) => { e.preventDefault(); openDocument(url); }} className="text-blue-600 font-semibold underline text-sm">View document ↗</a>
             : <span className="text-on-surface-variant/50 text-sm">— not uploaded —</span>}
         <label className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-widest cursor-pointer transition-all ${busy ? 'opacity-50 pointer-events-none' : ''} ${url ? 'border border-outline-variant/30 text-on-surface-variant hover:bg-surface-container-low' : 'bg-primary/10 text-primary hover:bg-primary/15'}`}>
           <span className="material-symbols-outlined text-[13px]">upload</span>

@@ -11,6 +11,7 @@ import {
   startReview,
   updateChecklist,
   updateDocumentStatus,
+  getApplicationDocumentViewUrl,
   addNote,
   messageApplicant,
   setRiskTier,
@@ -89,6 +90,7 @@ router.post('/applications/:id/claim', protect, viewOrAct, claimApplication);
 router.post('/applications/:id/start-review', protect, adminOrOwner, startReview);
 router.patch('/applications/:id/checklist', protect, viewOrAct, updateChecklist);
 router.patch('/applications/:id/documents/:docType', protect, viewOrAct, updateDocumentStatus);
+router.get('/applications/:id/documents/:docType/view-url', protect, viewOrAct, getApplicationDocumentViewUrl);
 router.post('/applications/:id/notes', protect, viewOrAct, addNote);
 router.post('/applications/:id/message', protect, viewOrAct, messageApplicant);
 router.patch('/applications/:id/risk-tier', protect, viewOrAct, setRiskTier);
