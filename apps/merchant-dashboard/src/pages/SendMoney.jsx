@@ -103,6 +103,9 @@ export default function SendMoney() {
   const isLipaNaMpesaBetaMerchant = LIPA_NA_MPESA_LIVE_TESTING_ENABLED && merchant?._id === LIPA_NA_MPESA_BETA_MERCHANT_ID
   const selectedDest = DESTINATIONS.find(d => d.id === destination)
   const isMobileDest = destination === 'mpesa-primary' || destination === 'mobile'
+  // Mirrors backend MIN_BANK_TRANSFER_AMOUNT (config/bankTransferTariffCard.js).
+  const MIN_BANK_TRANSFER = 100
+  const bankBelowMin = destination === 'bank' && Number(amount) > 0 && Number(amount) < MIN_BANK_TRANSFER
   const isB2bDest     = destination === 'till' || destination === 'paybill'
   // Live fee, fetched from the same tariff functions/per-merchant lock the
   // backend uses to actually charge (GET /api/transactions/fee-preview) —
@@ -320,7 +323,7 @@ export default function SendMoney() {
 
   const canContinue = () => {
     if (step === 1) return !!destination
-    if (step === 2) return !!amount && Number(amount) > 0 && (!isMobileDest || (Number(amount) >= 50 && Number(amount) <= 250000)) && !!recipientAccount && (destination !== 'bank' || !!bankCode) && (destination !== 'bank' || bankRail !== 'rtgs' || !!beneficiaryCountry) && (destination !== 'paybill' || !!paybillAccountRef)
+    if (step === 2) return !!amount && Number(amount) > 0 && (!isMobileDest || (Number(amount) >= 50 && Number(amount) <= 250000)) && !bankBelowMin && !!recipientAccount && (destination !== 'bank' || !!bankCode) && (destination !== 'bank' || bankRail !== 'rtgs' || !!beneficiaryCountry) && (destination !== 'paybill' || !!paybillAccountRef)
     if (!hasPin && step === 3) return newPin.length === 4 && confirmPin.length === 4
     if (step === confirmStep) return pin.length === 4 && liveFee !== null && (!stepUpRequired || stepUpCode.length === 6)
     return true
@@ -673,6 +676,14 @@ export default function SendMoney() {
                   <p className="text-[11px] font-bold text-slate-400">
                     Mobile Money transfers: min KES 50, max KES 250,000 per transaction
                   </p>
+                )}
+                {destination === 'bank' && (
+                  <p className="text-[11px] font-bold text-slate-400">
+                    Bank transfers: min KES {MIN_BANK_TRANSFER}. For smaller amounts, send to M-PESA.
+                  </p>
+                )}
+                {bankBelowMin && (
+                  <p className="text-[11px] font-bold text-red-500">Amount must be at least KES {MIN_BANK_TRANSFER} for a bank transfer</p>
                 )}
                 {Number(amount) > 0 && isMobileDest && (Number(amount) < 50 || Number(amount) > 250000) && (
                   <p className="text-[11px] font-bold text-red-500">

@@ -10,7 +10,7 @@ import {
   getInvoiceClientMarkupBands,
   getInvoiceMerchantFlatFee,
 } from '../utils/pricingEngine.js';
-import { MAX_PESALINK_AMOUNT, RTGS_BASE_COST, getPesaLinkTariff, getRtgsTariff } from '../config/bankTransferTariffCard.js';
+import { MAX_PESALINK_AMOUNT, MIN_BANK_TRANSFER_AMOUNT, PESALINK_BAND_MAXES, RTGS_BASE_COST, getPesaLinkTariff, getRtgsTariff } from '../config/bankTransferTariffCard.js';
 import { B2C_REGISTERED_USER_BANDS, MAX_B2C_AMOUNT, calculateB2cServiceFee } from '../config/mpesaB2cTariffCard.js';
 import { MAX_LIPA_NA_MPESA_B2B_AMOUNT, getLipaNaMpesaTariff } from '../config/lipaNaMpesaTariffCard.js';
 import {
@@ -63,9 +63,11 @@ const MAX_SANE_FEE_KES = 10_000;
 // tables (SAFARICOM_TARIFF) carry two separate zero-fee rows below 100
 // (a 49 and a 100 boundary) that would otherwise render as two identical
 // "free" rows back to back.
-function labelBands(bands, { free } = {}) {
+// `min`: the rail's minimum amount, so the first band reads e.g. "100–200"
+// instead of "1–200" (bank transfers can't go below MIN_BANK_TRANSFER_AMOUNT).
+function labelBands(bands, { free, min } = {}) {
   const rows = free ? bands.filter((b) => b.max >= free) : bands;
-  let prevMax = free || 0;
+  let prevMax = free || (min ? min - 1 : 0);
   return rows.map((b, i) => {
     const low = i === 0 && free ? 1 : prevMax + 1;
     prevMax = b.max;
@@ -145,7 +147,7 @@ function buildTariffPayload() {
           shape: 'tiered',
           tariffKey: 'pesalink_service_fee',
           maxAmount: MAX_PESALINK_AMOUNT,
-          bands: decorateBands('pesalink_service_fee', labelBands([500, 3500, 7000, 10000, 250000].map((max) => ({ max, ...getPesaLinkTariff(max) })))),
+          bands: decorateBands('pesalink_service_fee', labelBands(PESALINK_BAND_MAXES.map((max) => ({ max, ...getPesaLinkTariff(max) })), { min: MIN_BANK_TRANSFER_AMOUNT })),
         },
         {
           id: 'mobile_withdrawal',
@@ -270,7 +272,7 @@ const TARIFF_SHAPES = {
   customer_surcharge: { shape: 'tiered', maxes: [100, 500, 1000, 1500, 2500, 3500, 5000, 7500, 10000, 15000, 20000, 25000, 30000, 35000, 40000, 45000, 50000, 70000, 250000] },
   invoice_client_markup: { shape: 'tiered', maxes: [100, 500, 1000, 1500, 2500, 3500, 5000, 7500, 10000, 15000, 20000, 25000, 30000, 35000, 40000, 45000, 50000, 70000, 250000] },
   invoice_merchant_flat_fee: { shape: 'flat' },
-  pesalink_service_fee: { shape: 'tiered', maxes: [500, 3500, 7000, 10000, 250000] },
+  pesalink_service_fee: { shape: 'tiered', maxes: PESALINK_BAND_MAXES },
   rtgs_service_fee: { shape: 'flat' },
   mobile_withdrawal_service_fee: { shape: 'tiered', maxes: [49, 100, 500, 1000, 1500, 2500, 3500, 5000, 7500, 10000, 20000, 50000, 100000, 250000] },
   lipa_na_mpesa_service_fee: { shape: 'tiered', maxes: [100, 500, 1000, 2500, 5000, 10000, 20000, 30000, 40000, 50000, 100000, 150000, 200000, 250000] },

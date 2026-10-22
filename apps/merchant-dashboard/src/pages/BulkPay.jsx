@@ -290,6 +290,13 @@ export default function BulkPay() {
         addNotification({ title: 'Invalid Format', message: 'Bank Account Number must be between 8 and 14 digits.', type: 'error' });
         return;
       }
+      // Mirrors backend MIN_BANK_TRANSFER_AMOUNT — authorizeBatch rejects
+      // a batch with a bank row under it anyway; catching it here is kinder.
+      const bankAmount = parseFloat(String(newPayee.amount || '').replace(/,/g, '')) || 0;
+      if (bankAmount > 0 && bankAmount < 100) {
+        addNotification({ title: 'Amount Too Small', message: 'The minimum bank transfer is KES 100. Pay smaller amounts to M-PESA instead.', type: 'error' });
+        return;
+      }
     }
 
     const numericAmount = parseFloat(newPayee.amount.replace(/,/g, '')) || 0;

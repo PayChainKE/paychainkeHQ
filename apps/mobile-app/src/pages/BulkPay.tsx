@@ -716,6 +716,9 @@ export default function BulkPay() {
     } else if (newPayee.paymentMethod === 'Bank') {
       if (!newPayee.bankName.trim()) return 'Bank name is required.';
       if (!/^\d{8,14}$/.test(newPayee.accountNumber.trim())) return 'Bank account number must be 8–14 digits.';
+      // Mirrors backend MIN_BANK_TRANSFER_AMOUNT.
+      const bankAmount = parseFloat(String(newPayee.amount || '').replace(/,/g, '')) || 0;
+      if (bankAmount > 0 && bankAmount < 100) return 'The minimum bank transfer is KES 100. Pay smaller amounts to M-PESA instead.';
     }
     return null;
   };

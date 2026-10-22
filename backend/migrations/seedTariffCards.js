@@ -32,7 +32,7 @@ const TARIFF_CARDS = [
   {
     key: 'pesalink_service_fee', label: 'PesaLink — PayChain Margin', shape: 'tiered',
     bands: [
-      { max: 500, fee: 50 }, { max: 3500, fee: 20 }, { max: 7000, fee: 38 },
+      { max: 200, fee: 50 }, { max: 500, fee: 50 }, { max: 3500, fee: 20 }, { max: 7000, fee: 38 },
       { max: 10000, fee: 50 }, { max: 250000, fee: 110 },
     ],
   },
