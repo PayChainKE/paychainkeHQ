@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import Merchant from '../models/Merchant.js';
 import { logAudit } from '../utils/auditLog.js';
 import { phoneVariations } from './adminController.js';
+import { documentViewUrl } from './documentViewController.js';
 import { getNcbaVirtualAccountNumber, validatePhoneNumber, isValidPhoneInputFormat, NcbaValidationError } from '../utils/ncbaValidators.js';
 import { isValidEmail, EMAIL_FORMAT_HINT } from '../utils/emailValidator.js';
 import { sendMerchantInvite, sendKybRevisionRequest, sendKybRejection, sendApplicantMessageEmail } from '../utils/resend.js';
@@ -545,6 +546,29 @@ export const updateChecklist = async (req, res) => {
     res.json({ success: true, data: application.kybChecklist });
   } catch (error) {
     console.error('Update Checklist Error:', error?.message || error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+// @desc    Openable link for one of an application's KYC documents —
+//          business PDFs don't open over their plain Cloudinary URL (see
+//          documentViewController.js). Scoped like every other officer
+//          read: an officer only gets links for merchants they onboarded.
+// @route   GET /api/officer/applications/:id/documents/:docType/view-url
+// @access  Private (officer/admin)
+export const getApplicationDocumentViewUrl = async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) return res.status(400).json({ error: 'Invalid application id.' });
+    const application = await Merchant.findOne({ _id: req.params.id, ...scopedToOfficer(req.admin) }).select('kybDocuments certificateUrl').lean();
+    if (!application) return res.status(404).json({ error: 'Application not found.' });
+    const doc = (application.kybDocuments || []).find((d) => d.type === req.params.docType);
+    const rawUrl = doc?.url || (req.params.docType === 'certificate' ? application.certificateUrl : null);
+    if (!rawUrl || doc?.purgedAt) return res.status(404).json({ error: 'Document not found.' });
+    const view = documentViewUrl(rawUrl);
+    if (!view) return res.status(404).json({ error: 'Document not available.' });
+    res.json({ success: true, url: view.url });
+  } catch (error) {
+    console.error('Get Application Document View URL Error:', error);
     res.status(500).json({ error: 'Server Error' });
   }
 };

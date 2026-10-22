@@ -2,6 +2,23 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import api from '../api/api';
+
+// Business PDFs don't open over their plain Cloudinary URL, so ask the
+// backend for an openable (signed, short-lived) link. The tab opens
+// synchronously so the popup blocker counts it as part of the click.
+async function openApplicationDocument(applicationId, docType) {
+  const tab = window.open('', '_blank');
+  if (tab) tab.document.write('<p style="font-family:sans-serif;padding:24px;color:#555">Opening document…</p>');
+  try {
+    const res = await api.get(`/api/officer/applications/${applicationId}/documents/${encodeURIComponent(docType)}/view-url`);
+    if (tab) tab.location.href = res.data.url;
+    else window.location.assign(res.data.url);
+  } catch (err) {
+    const msg = err.response?.data?.error || 'Could not open this document.';
+    if (tab) tab.document.body.innerHTML = `<p style="font-family:sans-serif;padding:24px;color:#b91c1c">${msg.replace(/</g, '&lt;')}</p>`;
+    else window.alert(msg);
+  }
+}
 import { useAuth } from '../context/AuthContext';
 
 const CHECKLIST_ITEMS = [
@@ -191,7 +208,7 @@ const Workstation = () => {
                 <div key={doc.type} className="flex items-center justify-between gap-3 p-3 bg-surface-container-low rounded-lg">
                   <div className="min-w-0">
                     <p className="text-xs font-bold text-on-surface">{DOC_LABELS[doc.type] || doc.type}</p>
-                    <a href={doc.url} target="_blank" rel="noreferrer" className="text-2xs text-primary underline">Open document</a>
+                    <a href={doc.url} target="_blank" rel="noreferrer" onClick={(e) => { e.preventDefault(); openApplicationDocument(id, doc.type); }} className="text-2xs text-primary underline">Open document</a>
                     {doc.note && <p className="text-2xs text-on-surface-variant/50 mt-0.5">{doc.note}</p>}
                   </div>
                   <div className="flex items-center gap-1.5 flex-shrink-0">

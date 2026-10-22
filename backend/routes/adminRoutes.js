@@ -123,6 +123,7 @@ import {
 import { protect, protectAdminSSE, requireRole } from '../middleware/authMiddleware.js';
 import { upload, uploadReceipt, uploadMemory } from '../utils/cloudinary.js';
 import { registerAdminEventClient } from '../utils/adminEventStream.js';
+import { getDocumentViewUrl } from '../controllers/documentViewController.js';
 import {
   previewBalancePayout, requestBalancePayout, confirmBalancePayout,
   previewBulkBalancePayout, requestBulkBalancePayout, confirmBulkBalancePayout, getBulkBalancePayout, listBulkBalancePayouts,
@@ -224,6 +225,9 @@ router.delete('/merchants/:id/location', protect, requireMutator, sensitiveActio
 router.get('/merchants/:id/sticker', protect, excludeOfficer, downloadMerchantSticker);
 router.get('/merchants/:id/qr-code', protect, excludeOfficer, downloadMerchantQrCode);
 router.get('/merchants/:id/audit-log', protect, excludeOfficer, getMerchantAuditLog);
+// Signed, short-lived link for opening a stored KYC/KYB document (PDFs
+// won't open over their plain Cloudinary URL) — see documentViewController.js.
+router.get('/documents/view-url', protect, excludeOfficer, getDocumentViewUrl);
 // Full transaction history for one merchant, admin-scoped — backs the
 // "Generate Statement" download in the merchant detail drawer (defaults to
 // since the merchant joined; caller may narrow with ?from=&to=).
