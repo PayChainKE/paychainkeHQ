@@ -65,7 +65,7 @@ const PoolReconciliation = () => {
   const [sendBalanceFor, setSendBalanceFor] = useState(null);
   // Batch payouts: selected merchant ids, the open batch modal
   // ({ scope, merchantIds } or { batchId } for history), and history list.
-  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [selectedBalanceIds, setSelectedBalanceIds] = useState(() => new Set());
   const [bulkModal, setBulkModal] = useState(null);
   const [batchHistoryOpen, setBatchHistoryOpen] = useState(false);
   const [merchantSearch, setMerchantSearch] = useState('');
@@ -1047,13 +1047,13 @@ const PoolReconciliation = () => {
               {canSubmitCheck && (
                 <>
                   <button
-                    onClick={() => setBulkModal({ scope: 'selected', merchantIds: [...selectedIds] })}
-                    disabled={selectedIds.size === 0}
+                    onClick={() => setBulkModal({ scope: 'selected', merchantIds: [...selectedBalanceIds] })}
+                    disabled={selectedBalanceIds.size === 0}
                     title="Pay the ticked merchants their remaining balance to their primary phones (OTP-verified)"
                     className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-2xs font-bold uppercase tracking-widest hover:bg-emerald-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
                   >
                     <span className="material-symbols-outlined text-sm">checklist</span>
-                    Pay Selected ({selectedIds.size})
+                    Pay Selected ({selectedBalanceIds.size})
                   </button>
                   <button
                     onClick={() => setBulkModal({ scope: 'all', merchantIds: [] })}
@@ -1109,11 +1109,11 @@ const PoolReconciliation = () => {
                           <input
                             type="checkbox"
                             aria-label="Select all merchants with a balance"
-                            checked={payableFiltered.length > 0 && payableFiltered.every((m) => selectedIds.has(m._id))}
+                            checked={payableFiltered.length > 0 && payableFiltered.every((m) => selectedBalanceIds.has(m._id))}
                             onChange={(e) => {
-                              const next = new Set(selectedIds);
+                              const next = new Set(selectedBalanceIds);
                               payableFiltered.forEach((m) => (e.target.checked ? next.add(m._id) : next.delete(m._id)));
-                              setSelectedIds(next);
+                              setSelectedBalanceIds(next);
                             }}
                             className="accent-emerald-700"
                           />
@@ -1135,11 +1135,11 @@ const PoolReconciliation = () => {
                               type="checkbox"
                               aria-label={`Select ${m.businessName || 'merchant'}`}
                               disabled={!(m.kesBalance > 0)}
-                              checked={selectedIds.has(m._id)}
+                              checked={selectedBalanceIds.has(m._id)}
                               onChange={(e) => {
-                                const next = new Set(selectedIds);
+                                const next = new Set(selectedBalanceIds);
                                 if (e.target.checked) next.add(m._id); else next.delete(m._id);
-                                setSelectedIds(next);
+                                setSelectedBalanceIds(next);
                               }}
                               className="accent-emerald-700 disabled:opacity-30"
                             />
@@ -1563,7 +1563,7 @@ const PoolReconciliation = () => {
           merchantIds={bulkModal.merchantIds}
           batchId={bulkModal.batchId}
           onClose={() => { setBulkModal(null); fetchMerchantBalances(true); }}
-          onFinished={() => { setSelectedIds(new Set()); fetchMerchantBalances(true); }}
+          onFinished={() => { setSelectedBalanceIds(new Set()); fetchMerchantBalances(true); }}
         />
       )}
       {batchHistoryOpen && (
