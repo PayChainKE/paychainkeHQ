@@ -115,7 +115,7 @@ export function MerchantAuthProvider({ children }){
   async function realForgotPassword(identifier) {
     try {
       const res = await api.post('/api/auth/merchant/forgot-password', { email: identifier })
-      return { success: true, maskedEmail: res.data?.maskedEmail }
+      return { success: true, maskedEmail: res.data?.maskedEmail, maskedPhone: res.data?.maskedPhone }
     } catch (err) {
       return { success: false, error: err.response?.data?.error || 'Could not start password reset.' }
     }
