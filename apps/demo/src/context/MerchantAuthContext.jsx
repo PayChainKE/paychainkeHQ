@@ -174,27 +174,55 @@ export function MerchantAuthProvider({ children }){
 
   function normalizePhone(p){return p.replace(/\s|\+|-/g,'').replace(/^254/,'+254').replace(/^0/, '+254')}
 
-  async function login(phone, password){
-    // simulate API delay
-    await new Promise(r=>setTimeout(r,800))
-    const norm = normalizePhone(phone)
+  function enterDemoDashboard(){
+    setMerchant(mockMerchant)
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(mockMerchant))
+    setIsFirstLogin(false)
+  }
+
+  // Sign in with a phone number OR an email. The demo test credentials
+  // (phone or the demo email) keep the mock walkthrough; anything else is
+  // tried against the real backend, which accepts either identifier — so
+  // pilot merchants can sign in here with their own credentials, and the
+  // real Stellar session is established at the same time.
+  async function login(identifier, password){
+    const id = String(identifier || '').trim()
+    const isEmail = id.includes('@')
     const saved = JSON.parse(localStorage.getItem(CRED_KEY) || JSON.stringify({phone:TEST_PHONE,password:TEST_TEMP_PW,first:true}))
-    
-    // If using the INITIAL DEMO CREDENTIALS, always trigger reset flow
-    if (norm === TEST_PHONE && password === TEST_TEMP_PW) {
-      setIsFirstLogin(true)
-      return { success:true, firstLogin:true }
+    const isDemoId = isEmail
+      ? id.toLowerCase() === mockMerchant.email.toLowerCase()
+      : normalizePhone(id) === TEST_PHONE || normalizePhone(id) === saved.phone
+
+    if (isDemoId) {
+      // simulate API delay
+      await new Promise(r=>setTimeout(r,800))
+      // If using the INITIAL DEMO CREDENTIALS, always trigger reset flow
+      if (password === TEST_TEMP_PW) {
+        setIsFirstLogin(true)
+        return { success:true, firstLogin:true }
+      }
+      // If using SAVED CUSTOM CREDENTIALS, allow direct dashboard access
+      if (password === saved.password){
+        enterDemoDashboard()
+        return { success:true }
+      }
+      return { success:false, error:'Invalid phone number, email or password.' }
     }
 
-    // If using SAVED CUSTOM CREDENTIALS, allow direct dashboard access
-    if (norm === saved.phone && password === saved.password){
-      setMerchant(mockMerchant)
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(mockMerchant))
-      setIsFirstLogin(false)
+    const res = await realLogin(id, password)
+    if (!res.success) return { success:false, error: res.error || 'Invalid phone number, email or password.' }
+    if (res.completed) {
+      enterDemoDashboard()
       return { success:true }
     }
+    return { success:true, otpRequired:true, maskedPhone: res.maskedPhone }
+  }
 
-    return { success:false, error:'Invalid phone number or password.' }
+  // Second step of a real sign-in that needed an OTP.
+  async function verifyLoginOtp(identifier, otp){
+    const res = await realVerifyOtp(String(identifier || '').trim(), otp)
+    if (res.success) enterDemoDashboard()
+    return res
   }
 
   async function setNewPassword(newPassword){
@@ -218,7 +246,7 @@ export function MerchantAuthProvider({ children }){
 
   return (
     <MerchantAuthContext.Provider value={{
-      merchant, isLoading, isAuthenticated:!!merchant, isFirstLogin, login, setNewPassword, logout,
+      merchant, isLoading, isAuthenticated:!!merchant, isFirstLogin, login, verifyLoginOtp, setNewPassword, logout,
       // Real backend session (Stellar wallet / Inflation Shield pages only) —
       // see the block comment above REAL_STORAGE_KEY for why this is separate
       // from everything above.

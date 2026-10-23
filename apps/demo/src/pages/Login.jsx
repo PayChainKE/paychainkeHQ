@@ -6,8 +6,9 @@ import footerBrandsLogo from '../assets/signin-footer-logo.png'
 import poweredByLogo from '../assets/poweredby-logo.png'
 
 export default function Login() {
-  const { login, setNewPassword } = useMerchantAuth()
-  const [phone, setPhone] = useState('0712345678')
+  const { login, verifyLoginOtp, setNewPassword } = useMerchantAuth()
+  const [phone, setPhone] = useState('0712345678') // phone number or email
+  const looksLikePhone = /^[\d\s+()-]*$/.test(phone)
   const [password, setPassword] = useState('Paychain2026')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
@@ -24,6 +25,8 @@ export default function Login() {
   // OTP Flow States
   const [isOTPMode, setIsOTPMode] = useState(false)
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
+  // Set when a real (backend) sign-in is waiting on its SMS/email OTP.
+  const [realOtp, setRealOtp] = useState(null)
   
   // Real-time security validation
   useEffect(() => {
@@ -44,6 +47,10 @@ export default function Login() {
     if (res.success) {
       if (res.firstLogin) {
         setIsOTPMode(true) // Start with OTP for first login
+      } else if (res.otpRequired) {
+        setRealOtp({ maskedPhone: res.maskedPhone })
+        setOtp(['', '', '', '', '', ''])
+        setIsOTPMode(true)
       } else {
         nav('/overview')
       }
@@ -79,6 +86,16 @@ export default function Login() {
     const code = otp.join('')
     if (code.length < 6) return
     
+    if (realOtp) {
+      setLoading(true)
+      setErr('')
+      const res = await verifyLoginOtp(phone, code)
+      setLoading(false)
+      if (res.success) nav('/overview')
+      else setErr(res.error)
+      return
+    }
+
     setLoading(true)
     // Simulate verification
     await new Promise(r => setTimeout(r, 1000))
@@ -160,17 +177,21 @@ export default function Login() {
 
               <form onSubmit={handleLogin} className="space-y-5 lg:space-y-6">
                 <div className="space-y-2">
-                  <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">M-PESA Phone Number</label>
+                  <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Phone Number or Email</label>
                   <div className="flex group">
+                    {looksLikePhone && (
                     <div className="bg-surface-container-low border border-outline-variant/15 border-r-0 rounded-l-2xl px-4 lg:px-5 flex items-center justify-center text-sm font-black text-primary/40 group-focus-within:border-primary transition-colors">
                       +254
                     </div>
+                    )}
                     <input 
-                      className="flex-1 bg-white border border-outline-variant/15 rounded-r-2xl py-3 lg:py-4 px-4 lg:px-5 text-lg font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40"
+                      className={`flex-1 bg-white border border-outline-variant/15 ${looksLikePhone ? 'rounded-r-2xl' : 'rounded-2xl'} py-3 lg:py-4 px-4 lg:px-5 text-lg font-headline text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-outline-variant/40`}
                       value={phone} 
                       onChange={e => setPhone(e.target.value)} 
-                      placeholder="712 345 678"
-                      type="tel"
+                      placeholder="712 345 678 or you@business.co.ke"
+                      type="text"
+                      autoComplete="username"
+                      autoCapitalize="none"
                     />
                   </div>
                 </div>
@@ -236,7 +257,9 @@ export default function Login() {
                  <img src={footerBrandsLogo} alt="PayChain Logo" className="h-10 mb-6 w-auto object-contain" />
                  <h3 className="font-headline text-2xl lg:text-5xl text-primary tracking-tight font-black">Security Code</h3>
                  <p className="text-on-surface-variant font-medium mt-1.5 text-sm lg:text-base lg:mt-2 opacity-70 leading-relaxed max-w-sm">
-                   Enter the 6-digit code sent to your phone ending in <span className="text-primary font-black">...{phone.slice(-3)}</span>
+                   {realOtp
+                     ? <>Enter the 6-digit code sent to {realOtp.maskedPhone ? <span className="text-primary font-black">{realOtp.maskedPhone}</span> : 'your phone or email'}</>
+                     : <>Enter the 6-digit code sent to your phone ending in <span className="text-primary font-black">...{phone.slice(-3)}</span></>}
                  </p>
               </div>
 
