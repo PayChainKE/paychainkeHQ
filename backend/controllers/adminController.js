@@ -18,7 +18,7 @@ import AuditLog from '../models/AuditLog.js';
 import { sendMerchantInvite, sendAdminActionOTP, sendContactDetailsChangedEmail } from '../utils/resend.js';
 import { logAudit } from '../utils/auditLog.js';
 import { recordDeletion } from '../utils/trash.js';
-import { applyPayoutHold } from '../utils/payoutHold.js';
+import { applyPayoutHold, activePayoutHold } from '../utils/payoutHold.js';
 import { UnsupportedFileError } from '../utils/fileSignature.js';
 import { getNcbaVirtualAccountNumber, generateRandomMerchantCode, validatePhoneNumber, isValidPhoneInputFormat, NcbaValidationError } from '../utils/ncbaValidators.js';
 import { generateMerchantStickerPdf, generateBulkStickerPdf, generateMerchantQrFlyerPdf } from '../utils/stickerGenerator.js';
@@ -396,7 +396,7 @@ export const requestMerchantAction = async (req, res) => {
     if (action === 'unlock' && merchant.status !== 'locked') {
       return res.status(409).json({ error: 'Account is not locked.' });
     }
-    const holdActive = merchant.payoutHoldUntil && new Date(merchant.payoutHoldUntil) > new Date();
+    const holdActive = !!activePayoutHold(merchant);
     if (action === 'unlock_outbound' && !merchant.outboundLocked && !holdActive) {
       return res.status(409).json({ error: 'Payouts are not locked or paused on this account.' });
     }

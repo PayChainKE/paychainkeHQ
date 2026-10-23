@@ -2,7 +2,6 @@ import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import { formatKES, formatUSDC } from '../utils/formatCurrency'
-import { mockMerchant } from '../mockData/merchant'
 import { walletStats, walletHistory } from '../mockData/wallet'
 import { formatDateISO } from '../utils/formatDate'
 import { usePrivacyMode } from '../hooks/usePrivacyMode'
@@ -13,16 +12,16 @@ import StellarConnectPanel from '../components/ui/StellarConnectPanel'
 export default function Wallet() {
   const { showAmounts } = usePrivacyMode()
   const { addToast } = useToast()
-  const { realMerchant, realLoading } = useMerchantAuth()
+  const { realMerchant, realLoading, displayMerchant: account } = useMerchantAuth()
   // Real Stellar data when the demo merchant is connected, mock otherwise —
   // this card is the only part of this page tied to the grant deliverable;
   // everything else (withdraw, top up, payment links, QR) stays mock.
   const hasRealWallet = !!realMerchant?.stellarPublicKey
-  const displayUsdcBalance = hasRealWallet ? Number(realMerchant.usdcBalance || 0) : mockMerchant.financials.usdcBalance
-  const displayWalletAddress = hasRealWallet ? realMerchant.stellarPublicKey : mockMerchant.walletAddress
+  const displayUsdcBalance = hasRealWallet ? Number(realMerchant.usdcBalance || 0) : account.financials.usdcBalance
+  const displayWalletAddress = hasRealWallet ? realMerchant.stellarPublicKey : account.walletAddress
   const displayWalletAddressShort = hasRealWallet
     ? `${realMerchant.stellarPublicKey.slice(0, 6)}...${realMerchant.stellarPublicKey.slice(-4)}`
-    : mockMerchant.walletAddress
+    : account.walletAddress
   const [showStellarConnect, setShowStellarConnect] = useState(false)
   const [withdrawAmount, setWithdrawAmount] = useState('')
   const [destination, setDestination] = useState(walletStats.withdrawalDestinations[0].id)
@@ -63,7 +62,7 @@ export default function Wallet() {
   }
 
   // QR Logic
-  const qrData = `paychain://pay?account=${mockMerchant.virtualAccountNumber}&name=${encodeURIComponent(mockMerchant.businessName)}`
+  const qrData = `paychain://pay?account=${account.virtualAccountNumber}&name=${encodeURIComponent(account.businessName)}`
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrData)}&margin=10&bgcolor=FFFFFF&color=00351D`
 
   const handleDownload = () => {
@@ -96,8 +95,8 @@ export default function Wallet() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `Pay ${mockMerchant.businessName}`,
-          text: `Scan to pay ${mockMerchant.businessName} on PayChain`,
+          title: `Pay ${account.businessName}`,
+          text: `Scan to pay ${account.businessName} on PayChain`,
           url: qrData
         })
       } catch (err) {
@@ -118,7 +117,7 @@ export default function Wallet() {
     setIsGeneratingLink(true)
     setTimeout(() => {
       setIsGeneratingLink(false)
-      const link = `https://pay.paychain.ke/${mockMerchant.virtualAccountNumber}/${paymentLinkAmount}`
+      const link = `https://pay.paychain.ke/${account.virtualAccountNumber}/${paymentLinkAmount}`
       setGeneratedLink(link)
       addToast({
         title: 'Payment Link Created',
@@ -221,7 +220,7 @@ export default function Wallet() {
                 </div>
                 <p className="text-on-surface-variant/40 text-[9px] md:text-[10px] font-bold uppercase tracking-widest mb-1">Available for Withdrawal</p>
                 <h3 className={`font-headline font-bold text-2xl md:text-3xl lg:text-4xl tracking-tighter tabular-nums text-primary transition-all duration-300 ${!showAmounts && 'blur-xl'}`}>
-                  {formatKES(mockMerchant.financials.kesBalance)}
+                  {formatKES(account.financials.kesBalance)}
                 </h3>
              </div>
              <div className="flex gap-3 mt-6 relative z-10">
@@ -434,8 +433,8 @@ export default function Wallet() {
                       <div className="text-center relative z-10 w-full px-4">
                         <p className="text-emerald-400 text-[10px] font-black uppercase tracking-[0.2em] mb-2 opacity-80">Settlement QR</p>
                         <div className="space-y-1">
-                          <p className="text-white text-3xl font-headline tracking-widest">{mockMerchant.virtualAccountNumber}</p>
-                          <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest leading-relaxed">Merchant: {mockMerchant.businessName}</p>
+                          <p className="text-white text-3xl font-headline tracking-widest">{account.virtualAccountNumber}</p>
+                          <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest leading-relaxed">Merchant: {account.businessName}</p>
                         </div>
                       </div>
                     </div>

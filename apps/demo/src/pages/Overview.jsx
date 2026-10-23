@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import MerchantLayout from '../components/layout/MerchantLayout'
 import StatCard from '../components/ui/StatCard'
 import RevenueChart from '../components/charts/RevenueChart'
-import { mockMerchant } from '../mockData/merchant'
+import { useDisplayMerchant } from '../context/MerchantAuthContext'
 import { revenueByDay } from '../mockData/analytics'
 import { transactionsData, getTransactionStats } from '../mockData/transactions'
 import { formatKES } from '../utils/formatCurrency'
@@ -10,6 +10,7 @@ import { usePrivacyMode } from '../hooks/usePrivacyMode'
 import { useNavigate } from 'react-router-dom'
 
 export default function Overview() {
+  const account = useDisplayMerchant()
   const navigate = useNavigate()
   const { showAmounts, togglePrivacy } = usePrivacyMode()
   const [stats, setStats] = useState(getTransactionStats())
@@ -35,9 +36,9 @@ export default function Overview() {
 
   useEffect(() => {
     // Logic scaffolding: Simulate data loading or calculation
-    const totalTransactions = mockMerchant.financials.totalTransactions
+    const totalTransactions = account.financials.totalTransactions
     const alerts = 0 // In a real app, this would come from an API
-    const settlement = mockMerchant.financials.kesBalance + (mockMerchant.financials.usdcBalance * 130)
+    const settlement = account.financials.kesBalance + (account.financials.usdcBalance * 130)
 
     setFraudAlerts(alerts)
     setSettlementBalance(settlement)
@@ -57,9 +58,9 @@ export default function Overview() {
       {/* Greeting */}
       <section className="mb-6 px-1 lg:px-0 overflow-hidden">
         <h2 className="font-headline font-bold text-[24px] sm:text-3xl lg:text-4xl text-primary tracking-tight leading-tight whitespace-nowrap">
-          {getGreeting()}, {mockMerchant.name.split(' ')[0]}. 👋
+          {getGreeting()}, {account.name.split(' ')[0]}. 👋
         </h2>
-        <p className="text-on-surface-variant text-[11px] lg:text-sm mt-1.5 opacity-80 font-medium leading-relaxed">Here's how {mockMerchant.businessName} is doing today.</p>
+        <p className="text-on-surface-variant text-[11px] lg:text-sm mt-1.5 opacity-80 font-medium leading-relaxed">Here's how {account.businessName} is doing today.</p>
       </section>
 
       {/* Section 1: Balance Cards Row */}
@@ -73,7 +74,7 @@ export default function Overview() {
             <div className="flex justify-between items-start mb-8 lg:mb-10">
               <span className="bg-[#1F4D3C] text-[#5EFEB3] px-3 lg:px-4 py-1.5 rounded-full text-[8px] lg:text-[9px] font-black tracking-[0.15em] uppercase border border-white/10">PayChain Virtual Account</span>
               <div className="flex items-center gap-3 lg:gap-4 text-[8px] lg:text-[9px]">
-                <span className="text-white/40 uppercase font-bold tracking-[0.15em] hidden sm:inline">Account: {mockMerchant.virtualAccountNumber}</span>
+                <span className="text-white/40 uppercase font-bold tracking-[0.15em] hidden sm:inline">Account: {account.virtualAccountNumber}</span>
                 <button
                   onClick={togglePrivacy}
                   className="text-white/40 hover:text-white transition-colors p-1"
@@ -184,7 +185,7 @@ export default function Overview() {
             </div>
             <div className="flex-1">
               <h3 className={`font-headline font-bold text-3xl lg:text-4xl tracking-tighter tabular-nums mb-2 lg:mb-3 transition-all duration-300 ${!showAmounts && 'blur-lg grayscale'}`}>312.50 USDC</h3>
-              <p className={`text-white/40 text-[9px] lg:text-[10px] font-bold tracking-tight opacity-70 uppercase transition-all duration-300 ${!showAmounts && 'blur-sm grayscale'}`}>≈ {formatKES(mockMerchant.financials.usdcBalance * 130)}</p>
+              <p className={`text-white/40 text-[9px] lg:text-[10px] font-bold tracking-tight opacity-70 uppercase transition-all duration-300 ${!showAmounts && 'blur-sm grayscale'}`}>≈ {formatKES(account.financials.usdcBalance * 130)}</p>
             </div>
             <div className="flex gap-3 lg:gap-4 mt-6 lg:mt-8">
               <button 

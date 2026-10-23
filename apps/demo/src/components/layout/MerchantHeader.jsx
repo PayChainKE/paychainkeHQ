@@ -2,10 +2,11 @@ import React, { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useNotification } from '../../context/NotificationContext'
 import { useMerchantAuth } from '../../context/MerchantAuthContext'
-import { mockMerchant } from '../../mockData/merchant'
+import { useDisplayMerchant } from '../../context/MerchantAuthContext'
 import userIcon from '../../assets/user-icon.png'
 
 export default function MerchantHeader({ title, onMenuClick }) {
+  const account = useDisplayMerchant()
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const dropdownRef = useRef(null)
   const navigate = useNavigate()
@@ -76,8 +77,8 @@ export default function MerchantHeader({ title, onMenuClick }) {
                   <img src={userIcon} alt="Avatar" className="w-full h-full object-cover" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-xs font-black text-primary uppercase tracking-widest mb-0.5 truncate">{mockMerchant.businessName}</p>
-                  <p className="text-[10px] text-on-surface-variant font-medium opacity-60 truncate">{mockMerchant.email}</p>
+                  <p className="text-xs font-black text-primary uppercase tracking-widest mb-0.5 truncate">{account.businessName}</p>
+                  <p className="text-[10px] text-on-surface-variant font-medium opacity-60 truncate">{account.email}</p>
                 </div>
               </div>
               

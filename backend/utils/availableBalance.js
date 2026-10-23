@@ -1,5 +1,6 @@
 import Merchant from '../models/Merchant.js';
 import Transaction from '../models/Transaction.js';
+import { payoutHoldHours } from './payoutHold.js';
 
 // A merchant's real kesBalance can be inflated by a bug the moment a bad
 // credit lands — the 2026-08-27 STK double-credit incident (a webhook and
@@ -90,9 +91,9 @@ export async function debitAvailableBalance(merchantId, amount, { allowTestAccou
       _id: merchantId,
       kesBalance: { $gte: amount + held },
       ...testAccountGuard,
-      // Post-recovery payout hold (utils/payoutHold.js); null also matches
-      // a missing field.
-      $or: [{ payoutHoldUntil: null }, { payoutHoldUntil: { $lte: new Date() } }],
+      // Post-recovery payout hold (utils/payoutHold.js), only while switched
+      // on; null also matches a missing field.
+      ...(payoutHoldHours() ? { $or: [{ payoutHoldUntil: null }, { payoutHoldUntil: { $lte: new Date() } }] } : {}),
     },
     { $inc: { kesBalance: -amount } },
     { returnDocument: 'after' }
