@@ -42,6 +42,7 @@ const NAV_SECTIONS = [
       { icon: 'receipt_long',    label: 'Invoices',                path: '/invoices'               },
       { icon: 'savings',         label: 'Cash Advance Requests', path: '/cash-advance-requests' },
       { icon: 'security',        label: 'Wallet Audit',           path: '/wallet-audit'           },
+      { icon: 'receipt',         label: 'Stellar Statement',      path: '/stellar-statement'      },
       { icon: 'fact_check',      label: 'Audit Log',              path: '/audit-log'              },
       { icon: 'gpp_maybe',       label: 'Approvals',              path: '/approvals'              },
       { icon: 'restore_from_trash', label: 'Trash',               path: '/trash'                  },
