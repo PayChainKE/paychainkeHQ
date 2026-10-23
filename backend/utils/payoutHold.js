@@ -15,10 +15,13 @@ import { createNotification } from '../controllers/notificationController.js';
 // current password, PIN change with the current PIN).
 //
 // Enforced in utils/availableBalance.js#debitAvailableBalance (every real
-// payout rail). CREDENTIAL_RESET_PAYOUT_HOLD_HOURS=0 turns it off.
+// payout rail). OFF by default since 2026-10-23 (Brandon's call): set
+// CREDENTIAL_RESET_PAYOUT_HOLD_HOURS=24 (or any hours) to switch it back on.
+// While off, holds already stamped on merchants are ignored too, and the
+// recovery alerts below still go out.
 export function payoutHoldHours() {
   const raw = process.env.CREDENTIAL_RESET_PAYOUT_HOLD_HOURS;
-  const n = raw === undefined || raw === '' ? 24 : Number(raw);
+  const n = raw === undefined || raw === '' ? 0 : Number(raw);
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
@@ -37,6 +40,7 @@ export function applyPayoutHold(merchant, reason) {
 }
 
 export function activePayoutHold(merchant) {
+  if (!payoutHoldHours()) return null;
   const until = merchant?.payoutHoldUntil ? new Date(merchant.payoutHoldUntil) : null;
   return until && until > new Date() ? until : null;
 }
