@@ -121,11 +121,13 @@ export default function StellarConnectPanel({
       {stage === 'creds' && (
         <form onSubmit={handleCreds} className="space-y-3 text-left">
           <input
-            type="email"
+            type="text"
             required
+            autoComplete="username"
+            autoCapitalize="none"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="demo merchant email"
+            placeholder="email or phone number"
             className="w-full px-4 py-3 rounded-xl border border-outline-variant/20 text-sm outline-none focus:border-primary"
           />
           <input
