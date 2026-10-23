@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { mockMerchant } from '../mockData/merchant'
 import api from '../api/config'
@@ -203,6 +203,7 @@ export function MerchantAuthProvider({ children }){
       }
       // If using SAVED CUSTOM CREDENTIALS, allow direct dashboard access
       if (password === saved.password){
+        realLogout()
         enterDemoDashboard()
         return { success:true }
       }
@@ -239,13 +240,39 @@ export function MerchantAuthProvider({ children }){
   }
 
   function logout(){
+    realLogout()
     localStorage.removeItem(STORAGE_KEY)
     setMerchant(null)
     navigate('/login')
   }
 
+  // What the dashboard shows as "the merchant": the signed-in real account's
+  // identity and balances when there is one, layered over the sample
+  // profile (which still supplies the walkthrough's charts, trust score,
+  // advances, etc.). Demo credentials alone show the sample profile.
+  const displayMerchant = useMemo(() => {
+    if (!realMerchant) return mockMerchant
+    const r = realMerchant
+    return {
+      ...mockMerchant,
+      name: r.name || r.businessName || mockMerchant.name,
+      businessName: r.businessName || r.name || mockMerchant.businessName,
+      email: r.email || '',
+      phone: r.phone || '',
+      virtualAccountNumber: r.ncbaMerchantCode || r.ncbaVirtualAccountNumber || mockMerchant.virtualAccountNumber,
+      createdAt: r.createdAt || null,
+      lastLogin: r.lastLogin || null,
+      financials: {
+        ...mockMerchant.financials,
+        kesBalance: Number(r.kesBalance ?? 0),
+        usdcBalance: Number(r.usdcBalance ?? 0),
+      },
+    }
+  }, [realMerchant])
+
   return (
     <MerchantAuthContext.Provider value={{
+      displayMerchant,
       merchant, isLoading, isAuthenticated:!!merchant, isFirstLogin, login, verifyLoginOtp, setNewPassword, logout,
       // Real backend session (Stellar wallet / Inflation Shield pages only) —
       // see the block comment above REAL_STORAGE_KEY for why this is separate
@@ -259,5 +286,6 @@ export function MerchantAuthProvider({ children }){
 }
 
 export function useMerchantAuth(){ return useContext(MerchantAuthContext) }
+export function useDisplayMerchant(){ return useContext(MerchantAuthContext).displayMerchant }
 
 export default MerchantAuthContext

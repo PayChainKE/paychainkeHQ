@@ -1,18 +1,20 @@
 import React, { useState } from 'react'
 import MerchantLayout from '../components/layout/MerchantLayout'
+import { useDisplayMerchant } from '../context/MerchantAuthContext'
 
 export default function MyAccounts() {
+  const account = useDisplayMerchant()
   const [searchTerm, setSearchTerm] = useState('')
   const [entries, setEntries] = useState(10)
 
   const accountsData = [
     {
       service: 'M-PESA',
-      accountNumber: 'PC847291',
+      accountNumber: `PC${account.virtualAccountNumber}`,
       type: 'Buy Goods',
-      name: 'Kamau General Store',
+      name: account.businessName,
       linkedTransferAccount: '—',
-      manager: 'Kamau James',
+      manager: account.name,
       status: 'Active'
     }
   ]

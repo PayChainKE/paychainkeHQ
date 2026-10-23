@@ -1,6 +1,6 @@
 import React from 'react'
 import { NavLink } from 'react-router-dom'
-import { mockMerchant } from '../../mockData/merchant'
+import { useDisplayMerchant } from '../../context/MerchantAuthContext'
 import { usePrivacyMode } from '../../hooks/usePrivacyMode'
 import { formatKES } from '../../utils/formatCurrency'
 import userIcon from '../../assets/user-icon.png'
@@ -141,6 +141,7 @@ function NavItem({ item, depth = 0 }) {
 }
 
 export default function MerchantSidebar({ isOpen, onClose }) {
+  const account = useDisplayMerchant()
   const { showAmounts } = usePrivacyMode()
 
   return (
@@ -170,8 +171,8 @@ export default function MerchantSidebar({ isOpen, onClose }) {
             />
           </div>
           <div>
-            <p className="text-white text-xs font-bold leading-tight truncate w-[130px]">{mockMerchant.businessName}</p>
-            <p className="text-[#a8b3a8] text-[9px] uppercase tracking-wider mt-0.5">ACCOUNT: {mockMerchant.virtualAccountNumber} • TRUST: {mockMerchant.trustScore.current}/100</p>
+            <p className="text-white text-xs font-bold leading-tight truncate w-[130px]">{account.businessName}</p>
+            <p className="text-[#a8b3a8] text-[9px] uppercase tracking-wider mt-0.5">ACCOUNT: {account.virtualAccountNumber} • TRUST: {account.trustScore.current}/100</p>
           </div>
         </div>
 
@@ -190,8 +191,8 @@ export default function MerchantSidebar({ isOpen, onClose }) {
       <div className="p-6 mt-auto">
         <div className="bg-[#0D241E] rounded-[16px] p-5 mb-8 border border-white/5">
           <p className="text-[#5EFEB3] text-[9px] font-bold uppercase tracking-widest mb-2">Available Funds</p>
-          <p className={`text-white font-headline text-2xl tracking-tight mb-0.5 transition-all duration-300 ${!showAmounts && 'blur-md'}`}>{formatKES(mockMerchant.financials.kesBalance)}</p>
-          <p className={`text-[#a8b3a8] text-[10px] transition-all duration-300 ${!showAmounts && 'blur-sm'}`}>{mockMerchant.financials.usdcBalance.toFixed(2)} USDC</p>
+          <p className={`text-white font-headline text-2xl tracking-tight mb-0.5 transition-all duration-300 ${!showAmounts && 'blur-md'}`}>{formatKES(account.financials.kesBalance)}</p>
+          <p className={`text-[#a8b3a8] text-[10px] transition-all duration-300 ${!showAmounts && 'blur-sm'}`}>{account.financials.usdcBalance.toFixed(2)} USDC</p>
         </div>
         
         <div className="space-y-1 pt-4 border-t border-white/5">
@@ -208,7 +209,7 @@ export default function MerchantSidebar({ isOpen, onClose }) {
               <span className="material-symbols-outlined text-lg opacity-60 group-hover:opacity-100 transition-opacity">notifications</span>
               <span className="text-xs">Notifications</span>
             </div>
-            {mockMerchant.notifications.filter(n => !n.isRead).length > 0 && (
+            {account.notifications.filter(n => !n.isRead).length > 0 && (
               <span className="w-1.5 h-1.5 bg-red-600 rounded-full"></span>
             )}
           </NavLink>
