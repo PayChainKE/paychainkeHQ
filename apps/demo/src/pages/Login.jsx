@@ -4,6 +4,7 @@ import { useMerchantAuth } from '../context/MerchantAuthContext'
 import mainLogo from '../assets/signin-logo.png'
 import footerBrandsLogo from '../assets/signin-footer-logo.png'
 import poweredByLogo from '../assets/poweredby-logo.png'
+import ForgotPasswordPanel from '../components/ui/ForgotPasswordPanel'
 
 export default function Login() {
   const { login, verifyLoginOtp, setNewPassword } = useMerchantAuth()
@@ -27,6 +28,8 @@ export default function Login() {
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
   // Set when a real (backend) sign-in is waiting on its SMS/email OTP.
   const [realOtp, setRealOtp] = useState(null)
+  const [isForgotMode, setIsForgotMode] = useState(false)
+  const [resetNotice, setResetNotice] = useState('')
   
   // Real-time security validation
   useEffect(() => {
@@ -165,7 +168,19 @@ export default function Login() {
       {/* Right Login/Reset/OTP Side */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-6 lg:p-16 bg-white lg:bg-transparent -mt-10 lg:mt-0 rounded-t-[40px] lg:rounded-none relative z-20 shadow-[0_-20px_50px_rgba(0,0,0,0.1)] lg:shadow-none transition-all">
         <div className="max-w-md w-full animate-fade-in-up">
-          {!isResetMode && !isOTPMode ? (
+          {isForgotMode ? (
+            <ForgotPasswordPanel
+              initialIdentifier={phone === '0712345678' ? '' : phone}
+              onCancel={() => { setIsForgotMode(false); setErr('') }}
+              onDone={(id) => {
+                setPhone(id)
+                setPassword('')
+                setErr('')
+                setResetNotice('Password reset. Sign in with your new password.')
+                setIsForgotMode(false)
+              }}
+            />
+          ) : !isResetMode && !isOTPMode ? (
             /* LOGIN FORM */
             <>
               <div className="mb-8 lg:mb-10">
@@ -176,6 +191,9 @@ export default function Login() {
               </div>
 
               <form onSubmit={handleLogin} className="space-y-5 lg:space-y-6">
+                {resetNotice && (
+                  <p className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">{resetNotice}</p>
+                )}
                 <div className="space-y-2">
                   <label className="text-[11px] font-black uppercase tracking-widest text-primary/60 pl-1">Phone Number or Email</label>
                   <div className="flex group">
@@ -199,7 +217,7 @@ export default function Login() {
                 <div className="space-y-2">
                   <div className="flex justify-between items-center px-1">
                     <label className="text-[11px] font-black uppercase tracking-widest text-primary/60">Password</label>
-                    <a href="mailto:hello@paychainke.co" className="text-[9px] font-black uppercase tracking-widest text-emerald-600 hover:text-emerald-700">Forgot?</a>
+                    <button type="button" onClick={() => { setIsForgotMode(true); setErr(''); setResetNotice('') }} className="text-[9px] font-black uppercase tracking-widest text-emerald-600 hover:text-emerald-700">Forgot?</button>
                   </div>
                   <div className="relative">
                     <input 

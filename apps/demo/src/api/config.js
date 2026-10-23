@@ -9,7 +9,7 @@ const getBaseUrl = () => {
   const envUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL;
   
   if (import.meta.env.PROD) {
-    console.log("PayChain Merchant Diagnostic - Current API URL:", envUrl || "FALLBACK DIRECT TO WWW");
+    console.log("PayChain Merchant Diagnostic - Current API URL:", envUrl || "FALLBACK DIRECT TO api.paychain.co.ke");
   }
 
   if (envUrl) return envUrl;
@@ -19,7 +19,7 @@ const getBaseUrl = () => {
     return ''; // Use Vite Proxy for local development
   }
 
-  return 'https://www.paychain.co.ke';
+  return 'https://api.paychain.co.ke';
 };
 
 const API_BASE_URL = getBaseUrl();
