@@ -22,6 +22,7 @@ import BlogPosts from './pages/BlogPosts';
 import Automations from './pages/Automations';
 import FieldApprovals from './pages/FieldApprovals';
 import WalletAudit from './pages/WalletAudit';
+import StellarStatement from './pages/StellarStatement';
 import Invoices from './pages/Invoices';
 import CallCentre from './pages/CallCentre';
 import AuditLog from './pages/AuditLog';
@@ -91,6 +92,7 @@ export default function App(){
             <Route path="/bookkeeping" element={<Protected><Bookkeeping/></Protected>} />
             <Route path="/tax-compliance" element={<Protected><TaxCompliance/></Protected>} />
             <Route path="/wallet-audit" element={<Protected><WalletAudit/></Protected>} />
+            <Route path="/stellar-statement" element={<Protected><StellarStatement/></Protected>} />
             <Route path="/invoices" element={<Protected><Invoices/></Protected>} />
             <Route path="/audit-log" element={<Protected><AuditLog/></Protected>} />
             <Route path="/approvals" element={<Protected><Approvals/></Protected>} />

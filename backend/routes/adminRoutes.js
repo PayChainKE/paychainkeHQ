@@ -124,6 +124,7 @@ import { protect, protectAdminSSE, requireRole } from '../middleware/authMiddlew
 import { upload, uploadReceipt, uploadMemory } from '../utils/cloudinary.js';
 import { registerAdminEventClient } from '../utils/adminEventStream.js';
 import { getDocumentViewUrl } from '../controllers/documentViewController.js';
+import { getStellarStatement, exportStellarStatementCsv } from '../controllers/stellarStatementController.js';
 import {
   previewBalancePayout, requestBalancePayout, confirmBalancePayout,
   previewBulkBalancePayout, requestBulkBalancePayout, confirmBulkBalancePayout, getBulkBalancePayout, listBulkBalancePayouts,
@@ -228,6 +229,10 @@ router.get('/merchants/:id/audit-log', protect, excludeOfficer, getMerchantAudit
 // Signed, short-lived link for opening a stored KYC/KYB document (PDFs
 // won't open over their plain Cloudinary URL) — see documentViewController.js.
 router.get('/documents/view-url', protect, excludeOfficer, getDocumentViewUrl);
+// Stellar Instaward pilot statement (CSV here; PDF is built client-side) —
+// see stellarStatementController.js.
+router.get('/stellar/statement', protect, excludeOfficer, getStellarStatement);
+router.get('/stellar/statement.csv', protect, excludeOfficer, exportStellarStatementCsv);
 // Full transaction history for one merchant, admin-scoped — backs the
 // "Generate Statement" download in the merchant detail drawer (defaults to
 // since the merchant joined; caller may narrow with ?from=&to=).

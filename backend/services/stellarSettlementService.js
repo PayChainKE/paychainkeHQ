@@ -370,6 +370,8 @@ export async function redeemToMpesa({ merchantId, usdcAmount }) {
     merchantId, kind: 'redemption', status: 'pending', kesAmount: kesEquivalent, usdcAmount: amount, rate: ratePerKes,
     destinationPhoneMasked: maskPhone(merchant.phone),
   });
+  // Grant evidence: greppable server-log trail of each payout (search Render logs for [STELLAR_REDEEM]).
+  console.log(`[STELLAR_REDEEM] trigger entry=${entry._id} merchant=${merchantId} usdc=${amount} kes=${kesEquivalent} rate=${ratePerKes} to=${maskPhone(merchant.phone)}`);
 
   let txHash;
   try {
@@ -385,6 +387,7 @@ export async function redeemToMpesa({ merchantId, usdcAmount }) {
           : `${err.message} The debit may still confirm — check the wallet balance before retrying.`,
       },
     });
+    console.error(`[STELLAR_REDEEM] ${definitive ? 'failed' : 'unconfirmed'} entry=${entry._id} code=${err.code || '-'} ${err.message}`);
     throw new SettlementError(
       definitive ? err.message : 'The Stellar network did not confirm the payout in time. Check your balance before retrying.',
       err.code || (definitive ? 'STELLAR_REJECTED' : 'STELLAR_UNCONFIRMED'),
@@ -402,6 +405,10 @@ export async function redeemToMpesa({ merchantId, usdcAmount }) {
   await StellarLedgerEntry.updateOne({ _id: entry._id }, {
     $set: { status: 'completed', stellarTxHash: txHash, receiptHash, simulatedB2C: b2c },
   });
+  console.log(`[STELLAR_REDEEM] stellar_debit_confirmed entry=${entry._id} tx=${txHash} ${explorerTxUrl(txHash)}`);
+  console.log(`[STELLAR_REDEEM] simulated_b2c_request entry=${entry._id} ${JSON.stringify({ ...b2c.request, PartyB: maskPhone(merchant.phone) })}`);
+  console.log(`[STELLAR_REDEEM] simulated_b2c_response entry=${entry._id} ${JSON.stringify(b2c.response)}`);
+  console.log(`[STELLAR_REDEEM] completed entry=${entry._id} receipt=${receiptHash}`);
 
   try {
     await Transaction.create({
