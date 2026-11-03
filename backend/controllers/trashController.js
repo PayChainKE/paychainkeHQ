@@ -94,6 +94,11 @@ export const permanentlyDeleteTrashItem = async (req, res) => {
     if (!record) return res.status(404).json({ error: 'Not found, or already restored.' });
 
     const { collectionName, label, originalId } = record;
+    // A deleted merchant's record is kept permanently: their history since
+    // joining PayChain must never be erased.
+    if (collectionName === 'Merchant') {
+      return res.status(403).json({ error: 'Deleted merchant records are kept permanently and cannot be erased.' });
+    }
     // Restore is off the table the instant this is deleted for good, so a
     // Merchant's KYC/certificate/business-photo images can safely leave
     // Cloudinary right now instead of waiting out the rest of the 90-day

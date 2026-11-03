@@ -18,7 +18,6 @@ import AuditLog from '../models/AuditLog.js';
 import { sendMerchantInvite, sendAdminActionOTP, sendContactDetailsChangedEmail, sendMerchantLifecycleEmail } from '../utils/resend.js';
 import CheckoutPage from '../models/CheckoutPage.js';
 import ApiKey from '../models/ApiKey.js';
-import MerchantLoginDevice from '../models/MerchantLoginDevice.js';
 import { createNotification } from './notificationController.js';
 import { logAudit } from '../utils/auditLog.js';
 import { recordDeletion } from '../utils/trash.js';
@@ -640,21 +639,11 @@ export const confirmMerchantAction = async (req, res) => {
         }).catch((err) => console.error('Contact-changed notification SMS failed:', err));
       }
     } else if (action === 'delete') {
-      // Hard delete: remove the merchant + their non-financial owned
-      // records only. Transaction and PayoutBatch are real settled-money
-      // history — the platform's revenue page (GMV, GPR, gross platform
-      // volume, per-stream fees) and the admin Transactions list are both
-      // sourced directly from Transaction, so deleting a merchant's rows
-      // used to silently shrink every lifetime revenue figure the moment
-      // they were removed. Those two collections are deliberately excluded
-      // from this cascade now — real money moved, and that record has to
-      // survive the merchant who moved it (see the equivalent carve-out
-      // already in place for RevenueSweep, revenueController.js's
-      // getRevenueSweeps). Everything else here is pre-transaction
-      // merchant *configuration* (saved bulk-pay recipients, created
-      // payment link definitions, individual STK prompt attempts) with no
-      // standalone financial-reporting significance, so it's still fully
-      // removed.
+      // Deactivate, never erase. The Merchant document moves to a permanent
+      // DeletedRecord snapshot (Trash; Merchant snapshots never expire and
+      // can't be permanently deleted), and everything else the merchant
+      // created since joining (transactions, payouts, payees, payment links,
+      // payment attempts, KYC files) stays on record.
       // Log BEFORE deletion so we keep the merchant denormalised metadata.
       logAudit({
         action: 'admin.merchant.deleted', category: 'admin', severity: 'critical',
@@ -683,13 +672,14 @@ export const confirmMerchantAction = async (req, res) => {
       merchant.inboundLocked = true;
       merchant.tokenVersion = (merchant.tokenVersion || 0) + 1;
       await merchant.save().catch((err) => console.error('Pre-delete deactivate failed:', err?.message || err));
+      // Nothing a merchant created since joining is ever erased: payment
+      // attempts, payees, payment links and login devices all stay on
+      // record. Payment links are just marked expired so they can't be
+      // paid (the payment guards also refuse a deleted merchant).
       await Promise.all([
-        STKRequest.deleteMany({ merchantId: merchant._id }),
-        Payee.deleteMany({ merchantId: merchant._id }),
-        PaymentLink.deleteMany({ merchantId: merchant._id }),
+        PaymentLink.updateMany({ merchantId: merchant._id, status: 'active' }, { $set: { status: 'expired' } }),
         CheckoutPage.updateMany({ merchantId: merchant._id }, { $set: { active: false } }),
         ApiKey.updateMany({ merchantId: merchant._id, status: 'active' }, { $set: { status: 'revoked', revokedAt: new Date() } }),
-        MerchantLoginDevice.deleteMany({ merchantId: merchant._id }),
         retirements.length
           ? RetiredMerchantCode.insertMany(retirements, { ordered: false }).catch((err) => {
               // A duplicate-key here just means this code was already
@@ -700,11 +690,9 @@ export const confirmMerchantAction = async (req, res) => {
           : Promise.resolve(),
       ]);
       // Snapshot BEFORE deleting so this shows up on the Trash page and can
-      // be restored — see utils/trash.js. Only the Merchant document itself
-      // is restorable; the Payee/PaymentLink/STKRequest rows just deleted
-      // above are not (they're the "pre-transaction configuration" this
-      // cascade deliberately treats as non-critical — see the comment
-      // above this block).
+      // be restored — see utils/trash.js. The merchant's payees, payment
+      // links and payment attempts were kept above, so a restore brings the
+      // account back with all of them.
       await recordDeletion({ collectionName: 'Merchant', doc: merchant, label: merchant.businessName || merchant.email, deletedBy: admin._id });
       await Merchant.deleteOne({ _id: merchant._id });
     } else if (action === 'lock_inbound') {
