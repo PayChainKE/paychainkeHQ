@@ -2,6 +2,7 @@ import Transaction from '../models/Transaction.js';
 import RevenueSweep from '../models/RevenueSweep.js';
 import BankAccountCharge from '../models/BankAccountCharge.js';
 import RevenueWriteOff from '../models/RevenueWriteOff.js';
+import PoolGoodwillCredit from '../models/PoolGoodwillCredit.js';
 import Merchant from '../models/Merchant.js';
 import Admin from '../models/Admin.js';
 import { submitNcbaBankTransfer } from '../controllers/ncbaOpenBankingController.js';
@@ -109,7 +110,7 @@ function logEvent(level, event, fields) {
 // Callers that want the admin-facing "how much has PayChain earned" KPI
 // should read `grossUnswept` + `totalCharges` (shown as its own line) side
 // by side, never blended into one silently-netted number.
-async function computeUnsweptRevenue() {
+export async function computeUnsweptRevenue() {
   // See reversedTransactionExclusionMatch's doc comment — a duplicate
   // credit and its correction entry must never contribute to what this
   // function decides to physically transfer out of the pooled NCBA
@@ -121,7 +122,7 @@ async function computeUnsweptRevenue() {
     reversedTransactionExclusionMatch(),
     excludeDemoMerchantsMatch(),
   ]);
-  const [accruedAgg, sweptAgg, chargesAgg, writeOffAgg] = await Promise.all([
+  const [accruedAgg, sweptAgg, chargesAgg, writeOffAgg, goodwillAgg] = await Promise.all([
     Transaction.aggregate([
       { $match: { createdAt: { $gte: LIVE_DATA_CUTOFF }, status: { $in: ['completed', 'verified'] }, ...excludeReversed, ...excludeDemo } },
       { $group: { _id: null, total: { $sum: '$paychainFee' }, count: { $sum: 1 } } },
@@ -150,6 +151,14 @@ async function computeUnsweptRevenue() {
     RevenueWriteOff.aggregate([
       { $group: { _id: null, total: { $sum: '$amount' } } },
     ]),
+    // PayChain's own revenue spent crediting merchants (goodwill credits,
+    // models/PoolGoodwillCredit.js). That money now belongs to the merchant,
+    // so it is no longer PayChain's to sweep.
+    PoolGoodwillCredit.aggregate([
+      { $match: { status: 'completed' } },
+      // Only the revenue-funded part; the bank-surplus part was never revenue.
+      { $group: { _id: null, total: { $sum: { $ifNull: ['$fromRevenue', '$amount'] } } } },
+    ]),
   ]);
 
   const totalAccrued = accruedAgg[0]?.total || 0;
@@ -157,11 +166,12 @@ async function computeUnsweptRevenue() {
   const totalSwept = sweptAgg[0]?.total || 0;
   const totalCharges = chargesAgg[0]?.total || 0;
   const totalWriteOffs = writeOffAgg[0]?.total || 0;
+  const totalGoodwillCredits = goodwillAgg[0]?.total || 0;
 
-  const grossUnswept = Math.max(0, Math.round((totalAccrued - totalSwept) * 100) / 100);
+  const grossUnswept = Math.max(0, Math.round((totalAccrued - totalSwept - totalGoodwillCredits) * 100) / 100);
   const netUnswept = Math.max(0, Math.round((grossUnswept - totalCharges + totalWriteOffs) * 100) / 100);
 
-  return { grossUnswept, netUnswept, totalCharges, totalWriteOffs, transactionCount };
+  return { grossUnswept, netUnswept, totalCharges, totalWriteOffs, totalGoodwillCredits, transactionCount };
 }
 
 // What the pooled NCBA account SHOULD contain right now, per PayChain's own

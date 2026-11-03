@@ -44,6 +44,10 @@ export async function purgeMerchantCloudinaryAssets(snapshot) {
 // its own via DeletedRecord's TTL index; this only handles the Cloudinary
 // side, which nothing else ever touches).
 export async function purgeExpiringTrashCloudinaryAssets() {
+  // Switched off: a deleted merchant's KYC documents, certificate and
+  // business photos are kept permanently, like the rest of their record.
+  // This sweep only ever handled Merchant snapshots, so it now does nothing.
+  if (process.env.ALLOW_DELETED_MERCHANT_FILE_PURGE !== 'true') return { purgedRecords: 0, purgedFiles: 0 };
   const candidates = await DeletedRecord.find({
     status: 'trashed',
     collectionName: 'Merchant',

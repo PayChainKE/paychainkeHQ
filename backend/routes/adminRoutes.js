@@ -121,6 +121,7 @@ import {
   deleteTaxDeadline,
 } from '../controllers/taxDeadlineController.js';
 import { protect, protectAdminSSE, requireRole } from '../middleware/authMiddleware.js';
+import { requestPoolCredit, confirmPoolCredit } from '../controllers/poolCreditController.js';
 import { upload, uploadReceipt, uploadMemory } from '../utils/cloudinary.js';
 import { registerAdminEventClient } from '../utils/adminEventStream.js';
 import { getDocumentViewUrl } from '../controllers/documentViewController.js';
@@ -200,6 +201,9 @@ router.post('/merchants/:id/confirm-action', protect, requireMutator, sensitiveA
 router.get('/merchants/:id/balance-payout/preview', protect, requireMutator, previewBalancePayout);
 router.post('/merchants/:id/balance-payout/request', protect, requireMutator, sensitiveActionLimiter, requestBalancePayout);
 router.post('/merchants/:id/balance-payout/confirm', protect, requireMutator, sensitiveActionLimiter, confirmBalancePayout);
+// Credit a merchant from PayChain's own pool funds (goodwill). Owner only.
+router.post('/merchants/:id/pool-credit/request', protect, requireRole('owner'), sensitiveActionLimiter, requestPoolCredit);
+router.post('/merchants/:id/pool-credit/confirm', protect, requireRole('owner'), sensitiveActionLimiter, confirmPoolCredit);
 // Batch: pay everyone / selected merchants to their primary phones.
 router.get('/merchants/balance-payout/bulk', protect, requireMutator, listBulkBalancePayouts);
 router.post('/merchants/balance-payout/bulk/preview', protect, requireMutator, previewBulkBalancePayout);

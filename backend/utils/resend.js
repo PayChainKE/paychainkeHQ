@@ -2198,3 +2198,89 @@ export const sendApplicantMessageEmail = async (email, { applicantName, subject,
     throw error;
   }
 };
+
+// @desc  Official statement sent to a merchant after an admin pays out their
+// remaining balance (merchantBalancePayoutController.js#payOutBalance). Shows
+// the single transaction and the closing balance read back from the merchant
+// record, so a full clearance shows KES 0.00 and anything left (held funds, a
+// sub-shilling remainder) is shown as it really is.
+export const sendBalanceClearanceStatementEmail = async ({
+  to, businessName, accountNumber, openingBalance, amount, fee, closingBalance, destinationPhone, reference, status, date,
+}) => {
+  try {
+    const kes = (n) => `KES ${Number(n || 0).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const when = new Date(date || Date.now()).toLocaleString('en-KE', { timeZone: 'Africa/Nairobi', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const statusLabel = status === 'pending' ? 'Submitted — awaiting bank confirmation' : 'Completed';
+    const totalDebit = Math.round((Number(amount) + Number(fee)) * 100) / 100;
+    const row = (label, value, strong = false) => `
+      <tr style="border-bottom: 1px solid #e9ecef;">
+        <td style="padding: 11px 15px; color: #64748b; font-size: 13px;">${label}</td>
+        <td style="padding: 11px 15px; color: ${strong ? '#06201B' : '#111'}; font-size: 13px; font-weight: ${strong ? 800 : 600}; text-align: right;">${value}</td>
+      </tr>`;
+
+    const emailPayload = {
+      from: 'PayChain Statements <info@paychain.co.ke>',
+      to: [to],
+      subject: `Statement: balance cleared — ${kes(amount)} sent, closing balance ${kes(closingBalance)}`,
+      html: `
+        <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 620px; margin: 0 auto; background-color: #ffffff; color: #333; border-radius: 12px; overflow: hidden; border: 1px solid #e5e7eb;">
+          <div style="background-color: #06201B; padding: 32px 40px 30px; text-align: center; border-bottom: 4px solid #5EFEB3;">
+            <div style="margin-bottom: 16px;">${logoImgWhite(120)}</div>
+            <div style="color: #94A3B8; font-size: 12px; font-weight: 600; letter-spacing: 3px;">OFFICIAL ACCOUNT STATEMENT</div>
+            <div style="color: #5EFEB3; font-size: 12px; font-weight: 700; letter-spacing: 2px; margin-top: 6px;">BALANCE CLEARANCE</div>
+          </div>
+          <div style="padding: 36px 40px;">
+            <h1 style="font-size: 19px; font-weight: 700; color: #111; margin: 0 0 10px 0;">${escapeHtml(businessName || 'Merchant')}</h1>
+            <p style="font-size: 14px; line-height: 1.6; color: #555; margin: 0 0 24px 0;">
+              PayChain has paid out the remaining balance on your account to <strong>${escapeHtml(destinationPhone)}</strong>. This is your official record of that transaction.
+            </p>
+
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 22px; border: 1px solid #e9ecef;">
+              <tbody>
+                ${row('Account name', escapeHtml(businessName || '—'))}
+                ${row('PayChain account', escapeHtml(accountNumber || '—'))}
+                ${row('Statement date', escapeHtml(when))}
+                ${row('Reference', `<span style="font-family: 'Courier New', Courier, monospace;">${escapeHtml(reference)}</span>`)}
+                ${row('Status', statusLabel)}
+              </tbody>
+            </table>
+
+            <table style="width: 100%; border-collapse: collapse; border: 1px solid #e9ecef;">
+              <thead>
+                <tr style="background-color: #06201B; color: #ffffff;">
+                  <th style="padding: 11px 15px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; text-align: left;">Description</th>
+                  <th style="padding: 11px 15px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; text-align: right;">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${row('Opening balance', kes(openingBalance))}
+                ${row(`Balance payout to ${escapeHtml(destinationPhone)} (M-PESA)`, `− ${kes(amount)}`)}
+                ${row('Transfer fee', `− ${kes(fee)}`)}
+                ${row('Total debited', `− ${kes(totalDebit)}`)}
+                <tr style="background-color: #f0fdf4;">
+                  <td style="padding: 14px 15px; color: #166534; font-size: 14px; font-weight: 800;">Closing balance</td>
+                  <td style="padding: 14px 15px; color: #14532d; font-size: 16px; font-weight: 800; text-align: right;">${kes(closingBalance)}</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <p style="font-size: 12px; line-height: 1.6; color: #94a3b8; margin: 22px 0 0 0;">
+              If you don't recognise this transaction, contact <a href="mailto:support@paychain.co.ke" style="color: #64748b;">support@paychain.co.ke</a> immediately and quote the reference above.
+            </p>
+          </div>
+          <div style="background-color: #fafafa; padding: 22px 40px; text-align: center; border-top: 1px solid #e5e7eb;">
+            <p style="font-size: 11px; color: #9ca3af; margin: 0;">&copy; ${new Date().getFullYear()} PayChainKE. All rights reserved.</p>
+          </div>
+        </div>
+      `,
+    };
+    const data = await resend.emails.send(emailPayload);
+    if (data?.error) throw new Error(data.error.message || 'Email provider rejected the message.');
+    logEmail({ to, type: 'balance_clearance_statement', subject: emailPayload.subject, bodyHtml: emailPayload.html, resendId: data?.data?.id || data?.id || null }).catch(() => {});
+    return data;
+  } catch (error) {
+    console.error('❌ Balance clearance statement email failed:', error?.message);
+    // Never throws: the money has already moved, a failed email must not
+    // turn a successful payout into an error response.
+  }
+};

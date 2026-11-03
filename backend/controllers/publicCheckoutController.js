@@ -1,5 +1,6 @@
 import CheckoutSession from '../models/CheckoutSession.js';
 import Merchant from '../models/Merchant.js';
+import { canReceivePayments, PAYMENT_ACCEPTANCE_FIELDS, MERCHANT_CANNOT_RECEIVE_MESSAGE } from '../utils/merchantPaymentAcceptance.js';
 import { initiateCollectPayment, CollectValidationError } from '../services/developerCollectService.js';
 import { DuplicateSubmissionError } from '../utils/idempotencyGuard.js';
 import { isCheckoutSessionExpired, syncCheckoutSessionStatus } from '../services/checkoutSessionService.js';
@@ -21,7 +22,11 @@ export const getPublicCheckoutSession = async (req, res) => {
     const session = await CheckoutSession.findById(req.params.id);
     if (!session) return res.status(404).json({ error: 'Checkout link not found or no longer valid.' });
 
-    const merchant = session.merchantId ? await Merchant.findById(session.merchantId).select('businessName') : null;
+    const merchant = session.merchantId ? await Merchant.findById(session.merchantId).select(`businessName ${PAYMENT_ACCEPTANCE_FIELDS}`) : null;
+    // A locked merchant must not receive payments from anyone.
+    if (session.mode === 'live' && !canReceivePayments(merchant)) {
+      return res.status(403).json({ error: MERCHANT_CANNOT_RECEIVE_MESSAGE, code: 'MERCHANT_LOCKED' });
+    }
     const checkoutUrl = `${CHECKOUT_BASE_URL}/pay/${session._id}`;
 
     res.json({

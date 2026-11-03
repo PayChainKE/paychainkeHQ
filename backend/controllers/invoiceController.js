@@ -1,3 +1,4 @@
+import { canReceivePayments } from '../utils/merchantPaymentAcceptance.js';
 import crypto from 'crypto';
 import Invoice from '../models/Invoice.js';
 import PaymentLink from '../models/PaymentLink.js';
@@ -464,12 +465,17 @@ export const getPublicInvoice = async (req, res) => {
   try {
     const invoice = await Invoice.findOne({ publicToken: req.params.publicToken })
       .populate('paymentLinkId')
-      .populate('merchantId', 'businessName kraPin businessArea county email phone')
+      .populate('merchantId', 'businessName kraPin businessArea county email phone status inboundLocked')
       .populate('etimsInvoiceId');
 
     if (!invoice || invoice.status === 'draft') {
       return res.status(404).json({ error: 'Invoice not found.' });
     }
+
+    // A locked merchant must not receive payments from anyone: the invoice
+    // stays viewable, but the pay section is hidden (InvoiceView.jsx only
+    // renders it when payLinkId is set). processPaymentLink refuses it too.
+    const merchantLocked = !canReceivePayments(invoice.merchantId);
 
     const { subtotal, discount, total } = computeTotals(invoice.items);
     const shareUrl = invoiceShareUrl(invoice, invoice.paymentLinkId);
@@ -490,7 +496,7 @@ export const getPublicInvoice = async (req, res) => {
         discount,
         total,
         status: invoice.status,
-        payLinkId: invoice.paymentLinkId?.linkId || null,
+        payLinkId: merchantLocked ? null : (invoice.paymentLinkId?.linkId || null),
         paymentLinkStatus: invoice.paymentLinkId?.status || null,
         qrCodeDataUri: await generateQrDataUri(shareUrl),
         // Every invoice — eTIMS-fiscalized or not — should identify who's

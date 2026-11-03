@@ -89,7 +89,7 @@ const Trash = () => {
         <div>
           <h1 className="text-2xl font-bold text-on-surface tracking-tight font-headline">Trash</h1>
           <p className="text-sm text-on-surface-variant mt-1 max-w-2xl">
-            Everything a significant admin action has deleted — merchant accounts, team/officer removals, expenses, and manually-deleted stuck payouts. Restorable for 90 days, or deleted permanently right away.
+            Everything a significant admin action has deleted — merchant accounts, team/officer removals, expenses, and manually-deleted stuck payouts. Restorable for 90 days. Deleted merchant records are kept permanently and can't be erased.
           </p>
         </div>
 
@@ -134,13 +134,13 @@ const Trash = () => {
                                 <span className="material-symbols-outlined text-[14px]">restore</span>
                                 Restore
                               </button>
-                              <button
+                              {item.collectionName !== 'Merchant' && <button
                                 onClick={() => setDeleteTarget(item)}
                                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-200 text-red-700 hover:bg-red-50 text-2xs font-bold uppercase tracking-widest transition-all"
                               >
                                 <span className="material-symbols-outlined text-[14px]">delete_forever</span>
                                 Delete Permanently
-                              </button>
+                              </button>}
                             </div>
                           </td>
                         </tr>
@@ -168,7 +168,7 @@ const Trash = () => {
                 <h3 className="text-xl font-bold text-on-surface mb-1">Restore "{restoreTarget.label}"?</h3>
                 <p className="text-sm text-on-surface-variant mb-5">
                   Brings this {COLLECTION_META[restoreTarget.collectionName]?.label.toLowerCase() || restoreTarget.collectionName} back exactly as it was right before deletion.
-                  {restoreTarget.collectionName === 'Merchant' && ' Their saved payees and payment links from before the deletion are not restored, only the account itself.'}
+                  {restoreTarget.collectionName === 'Merchant' && ' Their saved payees, payment history and transactions were kept and come back with it.'}
                 </p>
                 <div className="flex gap-3">
                   <button onClick={() => setRestoreTarget(null)} disabled={restoreBusy} className="flex-1 py-2.5 rounded-lg border border-outline-variant/40 text-on-surface text-sm font-semibold uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40">Cancel</button>
