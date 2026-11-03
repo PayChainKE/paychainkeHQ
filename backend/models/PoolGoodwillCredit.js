@@ -11,6 +11,13 @@ import mongoose from 'mongoose';
 const poolGoodwillCreditSchema = new mongoose.Schema({
   merchantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Merchant', required: true, index: true },
   amount: { type: Number, required: true, min: 0.01 },
+  // How it was funded. fromRevenue came out of PayChain's unswept revenue
+  // (subtracted by computeUnsweptRevenue); fromSurplus came out of money in
+  // the NCBA account above everything owed to merchants and PayChain, which
+  // was never counted as revenue so nothing is subtracted for it. Rows from
+  // before this split have neither field and count as all revenue.
+  fromRevenue: { type: Number, default: null },
+  fromSurplus: { type: Number, default: 0 },
   reason: { type: String, required: true, trim: true },
   // Optional M-PESA/NCBA references of the original payments this makes good,
   // so a later manual credit of the same payment can be spotted.

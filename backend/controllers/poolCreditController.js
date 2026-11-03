@@ -12,6 +12,7 @@ import { safeSendSMS, formatKes } from '../utils/smsSanitizer.js';
 import { notifyAdmins, escapeHtml } from '../utils/securityAlerts.js';
 import { computeUnsweptRevenue } from '../services/revenueSweepService.js';
 import { getNcbaVirtualAccountNumber } from '../utils/ncbaValidators.js';
+import { getNcbaAccountBalance } from '../services/ncbaOpenBankingService.js';
 
 // Admin "Credit from PayChain pool": PayChain pays a merchant out of its own
 // unswept revenue held in the pooled NCBA account, like an internal transfer.
@@ -23,8 +24,9 @@ import { getNcbaVirtualAccountNumber } from '../utils/ncbaValidators.js';
 //   - owner role only (routes), plus a 6-character code emailed to the owner
 //     and bound to (merchant, amount, reason)
 //   - a written reason; per-credit cap
-//   - refused unless PayChain's own unswept revenue covers it, so it can
-//     never spend money that belongs to other merchants
+//   - funded from PayChain's unswept revenue first, then from bank surplus
+//     (live NCBA balance above everything owed to merchants). Refused if the
+//     two together can't cover it, so it never spends other merchants' money
 //   - critical audit row, alert to all admins, SMS/email/in-app to merchant
 
 const ACTION = 'pool_credit';
@@ -51,11 +53,46 @@ function parseRefs(raw) {
   return [...new Set(list.map((r) => String(r).trim().toUpperCase()).filter((r) => /^[A-Z0-9-]{4,40}$/.test(r)))].slice(0, 20);
 }
 
-// PayChain's own money in the pool that is free to spend: net unswept
-// revenue (already net of real bank charges, so it's money really there).
-async function availablePoolFunds() {
-  const { netUnswept } = await computeUnsweptRevenue();
-  return round2(netUnswept);
+// What PayChain may spend from the pool, and how a credit of `amount`
+// would be funded:
+//   - revenue: PayChain's net unswept revenue, used first
+//   - surplus: live NCBA balance minus all merchant balances minus revenue
+//     (money in the account that nobody is owed)
+// The hard ceiling is always live balance minus merchant balances, the same
+// gate the revenue sweep uses, so the account never drops below what is
+// owed to merchants. If NCBA's balance can't be read, only revenue is used.
+async function poolFunding(amount = 0) {
+  const [{ netUnswept }, merchantAgg, live] = await Promise.all([
+    computeUnsweptRevenue(),
+    Merchant.aggregate([
+      { $match: { isDemoMerchant: { $ne: true }, isAppReviewAccount: { $ne: true } } },
+      { $group: { _id: null, total: { $sum: '$kesBalance' } } },
+    ]),
+    getNcbaAccountBalance().catch(() => ({ balance: null })),
+  ]);
+  const revenue = round2(Math.max(0, netUnswept));
+  const merchantTotal = round2(merchantAgg[0]?.total || 0);
+  const liveBalance = Number.isFinite(live?.balance) ? round2(live.balance) : null;
+
+  let available;
+  let surplus = 0;
+  if (liveBalance === null) {
+    available = revenue;
+  } else {
+    const notOwedToMerchants = round2(Math.max(0, liveBalance - merchantTotal));
+    surplus = round2(Math.max(0, notOwedToMerchants - revenue));
+    available = notOwedToMerchants;
+  }
+  const fromRevenue = round2(Math.min(amount, revenue, available));
+  const fromSurplus = round2(Math.max(0, Math.min(amount, available) - fromRevenue));
+  return { available, revenue, surplus, liveBalance, merchantTotal, fromRevenue, fromSurplus };
+}
+
+function fundingShortMessage(f, amount) {
+  if (f.liveBalance === null) {
+    return `PayChain's unswept revenue is KES ${formatKes(f.revenue)} and the live NCBA balance couldn't be read to check for surplus, so KES ${formatKes(amount)} can't be covered right now. Try again shortly.`;
+  }
+  return `The pool can only spare KES ${formatKes(f.available)} (live balance KES ${formatKes(f.liveBalance)} minus KES ${formatKes(f.merchantTotal)} owed to merchants). Crediting KES ${formatKes(amount)} would use other merchants' money. Top up account 1010837186 first.`;
 }
 
 // @desc    Step 1: validate and email the owner a confirmation code.
@@ -80,11 +117,9 @@ export const requestPoolCredit = async (req, res) => {
       return res.status(409).json({ error: 'This is a demo/test account — it can\'t be credited real money.' });
     }
 
-    const available = await availablePoolFunds();
-    if (amount > available) {
-      return res.status(409).json({
-        error: `PayChain's own funds in the pool (unswept revenue) are KES ${formatKes(available)}, which doesn't cover KES ${formatKes(amount)}. Crediting more would use other merchants' money.`,
-      });
+    const funding = await poolFunding(amount);
+    if (amount > funding.available) {
+      return res.status(409).json({ error: fundingShortMessage(funding, amount) });
     }
 
     // Warn if one of these references was already credited to this merchant.
@@ -118,7 +153,11 @@ export const requestPoolCredit = async (req, res) => {
       metadata: { amount, reason, relatedRefs },
     });
 
-    res.json({ success: true, message: 'Verification code sent to your admin email.', data: { amount, available } });
+    res.json({
+      success: true,
+      message: 'Verification code sent to your admin email.',
+      data: { amount, fromRevenue: funding.fromRevenue, fromSurplus: funding.fromSurplus, revenue: funding.revenue, surplus: funding.surplus, liveBalance: funding.liveBalance },
+    });
   } catch (error) {
     console.error('Request Pool Credit Error:', error);
     res.status(500).json({ error: 'Server Error' });
@@ -160,10 +199,11 @@ export const confirmPoolCredit = async (req, res) => {
     if (!merchant) return res.status(404).json({ error: 'Merchant not found.' });
 
     // Re-check: other credits or a sweep may have run since the code was sent.
-    const available = await availablePoolFunds();
-    if (amount > available) {
-      return res.status(409).json({ error: `PayChain's own funds in the pool are now KES ${formatKes(available)}, which doesn't cover KES ${formatKes(amount)}. Nothing was credited.` });
+    const funding = await poolFunding(amount);
+    if (amount > funding.available) {
+      return res.status(409).json({ error: `${fundingShortMessage(funding, amount)} Nothing was credited.` });
     }
+    const { fromRevenue, fromSurplus } = funding;
 
     const reference = `GOODWILL-${Date.now().toString(36).toUpperCase()}${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
     const session = await mongoose.startSession();
@@ -191,6 +231,8 @@ export const confirmPoolCredit = async (req, res) => {
         await PoolGoodwillCredit.create([{
           merchantId: merchant._id,
           amount,
+          fromRevenue,
+          fromSurplus,
           reason,
           relatedRefs,
           reference,
@@ -209,7 +251,7 @@ export const confirmPoolCredit = async (req, res) => {
       action: 'admin.merchant.pool_credited', category: 'admin', severity: 'critical',
       message: `Credited KES ${formatKes(amount)} from PayChain's pool (OTP-verified), ref ${reference}. Reason: ${reason}`,
       merchant, actor: adminActor(admin), req,
-      metadata: { amount, reason, relatedRefs, reference, transactionId: String(transaction._id), newBalance },
+      metadata: { amount, fromRevenue, fromSurplus, liveBalance: funding.liveBalance, reason, relatedRefs, reference, transactionId: String(transaction._id), newBalance },
     });
     notifyAdmins({
       type: 'admin_balance_payout',
@@ -217,6 +259,7 @@ export const confirmPoolCredit = async (req, res) => {
       subject: `Pool credit — KES ${formatKes(amount)} to ${merchant.businessName}`,
       heading: 'Merchant credited from PayChain pool',
       details: `<p><strong>${escapeHtml(merchant.businessName || '')}</strong> was credited KES ${formatKes(amount)} from PayChain's own funds by ${escapeHtml(admin.email || 'admin')}.</p>`
+        + `<p>Funded from: PayChain revenue KES ${formatKes(fromRevenue)}${fromSurplus > 0 ? ` + bank surplus KES ${formatKes(fromSurplus)}` : ''}.</p>`
         + `<p>Reason: ${escapeHtml(reason)}</p>`
         + (relatedRefs.length ? `<p>Original payment refs: ${escapeHtml(relatedRefs.join(', '))} — do not also credit these via Credit Missed Collection.</p>` : '')
         + `<p>Ref ${escapeHtml(reference)}. New balance: KES ${formatKes(newBalance)}.</p>`,
@@ -247,7 +290,7 @@ export const confirmPoolCredit = async (req, res) => {
       }).catch((err) => console.error('Pool credit email failed:', err?.message || err));
     }
 
-    res.json({ success: true, message: `KES ${formatKes(amount)} credited to ${merchant.businessName}.`, data: { reference, amount, newBalance } });
+    res.json({ success: true, message: `KES ${formatKes(amount)} credited to ${merchant.businessName}.`, data: { reference, amount, fromRevenue, fromSurplus, newBalance } });
   } catch (error) {
     console.error('Confirm Pool Credit Error:', error);
     res.status(500).json({ error: 'Server Error' });

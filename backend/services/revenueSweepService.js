@@ -156,7 +156,8 @@ export async function computeUnsweptRevenue() {
     // so it is no longer PayChain's to sweep.
     PoolGoodwillCredit.aggregate([
       { $match: { status: 'completed' } },
-      { $group: { _id: null, total: { $sum: '$amount' } } },
+      // Only the revenue-funded part; the bank-surplus part was never revenue.
+      { $group: { _id: null, total: { $sum: { $ifNull: ['$fromRevenue', '$amount'] } } } },
     ]),
   ]);
 

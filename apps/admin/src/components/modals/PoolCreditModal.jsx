@@ -15,6 +15,7 @@ export default function PoolCreditModal({ merchant, onClose, onSuccess }) {
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState('');
   const [result, setResult] = React.useState(null);
+  const [funding, setFunding] = React.useState(null);
 
   const otpValid = /^[A-Z0-9]{6}$/.test(otp) && (otp.match(/\d/g) || []).length === 1;
   const amountNum = Number(amount);
@@ -30,7 +31,10 @@ export default function PoolCreditModal({ merchant, onClose, onSuccess }) {
         reason: reason.trim(),
         relatedRefs: refs,
       });
-      if (res.data?.success) setStage('otp');
+      if (res.data?.success) {
+        setFunding(res.data.data || null);
+        setStage('otp');
+      }
       else setError(res.data?.error || 'Could not send code.');
     } catch (e) {
       setError(e.response?.data?.error || 'Could not send code.');
@@ -79,7 +83,7 @@ export default function PoolCreditModal({ merchant, onClose, onSuccess }) {
             </div>
             <h3 className="text-xl font-bold text-on-surface mb-1">Credit from PayChain Pool</h3>
             <p className="text-sm text-on-surface-variant mb-4">
-              Credit <strong>{merchant.businessName}</strong>'s wallet from PayChain's own funds in the pool, like an internal transfer. It comes out of PayChain's unswept revenue, never other merchants' money.
+              Credit <strong>{merchant.businessName}</strong>'s wallet from PayChain's own funds in the pool (NCBA 1010837186), like an internal transfer. It comes out of PayChain's unswept revenue first, then any surplus in the bank balance. It never uses money owed to other merchants.
             </p>
             <div className="text-[13px] px-3 py-2.5 rounded-lg mb-5 bg-amber-50 text-amber-800 border border-amber-100">
               If you have the bank reference for a missed payment, use Pool Reconciliation → Credit Missed Collection instead. Never credit the same payment both ways.
@@ -115,6 +119,15 @@ export default function PoolCreditModal({ merchant, onClose, onSuccess }) {
               <span className="material-symbols-outlined text-3xl">mark_email_unread</span>
             </div>
             <h3 className="text-xl font-bold text-on-surface mb-1">Confirm credit</h3>
+            {funding && (
+              <div className="rounded-xl border border-outline-variant/40 bg-surface-container-low/50 px-4 py-3 mb-4 text-sm">
+                <div className="flex justify-between py-1"><span className="text-on-surface-variant">From PayChain revenue</span><span className="tabular-nums font-semibold">{formatKES(funding.fromRevenue)}</span></div>
+                <div className="flex justify-between py-1"><span className="text-on-surface-variant">From bank surplus</span><span className="tabular-nums font-semibold">{formatKES(funding.fromSurplus)}</span></div>
+                {funding.liveBalance != null && (
+                  <div className="flex justify-between py-1 border-t border-outline-variant/40 mt-1 pt-2"><span className="text-on-surface-variant text-xs">Live NCBA balance</span><span className="tabular-nums text-xs">{formatKES(funding.liveBalance)}</span></div>
+                )}
+              </div>
+            )}
             <p className="text-sm text-on-surface-variant mb-4">
               Crediting <strong>{formatKES(amountNum)}</strong> to <strong>{merchant.businessName}</strong>. Enter the code we emailed you: <strong>5 letters and 1 digit</strong>. It expires in 10 minutes.
             </p>
