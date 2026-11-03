@@ -10,6 +10,8 @@ import EditableField from '../components/modals/EditableField'
 import UploadableDocRow from '../components/modals/UploadableDocRow'
 import ResetContactModal from '../components/modals/ResetContactModal';
 import SendBalanceModal from '../components/modals/SendBalanceModal';
+import PoolCreditModal from '../components/modals/PoolCreditModal';
+import { useAuth } from '../context/AuthContext';
 import openDocument from '../utils/openDocument';
 import EditSignupDetailsModal from '../components/modals/EditSignupDetailsModal';
 import GenerateStatementModal from '../components/modals/GenerateStatementModal';
@@ -1370,6 +1372,9 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
   const [certificateUrl, setCertificateUrl] = React.useState(merchant?.certificateUrl || null);
   const [resetContactOpen, setResetContactOpen] = React.useState(false);
   const [sendBalanceOpen, setSendBalanceOpen] = React.useState(false);
+  const [poolCreditOpen, setPoolCreditOpen] = React.useState(false);
+  const { admin: currentAdmin } = useAuth();
+  const isOwner = currentAdmin?.role === 'owner';
   const [contactOverride, setContactOverride] = React.useState(null); // { email, phone } after a reset_contact confirm
   // Signup-details fields (National ID, business type, county/area/ward/
   // street) — editable via EditSignupDetailsModal, mainly so an admin can
@@ -2120,6 +2125,18 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
                   Send Balance
                 </button>
               } />
+              {isOwner && !m.isDeleted && (
+                <Row label="Credit from Pool" value={
+                  <button
+                    onClick={() => setPoolCreditOpen(true)}
+                    title="Credit this merchant from PayChain's own funds in the pool (owner only, OTP-verified)"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 text-[11px] font-bold uppercase tracking-widest transition-all"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">account_balance</span>
+                    Credit Merchant
+                  </button>
+                } />
+              )}
               <Row
                 label="Newsletter"
                 value={
@@ -2496,6 +2513,9 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
           onClose={() => setResetContactOpen(false)}
           onSuccess={(data) => setContactOverride(data)}
         />
+      )}
+      {poolCreditOpen && (
+        <PoolCreditModal merchant={m} onClose={() => setPoolCreditOpen(false)} />
       )}
       {sendBalanceOpen && (
         <SendBalanceModal
