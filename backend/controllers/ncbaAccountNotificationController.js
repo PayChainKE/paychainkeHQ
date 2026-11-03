@@ -1,3 +1,5 @@
+import RetiredMerchantCode from '../models/RetiredMerchantCode.js';
+import { canReceivePayments } from '../utils/merchantPaymentAcceptance.js';
 import mongoose from 'mongoose';
 import Merchant from '../models/Merchant.js';
 import MissedNcbaCollectionCandidate from '../models/MissedNcbaCollectionCandidate.js';
@@ -259,12 +261,50 @@ export const handleNcbaAccountNotification = async (req, res) => {
     const merchant = await Merchant.findOne({ ncbaMerchantCode: merchantCode });
     if (!merchant) {
       logEvent('warn', 'ncba_account_notification_unknown_merchant', { transId, merchantCode });
+      // A deleted merchant's code is retired, not reused. Money paid to it
+      // has really landed, so hold and flag it like a blocked merchant's.
+      const retired = await RetiredMerchantCode.findOne({ type: 'ncbaMerchantCode', code: merchantCode }).lean().catch(() => null);
+      if (retired) {
+        NcbaUnattributedCredit.create({
+          transId, txnType: rawTransType, amount: transAmount,
+          rawAccountNr, rawNarrative, rawCustomerName, rawPhoneNr,
+          resolvedNote: `Held: ${retired.formerBusinessName || merchantCode} (${merchantCode}) — account deleted`,
+        }).catch((e) => logEvent('error', 'ncba_unattributed_credit_log_failed', { transId, error: e.message }));
+        notifyAdmins({
+          type: 'ncba_blocked_merchant_credit',
+          severity: 'critical',
+          subject: `KES ${transAmount.toLocaleString()} paid to deleted merchant ${retired.formerBusinessName || merchantCode} was held`,
+          heading: 'Payment Held — Merchant Deleted',
+          details: `A real KES ${transAmount.toLocaleString()} credit (ref ${escapeHtml(transId)}) landed on PayChain's NCBA account for account ${escapeHtml(merchantCode)}${retired.formerBusinessName ? ` (formerly ${escapeHtml(retired.formerBusinessName)})` : ''}, which belongs to a deleted merchant. Nothing was credited. Refund the payer.`,
+          metadata: { transId, txnType: rawTransType, amount: transAmount, merchantCode, formerMerchantId: retired.formerMerchantId ? String(retired.formerMerchantId) : null, reason: 'account deleted', customerName: rawCustomerName || null },
+        });
+      }
       return respondFail(res, 'Unknown merchant');
     }
 
-    if (merchant.status !== 'active') {
-      logEvent('warn', 'ncba_account_notification_merchant_inactive', { transId, merchantId: merchant._id.toString(), status: merchant.status });
-      return respondFail(res, `Merchant account is ${merchant.status}`);
+    // Locked account, or admin "Block incoming payments" (see
+    // utils/merchantPaymentAcceptance.js). A customer paying the paybill
+    // straight from M-PESA reaches NCBA before PayChain is asked, so the money
+    // has really landed. It must not reach the merchant's wallet, but it must
+    // not vanish either: park it with the unattributed credits and alert
+    // admins so they can refund the payer or credit it once the block lifts.
+    if (!canReceivePayments(merchant)) {
+      const reason = merchant.status === 'locked' ? 'account locked' : 'incoming payments blocked';
+      logEvent('warn', 'ncba_account_notification_merchant_cannot_receive', { transId, merchantId: merchant._id.toString(), status: merchant.status, inboundLocked: !!merchant.inboundLocked });
+      NcbaUnattributedCredit.create({
+        transId, txnType: rawTransType, amount: transAmount,
+        rawAccountNr, rawNarrative, rawCustomerName, rawPhoneNr,
+        resolvedNote: `Held: ${merchant.businessName || merchantCode} (${merchantCode}) — ${reason}`,
+      }).catch((e) => logEvent('error', 'ncba_unattributed_credit_log_failed', { transId, error: e.message }));
+      notifyAdmins({
+        type: 'ncba_blocked_merchant_credit',
+        severity: 'critical',
+        subject: `KES ${transAmount.toLocaleString()} paid to ${merchant.businessName || merchantCode} was held (${reason})`,
+        heading: 'Payment Held — Merchant Cannot Receive',
+        details: `A real KES ${transAmount.toLocaleString()} credit (ref ${escapeHtml(transId)}) landed on PayChain's NCBA account for ${escapeHtml(merchant.businessName || '')} (account ${escapeHtml(merchantCode)}), but this merchant's ${reason}. It was NOT credited to their wallet. Refund the payer, or credit it via the missed-collection tool once the block is lifted.`,
+        metadata: { transId, txnType: rawTransType, amount: transAmount, merchantId: merchant._id.toString(), merchantCode, reason, customerName: rawCustomerName || null },
+      });
+      return respondFail(res, `Merchant cannot receive payments (${reason})`);
     }
 
     // CustomerName has proven more reliable than PhoneNr for actually

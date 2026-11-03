@@ -520,6 +520,26 @@ const merchantSchema = new mongoose.Schema({
     type: String,
     default: null,
   },
+  // Admin "Block incoming payments" (OTP-gated 'lock_inbound' /
+  // 'unlock_inbound' in adminController.js). The opposite of outboundLocked:
+  // the merchant can still sign in and use the app, but no one can pay them.
+  // No new STK prompt, QR, payment link, checkout or API collect is created,
+  // and direct paybill deposits aren't credited (they're parked for admin
+  // review instead). The full lock (status 'locked') blocks payments too.
+  // See utils/merchantPaymentAcceptance.js.
+  inboundLocked: {
+    type: Boolean,
+    default: false,
+  },
+  inboundLockedAt: {
+    type: Date,
+    default: null,
+  },
+  inboundLockedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin',
+    default: null,
+  },
   // ── Onboarding-Officer KYC pipeline (unset for self-serve merchants) ──
   // kybStatus has NO default — it must stay genuinely absent on every
   // merchant created by self-serve signup or the admin direct-onboard flow,

@@ -92,8 +92,10 @@ const ACTIVITY_STYLE = {
 const ACTION_META = {
   lock:   { label: 'Lock Account',   verb: 'lock',   tone: 'amber',   icon: 'lock',         copy: 'The merchant will be unable to sign in until unlocked. Funds and data remain intact.' },
   unlock: { label: 'Unlock Account', verb: 'unlock', tone: 'emerald', icon: 'lock_open',    copy: 'The merchant will regain access to their dashboard and mobile app.' },
+  lock_inbound:   { label: 'Block Incoming Payments', verb: 'block incoming payments to', tone: 'amber', icon: 'block', copy: 'No one will be able to pay this merchant: payment links, checkout pages, QR/Pay Account, invoices, Request Money and API collections are all refused. The merchant can still sign in, see their history and withdraw their existing balance. Direct paybill deposits are held (not credited) and flagged to admins.' },
+  unlock_inbound: { label: 'Allow Incoming Payments', verb: 'allow incoming payments to', tone: 'emerald', icon: 'payments', copy: 'Customers will be able to pay this merchant again through every channel.' },
   unlock_outbound: { label: 'Resume Payouts', verb: 'resume payouts for', tone: 'emerald', icon: 'payments', copy: 'Lifts the anti-takeover payout hold (set after a password/PIN/contact reset) and any outbound lock. Only do this after confirming with the merchant on their known number that they made the change.' },
-  delete: { label: 'Delete Account', verb: 'delete', tone: 'red',     icon: 'delete_forever', copy: 'The merchant record and ALL related transactions, payouts, payees and payment links will be permanently removed. This cannot be undone.' },
+  delete: { label: 'Delete Account', verb: 'delete', tone: 'red',     icon: 'delete_forever', copy: 'The merchant is signed out everywhere and can no longer log in, their API keys are revoked, checkout pages switched off, and no one can pay them any more (direct paybill deposits are held and flagged). Payees, payment links and pending prompts are removed; settled transaction history is kept for records.' },
 };
 
 function relativeTime(iso) {
@@ -848,6 +850,11 @@ const Merchants = () => {
                             {m.isVerified ? 'Verified' : 'Unverified'}
                           </span>
                         )}
+                        {!deleted && !locked && m.inboundLocked && (
+                          <span className="ml-1 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border tracking-tight uppercase bg-red-50 text-red-700 border-red-200">
+                            <span className="material-symbols-outlined text-[12px]">block</span> Payments blocked
+                          </span>
+                        )}
                       </td>
                       <td className="py-2 px-3 border-b border-outline-variant/5 text-on-surface-variant/60 text-[11px]">
                         {new Date(m.createdAt).toLocaleDateString()}
@@ -879,6 +886,11 @@ const Merchants = () => {
                                   <MenuItem icon="payments" tone="emerald" onClick={() => startAction(m, 'unlock_outbound')}>
                                     Resume payouts{m.payoutHoldUntil && new Date(m.payoutHoldUntil) > new Date() ? ` (paused until ${new Date(m.payoutHoldUntil).toLocaleString()})` : ''}
                                   </MenuItem>
+                                )}
+                                {m.inboundLocked ? (
+                                  <MenuItem icon="payments" tone="emerald" onClick={() => startAction(m, 'unlock_inbound')}>Allow incoming payments</MenuItem>
+                                ) : (
+                                  <MenuItem icon="block" tone="amber" onClick={() => startAction(m, 'lock_inbound')}>Block incoming payments</MenuItem>
                                 )}
                                 {locked ? (
                                   <MenuItem icon="lock_open" tone="emerald" onClick={() => startAction(m, 'unlock')}>Unlock account</MenuItem>
@@ -1164,7 +1176,7 @@ const ActionModal = ({ state, onClose, onConfirm, onSubmitOtp, onOtpChange }) =>
               <span className="material-symbols-outlined text-3xl">check_circle</span>
             </div>
             <h3 className="text-xl font-bold text-on-surface mb-1">
-              {state.action === 'delete' ? 'Merchant deleted' : state.action === 'freeze' ? 'Account frozen' : state.action === 'unlock_outbound' ? 'Payouts resumed' : 'Account reactivated'}
+              {state.action === 'delete' ? 'Merchant deleted' : state.action === 'freeze' ? 'Account frozen' : state.action === 'unlock_outbound' ? 'Payouts resumed' : state.action === 'lock_inbound' ? 'Incoming payments blocked' : state.action === 'unlock_inbound' ? 'Incoming payments allowed' : 'Account reactivated'}
             </h3>
             <p className="text-sm text-on-surface-variant mb-5">
               {state.action === 'delete'
@@ -1173,6 +1185,10 @@ const ActionModal = ({ state, onClose, onConfirm, onSubmitOtp, onOtpChange }) =>
                   ? `${state.merchant.businessName} can no longer sign in until reactivated.`
                   : state.action === 'unlock_outbound'
                     ? `${state.merchant.businessName} can send payouts again.`
+                  : state.action === 'lock_inbound'
+                    ? `No one can pay ${state.merchant.businessName} until you allow incoming payments again. They can still sign in.`
+                  : state.action === 'unlock_inbound'
+                    ? `${state.merchant.businessName} can receive payments again.`
                     : `${state.merchant.businessName} has regained dashboard access.`}
             </p>
             <button onClick={onClose} className="px-5 py-2.5 rounded-lg bg-primary text-white text-sm font-semibold uppercase tracking-widest hover:shadow-lg active:scale-95 transition-all">Done</button>
@@ -1896,6 +1912,7 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
                   {m.status === 'locked' ? 'Locked' : 'Active'}
                 </Badge>
               )}
+              {m.inboundLocked && <Badge tone="red" icon="block">Payments blocked</Badge>}
               {m.flagged && <Badge tone="red" icon="flag">Flagged</Badge>}
               <Badge tone={m.isVerified ? 'emerald' : 'gray'} icon={m.isVerified ? 'verified' : 'pending'}>
                 {m.isVerified ? 'Account Verified' : 'Unverified'}
@@ -2223,6 +2240,12 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
                 <>
                   <Row label="Locked At" value={fmtDate(m.lockedAt)} />
                   {m.lockedBy?.email && <Row label="Locked By" value={m.lockedBy.email} />}
+                </>
+              )}
+              {m.inboundLocked && (
+                <>
+                  <Row label="Payments Blocked At" value={fmtDate(m.inboundLockedAt)} />
+                  {m.inboundLockedBy?.email && <Row label="Payments Blocked By" value={m.inboundLockedBy.email} />}
                 </>
               )}
             </Section>

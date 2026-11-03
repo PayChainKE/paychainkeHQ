@@ -11,6 +11,18 @@ export class StkSetupError extends Error {
   }
 }
 
+// An admin has locked this merchant or blocked its incoming payments (see
+// utils/merchantPaymentAcceptance.js), so no prompt or QR is created for it. The customer-facing
+// message stays neutral on purpose: it doesn't tell a payer the account is
+// locked.
+export class MerchantLockedError extends StkSetupError {
+  constructor() {
+    super('This merchant account cannot receive payments (locked or incoming payments blocked by admin).');
+    this.name = 'MerchantLockedError';
+    this.code = 'MERCHANT_LOCKED';
+  }
+}
+
 // Detail is for staff only, but still never store a token that slipped into an
 // upstream error body.
 const redact = (s) => String(s || '')
@@ -25,6 +37,11 @@ const redact = (s) => String(s || '')
  * connection stays a 502 for exactly that reason.
  */
 export function classifyStkSendError(err) {
+  if (err instanceof MerchantLockedError) {
+    // Only reached from the merchant's own Request Money (public pages
+    // catch MerchantLockedError themselves), so speak to the merchant.
+    return { stage: 'setup', notSent: true, httpStatus: 403, message: 'Incoming payments are blocked on your account. Contact support.' };
+  }
   if (err instanceof StkSetupError) {
     return { stage: 'setup', notSent: true, httpStatus: 409, message: 'Your account is not ready to receive M-PESA payments yet. Please contact support.' };
   }

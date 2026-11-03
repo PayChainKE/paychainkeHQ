@@ -2,10 +2,10 @@ import crypto from 'crypto';
 import mongoose from 'mongoose';
 import Merchant from '../models/Merchant.js';
 import Admin from '../models/Admin.js';
-import { sendAdminActionOTP } from '../utils/resend.js';
+import { sendAdminActionOTP, sendBalanceClearanceStatementEmail } from '../utils/resend.js';
 import { logAudit } from '../utils/auditLog.js';
 import { adminActor } from './adminController.js';
-import { validatePhoneNumber, NcbaValidationError } from '../utils/ncbaValidators.js';
+import { validatePhoneNumber, NcbaValidationError, getNcbaVirtualAccountNumber } from '../utils/ncbaValidators.js';
 import { getAvailableBalance } from '../utils/availableBalance.js';
 import { getB2cTariff, MAX_B2C_AMOUNT } from '../config/mpesaB2cTariffCard.js';
 import { withMerchantTariffLock } from '../services/tariffCardCache.js';
@@ -270,7 +270,7 @@ export const confirmBalancePayout = async (req, res) => {
       return res.status(400).json({ error: 'This request is missing its payout details. Request a new code.' });
     }
 
-    const merchant = await Merchant.findById(id).select('businessName email phone kesBalance payoutHoldUntil');
+    const merchant = await Merchant.findById(id).select('businessName email phone kesBalance payoutHoldUntil ncbaMerchantCode');
     if (!merchant) return res.status(404).json({ error: 'Merchant not found.' });
 
     const outcome = await payOutBalance({ merchant, phone, network, destination, amount, fee, req, admin: req.admin });
@@ -371,11 +371,32 @@ async function payOutBalance({ merchant, phone, network, destination = 'primary'
     title: 'Balance sent to your phone',
     message: `PayChain sent your remaining balance of KES ${formatKes(amount)} to ${phone}. Ref ${transaction.reference}.`,
   });
+  // Official statement of the clearance, by SMS and email. Closing balance
+  // is read back from the merchant record (newBalance), never assumed to be
+  // zero.
+  const openingBalance = Math.round((merchant.kesBalance || 0) * 100) / 100;
+  const accountNumber = getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode) || merchant.ncbaMerchantCode || null;
+  const statementDate = new Date().toLocaleString('en-KE', { timeZone: 'Africa/Nairobi', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   if (merchant.phone) {
     safeSendSMS({
       to: merchant.phone,
-      message: `PayChain: Your remaining balance of Ksh ${formatKes(amount)} has been sent to ${phone}. Ref ${transaction.reference}. Questions? support@paychain.co.ke`,
+      message: `PayChain Statement (${statementDate}): Balance cleared. Ksh ${formatKes(amount)} sent to ${phone}, fee Ksh ${formatKes(fee)}. Ref ${transaction.reference}.${pending ? ' Awaiting bank confirmation.' : ''} Closing balance: Ksh ${formatKes(newBalance)}. Queries: support@paychain.co.ke`,
     }).catch((err) => console.error('Balance payout SMS failed:', err));
+  }
+  if (merchant.email) {
+    sendBalanceClearanceStatementEmail({
+      to: merchant.email,
+      businessName: merchant.businessName,
+      accountNumber,
+      openingBalance,
+      amount,
+      fee,
+      closingBalance: newBalance,
+      destinationPhone: phone,
+      reference: transaction.reference,
+      status: transaction.status,
+      date: new Date(),
+    });
   }
 
   return { ok: true, transaction, newBalance, pending };
@@ -534,7 +555,7 @@ async function processBatch(batchId, { req, admin }) {
 
     let update;
     try {
-      const merchant = await Merchant.findById(item.merchantId).select('businessName email phone kesBalance payoutHoldUntil');
+      const merchant = await Merchant.findById(item.merchantId).select('businessName email phone kesBalance payoutHoldUntil ncbaMerchantCode');
       if (!merchant) {
         update = { status: 'failed', error: 'Merchant no longer exists.' };
       } else {

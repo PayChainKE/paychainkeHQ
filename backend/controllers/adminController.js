@@ -15,7 +15,11 @@ import Contact from '../models/Contact.js';
 import Communication from '../models/Communication.js';
 import SmsLog from '../models/SmsLog.js';
 import AuditLog from '../models/AuditLog.js';
-import { sendMerchantInvite, sendAdminActionOTP, sendContactDetailsChangedEmail } from '../utils/resend.js';
+import { sendMerchantInvite, sendAdminActionOTP, sendContactDetailsChangedEmail, sendMerchantLifecycleEmail } from '../utils/resend.js';
+import CheckoutPage from '../models/CheckoutPage.js';
+import ApiKey from '../models/ApiKey.js';
+import MerchantLoginDevice from '../models/MerchantLoginDevice.js';
+import { createNotification } from './notificationController.js';
 import { logAudit } from '../utils/auditLog.js';
 import { recordDeletion } from '../utils/trash.js';
 import { applyPayoutHold, activePayoutHold } from '../utils/payoutHold.js';
@@ -59,6 +63,8 @@ const ACTION_LABELS = {
   delete: 'Permanently delete merchant account',
   reset_contact: 'Reset merchant primary email/phone',
   unlock_outbound: 'Unlock outbound transfers / lift payout hold',
+  lock_inbound: 'Block incoming payments to merchant',
+  unlock_inbound: 'Allow incoming payments to merchant again',
 };
 
 // Derive an activity tier from a Date — used to colour-code merchant rows.
@@ -386,7 +392,7 @@ export const requestMerchantAction = async (req, res) => {
       return res.status(400).json({ error: 'Invalid merchant id.' });
     }
 
-    const merchant = await Merchant.findById(id).select('email phone businessName status outboundLocked payoutHoldUntil');
+    const merchant = await Merchant.findById(id).select('email phone businessName status outboundLocked payoutHoldUntil inboundLocked');
     if (!merchant) return res.status(404).json({ error: 'Merchant not found.' });
 
     // No-op guards — also stops admin from racking up OTPs against a no-op.
@@ -395,6 +401,12 @@ export const requestMerchantAction = async (req, res) => {
     }
     if (action === 'unlock' && merchant.status !== 'locked') {
       return res.status(409).json({ error: 'Account is not locked.' });
+    }
+    if (action === 'lock_inbound' && merchant.inboundLocked) {
+      return res.status(409).json({ error: 'Incoming payments are already blocked.' });
+    }
+    if (action === 'unlock_inbound' && !merchant.inboundLocked) {
+      return res.status(409).json({ error: 'Incoming payments are not blocked on this account.' });
     }
     const holdActive = !!activePayoutHold(merchant);
     if (action === 'unlock_outbound' && !merchant.outboundLocked && !holdActive) {
@@ -469,6 +481,46 @@ export const requestMerchantAction = async (req, res) => {
     res.status(500).json({ error: 'Server Error' });
   }
 };
+
+// Tells the merchant (SMS, email, in-app) that admin blocked or restored
+// incoming payments. When blocked, they're told plainly not to collect any
+// payment to their PayChain account, since money sent anyway is held, not
+// credited. Fire-and-forget: a delivery failure never undoes the action.
+function notifyMerchantInboundChange(merchant, blocked) {
+  const name = merchant.businessName || 'your business';
+  const account = getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode) || merchant.ncbaMerchantCode || null;
+  const sms = blocked
+    ? `PayChain: Incoming payments to your account${account ? ` ${account}` : ''} have been suspended. Do NOT ask customers to pay you via PayChain (paybill, payment links, QR, invoices) until further notice. You can still log in and withdraw your balance. Contact support@paychain.co.ke`
+    : `PayChain: Incoming payments to your account${account ? ` ${account}` : ''} have been restored. You can collect payments via PayChain again.`;
+  if (merchant.phone) {
+    safeSendSMS({ to: merchant.phone, message: sms })
+      .catch((err) => console.error('Inbound-lock SMS failed:', err));
+  }
+  if (merchant.email) {
+    const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const paragraphsHtml = blocked
+      ? `<p>Hello ${esc(name)},</p>
+         <p>PayChain has <strong>suspended incoming payments</strong> to your account${account ? ` (<strong>${esc(account)}</strong>)` : ''}, effective immediately.</p>
+         <p><strong>Please do not collect any payment to your PayChain account</strong> until you hear from us. This covers the paybill and account number, payment links, QR codes, checkout pages, invoices and Request Money. Customers who try to pay will be refused, and money sent straight to the paybill will be held and not credited to your wallet.</p>
+         <p>You can still sign in, view your history and withdraw your existing balance.</p>
+         <p>If you think this is a mistake, contact <a href="mailto:support@paychain.co.ke">support@paychain.co.ke</a>.</p>`
+      : `<p>Hello ${esc(name)},</p>
+         <p>Incoming payments to your PayChain account${account ? ` (<strong>${esc(account)}</strong>)` : ''} have been <strong>restored</strong>. You can collect payments through PayChain again.</p>`;
+    sendMerchantLifecycleEmail(merchant.email, {
+      subject: blocked ? 'Important: incoming payments to your PayChain account are suspended' : 'Incoming payments to your PayChain account are restored',
+      heading: blocked ? 'Do not collect payments to your PayChain account' : 'You can receive payments again',
+      paragraphsHtml,
+    }).catch((err) => console.error('Inbound-lock email failed:', err?.message || err));
+  }
+  createNotification({
+    merchantId: merchant._id,
+    kind: 'security',
+    title: blocked ? 'Incoming payments suspended' : 'Incoming payments restored',
+    message: blocked
+      ? 'Do not collect any payment to your PayChain account until further notice. Payments sent anyway are held, not credited.'
+      : 'You can collect payments through PayChain again.',
+  });
+}
 
 // @desc    Confirm a pending sensitive action with the OTP. Executes the
 //          action only if (action, targetId, otpHash, !expired) all match
@@ -618,10 +670,26 @@ export const confirmMerchantAction = async (req, res) => {
         retirements.push({ type: 'ncbaMerchantCode', code: merchant.ncbaMerchantCode, formerMerchantId: merchant._id, formerBusinessName: merchant.businessName || null });
       }
 
+      // Shut everything off for this account: no sign-in, no credentials,
+      // no way to pay it. Sign-in, passkeys and sessions all live on the
+      // Merchant document, so deleting it (below) ends them; bumping
+      // tokenVersion first also kills any JWT in the window before the
+      // delete lands. Hosted checkout pages are switched off and API keys
+      // bound to this merchant revoked (developers' other merchants
+      // untouched). Every collection path also refuses a merchant that no
+      // longer exists (utils/merchantPaymentAcceptance.js), and direct paybill
+      // deposits to the retired account number are held and flagged to
+      // admins (ncbaAccountNotificationController.js).
+      merchant.inboundLocked = true;
+      merchant.tokenVersion = (merchant.tokenVersion || 0) + 1;
+      await merchant.save().catch((err) => console.error('Pre-delete deactivate failed:', err?.message || err));
       await Promise.all([
         STKRequest.deleteMany({ merchantId: merchant._id }),
         Payee.deleteMany({ merchantId: merchant._id }),
         PaymentLink.deleteMany({ merchantId: merchant._id }),
+        CheckoutPage.updateMany({ merchantId: merchant._id }, { $set: { active: false } }),
+        ApiKey.updateMany({ merchantId: merchant._id, status: 'active' }, { $set: { status: 'revoked', revokedAt: new Date() } }),
+        MerchantLoginDevice.deleteMany({ merchantId: merchant._id }),
         retirements.length
           ? RetiredMerchantCode.insertMany(retirements, { ordered: false }).catch((err) => {
               // A duplicate-key here just means this code was already
@@ -639,6 +707,31 @@ export const confirmMerchantAction = async (req, res) => {
       // above this block).
       await recordDeletion({ collectionName: 'Merchant', doc: merchant, label: merchant.businessName || merchant.email, deletedBy: admin._id });
       await Merchant.deleteOne({ _id: merchant._id });
+    } else if (action === 'lock_inbound') {
+      // Payments-only block: no tokenVersion bump, the merchant stays signed
+      // in. Enforced by utils/merchantPaymentAcceptance.js at every
+      // collection path.
+      merchant.inboundLocked = true;
+      merchant.inboundLockedAt = new Date();
+      merchant.inboundLockedBy = admin._id;
+      await merchant.save();
+      logAudit({
+        action: 'admin.merchant.inbound_locked', category: 'admin', severity: 'critical',
+        message: 'Incoming payments blocked by admin (OTP-verified)',
+        merchant, actor: adminActor(admin), req,
+      });
+      notifyMerchantInboundChange(merchant, true);
+    } else if (action === 'unlock_inbound') {
+      merchant.inboundLocked = false;
+      merchant.inboundLockedAt = null;
+      merchant.inboundLockedBy = null;
+      await merchant.save();
+      logAudit({
+        action: 'admin.merchant.inbound_unlocked', category: 'admin', severity: 'success',
+        message: 'Incoming payments allowed again by admin (OTP-verified)',
+        merchant, actor: adminActor(admin), req,
+      });
+      notifyMerchantInboundChange(merchant, false);
     } else if (action === 'unlock_outbound') {
       const liftedHold = merchant.payoutHoldUntil ? { until: merchant.payoutHoldUntil, reason: merchant.payoutHoldReason } : null;
       merchant.payoutHoldUntil = null;
@@ -672,7 +765,11 @@ export const confirmMerchantAction = async (req, res) => {
             ? 'Primary email/phone updated. The merchant has been signed out everywhere.'
             : action === 'unlock_outbound'
               ? 'Payouts unlocked.'
-              : 'Merchant account unlocked.',
+              : action === 'lock_inbound'
+                ? 'Incoming payments blocked.'
+                : action === 'unlock_inbound'
+                  ? 'Incoming payments allowed again.'
+                  : 'Merchant account unlocked.',
       data: action === 'reset_contact' ? { email: merchant.email, phone: merchant.phone } : undefined,
     });
   } catch (error) {
@@ -1773,6 +1870,7 @@ export const getMerchantDetail = async (req, res) => {
     let merchant = await Merchant.findById(id)
       .select('+password +appPin +stellarEncryptedSecretKey +passwordResetExpires')
       .populate('lockedBy', 'email')
+      .populate('inboundLockedBy', 'email')
       .populate('invitedBy', 'email')
       .populate('flaggedBy', 'email')
       .populate('onboardingOfficerId', 'name email')
@@ -1932,6 +2030,9 @@ export const getMerchantDetail = async (req, res) => {
         invitedBy: merchant.invitedBy ? { email: merchant.invitedBy.email } : null,
         lockedAt: merchant.lockedAt,
         lockedBy: merchant.lockedBy ? { email: merchant.lockedBy.email } : null,
+        inboundLocked: !!merchant.inboundLocked,
+        inboundLockedAt: merchant.inboundLockedAt || null,
+        inboundLockedBy: merchant.inboundLockedBy ? { email: merchant.inboundLockedBy.email } : null,
         // Flag / risk
         flagged: !!merchant.flagged,
         flagReason: merchant.flagReason,

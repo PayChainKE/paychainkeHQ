@@ -23,6 +23,7 @@ const ALERT_TYPE_META = {
   ncba_openbanking_down:      { label: 'NCBA Open Banking Down',      icon: 'cloud_off' },
   ncba_openbanking_recovered: { label: 'NCBA Open Banking Recovered', icon: 'cloud_done' },
   ncba_unattributed_credit:  { label: 'Unattributed NCBA Credit',    icon: 'help' },
+  ncba_blocked_merchant_credit: { label: 'Payment Held (Merchant Blocked)', icon: 'block' },
 };
 
 const SEVERITY_TONE = {
@@ -43,6 +44,7 @@ const TYPE_OPTIONS = [
   { v: 'ncba_openbanking_down',      l: 'NCBA Open Banking Down' },
   { v: 'ncba_openbanking_recovered', l: 'NCBA Open Banking Recovered' },
   { v: 'ncba_unattributed_credit',   l: 'Unattributed NCBA Credit' },
+  { v: 'ncba_blocked_merchant_credit', l: 'Payment Held (Merchant Blocked)' },
 ];
 
 const SEVERITY_OPTIONS = [

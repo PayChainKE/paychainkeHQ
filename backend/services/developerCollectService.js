@@ -1,5 +1,7 @@
 import DeveloperPayment from '../models/DeveloperPayment.js';
 import STKRequest from '../models/STKRequest.js';
+import Merchant from '../models/Merchant.js';
+import { canReceivePayments, PAYMENT_ACCEPTANCE_FIELDS, MERCHANT_CANNOT_RECEIVE_MESSAGE } from '../utils/merchantPaymentAcceptance.js';
 import { initiateAndTrackNcbaStk } from '../controllers/mpesaController.js';
 import { validatePhoneNumber, NcbaValidationError } from '../utils/ncbaValidators.js';
 import { getCheckoutTotal } from '../utils/pricingEngine.js';
@@ -76,6 +78,16 @@ export async function initiateCollectPayment({ developerId, apiKeyId, merchantId
 
   if (mode === 'live' && !merchantId) {
     throw new CollectValidationError('A live collection needs a linked merchant account.', 'NO_LINKED_MERCHANT');
+  }
+
+  // A locked / incoming-blocked merchant must not receive payments, API included.
+  // initiateAndTrackNcbaStk would refuse it anyway; checking here first
+  // avoids burning the idempotency key and leaving a failed payment row.
+  if (mode === 'live') {
+    const merchant = await Merchant.findById(merchantId).select(PAYMENT_ACCEPTANCE_FIELDS).lean();
+    if (!canReceivePayments(merchant)) {
+      throw new CollectValidationError(MERCHANT_CANNOT_RECEIVE_MESSAGE, 'MERCHANT_LOCKED');
+    }
   }
 
   await claimClientIdempotencyKey(developerId, idempotencyKey);

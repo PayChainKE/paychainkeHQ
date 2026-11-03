@@ -6,6 +6,8 @@ import STKRequest from '../models/STKRequest.js';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { initiateAndTrackNcbaStk } from './mpesaController.js';
+import { MerchantLockedError } from '../services/stkSendFailureService.js';
+import { canReceivePayments, PAYMENT_ACCEPTANCE_FIELDS, MERCHANT_CANNOT_RECEIVE_MESSAGE } from '../utils/merchantPaymentAcceptance.js';
 import { settleInflationShield, provisionMerchantWallet, getWalletBalance, swapUsdcToKesOnChain } from '../utils/stellarHelper.js';
 import { encryptKey } from '../utils/cryptoHelper.js';
 import { getLiveKesToUsdcRate } from '../utils/rateEngine.js';
@@ -768,10 +770,18 @@ export const listPaymentLinks = async (req, res) => {
 export const getPaymentLink = async (req, res) => {
   try {
     const { linkId } = req.params;
-    const link = await PaymentLink.findOne({ linkId }).populate('merchantId', 'businessName ncbaMerchantCode');
+    const link = await PaymentLink.findOne({ linkId }).populate('merchantId', `businessName ncbaMerchantCode ${PAYMENT_ACCEPTANCE_FIELDS}`);
 
     if (!link) {
       return res.status(404).json({ error: 'Payment link not found or has expired.' });
+    }
+
+    // A locked merchant must not receive payments from anyone — see
+    // initiateAndTrackNcbaStk (mpesaController.js), the real enforcement
+    // point. Checked here too so the customer is told up front instead of
+    // after typing their number.
+    if (!canReceivePayments(link.merchantId)) {
+      return res.status(403).json({ error: MERCHANT_CANNOT_RECEIVE_MESSAGE, code: 'MERCHANT_LOCKED' });
     }
 
     if (link.status !== 'active') {
@@ -820,6 +830,9 @@ export const processPaymentLink = async (req, res) => {
     if (!link || link.status !== 'active') {
       return res.status(400).json({ error: 'Payment link is invalid or expired.' });
     }
+    if (!canReceivePayments(link.merchantId)) {
+      return res.status(403).json({ error: MERCHANT_CANNOT_RECEIVE_MESSAGE, code: 'MERCHANT_LOCKED' });
+    }
 
     // Public route — validate strictly rather than best-effort normalise,
     // since anyone on the internet can hit this (rate-limited, but not
@@ -865,6 +878,9 @@ export const processPaymentLink = async (req, res) => {
     res.status(200).json({ success: true, checkoutRequestId, message: 'STK Push sent to phone' });
 
   } catch (error) {
+    if (error instanceof MerchantLockedError) {
+      return res.status(403).json({ error: MERCHANT_CANNOT_RECEIVE_MESSAGE, code: 'MERCHANT_LOCKED' });
+    }
     console.error('❌ Payment Link Processing Error:', error.response?.data || error.message);
     res.status(400).json({ error: 'Failed to trigger payment on your phone.' });
   }
@@ -1103,9 +1119,12 @@ export const deleteCheckoutPage = async (req, res) => {
 // @access  Public
 export const getCheckoutPagePublic = async (req, res) => {
   try {
-    const page = await CheckoutPage.findOne({ pageId: req.params.pageId }).populate('merchantId', 'businessName');
+    const page = await CheckoutPage.findOne({ pageId: req.params.pageId }).populate('merchantId', `businessName ${PAYMENT_ACCEPTANCE_FIELDS}`);
     if (!page || !page.active) {
       return res.status(404).json({ error: 'This checkout page is not available.' });
+    }
+    if (!canReceivePayments(page.merchantId)) {
+      return res.status(403).json({ error: MERCHANT_CANNOT_RECEIVE_MESSAGE, code: 'MERCHANT_LOCKED' });
     }
     const sold = await getSoldQuantities(page.pageId);
     res.json({
@@ -1142,6 +1161,12 @@ export const checkoutPageCheckout = async (req, res) => {
     const page = await CheckoutPage.findOne({ pageId: req.params.pageId });
     if (!page || !page.active) {
       return res.status(404).json({ error: 'This checkout page is not available.' });
+    }
+    // Don't mint a cart PaymentLink for a locked merchant at all — the pay
+    // step would refuse it anyway (initiateAndTrackNcbaStk).
+    const pageMerchant = await Merchant.findById(page.merchantId).select(PAYMENT_ACCEPTANCE_FIELDS).lean();
+    if (!canReceivePayments(pageMerchant)) {
+      return res.status(403).json({ error: MERCHANT_CANNOT_RECEIVE_MESSAGE, code: 'MERCHANT_LOCKED' });
     }
 
     const cartLines = Array.isArray(req.body?.items) ? req.body.items : [];
@@ -1232,7 +1257,7 @@ export const checkoutPageCheckout = async (req, res) => {
 export const getMerchantByAccount = async (req, res) => {
   try {
     const merchant = await findMerchantByAccountNumber(req.params.account);
-    if (!merchant || merchant.status === 'locked') {
+    if (!merchant || !canReceivePayments(merchant)) {
       return res.status(404).json({ error: 'Account not found.' });
     }
     res.json({
@@ -1287,7 +1312,7 @@ export const getCheckoutPreview = (req, res) => {
 export const payToMerchantAccount = async (req, res) => {
   try {
     const merchant = await findMerchantByAccountNumber(req.params.account);
-    if (!merchant || merchant.status === 'locked') {
+    if (!merchant || !canReceivePayments(merchant)) {
       return res.status(404).json({ error: 'Account not found.' });
     }
 
@@ -1320,6 +1345,9 @@ export const payToMerchantAccount = async (req, res) => {
     res.status(200).json({ success: true, checkoutRequestId, message: 'STK Push sent to phone' });
 
   } catch (error) {
+    if (error instanceof MerchantLockedError) {
+      return res.status(403).json({ error: MERCHANT_CANNOT_RECEIVE_MESSAGE, code: 'MERCHANT_LOCKED' });
+    }
     console.error('❌ Direct Account Payment Error:', error.response?.data || error.message);
     res.status(400).json({ error: 'Failed to trigger payment on your phone.' });
   }
