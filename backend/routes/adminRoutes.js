@@ -95,6 +95,7 @@ import { sendSmsBroadcast, getSmsBroadcasts, deleteSmsBroadcast, clearSmsBroadca
 import { sendEmailBroadcast, getEmailBroadcasts, deleteEmailBroadcast, clearEmailBroadcasts } from '../controllers/emailBroadcastController.js';
 import { getDormantMerchants, sendDormantReminders } from '../controllers/dormantAccountsController.js';
 import { getEmailLogs, getEmailLogDetail, clearEmailLogs } from '../controllers/emailLogController.js';
+import { previewBulkInboundBlock, requestBulkInboundBlock, confirmBulkInboundBlock } from '../controllers/merchantInboundBlockController.js';
 import { getRevenue, getRevenueSweeps, archiveRevenueSweep, unarchiveRevenueSweep, exportRevenueSweeps, triggerRevenueSweep, getReconciliations, submitReconciliation, archiveReconciliation, unarchiveReconciliation, bulkArchiveReconciliations, getExpectedPoolBalance, getLivePoolBalance, getPoolAccountStatement, getBankCharges, recordBankCharge, updateBankCharge, archiveBankCharge, writeOffRevenueDeficit, getRevenueTransactions } from '../controllers/revenueController.js';
 import { getApiTransactions, getApiTransactionsSummary } from '../controllers/apiTransactionsController.js';
 import { getTariffs, requestTariffUpdate, confirmTariffUpdate, requestMerchantTariffResync, confirmMerchantTariffResync } from '../controllers/tariffController.js';
@@ -210,6 +211,11 @@ router.post('/merchants/balance-payout/bulk/preview', protect, requireMutator, p
 router.post('/merchants/balance-payout/bulk/request', protect, requireMutator, sensitiveActionLimiter, requestBulkBalancePayout);
 router.post('/merchants/balance-payout/bulk/confirm', protect, requireMutator, sensitiveActionLimiter, confirmBulkBalancePayout);
 router.get('/merchants/balance-payout/bulk/:batchId', protect, requireMutator, getBulkBalancePayout);
+// Block / allow incoming payments for many merchants at once (closing
+// operations). One emailed code approves the list; see the controller.
+router.post('/merchants/inbound-block/preview', protect, requireMutator, previewBulkInboundBlock);
+router.post('/merchants/inbound-block/request', protect, requireMutator, sensitiveActionLimiter, requestBulkInboundBlock);
+router.post('/merchants/inbound-block/confirm', protect, requireMutator, sensitiveActionLimiter, confirmBulkInboundBlock);
 router.post('/merchants/:id/flag', protect, requireMutator, sensitiveActionLimiter, flagMerchant);
 router.post('/merchants/:id/unflag', protect, requireMutator, sensitiveActionLimiter, unflagMerchant);
 router.patch('/merchants/:id/features', protect, requireMutator, sensitiveActionLimiter, updateMerchantFeatures);

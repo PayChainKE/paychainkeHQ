@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import mongoose from 'mongoose';
 import Merchant from '../models/Merchant.js';
+import { normalizeInboundBlockReason, DEFAULT_INBOUND_BLOCK_REASON, MAX_INBOUND_BLOCK_REASON } from '../utils/merchantPaymentAcceptance.js';
 import DeletedRecord from '../models/DeletedRecord.js';
 import Admin from '../models/Admin.js';
 import Transaction from '../models/Transaction.js';
@@ -453,6 +454,11 @@ export const requestMerchantAction = async (req, res) => {
       }
       payload = { ...(newEmail ? { email: newEmail } : {}), ...(newPhone ? { phone: newPhone } : {}) };
     }
+    if (action === 'lock_inbound') {
+      const reason = normalizeInboundBlockReason(req.body?.reason);
+      if (!reason) return res.status(400).json({ error: `Keep the reason under ${MAX_INBOUND_BLOCK_REASON} characters.` });
+      payload = { reason };
+    }
 
     const admin = await Admin.findById(req.admin._id);
     if (!admin) return res.status(401).json({ error: 'Admin session invalid.' });
@@ -481,44 +487,49 @@ export const requestMerchantAction = async (req, res) => {
   }
 };
 
-// Tells the merchant (SMS, email, in-app) that admin blocked or restored
-// incoming payments. When blocked, they're told plainly not to collect any
-// payment to their PayChain account, since money sent anyway is held, not
-// credited. Fire-and-forget: a delivery failure never undoes the action.
-function notifyMerchantInboundChange(merchant, blocked) {
+// Tells the merchant that admin blocked or restored incoming payments, with
+// the reason admin chose. When blocked they're asked not to collect through
+// PayChain, since money sent anyway is held, not credited. Delivery failures
+// never undo the action. Split so a bulk block can pace SMS/email separately.
+export function notifyMerchantInboundInApp(merchant, blocked, reason) {
+  return createNotification({
+    merchantId: merchant._id,
+    kind: 'system',
+    title: blocked ? 'Payment collection temporarily paused' : 'Payment collection resumed',
+    message: blocked
+      ? `Payment collection on your PayChain account is temporarily paused due to ${reason}. Please ask your customers not to pay you through PayChain, including by paybill, until collection resumes: any payment sent in the meantime is held and not added to your balance. You can still sign in, view your history and withdraw your balance. We'll notify you as soon as collection resumes.`
+      : 'Thank you for your patience. Customers can pay you through PayChain again.',
+  });
+}
+
+export function notifyMerchantInboundExternal(merchant, blocked, reason) {
   const name = merchant.businessName || 'your business';
   const account = getNcbaVirtualAccountNumber(merchant.ncbaMerchantCode) || merchant.ncbaMerchantCode || null;
-  const sms = blocked
-    ? `PayChain: Incoming payments to your account${account ? ` ${account}` : ''} have been suspended. Do NOT ask customers to pay you via PayChain (paybill, payment links, QR, invoices) until further notice. You can still log in and withdraw your balance. Contact support@paychain.co.ke`
-    : `PayChain: Incoming payments to your account${account ? ` ${account}` : ''} have been restored. You can collect payments via PayChain again.`;
+  const sends = [];
   if (merchant.phone) {
-    safeSendSMS({ to: merchant.phone, message: sms })
-      .catch((err) => console.error('Inbound-lock SMS failed:', err));
+    const sms = blocked
+      ? `PayChain: Payment collection on your account${account ? ` ${account}` : ''} is temporarily paused due to ${reason}. Please do not ask customers to pay you via PayChain until we confirm it has resumed. You can still log in and withdraw your balance. Support: support@paychain.co.ke`
+      : `PayChain: Payment collection on your account${account ? ` ${account}` : ''} has resumed. You can collect payments via PayChain again.`;
+    sends.push(safeSendSMS({ to: merchant.phone, message: sms })
+      .catch((err) => console.error('Inbound-lock SMS failed:', err)));
   }
   if (merchant.email) {
     const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const paragraphsHtml = blocked
       ? `<p>Hello ${esc(name)},</p>
-         <p>PayChain has <strong>suspended incoming payments</strong> to your account${account ? ` (<strong>${esc(account)}</strong>)` : ''}, effective immediately.</p>
-         <p><strong>Please do not collect any payment to your PayChain account</strong> until you hear from us. This covers the paybill and account number, payment links, QR codes, checkout pages, invoices and Request Money. Customers who try to pay will be refused, and money sent straight to the paybill will be held and not credited to your wallet.</p>
-         <p>You can still sign in, view your history and withdraw your existing balance.</p>
-         <p>If you think this is a mistake, contact <a href="mailto:support@paychain.co.ke">support@paychain.co.ke</a>.</p>`
+         <p>Payment collection on your PayChain account${account ? ` (<strong>${esc(account)}</strong>)` : ''} is <strong>temporarily paused</strong> due to ${esc(reason)}, effective immediately.</p>
+         <p><strong>Please ask your customers not to pay you through PayChain until collection resumes.</strong> This covers the paybill and account number, payment links, QR codes, checkout pages, invoices, Request Money and API collections. Any payment sent in the meantime is held and not added to your balance.</p>
+         <p>You can still sign in, view your history and withdraw your existing balance. We'll notify you as soon as collection resumes.</p>
+         <p>If you have any questions, contact <a href="mailto:support@paychain.co.ke">support@paychain.co.ke</a>.</p>`
       : `<p>Hello ${esc(name)},</p>
-         <p>Incoming payments to your PayChain account${account ? ` (<strong>${esc(account)}</strong>)` : ''} have been <strong>restored</strong>. You can collect payments through PayChain again.</p>`;
-    sendMerchantLifecycleEmail(merchant.email, {
-      subject: blocked ? 'Important: incoming payments to your PayChain account are suspended' : 'Incoming payments to your PayChain account are restored',
-      heading: blocked ? 'Do not collect payments to your PayChain account' : 'You can receive payments again',
+         <p>Payment collection on your PayChain account${account ? ` (<strong>${esc(account)}</strong>)` : ''} has <strong>resumed</strong>. You can collect payments through PayChain again. Thank you for your patience.</p>`;
+    sends.push(sendMerchantLifecycleEmail(merchant.email, {
+      subject: blocked ? 'Important: payment collection on your PayChain account is temporarily paused' : 'Payment collection on your PayChain account has resumed',
+      heading: blocked ? 'Payment collection is temporarily paused' : 'You can receive payments again',
       paragraphsHtml,
-    }).catch((err) => console.error('Inbound-lock email failed:', err?.message || err));
+    }).catch((err) => console.error('Inbound-lock email failed:', err?.message || err)));
   }
-  createNotification({
-    merchantId: merchant._id,
-    kind: 'security',
-    title: blocked ? 'Incoming payments suspended' : 'Incoming payments restored',
-    message: blocked
-      ? 'Do not collect any payment to your PayChain account until further notice. Payments sent anyway are held, not credited.'
-      : 'You can collect payments through PayChain again.',
-  });
+  return Promise.all(sends);
 }
 
 // @desc    Confirm a pending sensitive action with the OTP. Executes the
@@ -702,24 +713,29 @@ export const confirmMerchantAction = async (req, res) => {
       merchant.inboundLocked = true;
       merchant.inboundLockedAt = new Date();
       merchant.inboundLockedBy = admin._id;
+      const reason = pa.payload?.reason || DEFAULT_INBOUND_BLOCK_REASON;
+      merchant.inboundLockReason = reason;
       await merchant.save();
       logAudit({
         action: 'admin.merchant.inbound_locked', category: 'admin', severity: 'critical',
-        message: 'Incoming payments blocked by admin (OTP-verified)',
+        message: `Incoming payments blocked by admin (OTP-verified) — reason: ${reason}`,
         merchant, actor: adminActor(admin), req,
       });
-      notifyMerchantInboundChange(merchant, true);
+      notifyMerchantInboundInApp(merchant, true, reason);
+      notifyMerchantInboundExternal(merchant, true, reason);
     } else if (action === 'unlock_inbound') {
       merchant.inboundLocked = false;
       merchant.inboundLockedAt = null;
       merchant.inboundLockedBy = null;
+      merchant.inboundLockReason = null;
       await merchant.save();
       logAudit({
         action: 'admin.merchant.inbound_unlocked', category: 'admin', severity: 'success',
         message: 'Incoming payments allowed again by admin (OTP-verified)',
         merchant, actor: adminActor(admin), req,
       });
-      notifyMerchantInboundChange(merchant, false);
+      notifyMerchantInboundInApp(merchant, false);
+      notifyMerchantInboundExternal(merchant, false);
     } else if (action === 'unlock_outbound') {
       const liftedHold = merchant.payoutHoldUntil ? { until: merchant.payoutHoldUntil, reason: merchant.payoutHoldReason } : null;
       merchant.payoutHoldUntil = null;
@@ -2020,6 +2036,7 @@ export const getMerchantDetail = async (req, res) => {
         lockedBy: merchant.lockedBy ? { email: merchant.lockedBy.email } : null,
         inboundLocked: !!merchant.inboundLocked,
         inboundLockedAt: merchant.inboundLockedAt || null,
+        inboundLockReason: merchant.inboundLockReason || null,
         inboundLockedBy: merchant.inboundLockedBy ? { email: merchant.inboundLockedBy.email } : null,
         // Flag / risk
         flagged: !!merchant.flagged,

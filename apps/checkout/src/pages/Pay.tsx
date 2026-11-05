@@ -4,7 +4,7 @@ import { ShieldCheck, Loader2, CheckCircle2, XCircle, Clock, Smartphone, QrCode 
 import { cn } from "@/lib/cn";
 import { fetchCheckoutSession, payCheckoutSession, fetchCheckoutStatus, CheckoutSession } from "@/lib/api";
 
-type ViewState = "loading" | "not-found" | "form" | "processing" | "success" | "expired";
+type ViewState = "loading" | "not-found" | "unavailable" | "form" | "processing" | "success" | "expired";
 
 const POLL_INTERVAL_MS = 3000;
 const AUTO_REDIRECT_DELAY_MS = 2500;
@@ -19,6 +19,7 @@ export default function Pay() {
   const [session, setSession] = useState<CheckoutSession | null>(null);
   const [phone, setPhone] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
+  const [unavailableMessage, setUnavailableMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [showQr, setShowQr] = useState(false);
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -27,6 +28,11 @@ export default function Pay() {
     let cancelled = false;
     fetchCheckoutSession(sessionId).then(({ ok, data }) => {
       if (cancelled) return;
+      if (data.code === "MERCHANT_LOCKED") {
+        setUnavailableMessage(data.error || null);
+        setView("unavailable");
+        return;
+      }
       if (!ok || !data.session) {
         setView("not-found");
         return;
@@ -122,6 +128,14 @@ export default function Pay() {
               <XCircle className="w-10 h-10 text-red-400 mb-3" />
               <p className="text-[15px] font-bold text-ink mb-1">Link not found</p>
               <p className="text-[13px] text-ink-muted text-center">This checkout link is invalid or no longer exists.</p>
+            </StatePanel>
+          )}
+
+          {view === "unavailable" && (
+            <StatePanel>
+              <XCircle className="w-10 h-10 text-amber-500 mb-3" />
+              <p className="text-[15px] font-bold text-ink mb-1">Payments temporarily unavailable</p>
+              <p className="text-[13px] text-ink-muted text-center">{unavailableMessage}</p>
             </StatePanel>
           )}
 

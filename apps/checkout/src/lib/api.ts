@@ -32,7 +32,7 @@ export interface CheckoutStatus {
   callbackUrl: string | null;
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<{ ok: boolean; status: number; data: T & { error?: string } }> {
+async function request<T>(path: string, init?: RequestInit): Promise<{ ok: boolean; status: number; data: T & { error?: string; code?: string } }> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers: { "Content-Type": "application/json", ...(init?.headers || {}) },

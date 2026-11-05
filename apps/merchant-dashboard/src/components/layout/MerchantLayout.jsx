@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import MerchantSidebar from './MerchantSidebar'
 import MerchantHeader from './MerchantHeader'
 import InstallBanner from '../ui/InstallBanner'
+import CollectionsPausedNotice from '../ui/CollectionsPausedNotice'
 import BiometricOnboardingModal from '../modals/BiometricOnboardingModal'
 import poweredByLogo from '../../assets/poweredby-logo.png'
 
@@ -29,6 +30,7 @@ export default function MerchantLayout({ children, title = 'Overview' }) {
       <div className="flex-1 flex flex-col min-h-screen w-full lg:ml-[240px] transition-all pt-[64px] lg:pt-[56px]">
         <MerchantHeader title={title} onMenuClick={toggleSidebar} />
         <main className="flex-1 px-4 lg:px-8 pt-4 pb-12 max-w-[1400px] w-full mx-auto space-y-6 lg:space-y-10">
+          <CollectionsPausedNotice />
           {children}
         </main>
         

@@ -497,6 +497,7 @@ export const getPublicInvoice = async (req, res) => {
         total,
         status: invoice.status,
         payLinkId: merchantLocked ? null : (invoice.paymentLinkId?.linkId || null),
+        paymentsUnavailable: merchantLocked,
         paymentLinkStatus: invoice.paymentLinkId?.status || null,
         qrCodeDataUri: await generateQrDataUri(shareUrl),
         // Every invoice — eTIMS-fiscalized or not — should identify who's

@@ -29,7 +29,7 @@ import { validatePhoneNumber, NcbaValidationError, getNcbaVirtualAccountNumber }
 import { isLipaNaMpesaBetaMerchant, LIPA_NA_MPESA_NOT_AVAILABLE_MESSAGE } from '../config/lipaNaMpesaBetaAllowlist.js';
 import { generateBrandedQrDataUri } from '../utils/qrCode.js';
 import DeveloperPayment from '../models/DeveloperPayment.js';
-import { canReceivePayments, PAYMENT_ACCEPTANCE_FIELDS, MERCHANT_CANNOT_RECEIVE_MESSAGE } from '../utils/merchantPaymentAcceptance.js';
+import { canReceivePayments, merchantBlockedMessage, PAYMENT_ACCEPTANCE_FIELDS, MERCHANT_CANNOT_RECEIVE_MESSAGE } from '../utils/merchantPaymentAcceptance.js';
 import { StkSetupError, MerchantLockedError, classifyStkSendError, recordStkSendFailure } from '../services/stkSendFailureService.js';
 import { publicDeveloperPayment } from '../utils/developerPaymentView.js';
 import { dispatchDeveloperEvent } from '../services/webhookDeliveryService.js';
@@ -866,7 +866,7 @@ export async function initiateAndTrackNcbaStk({ merchantId, phone, checkoutTotal
   // funnels through here, so this one check stops a locked merchant
   // receiving money however the payment is started. Not recorded as a
   // send failure, because nothing went wrong with the send.
-  if (!canReceivePayments(merchant)) throw new MerchantLockedError();
+  if (!canReceivePayments(merchant)) throw new MerchantLockedError(merchantBlockedMessage(merchant));
   if (!merchant?.ncbaMerchantCode) {
     const setupErr = new StkSetupError('This merchant has no NCBA virtual account assigned yet — cannot process this payment request.');
     await recordStkSendFailure({ merchantId, phone, amount: checkoutTotal, kind: extra.kind || (extra.linkId ? 'payment_link' : null), err: setupErr });
@@ -939,7 +939,7 @@ export async function initiateAndTrackNcbaStk({ merchantId, phone, checkoutTotal
 // NCBA-issued one, purely to satisfy STKRequest's existing unique key.
 export async function generateNcbaQrCheckout({ merchantId, checkoutTotal, extra = {} }) {
   const merchant = await Merchant.findById(merchantId).select(`ncbaMerchantCode ${PAYMENT_ACCEPTANCE_FIELDS}`);
-  if (!canReceivePayments(merchant)) throw new MerchantLockedError();
+  if (!canReceivePayments(merchant)) throw new MerchantLockedError(merchantBlockedMessage(merchant));
   if (!merchant?.ncbaMerchantCode) {
     throw new Error('This merchant has no NCBA virtual account assigned yet — cannot process this payment request.');
   }
@@ -995,7 +995,7 @@ export const generateQrCheckout = async (req, res) => {
     });
   } catch (error) {
     if (error instanceof MerchantLockedError) {
-      return res.status(403).json({ error: 'Incoming payments are blocked on your account. Contact support.', code: 'MERCHANT_LOCKED' });
+      return res.status(403).json({ error: error.merchantMessage, code: 'MERCHANT_LOCKED' });
     }
     console.error('❌ QR Generate Error:', error.message);
     res.status(502).json({ error: 'Failed to generate QR code — please try again.' });

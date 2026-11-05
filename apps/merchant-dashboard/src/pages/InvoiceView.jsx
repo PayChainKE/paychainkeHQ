@@ -283,6 +283,15 @@ export default function InvoiceView() {
           </div>
         )}
 
+        {!isPaid && !justPaid && invoice.paymentsUnavailable && (
+          <div className="p-8 md:p-10">
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <p className="font-bold">Payments temporarily unavailable</p>
+              <p className="mt-0.5">This invoice can't be paid through PayChain right now. Please do not send money to this merchant through PayChain, including by paybill, until the service resumes.</p>
+            </div>
+          </div>
+        )}
+
         {/* Pay */}
         {!isPaid && !justPaid && invoice.payLinkId && (
           <div className="p-8 md:p-10">

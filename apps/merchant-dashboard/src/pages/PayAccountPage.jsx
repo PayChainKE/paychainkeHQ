@@ -15,6 +15,7 @@ export default function PayAccountPage() {
   const [merchantDetails, setMerchantDetails] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [unavailable, setUnavailable] = useState(false);
   const [paymentError, setPaymentError] = useState('');
 
   const [amount, setAmount] = useState('');
@@ -66,6 +67,7 @@ export default function PayAccountPage() {
         }
       } catch (err) {
         setError(err.response?.data?.error || 'Account not found.');
+        setUnavailable(err.response?.data?.code === 'MERCHANT_LOCKED');
       } finally {
         setIsLoading(false);
       }
@@ -137,7 +139,7 @@ export default function PayAccountPage() {
           <div className="w-20 h-20 mx-auto bg-error/10 rounded-full flex items-center justify-center text-error mb-6">
             <span className="material-symbols-outlined text-4xl">error</span>
           </div>
-          <h2 className="font-headline text-2xl text-on-surface tracking-tight mb-2">Oops! Account not found</h2>
+          <h2 className="font-headline text-2xl text-on-surface tracking-tight mb-2">{unavailable ? 'Payments temporarily unavailable' : 'Oops! Account not found'}</h2>
           <p className="text-on-surface-variant font-medium mb-8">{error}</p>
           <Link to="/" className="inline-block px-6 py-3 bg-primary text-white font-bold rounded-xl shadow-lg hover:shadow-xl hover:bg-primary/90 transition-all">
             Return to Home

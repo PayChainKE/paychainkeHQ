@@ -10,6 +10,8 @@ import EditableField from '../components/modals/EditableField'
 import UploadableDocRow from '../components/modals/UploadableDocRow'
 import ResetContactModal from '../components/modals/ResetContactModal';
 import SendBalanceModal from '../components/modals/SendBalanceModal';
+import BulkInboundBlockModal from '../components/modals/BulkInboundBlockModal';
+import InboundBlockReasonPicker, { DEFAULT_REASON } from '../components/modals/InboundBlockReasonPicker';
 import PoolCreditModal from '../components/modals/PoolCreditModal';
 import { useAuth } from '../context/AuthContext';
 import openDocument from '../utils/openDocument';
@@ -57,6 +59,7 @@ const defaultFilters = {
   source: 'all',       // all | web | mobile
   kra: 'all',          // all | verified | missing
   flag: 'all',         // all | flagged | risk (any risk signal) | clean
+  payments: 'all',     // all | blocked | open (incoming payments)
 };
 
 // Severity → colour for risk-signal chips.
@@ -156,6 +159,8 @@ const Merchants = () => {
   const [filters, setFilters] = useState(defaultFilters);
   const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(1);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [bulkInbound, setBulkInbound] = useState(null); // { mode, merchantIds }
   const filtersRef = useRef(null);
 
   // Phone normalizer: strip non-digits + drop common KE prefixes so 0790…,
@@ -213,6 +218,9 @@ const Merchants = () => {
       if (filters.flag === 'flagged' && !m.flagged) return false;
       if (filters.flag === 'risk' && !(m.riskSignals && m.riskSignals.length > 0)) return false;
       if (filters.flag === 'clean' && (m.flagged || (m.riskSignals && m.riskSignals.length > 0))) return false;
+      // Incoming payments
+      if (filters.payments === 'blocked' && !m.inboundLocked) return false;
+      if (filters.payments === 'open' && m.inboundLocked) return false;
       return true;
     });
   }, [merchantsData, search, filters]);
@@ -224,6 +232,32 @@ const Merchants = () => {
     const start = (page - 1) * PAGE_SIZE;
     return filteredMerchants.slice(start, start + PAGE_SIZE);
   }, [filteredMerchants, page]);
+
+  // Deleted merchants can't be selected: there's no live account to change.
+  const selectable = useMemo(() => filteredMerchants.filter((m) => !m.isDeleted), [filteredMerchants]);
+  const selectablePage = useMemo(() => pagedMerchants.filter((m) => !m.isDeleted), [pagedMerchants]);
+  const pageAllSelected = selectablePage.length > 0 && selectablePage.every((m) => selectedIds.has(m._id));
+  const allMatchingSelected = selectable.length > 0 && selectable.every((m) => selectedIds.has(m._id));
+
+  function toggleSelected(id) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+  function togglePageSelected() {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      selectablePage.forEach((m) => { if (pageAllSelected) next.delete(m._id); else next.add(m._id); });
+      return next;
+    });
+  }
+  const blockedMerchants = useMemo(() => merchantsData.filter((m) => m.inboundLocked && !m.isDeleted), [merchantsData]);
+  const allBlockedSelected = blockedMerchants.length > 0 && selectedIds.size === blockedMerchants.length && blockedMerchants.every((m) => selectedIds.has(m._id));
+  function selectAllBlocked() { setSelectedIds(new Set(blockedMerchants.map((m) => m._id))); }
+  function selectAllMatching() { setSelectedIds(new Set(selectable.map((m) => m._id))); }
+  function clearSelection() { setSelectedIds(new Set()); }
 
   function clearFilters() { setFilters(defaultFilters); setSearch(''); }
 
@@ -329,7 +363,7 @@ const Merchants = () => {
   // ── Sensitive actions ───────────────────────────────────────────────
   function startAction(merchant, action) {
     setOpenMenuId(null);
-    setActionState({ merchant, action, stage: 'confirm', otp: '', error: '', busy: false });
+    setActionState({ merchant, action, stage: 'confirm', otp: '', reason: DEFAULT_REASON, error: '', busy: false });
   }
 
   async function requestActionOtp() {
@@ -338,6 +372,7 @@ const Merchants = () => {
     try {
       const res = await api.post(`/api/admin/merchants/${actionState.merchant._id}/request-action`, {
         action: actionState.action,
+        ...(actionState.action === 'lock_inbound' ? { reason: actionState.reason } : {}),
       });
       if (res.data?.success) {
         setActionState((s) => ({ ...s, stage: 'otp', busy: false }));
@@ -642,9 +677,16 @@ const Merchants = () => {
         </div>
 
         {/* Stats Strip */}
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-3 md:gap-4">
           <StatCard label="Active" value={merchantStats.active} icon="bolt" tone="emerald" />
           <StatCard label="Locked" value={merchantStats.locked} icon="lock" tone="amber" />
+          <StatCard
+            label="Payments Blocked"
+            value={blockedMerchants.length}
+            icon="block"
+            tone="red"
+            onClick={() => { setFilters((f) => ({ ...f, status: 'all', payments: 'blocked' })); setShowFilters(false); }}
+          />
           <StatCard label="Flagged" value={merchantStats.flagged} icon="flag" tone="red" />
           <StatCard label="Dormant" value={merchantStats.dormant} icon="schedule" tone="gray" />
           <StatCard
@@ -757,10 +799,65 @@ const Merchants = () => {
               )}
             </div>
           )}
+          {filters.payments !== 'all' && (
+            <div className="px-4 md:px-6 py-2 border-b border-outline-variant/10 bg-surface-container-low/30 flex flex-wrap items-center gap-2">
+              <Chip onClear={() => setFilters((f) => ({ ...f, payments: 'all' }))}>{filters.payments === 'blocked' ? 'Payments blocked' : 'Accepting payments'}</Chip>
+            </div>
+          )}
+          {blockedMerchants.length > 0 && !allBlockedSelected && (
+            <div className="px-4 md:px-6 py-2 border-b border-outline-variant/10 bg-amber-50/60 flex flex-wrap items-center gap-x-3 gap-y-1">
+              <p className="text-[12px] font-semibold text-amber-900">{blockedMerchants.length} merchant{blockedMerchants.length === 1 ? ' has' : 's have'} incoming payments blocked</p>
+              <button onClick={selectAllBlocked} className="text-[12px] font-bold text-amber-800 underline hover:text-amber-950">Select all blocked</button>
+            </div>
+          )}
+          {selectedIds.size > 0 && (
+            <div className="px-4 md:px-6 py-3 border-b border-outline-variant/10 bg-primary/5 flex flex-wrap items-center gap-x-4 gap-y-2">
+              <p className="text-[13px] font-bold text-on-surface">{selectedIds.size} selected</p>
+              {!allMatchingSelected && (
+                <button onClick={selectAllMatching} className="text-[12px] font-semibold text-primary hover:underline">
+                  Select all {selectable.length} {activeFilterCount > 0 || search ? 'matching' : ''} merchants
+                </button>
+              )}
+              <button onClick={clearSelection} className="text-[12px] font-semibold text-on-surface-variant hover:underline">Clear</button>
+              <div className="flex flex-wrap gap-2 sm:ml-auto">
+                <button
+                  onClick={() => setBulkInbound({ mode: 'notify', merchantIds: [...selectedIds] })}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-outline-variant/40 text-on-surface text-[12px] font-bold hover:bg-surface-container-low transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[16px]">campaign</span>
+                  SMS &amp; email blocked merchants
+                </button>
+                <button
+                  onClick={() => setBulkInbound({ mode: 'allow', merchantIds: [...selectedIds] })}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-emerald-600/40 text-emerald-800 text-[12px] font-bold hover:bg-emerald-50 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[16px]">payments</span>
+                  Allow incoming payments
+                </button>
+                <button
+                  onClick={() => setBulkInbound({ mode: 'block', merchantIds: [...selectedIds] })}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-600 text-white text-[12px] font-bold hover:bg-amber-700 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[16px]">block</span>
+                  Block incoming payments
+                </button>
+              </div>
+            </div>
+          )}
           <div className="overflow-x-auto custom-scrollbar">
             <table className="w-full text-left border-collapse font-body">
               <thead>
                 <tr className="bg-surface-container-low/50">
+                  <th className="py-3 pl-4 pr-1 border-b border-outline-variant/10 w-8">
+                    <input
+                      type="checkbox"
+                      aria-label="Select every merchant on this page"
+                      checked={pageAllSelected}
+                      disabled={selectablePage.length === 0}
+                      onChange={togglePageSelected}
+                      className="w-4 h-4 accent-emerald-700 cursor-pointer align-middle"
+                    />
+                  </th>
                   <Th>#</Th>
                   <Th>Merchant</Th>
                   <Th>Contact</Th>
@@ -781,6 +878,17 @@ const Merchants = () => {
                   const highSeverity = riskSignals.some((s) => s.severity === 'high');
                   return (
                     <tr key={m._id || i} className={`hover:bg-secondary-container/5 transition-colors group cursor-pointer ${locked ? 'opacity-70' : ''} ${deleted ? 'opacity-50 grayscale-[60%]' : ''} ${flagged ? 'bg-red-50/30' : ''}`} onClick={() => openDetail(m._id)}>
+                      <td className="py-2 pl-4 pr-1 border-b border-outline-variant/5" onClick={(e) => e.stopPropagation()}>
+                        {!deleted && (
+                          <input
+                            type="checkbox"
+                            aria-label={`Select ${m.businessName || m.email || 'merchant'}`}
+                            checked={selectedIds.has(m._id)}
+                            onChange={() => toggleSelected(m._id)}
+                            className="w-4 h-4 accent-emerald-700 cursor-pointer align-middle"
+                          />
+                        )}
+                      </td>
                       <td className="py-2 px-3 text-on-surface-variant/40 border-b border-outline-variant/5 text-[11px] tabular-nums">{String((page - 1) * PAGE_SIZE + i + 1).padStart(2, '0')}</td>
                       <td className="py-2 px-3 border-b border-outline-variant/5">
                         <div className="flex items-center gap-2.5">
@@ -852,7 +960,7 @@ const Merchants = () => {
                             {m.isVerified ? 'Verified' : 'Unverified'}
                           </span>
                         )}
-                        {!deleted && !locked && m.inboundLocked && (
+                        {!deleted && m.inboundLocked && (
                           <span className="ml-1 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border tracking-tight uppercase bg-red-50 text-red-700 border-red-200">
                             <span className="material-symbols-outlined text-[12px]">block</span> Payments blocked
                           </span>
@@ -911,7 +1019,7 @@ const Merchants = () => {
                 })}
                 {filteredMerchants.length === 0 && (
                   <tr>
-                    <td colSpan="8" className="py-10 text-center text-on-surface-variant/40">
+                    <td colSpan="9" className="py-10 text-center text-on-surface-variant/40">
                       {merchantsData.length === 0
                         ? 'No merchants found.'
                         : (
@@ -1019,9 +1127,19 @@ const Merchants = () => {
       )}
 
       {/* Sensitive Action Modal (confirm → OTP → done) */}
+      {bulkInbound && (
+        <BulkInboundBlockModal
+          mode={bulkInbound.mode}
+          merchantIds={bulkInbound.merchantIds}
+          onClose={() => setBulkInbound(null)}
+          onDone={() => { clearSelection(); fetchMerchants(); }}
+        />
+      )}
+
       {actionState && (
         <ActionModal
           state={actionState}
+          onReasonChange={(v) => setActionState((s) => ({ ...s, reason: v }))}
           onClose={closeAction}
           onConfirm={requestActionOtp}
           onSubmitOtp={confirmActionOtp}
@@ -1104,7 +1222,7 @@ const MenuItem = ({ icon, tone, onClick, children }) => {
   );
 };
 
-const ActionModal = ({ state, onClose, onConfirm, onSubmitOtp, onOtpChange }) => {
+const ActionModal = ({ state, onClose, onConfirm, onSubmitOtp, onOtpChange, onReasonChange }) => {
   const meta = ACTION_META[state.action];
   const toneRing = {
     amber:   'bg-amber-50 text-amber-600',
@@ -1132,6 +1250,7 @@ const ActionModal = ({ state, onClose, onConfirm, onSubmitOtp, onOtpChange }) =>
             <div className={`text-[13px] px-3 py-2.5 rounded-lg mb-5 ${meta.tone === 'red' ? 'bg-red-50 text-red-800 border border-red-100' : 'bg-amber-50 text-amber-800 border border-amber-100'}`}>
               {meta.copy}
             </div>
+            {state.action === 'lock_inbound' && <InboundBlockReasonPicker value={state.reason} onChange={onReasonChange} />}
             <p className="text-[12px] text-on-surface-variant/70 mb-5">For security, a 6-digit verification code will be sent to your admin email to confirm this action.</p>
             {state.error && <div className="text-[13px] text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-medium mb-3">{state.error}</div>}
             <div className="flex gap-3">
@@ -1273,6 +1392,9 @@ const FILTER_GROUPS = [
   ]},
   { key: 'kra',          label: 'KRA PIN', opts: [
     { v: 'all', l: 'All' }, { v: 'verified', l: 'KRA Verified' }, { v: 'missing', l: 'Not Verified' },
+  ]},
+  { key: 'payments',     label: 'Incoming Payments', opts: [
+    { v: 'all', l: 'All' }, { v: 'blocked', l: 'Blocked' }, { v: 'open', l: 'Accepting' },
   ]},
   { key: 'flag',         label: 'Flag / Risk', opts: [
     { v: 'all', l: 'All' }, { v: 'flagged', l: 'Manually flagged' }, { v: 'risk', l: 'Has risk signals' }, { v: 'clean', l: 'Clean' },
@@ -2263,6 +2385,7 @@ const KybDrawer = ({ merchant, loading, error, onClose, onBusinessNameUpdated })
                 <>
                   <Row label="Payments Blocked At" value={fmtDate(m.inboundLockedAt)} />
                   {m.inboundLockedBy?.email && <Row label="Payments Blocked By" value={m.inboundLockedBy.email} />}
+                  {m.inboundLockReason && <Row label="Reason Shown To Merchant" value={m.inboundLockReason} />}
                 </>
               )}
             </Section>
