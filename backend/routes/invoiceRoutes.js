@@ -1,3 +1,4 @@
+import { requireCollectionsOpen } from '../middleware/collectionGuard.js';
 import express from 'express';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import {
@@ -34,9 +35,9 @@ router.get('/public/:publicToken', getPublicInvoice);
 
 router.get('/next-number', protectMerchant, peekNextInvoiceNumber);
 router.get('/', protectMerchant, listInvoices);
-router.post('/', protectMerchant, createInvoice);
+router.post('/', protectMerchant, requireCollectionsOpen, createInvoice);
 router.put('/:id', protectMerchant, updateInvoice);
-router.post('/:id/send', protectMerchant, sendInvoiceLimiter, sendInvoice);
+router.post('/:id/send', protectMerchant, requireCollectionsOpen, sendInvoiceLimiter, sendInvoice);
 router.delete('/:id', protectMerchant, deleteInvoice);
 
 export default router;

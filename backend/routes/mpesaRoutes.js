@@ -1,3 +1,4 @@
+import { requireCollectionsOpen } from '../middleware/collectionGuard.js';
 import express from 'express';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { initiateSTKPush, getSTKStatus, initiateB2C, initiateB2B, generateQrCheckout, generateAccountQr } from '../controllers/mpesaController.js';
@@ -33,17 +34,17 @@ const stkPushLimiter = rateLimit({
 });
 
 // STK Push Routes (Inbound, via NCBA)
-router.post('/stk-push', protectMerchant, stkPushLimiter, initiateSTKPush);
+router.post('/stk-push', protectMerchant, requireCollectionsOpen, stkPushLimiter, initiateSTKPush);
 router.get('/stk-status/:checkoutId', protectMerchant, getSTKStatus);
 
 // Dynamic QR Code collection (Inbound, via NCBA) — same abuse shape as STK
 // (a real NCBA API call an authenticated account could otherwise spam),
 // same limiter.
-router.post('/generate-qr', protectMerchant, stkPushLimiter, generateQrCheckout);
+router.post('/generate-qr', protectMerchant, requireCollectionsOpen, stkPushLimiter, generateQrCheckout);
 // Open-amount "my account" QR (Wallet page, MyAccounts modal) — same
 // abuse shape, lighter limiter since it's just a standing display code a
 // page might regenerate on load rather than a per-checkout action.
-router.get('/account-qr', protectMerchant, stkPushLimiter, generateAccountQr);
+router.get('/account-qr', protectMerchant, requireCollectionsOpen, stkPushLimiter, generateAccountQr);
 
 // B2C Routes (Outbound to a phone number, via NCBA Mobile B2W)
 router.post('/b2c-request', protectMerchant, payoutAccountGuard, pinLimiter, initiateB2C);

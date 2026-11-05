@@ -1,3 +1,4 @@
+import { requireCollectionsOpen } from '../middleware/collectionGuard.js';
 import express from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
@@ -40,13 +41,13 @@ router.post('/activate-wallet', protectMerchant, activateWallet);
 router.post('/sync-wallet', protectMerchant, syncWalletBalance);
 router.post('/send-money', protectMerchant, payoutAccountGuard, pinLimiter, sendMoney);
 router.get('/fee-preview', protectMerchant, getFeePreview);
-router.post('/payment-link', protectMerchant, generatePaymentLink);
+router.post('/payment-link', protectMerchant, requireCollectionsOpen, generatePaymentLink);
 router.get('/payment-link', protectMerchant, listPaymentLinks);
 
 // Checkout Pages — merchant-owned multi-product catalog backing the
 // "storefront" no-code embed. Management routes are merchant-authenticated;
 // the public/checkout routes below (with the other public routes) are not.
-router.post('/checkout-page', protectMerchant, createCheckoutPage);
+router.post('/checkout-page', protectMerchant, requireCollectionsOpen, createCheckoutPage);
 router.get('/checkout-page', protectMerchant, listCheckoutPages);
 router.get('/checkout-page/:pageId', protectMerchant, getCheckoutPageForMerchant);
 router.patch('/checkout-page/:pageId', protectMerchant, updateCheckoutPage);
@@ -123,7 +124,7 @@ router.use('/public-stk-status/:checkoutId', embedCors);
 router.get('/public-stk-status/:checkoutId', pollStatusLimiter, getPublicSTKStatus);
 
 router.post('/statement/email', protectMerchant, emailStatement);
-router.get('/sticker', protectMerchant, downloadSticker);
+router.get('/sticker', protectMerchant, requireCollectionsOpen, downloadSticker);
 
 router.get('/live-rate', protectMerchant, getLiveRate);
 
