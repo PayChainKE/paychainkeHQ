@@ -34,6 +34,7 @@ import { toTitleCase } from '../utils/smsSanitizer.js';
 import NcbaDebitNotificationSample from '../models/NcbaDebitNotificationSample.js';
 import NcbaPhoneExtractionMiss from '../models/NcbaPhoneExtractionMiss.js';
 import NcbaUnattributedCredit from '../models/NcbaUnattributedCredit.js';
+import { holdBlockedMerchantCredit } from '../services/heldCreditService.js';
 import { notifyAdmins, escapeHtml } from '../utils/securityAlerts.js';
 
 const respondOk = (res, detail) => res.status(200).type('application/xml').send(buildNcbaOkResult(detail));
@@ -283,26 +284,12 @@ export const handleNcbaAccountNotification = async (req, res) => {
     }
 
     // Locked account, or admin "Block incoming payments" (see
-    // utils/merchantPaymentAcceptance.js). A customer paying the paybill
-    // straight from M-PESA reaches NCBA before PayChain is asked, so the money
-    // has really landed. It must not reach the merchant's wallet, but it must
-    // not vanish either: park it with the unattributed credits and alert
-    // admins so they can refund the payer or credit it once the block lifts.
+    // utils/merchantPaymentAcceptance.js): held, not credited.
     if (!canReceivePayments(merchant)) {
-      const reason = merchant.status === 'locked' ? 'account locked' : 'incoming payments blocked';
       logEvent('warn', 'ncba_account_notification_merchant_cannot_receive', { transId, merchantId: merchant._id.toString(), status: merchant.status, inboundLocked: !!merchant.inboundLocked });
-      NcbaUnattributedCredit.create({
-        transId, txnType: rawTransType, amount: transAmount,
+      const { reason } = await holdBlockedMerchantCredit({
+        merchant, merchantCode, transId, txnType: rawTransType, amount: transAmount,
         rawAccountNr, rawNarrative, rawCustomerName, rawPhoneNr,
-        resolvedNote: `Held: ${merchant.businessName || merchantCode} (${merchantCode}) — ${reason}`,
-      }).catch((e) => logEvent('error', 'ncba_unattributed_credit_log_failed', { transId, error: e.message }));
-      notifyAdmins({
-        type: 'ncba_blocked_merchant_credit',
-        severity: 'critical',
-        subject: `KES ${transAmount.toLocaleString()} paid to ${merchant.businessName || merchantCode} was held (${reason})`,
-        heading: 'Payment Held — Merchant Cannot Receive',
-        details: `A real KES ${transAmount.toLocaleString()} credit (ref ${escapeHtml(transId)}) landed on PayChain's NCBA account for ${escapeHtml(merchant.businessName || '')} (account ${escapeHtml(merchantCode)}), but this merchant's ${reason}. It was NOT credited to their wallet. Refund the payer, or credit it via the missed-collection tool once the block is lifted.`,
-        metadata: { transId, txnType: rawTransType, amount: transAmount, merchantId: merchant._id.toString(), merchantCode, reason, customerName: rawCustomerName || null },
       });
       return respondFail(res, `Merchant cannot receive payments (${reason})`);
     }

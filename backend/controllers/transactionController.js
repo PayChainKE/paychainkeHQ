@@ -1257,8 +1257,11 @@ export const checkoutPageCheckout = async (req, res) => {
 export const getMerchantByAccount = async (req, res) => {
   try {
     const merchant = await findMerchantByAccountNumber(req.params.account);
-    if (!merchant || !canReceivePayments(merchant)) {
+    if (!merchant) {
       return res.status(404).json({ error: 'Account not found.' });
+    }
+    if (!canReceivePayments(merchant)) {
+      return res.status(403).json({ error: MERCHANT_CANNOT_RECEIVE_MESSAGE, code: 'MERCHANT_LOCKED' });
     }
     res.json({
       success: true,
@@ -1312,8 +1315,11 @@ export const getCheckoutPreview = (req, res) => {
 export const payToMerchantAccount = async (req, res) => {
   try {
     const merchant = await findMerchantByAccountNumber(req.params.account);
-    if (!merchant || !canReceivePayments(merchant)) {
+    if (!merchant) {
       return res.status(404).json({ error: 'Account not found.' });
+    }
+    if (!canReceivePayments(merchant)) {
+      return res.status(403).json({ error: MERCHANT_CANNOT_RECEIVE_MESSAGE, code: 'MERCHANT_LOCKED' });
     }
 
     const amount = Number(req.body.amount);

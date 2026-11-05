@@ -540,6 +540,12 @@ const merchantSchema = new mongoose.Schema({
     ref: 'Admin',
     default: null,
   },
+  // Shown to the merchant in-app and in the SMS/email notice. Completes the
+  // sentence "...temporarily paused due to ___".
+  inboundLockReason: {
+    type: String,
+    default: null,
+  },
   // ── Onboarding-Officer KYC pipeline (unset for self-serve merchants) ──
   // kybStatus has NO default — it must stay genuinely absent on every
   // merchant created by self-serve signup or the admin direct-onboard flow,

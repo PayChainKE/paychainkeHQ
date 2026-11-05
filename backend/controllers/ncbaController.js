@@ -1,5 +1,7 @@
 import bcrypt from 'bcryptjs';
 import Merchant from '../models/Merchant.js';
+import { canReceivePayments } from '../utils/merchantPaymentAcceptance.js';
+import { holdBlockedMerchantCredit, RECONCILIATION_FEED } from '../services/heldCreditService.js';
 import { createNotification } from './notificationController.js';
 import { safeSendSMS, sendStaggeredSms, formatKes } from '../utils/smsSanitizer.js';
 import { buildPaybillPaymentReceiptSms, buildPaymentReceivedSms } from '../utils/paymentSmsTemplates.js';
@@ -78,6 +80,17 @@ export const handleNcbaReconciliationWebhook = async (req, res) => {
     if (!merchant) {
       logEvent('warn', 'ncba_reconciliation_unknown_merchant', { transactionReference, merchantCode });
       return reject(res, transactionReference, 'UNKNOWN_MERCHANT', 'No active merchant matches this Virtual Account');
+    }
+
+    // Blocked or locked: held, not credited. Must match the account
+    // notification feed, or a deposit blocked there is credited here.
+    if (!canReceivePayments(merchant)) {
+      logEvent('warn', 'ncba_reconciliation_merchant_cannot_receive', { transactionReference, merchantId: merchant._id.toString(), status: merchant.status, inboundLocked: !!merchant.inboundLocked });
+      const { reason } = await holdBlockedMerchantCredit({
+        merchant, merchantCode, transId: transactionReference, txnType: RECONCILIATION_FEED, amount: grossAmount,
+        rawPhoneNr: customerPhone,
+      });
+      return reject(res, transactionReference, 'MERCHANT_CANNOT_RECEIVE', `Merchant cannot receive payments (${reason})`);
     }
 
     if (merchant.status !== 'active') {

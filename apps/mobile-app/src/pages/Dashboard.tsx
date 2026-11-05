@@ -448,6 +448,23 @@ export default function Dashboard({ navigation }: any) {
             </View>
           </LinearGradient>
 
+          {/* Reads the live account flag, so it stays while the pause is on and
+              disappears by itself when it's lifted. */}
+          {merchant?.inboundLocked && (
+            <View
+              accessibilityRole="alert"
+              style={{ marginHorizontal: 24, marginTop: 20, padding: 14, borderRadius: 16, borderWidth: 1, borderColor: '#fde68a', backgroundColor: '#fffbeb', flexDirection: 'row', gap: 10 }}
+            >
+              <MaterialIcons name="engineering" size={22} color="#b45309" />
+              <View style={{ flex: 1 }}>
+                <Text className="font-jakarta-bold" style={{ color: '#451a03', fontSize: 14 }}>Payment collection is temporarily paused</Text>
+                <Text className="font-body" style={{ color: '#78350f', fontSize: 12.5, lineHeight: 18, marginTop: 3 }}>
+                  This is due to {merchant.inboundLockReason || 'scheduled system maintenance'}. Please ask your customers not to pay you through PayChain, including by paybill, until collection resumes: any payment sent in the meantime is held and not added to your balance. You can still view your history and withdraw your balance. We'll notify you as soon as collection resumes.
+                </Text>
+              </View>
+            </View>
+          )}
+
           {/* Wallet card — floats over the backdrop at a real e-wallet card
               proportion (ISO card ratio, ~1.586:1) instead of a full-bleed
               banner, with a real drop shadow so it reads as a physical

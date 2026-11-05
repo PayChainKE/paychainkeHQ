@@ -16,10 +16,11 @@ export class StkSetupError extends Error {
 // message stays neutral on purpose: it doesn't tell a payer the account is
 // locked.
 export class MerchantLockedError extends StkSetupError {
-  constructor() {
+  constructor(merchantMessage = 'Incoming payments are blocked on your account. Contact support.') {
     super('This merchant account cannot receive payments (locked or incoming payments blocked by admin).');
     this.name = 'MerchantLockedError';
     this.code = 'MERCHANT_LOCKED';
+    this.merchantMessage = merchantMessage;
   }
 }
 
@@ -40,7 +41,7 @@ export function classifyStkSendError(err) {
   if (err instanceof MerchantLockedError) {
     // Only reached from the merchant's own Request Money (public pages
     // catch MerchantLockedError themselves), so speak to the merchant.
-    return { stage: 'setup', notSent: true, httpStatus: 403, message: 'Incoming payments are blocked on your account. Contact support.' };
+    return { stage: 'setup', notSent: true, httpStatus: 403, message: err.merchantMessage };
   }
   if (err instanceof StkSetupError) {
     return { stage: 'setup', notSent: true, httpStatus: 409, message: 'Your account is not ready to receive M-PESA payments yet. Please contact support.' };
