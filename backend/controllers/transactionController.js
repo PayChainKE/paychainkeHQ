@@ -7,7 +7,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { initiateAndTrackNcbaStk } from './mpesaController.js';
 import { MerchantLockedError } from '../services/stkSendFailureService.js';
-import { canReceivePayments, PAYMENT_ACCEPTANCE_FIELDS, MERCHANT_CANNOT_RECEIVE_MESSAGE } from '../utils/merchantPaymentAcceptance.js';
+import { canReceivePayments, merchantBlockedMessage, PAYMENT_ACCEPTANCE_FIELDS, MERCHANT_CANNOT_RECEIVE_MESSAGE } from '../utils/merchantPaymentAcceptance.js';
 import { settleInflationShield, provisionMerchantWallet, getWalletBalance, swapUsdcToKesOnChain } from '../utils/stellarHelper.js';
 import { encryptKey } from '../utils/cryptoHelper.js';
 import { getLiveKesToUsdcRate } from '../utils/rateEngine.js';
@@ -1073,6 +1073,11 @@ export const updateCheckoutPage = async (req, res) => {
       page.title = title;
     }
     if (req.body?.description !== undefined) page.description = String(req.body.description).trim();
+    // A blocked merchant can tidy a page but not put it back on sale. A page
+    // turned off by a disable comes back when payments are allowed again.
+    if (req.body?.active === true && !page.active && !canReceivePayments(req.merchant)) {
+      return res.status(403).json({ error: merchantBlockedMessage(req.merchant), code: 'COLLECTIONS_PAUSED' });
+    }
     if (req.body?.active !== undefined) page.active = !!req.body.active;
     if (req.body?.collectBuyerName !== undefined) page.collectBuyerName = !!req.body.collectBuyerName;
     if (req.body?.items !== undefined) {

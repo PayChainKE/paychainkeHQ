@@ -142,7 +142,7 @@ export default function CheckoutPages() {
       await axios.patch(`${API_URL}/api/transactions/checkout-page/${page.pageId}`, { active: !page.active }, { headers: authHeaders() })
       setPages((prev) => prev.map((p) => (p.pageId === page.pageId ? { ...p, active: !p.active } : p)))
     } catch (err) {
-      addNotification({ title: 'Update Failed', message: 'Could not change page status.', type: 'error' })
+      addNotification({ title: 'Update Failed', message: err.response?.data?.error || 'Could not change page status.', type: 'error' })
     }
   }
 

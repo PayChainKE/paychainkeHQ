@@ -1,3 +1,5 @@
+import { canReceivePayments, PAYMENT_ACCEPTANCE_FIELDS, MERCHANT_CANNOT_RECEIVE_MESSAGE } from '../utils/merchantPaymentAcceptance.js';
+import Merchant from '../models/Merchant.js';
 import { resolveKeyMerchantId, keyScope } from '../utils/developerMerchants.js';
 import CheckoutSession from '../models/CheckoutSession.js';
 import { syncCheckoutSessionStatus } from '../services/checkoutSessionService.js';
@@ -54,6 +56,14 @@ export const createCheckoutSession = async (req, res) => {
     const merchantId = resolveKeyMerchantId(req.apiKey, developer);
     if (!merchantId && req.apiKey.mode === 'live') {
       return res.status(400).json({ error: 'No merchant account linked. Complete /api/developer/link-merchant first.', code: 'NO_LINKED_MERCHANT' });
+    }
+
+    // Keys with no merchant of their own survive a disable, so check here too.
+    if (req.apiKey.mode === 'live') {
+      const acceptance = await Merchant.findById(merchantId).select(PAYMENT_ACCEPTANCE_FIELDS).lean();
+      if (!canReceivePayments(acceptance)) {
+        return res.status(403).json({ error: MERCHANT_CANNOT_RECEIVE_MESSAGE, code: 'MERCHANT_LOCKED' });
+      }
     }
 
     const { amount, reference, description, callbackUrl, customer, expiresInMinutes } = req.body || {};

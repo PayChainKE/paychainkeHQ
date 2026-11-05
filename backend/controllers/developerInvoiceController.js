@@ -1,5 +1,6 @@
 import { resolveKeyMerchantId, keyScope } from '../utils/developerMerchants.js';
 import crypto from 'crypto';
+import { canReceivePayments, PAYMENT_ACCEPTANCE_FIELDS, MERCHANT_CANNOT_RECEIVE_MESSAGE } from '../utils/merchantPaymentAcceptance.js';
 import Invoice from '../models/Invoice.js';
 import PaymentLink from '../models/PaymentLink.js';
 import Merchant from '../models/Merchant.js';
@@ -38,6 +39,12 @@ export const createDeveloperInvoice = async (req, res) => {
     const merchantId = resolveKeyMerchantId(req.apiKey, developer);
     if (!merchantId) {
       return res.status(400).json({ error: 'No merchant account linked. Complete /api/developer/link-merchant first.', code: 'NO_LINKED_MERCHANT' });
+    }
+
+    // Keys with no merchant of their own survive a disable, so check here too.
+    const acceptance = await Merchant.findById(merchantId).select(PAYMENT_ACCEPTANCE_FIELDS).lean();
+    if (!canReceivePayments(acceptance)) {
+      return res.status(403).json({ error: MERCHANT_CANNOT_RECEIVE_MESSAGE, code: 'MERCHANT_LOCKED' });
     }
 
     const { customer, items, issueDate, dueDate, notes } = req.body || {};
@@ -87,6 +94,11 @@ export const sendDeveloperInvoice = async (req, res) => {
     const merchantId = resolveKeyMerchantId(req.apiKey, developer);
     if (!merchantId) {
       return res.status(400).json({ error: 'No merchant account linked. Complete /api/developer/link-merchant first.', code: 'NO_LINKED_MERCHANT' });
+    }
+
+    const acceptance = await Merchant.findById(merchantId).select(PAYMENT_ACCEPTANCE_FIELDS).lean();
+    if (!canReceivePayments(acceptance)) {
+      return res.status(403).json({ error: MERCHANT_CANNOT_RECEIVE_MESSAGE, code: 'MERCHANT_LOCKED' });
     }
 
     const invoice = await Invoice.findOne({ _id: req.params.id, merchantId, createdViaDeveloperId: developer._id }).populate('paymentLinkId');
