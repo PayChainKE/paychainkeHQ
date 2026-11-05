@@ -3,10 +3,8 @@ import React from 'react';
 // Each reason completes the sentence the merchant reads, so presets and custom
 // text stay grammatical: "...temporarily paused due to ___."
 export const DEFAULT_REASON = 'scheduled system maintenance';
-export const NCBA_REASON = 'system maintenance being done by our banking partner, NCBA';
 const PRESETS = [
   DEFAULT_REASON,
-  NCBA_REASON,
   'a scheduled system upgrade',
   'a planned service update',
   'a temporary service interruption',

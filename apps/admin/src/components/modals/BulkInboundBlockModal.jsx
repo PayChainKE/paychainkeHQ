@@ -1,6 +1,6 @@
 import React from 'react';
 import api from '../../api/api';
-import InboundBlockReasonPicker, { DEFAULT_REASON, NCBA_REASON } from './InboundBlockReasonPicker';
+import InboundBlockReasonPicker, { DEFAULT_REASON } from './InboundBlockReasonPicker';
 
 // Block or allow incoming payments for every selected merchant, or message the
 // ones already blocked. One 6-digit code emailed to the acting admin approves
@@ -16,7 +16,7 @@ export default function BulkInboundBlockModal({ merchantIds, mode, onClose, onDo
   const [preview, setPreview] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
   const [showSkipped, setShowSkipped] = React.useState(false);
-  const [reason, setReason] = React.useState(mode === 'notify' ? NCBA_REASON : DEFAULT_REASON);
+  const [reason, setReason] = React.useState(DEFAULT_REASON);
   const [notifyExternal, setNotifyExternal] = React.useState(true);
   const [otp, setOtp] = React.useState('');
   const [busy, setBusy] = React.useState(false);
