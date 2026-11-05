@@ -48,6 +48,12 @@ const checkoutPageSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
+  // Switched off automatically when its merchant was disabled, so allowing
+  // the merchant again brings back only what the disable turned off.
+  disabledWithAccount: {
+    type: Boolean,
+    default: false,
+  },
   // When true, the public cart-checkout page requires a buyer name before
   // paying (stored on the minted PaymentLink) — off by default, since a
   // plain product sale only needs a phone number to pay.

@@ -2,14 +2,17 @@ import React from 'react';
 import api from '../../api/api';
 import InboundBlockReasonPicker, { DEFAULT_REASON } from './InboundBlockReasonPicker';
 
-// Block or allow incoming payments for every selected merchant, or message the
-// ones already blocked. One 6-digit code emailed to the acting admin approves
-// the whole list. See merchantInboundBlockController.js.
+// Block or allow incoming payments for every selected merchant, message the
+// ones already blocked, or credit their held deposits and disable them. One
+// 6-digit code emailed to the acting admin approves the whole list. See
+// merchantInboundBlockController.js.
 const MODE_COPY = {
   block: { title: 'Block Incoming Payments', confirm: 'Block', doneTitle: 'Incoming payments blocked', icon: 'block' },
   allow: { title: 'Allow Incoming Payments', confirm: 'Allow', doneTitle: 'Incoming payments allowed', icon: 'payments' },
   notify: { title: 'Notify Blocked Merchants', confirm: 'Notify', doneTitle: 'Notices are going out', icon: 'campaign' },
+  disable: { title: 'Credit Held Payments & Disable', confirm: 'Disable', doneTitle: 'Accounts disabled', icon: 'person_off' },
 };
+const kes = (n) => `KES ${Number(n || 0).toLocaleString()}`;
 
 export default function BulkInboundBlockModal({ merchantIds, mode, onClose, onDone }) {
   const [stage, setStage] = React.useState('review'); // review | otp | done
@@ -35,6 +38,23 @@ export default function BulkInboundBlockModal({ merchantIds, mode, onClose, onDo
   const plural = count === 1 ? '' : 's';
   const copy = MODE_COPY[mode];
   const block = mode === 'block';
+  const disable = mode === 'disable';
+  const heldItems = preview?.items.filter((i) => i.holds?.length) || [];
+  const heldTotal = heldItems.reduce((sum, i) => sum + i.heldAmount, 0);
+  const needsReview = (stage === 'done' ? result?.needsReview : preview?.needsReview) || [];
+  const reviewList = needsReview.length > 0 && (
+    <div className="mb-4">
+      <p className="text-[13px] font-semibold text-red-700 mb-1.5">{needsReview.length} held payment{needsReview.length === 1 ? '' : 's'} will not be credited. Check them first: they may already be paid.</p>
+      <ul className="border border-red-100 bg-red-50/50 rounded-lg divide-y divide-red-100 max-h-40 overflow-y-auto text-[12px]">
+        {needsReview.map((r) => (
+          <li key={r.holdId} className="px-3 py-1.5">
+            <span className="font-medium">{r.businessName} · {kes(r.amount)} · {r.transId || 'no ref'}</span>
+            <span className="block text-on-surface-variant">{r.reason}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
   const doneCount = result?.changed ?? count;
   const donePlural = doneCount === 1 ? '' : 's';
 
@@ -90,11 +110,20 @@ export default function BulkInboundBlockModal({ merchantIds, mode, onClose, onDo
               ) : preview && (
                 <>
                   <p className="text-sm text-on-surface-variant mb-4">
-                    {mode === 'block' && <>No customer will be able to pay <strong>{count} merchant{plural}</strong> through payment links, checkout pages, QR/Pay Account, invoices, Request Money or the API. They can still sign in and withdraw their balance.</>}
-                    {mode === 'allow' && <>Customers will be able to pay <strong>{count} merchant{plural}</strong> again through every channel.</>}
+                    {mode === 'block' && <>No customer will be able to pay <strong>{count} merchant{plural}</strong> through payment links, checkout pages, QR/Pay Account, invoices, Request Money or the API. Their accounts are also disabled: payment links and checkout pages are switched off and API keys revoked. They can still sign in and withdraw their balance.</>}
+                    {mode === 'allow' && <>Customers will be able to pay <strong>{count} merchant{plural}</strong> again through every channel. Links, checkout pages and API keys switched off by a disable come back.</>}
+                    {disable && <><strong>{count} blocked merchant{plural}</strong> will have held payments credited to their wallet, then their accounts disabled: payment links and checkout pages off, API keys revoked. They can still sign in and withdraw.</>}
                     {mode === 'notify' && <><strong>{count} blocked merchant{plural}</strong> will get an SMS, an email and an in-app notice with this reason. Their in-app banner updates to match. Nothing else about their account changes.</>}
                   </p>
-                  {block && (
+                  {disable && count > 0 && (
+                    <div className="text-[13px] px-3 py-2.5 rounded-lg mb-4 bg-emerald-50 text-emerald-900 border border-emerald-100">
+                      {heldItems.length > 0
+                        ? <><strong>{kes(heldTotal)}</strong> held will be credited to {heldItems.length} merchant{heldItems.length === 1 ? '' : 's'}: {heldItems.map((i) => `${i.businessName} (${kes(i.heldAmount)})`).join(', ')}. If you already refunded any of these payers, stop here.</>
+                        : 'No held payments to credit for these merchants.'}
+                    </div>
+                  )}
+                  {reviewList}
+                  {(block || disable) && (
                     <div className="text-[13px] px-3 py-2.5 rounded-lg mb-4 bg-amber-50 text-amber-800 border border-amber-100">
                       Direct paybill deposits can't be refused before they're sent: M-PESA takes the money first. They're held (not credited) and flagged to admins to refund.
                     </div>
@@ -122,7 +151,7 @@ export default function BulkInboundBlockModal({ merchantIds, mode, onClose, onDo
                   {mode !== 'notify' && count > 0 && (
                     <label className="flex items-start gap-2.5 text-[13px] text-on-surface mb-4 cursor-pointer">
                       <input type="checkbox" checked={notifyExternal} onChange={(e) => setNotifyExternal(e.target.checked)} className="mt-0.5 accent-emerald-700" />
-                      <span>Also send each merchant an SMS and email. The in-app notice always goes out.</span>
+                      <span>{disable ? 'Also text merchants whose held payments are credited. The in-app notice always goes out.' : 'Also send each merchant an SMS and email. The in-app notice always goes out.'}</span>
                     </label>
                   )}
                 </>
@@ -163,10 +192,17 @@ export default function BulkInboundBlockModal({ merchantIds, mode, onClose, onDo
             <>
               <h3 className="text-xl font-bold text-on-surface mb-1">{copy.doneTitle}</h3>
               <p className="text-sm text-on-surface-variant mb-5">
-                {mode === 'block' && `${doneCount} merchant${donePlural} can no longer be paid. Their notices are going out now.`}
+                {mode === 'block' && `${doneCount} merchant${donePlural} can no longer be paid and their accounts are disabled. Their notices are going out now.`}
+                {disable && `${doneCount} merchant${donePlural} processed. ${kes(result?.creditedAmount)} credited from ${result?.creditedCount || 0} held payment${result?.creditedCount === 1 ? '' : 's'}.`}
                 {mode === 'allow' && `${doneCount} merchant${donePlural} can receive payments again.`}
                 {mode === 'notify' && `${doneCount} merchant${donePlural} will get their SMS and email over the next few minutes.`}
               </p>
+              {result?.failed?.length > 0 && (
+                <div className="text-[13px] text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2 font-medium mb-3">
+                  {result.failed.length} credit{result.failed.length === 1 ? '' : 's'} failed and stayed held: {result.failed.map((f) => `${f.businessName} ${kes(f.amount)}`).join(', ')}. Run this again to retry.
+                </div>
+              )}
+              {reviewList}
               <button onClick={onClose} className="w-full py-2.5 rounded-lg bg-primary text-white text-sm font-semibold uppercase tracking-widest">Done</button>
             </>
           )}
