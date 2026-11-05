@@ -25,6 +25,12 @@ const paymentLinkSchema = new mongoose.Schema({
     enum: ['active', 'paid', 'expired'],
     default: 'active',
   },
+  // Switched off automatically when its merchant was disabled, so allowing
+  // the merchant again brings back only what the disable turned off.
+  disabledWithAccount: {
+    type: Boolean,
+    default: false,
+  },
   // Set when this link was minted to collect payment on a specific invoice —
   // lets processPaymentLink flip the invoice to 'paid' on success. Null for
   // plain ad-hoc payment links (Wallet's "Request Money" -> Payment Link).

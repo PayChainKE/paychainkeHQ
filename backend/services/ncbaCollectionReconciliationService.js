@@ -42,7 +42,7 @@ import { extractMerchantCode } from '../utils/ncbaAccountNotificationValidators.
 // (see mpesaController.js#resolveStkOutcome). Used only to check "was this
 // merchant already credited around this amount/time," not to create
 // anything.
-const INBOUND_TYPES = ['ncba_inbound', 'inbound', 'top_up'];
+export const INBOUND_TYPES = ['ncba_inbound', 'inbound', 'top_up'];
 
 // Wide on purpose — this runs as an hourly post-hoc sweep, not a live race,
 // so there's no cost to being generous. NCBA's own webhook has been

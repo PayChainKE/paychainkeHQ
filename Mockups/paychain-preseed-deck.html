@@ -1,0 +1,596 @@
+<title>PayChain Pre-Seed Deck</title>
+<style>
+  :root{
+    --bg:#F1F2EC;
+    --surface:#FFFFFF;
+    --ink:#16241D;
+    --ink-soft:#55645C;
+    --line:rgba(22,36,29,0.14);
+    --line-strong:rgba(22,36,29,0.28);
+    --accent:#B9862A;
+    --accent-ink:#7A5314;
+    --accent-2:#2E6E5C;
+    --tile-bg:#FFFFFF;
+    --note-bg:rgba(46,110,92,0.06);
+    --code-bg:rgba(22,36,29,0.05);
+    --shadow:0 1px 2px rgba(22,36,29,0.06);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#121814;
+      --surface:#182019;
+      --ink:#ECE9DF;
+      --ink-soft:#A6AEA5;
+      --line:rgba(236,233,223,0.14);
+      --line-strong:rgba(236,233,223,0.28);
+      --accent:#E3AE55;
+      --accent-ink:#E3AE55;
+      --accent-2:#59B79C;
+      --tile-bg:#1C2620;
+      --note-bg:rgba(89,183,156,0.08);
+      --code-bg:rgba(236,233,223,0.06);
+      --shadow:0 1px 2px rgba(0,0,0,0.4);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#121814;
+    --surface:#182019;
+    --ink:#ECE9DF;
+    --ink-soft:#A6AEA5;
+    --line:rgba(236,233,223,0.14);
+    --line-strong:rgba(236,233,223,0.28);
+    --accent:#E3AE55;
+    --accent-ink:#E3AE55;
+    --accent-2:#59B79C;
+    --tile-bg:#1C2620;
+    --note-bg:rgba(89,183,156,0.08);
+    --code-bg:rgba(236,233,223,0.06);
+    --shadow:0 1px 2px rgba(0,0,0,0.4);
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:"IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3{
+    font-family:"Fraunces", Georgia, serif;
+    text-wrap:balance;
+    color:var(--ink);
+    margin:0;
+  }
+  .mono{
+    font-family:"IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  a{color:var(--accent-ink);}
+
+  .wrap{max-width:920px;margin:0 auto;padding:0 24px 96px;}
+
+  /* ---------- Masthead / cover ---------- */
+  .cover{
+    padding:64px 24px 48px;
+    border-bottom:1px solid var(--line-strong);
+    background:var(--surface);
+  }
+  .cover-inner{max-width:920px;margin:0 auto;}
+  .eyebrow{
+    font-family:"IBM Plex Mono", monospace;
+    font-size:12px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--accent-ink);
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .eyebrow::before{
+    content:"";
+    width:7px;height:7px;border-radius:50%;
+    background:var(--accent);
+    flex:none;
+  }
+  .cover h1{
+    font-size:clamp(40px,7vw,64px);
+    font-weight:900;
+    margin-top:14px;
+    letter-spacing:-0.01em;
+  }
+  .cover .tagline{
+    font-size:clamp(17px,2.4vw,21px);
+    color:var(--ink-soft);
+    max-width:60ch;
+    margin-top:14px;
+  }
+  .cover .meta{
+    margin-top:32px;
+    display:flex;
+    gap:28px;
+    flex-wrap:wrap;
+    font-family:"IBM Plex Mono",monospace;
+    font-size:12px;
+    color:var(--ink-soft);
+  }
+  .cover .meta b{color:var(--ink);font-weight:600;}
+
+  /* ---------- Intro / how-to-use ---------- */
+  .intro{
+    padding:36px 24px;
+    max-width:920px;
+    margin:0 auto;
+  }
+  .intro p{max-width:68ch;color:var(--ink-soft);font-size:15px;}
+  .intro p + p{margin-top:10px;}
+  .intro strong{color:var(--ink);}
+
+  /* ---------- Slide sections ---------- */
+  .deck{max-width:920px;margin:0 auto;}
+  .slide{
+    display:grid;
+    grid-template-columns:64px 1fr;
+    gap:0 28px;
+    padding:40px 24px 44px;
+    border-top:1px solid var(--line);
+    position:relative;
+  }
+  .slide-index{
+    font-family:"IBM Plex Mono",monospace;
+    font-size:12px;
+    color:var(--ink-soft);
+    padding-top:6px;
+  }
+  .slide-index .num{
+    display:block;
+    font-size:22px;
+    font-weight:600;
+    color:var(--accent-ink);
+    line-height:1;
+    margin-bottom:6px;
+  }
+  .slide-body{min-width:0;}
+  .eyebrow-slide{
+    font-family:"IBM Plex Mono",monospace;
+    font-size:11px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+  }
+  .slide h2{
+    font-size:clamp(24px,3.4vw,32px);
+    font-weight:600;
+    margin-top:8px;
+    max-width:24ch;
+  }
+  .slide .lede{
+    margin-top:12px;
+    max-width:62ch;
+    color:var(--ink-soft);
+    font-size:15.5px;
+  }
+  .slide ul{
+    margin:16px 0 0;
+    padding:0;
+    list-style:none;
+    max-width:64ch;
+  }
+  .slide ul li{
+    position:relative;
+    padding-left:20px;
+    margin-top:10px;
+    font-size:15px;
+  }
+  .slide ul li::before{
+    content:"—";
+    position:absolute;left:0;top:0;
+    color:var(--accent);
+  }
+  .slide ol.pillars{
+    margin:20px 0 0;
+    padding:0;
+    list-style:none;
+    display:grid;
+    gap:12px;
+  }
+  .pillar{
+    background:var(--tile-bg);
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:14px 16px;
+    box-shadow:var(--shadow);
+    display:grid;
+    grid-template-columns:28px 1fr;
+    gap:12px;
+    align-items:baseline;
+  }
+  .pillar .n{
+    font-family:"IBM Plex Mono",monospace;
+    color:var(--accent-ink);
+    font-weight:600;
+    font-size:14px;
+  }
+  .pillar b{display:block;font-size:15px;margin-bottom:2px;}
+  .pillar span{color:var(--ink-soft);font-size:14px;}
+
+  /* stat tiles */
+  .stats{
+    margin-top:18px;
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:12px;
+  }
+  .stat{
+    background:var(--tile-bg);
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:16px;
+    box-shadow:var(--shadow);
+  }
+  .stat .num{
+    font-family:"IBM Plex Mono",monospace;
+    font-variant-numeric:tabular-nums;
+    font-size:26px;
+    font-weight:600;
+    color:var(--ink);
+  }
+  .stat .label{margin-top:4px;font-size:13px;color:var(--ink-soft);}
+  .stat .src{margin-top:8px;font-size:11px;color:var(--ink-soft);font-family:"IBM Plex Mono",monospace;}
+
+  /* fill-in metric rows (traction) */
+  .fillrows{margin-top:18px;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--tile-bg);box-shadow:var(--shadow);}
+  .fillrow{
+    display:flex;justify-content:space-between;gap:16px;
+    padding:11px 16px;
+    border-top:1px solid var(--line);
+    font-size:14px;
+  }
+  .fillrow:first-child{border-top:none;}
+  .fillrow .k{color:var(--ink-soft);}
+  .fillrow .v{
+    font-family:"IBM Plex Mono",monospace;
+    font-variant-numeric:tabular-nums;
+    color:var(--accent-ink);
+    font-weight:600;
+    white-space:nowrap;
+  }
+
+  /* comparison table */
+  .tbl-wrap{overflow-x:auto;margin-top:18px;}
+  table.compare{
+    border-collapse:collapse;
+    width:100%;
+    min-width:560px;
+    font-size:13.5px;
+    background:var(--tile-bg);
+    border:1px solid var(--line);
+    border-radius:6px;
+    overflow:hidden;
+  }
+  table.compare th, table.compare td{
+    padding:10px 12px;
+    border-bottom:1px solid var(--line);
+    text-align:left;
+    vertical-align:top;
+  }
+  table.compare thead th{
+    font-family:"IBM Plex Mono",monospace;
+    font-size:11px;
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    background:var(--code-bg);
+  }
+  table.compare tr:last-child td{border-bottom:none;}
+  table.compare td.us{color:var(--accent-ink);font-weight:600;}
+
+  /* design note aside */
+  .note{
+    margin-top:18px;
+    border:1px dashed var(--line-strong);
+    border-radius:6px;
+    padding:12px 14px;
+    background:var(--note-bg);
+    max-width:64ch;
+  }
+  .note .tag{
+    font-family:"IBM Plex Mono",monospace;
+    font-size:10.5px;
+    letter-spacing:0.1em;
+    text-transform:uppercase;
+    color:var(--accent-2);
+    font-weight:600;
+  }
+  .note p{margin:6px 0 0;font-size:13.5px;color:var(--ink-soft);}
+  .note p + p{margin-top:6px;}
+
+  .fill{
+    font-family:"IBM Plex Mono",monospace;
+    background:var(--code-bg);
+    border-bottom:1px dashed var(--line-strong);
+    padding:0 3px;
+    color:var(--accent-ink);
+  }
+
+  /* checklist */
+  .checklist{
+    border-top:1px solid var(--line-strong);
+    padding:40px 24px 24px;
+  }
+  .checklist h2{font-size:22px;font-weight:600;}
+  .checklist ul{list-style:none;margin:18px 0 0;padding:0;max-width:64ch;}
+  .checklist li{
+    display:flex;gap:10px;align-items:flex-start;
+    padding:9px 0;border-top:1px solid var(--line);
+    font-size:14px;
+  }
+  .checklist li:first-child{border-top:none;}
+  .checklist li::before{
+    content:"";
+    flex:none;width:14px;height:14px;margin-top:2px;
+    border:1.5px solid var(--line-strong);border-radius:3px;
+  }
+
+  footer{
+    padding:32px 24px 64px;
+    text-align:center;
+    color:var(--ink-soft);
+    font-family:"IBM Plex Mono",monospace;
+    font-size:11px;
+    letter-spacing:0.04em;
+  }
+
+  @media (max-width:600px){
+    .slide{grid-template-columns:1fr;gap:6px;}
+    .slide-index{display:flex;align-items:center;gap:8px;padding-top:0;}
+    .slide-index .num{margin-bottom:0;}
+  }
+
+  @media (prefers-reduced-motion:no-preference){
+    .slide, .cover{scroll-margin-top:12px;}
+  }
+</style>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,900&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<section class="cover">
+  <div class="cover-inner">
+    <div class="eyebrow">Pre-seed &middot; investor deck content</div>
+    <h1>PayChain</h1>
+    <p class="tagline">The operating account for Kenya's formal merchant economy — collections, payouts, KRA-compliant invoicing, working capital and a digital wallet, on one ledger.</p>
+    <div class="meta">
+      <span><b>Prepared for</b> design &amp; slide production</span>
+      <span><b>Stage</b> Pre-seed</span>
+      <span><b>Sector</b> Fintech / merchant infrastructure &middot; Kenya</span>
+    </div>
+  </div>
+</section>
+
+<div class="intro">
+  <p><strong>What this is.</strong> Slide-by-slide content for PayChain's pre-seed deck — the words that go on each slide, in the order they should run. It's written to be lifted straight into whatever design tool you use next.</p>
+  <p>Every stat that's independently verifiable (Kenya MSME counts, M-Pesa volume) is sourced. Everywhere the number is <em>yours</em> — traction, the ask, team bios — it's marked <span class="fill">like this</span> instead of guessed at. Pull those from your own admin dashboard and cap table right before you present; a stale number in front of an investor costs more than a blank one.</p>
+</div>
+
+<div class="deck">
+
+  <section class="slide" id="s1">
+    <div class="slide-index"><span class="num">01</span>problem</div>
+    <div class="slide-body">
+      <div class="eyebrow-slide">The problem</div>
+      <h2>Kenyan merchants run their business on five disconnected tools.</h2>
+      <ul>
+        <li>Collections happen on M-Pesa. Payroll happens through a paybill and a spreadsheet, or cash in an envelope. Invoices are a Word template with no tax compliance behind them. Working capital means a chama, a shark loan, or nothing at all.</li>
+        <li>KRA now requires VAT-registered businesses to issue invoices through eTIMS — a real compliance obligation most merchants have no practical way to meet, and one most fintechs don't touch at all.</li>
+        <li>None of these tools verify who's actually on the other end. A fraud ring can register five merchant accounts on five stolen IDs, and nothing catches it until the money's already moved.</li>
+      </ul>
+      <p class="lede">The result: a merchant's money, tax compliance and payroll all depend on tools that were never built to talk to each other — or to defend the business that depends on them.</p>
+    </div>
+  </section>
+
+  <section class="slide" id="s2">
+    <div class="slide-index"><span class="num">02</span>solution</div>
+    <div class="slide-body">
+      <div class="eyebrow-slide">The solution</div>
+      <h2>One merchant account. Every money movement. Compliance built in, not bolted on.</h2>
+      <ul>
+        <li>PayChain is the merchant operating account for Kenyan SMEs: collect via M-Pesa and bank, pay staff and suppliers in bulk, invoice customers with real KRA eTIMS compliance, draw working capital, and hold a digital wallet — one dashboard, one mobile app, one ledger.</li>
+        <li>Most fintechs bolt on fraud controls after their first incident. PayChain shipped with them: velocity-limited payouts, new-device login alerts, and cross-account identity-document matching are live in production today, not a roadmap item.</li>
+        <li>Onboarding matches how Kenyan business actually works — a Sole Proprietorship and a PLC are asked for exactly the paperwork the law requires for that structure, not one generic upload box for everyone.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="slide" id="s3">
+    <div class="slide-index"><span class="num">03</span>product</div>
+    <div class="slide-body">
+      <div class="eyebrow-slide">Product</div>
+      <h2>A merchant's entire money workflow, in one account.</h2>
+      <ol class="pillars">
+        <li class="pillar"><span class="n">01</span><div><b>Collect</b><span>M-Pesa STK Push, Till/QR, and direct bank rails via NCBA Open Banking — money lands in one balance, not five wallets.</span></div></li>
+        <li class="pillar"><span class="n">02</span><div><b>Pay</b><span>Bulk Pay runs payroll and supplier payouts in a single batch, over M-Pesa B2C or bank transfer, reconciled automatically.</span></div></li>
+        <li class="pillar"><span class="n">03</span><div><b>Invoice</b><span>Customer invoicing wired directly into KRA's eTIMS, so every invoice a merchant sends is tax-compliant the moment it's issued.</span></div></li>
+        <li class="pillar"><span class="n">04</span><div><b>Grow</b><span>A Cash Advance product underwritten on a merchant's own transaction history, plus an opt-in digital wallet for merchants holding value in stablecoin.</span></div></li>
+      </ol>
+      <p class="lede" style="margin-top:16px;">Delivered as a web dashboard, a native mobile app, and an internal admin console for compliance and support — three products, one ledger underneath.</p>
+    </div>
+  </section>
+
+  <section class="slide" id="s4">
+    <div class="slide-index"><span class="num">04</span>moat</div>
+    <div class="slide-body">
+      <div class="eyebrow-slide">Why we win</div>
+      <h2>We treat compliance and fraud prevention as the product, not a checkbox.</h2>
+      <ul>
+        <li><strong>Business-type-aware KYB.</strong> A sole trader, a SACCO, and a PLC are legally different animals — each is asked for exactly the documents Kenyan law requires for that structure (CR12, business permit, National ID, KRA PIN certificate).</li>
+        <li><strong>Automatic fraud screening on every account.</strong> Outbound transfers auto-lock for 15 minutes on suspicious velocity and alert our team; logins from an unrecognized device trigger an instant alert; identity documents are hashed and cross-checked against every other merchant on the platform, so identity reuse is caught at signup — before the money moves, not after.</li>
+        <li>This is infrastructure a competitor has to spend a year rebuilding after their first fraud incident. We built it before we needed to.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="slide" id="s5">
+    <div class="slide-index"><span class="num">05</span>market</div>
+    <div class="slide-body">
+      <div class="eyebrow-slide">Market</div>
+      <h2>Kenya's merchant economy is enormous, mobile-first, and still running on disconnected tools.</h2>
+      <div class="stats">
+        <div class="stat">
+          <div class="num">7.4M</div>
+          <div class="label">MSMEs in Kenya — 1.56M formal, 5.84M informal — contributing 30&ndash;34% of GDP and 14.9M+ jobs</div>
+          <div class="src">FSD Kenya &middot; Strathmore Business School</div>
+        </div>
+        <div class="stat">
+          <div class="num">KES 38.3T</div>
+          <div class="label">moved through M-Pesa in the year to March 2025 — mobile money value that now exceeds Kenya's entire annual GDP</div>
+          <div class="src">Reporting on Safaricom FY2025 results</div>
+        </div>
+        <div class="stat">
+          <div class="num">90%+</div>
+          <div class="label">of Kenya's private enterprises are MSMEs — nearly all of them need collections, payouts, and increasingly, compliant invoicing</div>
+          <div class="src">FSD Kenya MSME Outlook</div>
+        </div>
+      </div>
+      <div class="note">
+        <div class="tag">Fill in — TAM / SAM / SOM</div>
+        <p><strong>TAM:</strong> Kenya's merchant payments, payroll and invoicing infrastructure market.</p>
+        <p><strong>SAM:</strong> formal and formalizing SMEs needing bank + mobile money collections, bulk payouts and eTIMS compliance — build this bottoms-up from the MSME split above and drop the number in as <span class="fill">[SAM figure]</span>.</p>
+        <p><strong>SOM (18&ndash;24mo):</strong> <span class="fill">[X]</span> merchants across <span class="fill">[target sectors]</span> — the segments already showing organic demand in your live user base.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" id="s6">
+    <div class="slide-index"><span class="num">06</span>model</div>
+    <div class="slide-body">
+      <div class="eyebrow-slide">Business model</div>
+      <h2>We make money exactly when our merchants do.</h2>
+      <ul>
+        <li><strong>Take-rate on payment volume</strong> — a per-transaction tariff on every collection and payout moving through a merchant's account.</li>
+        <li><strong>FX spread</strong> — on wallet conversions between KES and stablecoin balance, for merchants who opt into the digital wallet.</li>
+        <li><strong>Cash Advance fees</strong> — a fee on working capital drawn against a merchant's own verified transaction history.</li>
+        <li><span class="fill">[Optional: a subscription tier for advanced invoicing/compliance features, once usage data supports it]</span></li>
+      </ul>
+      <p class="lede">No per-seat SaaS fee. Pricing scales with a merchant's own volume — free to try, and it grows only as their business does.</p>
+    </div>
+  </section>
+
+  <section class="slide" id="s7">
+    <div class="slide-index"><span class="num">07</span>traction</div>
+    <div class="slide-body">
+      <div class="eyebrow-slide">Traction</div>
+      <h2 class="fill">[Your headline — e.g. "Live in production, with real merchants moving real money."]</h2>
+      <div class="fillrows">
+        <div class="fillrow"><span class="k">Merchants onboarded</span><span class="v fill">[ ]</span></div>
+        <div class="fillrow"><span class="k">Monthly transaction volume (GMV)</span><span class="v fill">KES [ ]</span></div>
+        <div class="fillrow"><span class="k">Revenue to date / MRR</span><span class="v fill">KES [ ]</span></div>
+        <div class="fillrow"><span class="k">Month-over-month growth</span><span class="v fill">[ ]%</span></div>
+        <div class="fillrow"><span class="k">Sectors represented</span><span class="v fill">[ ]</span></div>
+        <div class="fillrow"><span class="k">Platform status</span><span class="v">Dashboard + admin live &middot; mobile app in Play review</span></div>
+        <div class="fillrow"><span class="k">Bank rail</span><span class="v">NCBA Open Banking integration live in production</span></div>
+      </div>
+      <div class="note">
+        <div class="tag">Before you present</div>
+        <p>Pull every number in this slide fresh from your own admin dashboard the day you present — never carry one forward from an earlier version of this deck.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" id="s8">
+    <div class="slide-index"><span class="num">08</span>gtm</div>
+    <div class="slide-body">
+      <div class="eyebrow-slide">Go-to-market</div>
+      <h2>Officer-led onboarding first, self-serve at scale.</h2>
+      <ul>
+        <li>Onboarding officers guide the first wave of formal SMEs through KYB and account setup — the same trust-building motion that made M-Pesa agents work at street level.</li>
+        <li>Self-serve web and mobile signup, with the KYB engine doing the compliance work an officer would otherwise do by hand, unlocks scale without a linear increase in headcount.</li>
+        <li><strong>Wedge sectors:</strong> <span class="fill">[merchants who already need multiple PayChain products at once — e.g. agri-processors with payroll + supplier payouts + invoicing, or SACCOs with member payouts]</span>.</li>
+        <li><strong>Distribution partnerships:</strong> <span class="fill">[banks, SACCOs, trade associations, accounting/eTIMS software vendors — name the ones actually in conversation]</span>.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="slide" id="s9">
+    <div class="slide-index"><span class="num">09</span>competition</div>
+    <div class="slide-body">
+      <div class="eyebrow-slide">Competitive landscape</div>
+      <h2>Everyone else solves one slice. We're the account underneath all of them.</h2>
+      <div class="tbl-wrap">
+        <table class="compare">
+          <thead><tr><th>Player</th><th>Collections</th><th>Bulk payouts</th><th>Compliant invoicing</th><th>Working capital</th><th>Fraud infra</th></tr></thead>
+          <tbody>
+            <tr><td>Mobile money (M-Pesa)</td><td>Yes</td><td>No</td><td>No</td><td>No</td><td>No</td></tr>
+            <tr><td>Payroll / bulk-pay tools</td><td>No</td><td>Yes</td><td>No</td><td>No</td><td>No</td></tr>
+            <tr><td>Accounting / invoicing software</td><td>No</td><td>No</td><td>Bolted on</td><td>No</td><td>No</td></tr>
+            <tr><td>Digital lenders</td><td>No</td><td>No</td><td>No</td><td>Yes</td><td>No</td></tr>
+            <tr><td class="us">PayChain</td><td class="us">Yes</td><td class="us">Yes</td><td class="us">Yes</td><td class="us">Yes</td><td class="us">Yes</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" id="s10">
+    <div class="slide-index"><span class="num">10</span>team</div>
+    <div class="slide-body">
+      <div class="eyebrow-slide">Team</div>
+      <h2 class="fill">[Your headline — e.g. "Builders who've shipped this before."]</h2>
+      <div class="fillrows">
+        <div class="fillrow"><span class="k fill">[Name — Role]</span><span class="v fill">[one line of credibility: prior company, domain expertise, what they've shipped]</span></div>
+        <div class="fillrow"><span class="k fill">[Name — Role]</span><span class="v fill">[one line of credibility]</span></div>
+        <div class="fillrow"><span class="k fill">[Advisor — affiliation]</span><span class="v fill">[why they matter here]</span></div>
+      </div>
+      <div class="note">
+        <div class="tag">Don't leave this thin</div>
+        <p>Investors fund the team as much as the deck. Real names, real photos, one sharp line of credibility each — not job titles.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" id="s11">
+    <div class="slide-index"><span class="num">11</span>ask</div>
+    <div class="slide-body">
+      <div class="eyebrow-slide">The ask</div>
+      <h2>Raising <span class="fill">KES [ ] (USD [ ])</span> pre-seed.</h2>
+      <p class="lede">Use of funds, tied to the milestones already in motion:</p>
+      <ul>
+        <li>Complete KRA eTIMS vendor certification and per-merchant OSCU rollout — unlocks compliant invoicing at scale.</li>
+        <li>Launch the mobile app publicly once Google Play review clears — the self-serve growth channel.</li>
+        <li>Grow the onboarding and compliance team — KYB review, fraud monitoring, merchant support.</li>
+        <li>Expand bank-rail coverage beyond the current NCBA operating account.</li>
+        <li><span class="fill">[X months]</span> of runway to <span class="fill">[next milestone — e.g. Seed round, break-even on transaction revenue]</span>.</li>
+      </ul>
+      <div class="note">
+        <div class="tag">Stress-tested hardest</div>
+        <p>Fill in the actual raise amount, instrument (SAFE vs. priced equity), valuation/cap, and the runway math behind it. This is the one slide every investor will do their own arithmetic on — don't leave the arithmetic to them.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide" id="s12">
+    <div class="slide-index"><span class="num">12</span>vision</div>
+    <div class="slide-body">
+      <div class="eyebrow-slide">Vision</div>
+      <h2>Every formal business in Kenya should have one account it can run on.</h2>
+      <p class="lede">Start with collections, payouts, invoicing and working capital for Kenyan SMEs. Extend to the rest of East Africa's merchant economy once the compliance and fraud infrastructure — the hard part — is proven at home.</p>
+      <p class="lede">The tools to move money in Kenya already exist. What's missing is one account that does it safely, compliantly, and completely. That's PayChain.</p>
+      <p class="lede fill" style="margin-top:20px;">[Founder name] &middot; [email] &middot; [phone] &middot; paychain.co.ke</p>
+    </div>
+  </section>
+
+</div>
+
+<div class="checklist">
+  <h2>Before you present — everything still marked <span class="fill">[ ]</span></h2>
+  <ul>
+    <li>Slide 05 — SAM figure and SOM target (sectors + merchant count)</li>
+    <li>Slide 07 — merchants onboarded, GMV, revenue/MRR, growth rate, sectors, headline</li>
+    <li>Slide 08 — named wedge sectors and any partnerships actually in conversation</li>
+    <li>Slide 10 — real names, roles, photos and one credibility line per person</li>
+    <li>Slide 11 — raise amount, instrument, valuation/cap, runway and next milestone</li>
+    <li>Slide 12 — founder contact details</li>
+    <li>Cover — presentation date and founder name(s)</li>
+  </ul>
+</div>
+
+<footer>paychain pre-seed deck &middot; content draft &middot; verify every sourced stat before printing</footer>

@@ -62,6 +62,12 @@ const apiKeySchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  // Switched off automatically when its merchant was disabled, so allowing
+  // the merchant again brings back only what the disable turned off.
+  disabledWithAccount: {
+    type: Boolean,
+    default: false,
+  },
 }, {
   timestamps: true,
 });

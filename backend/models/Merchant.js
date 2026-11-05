@@ -546,6 +546,18 @@ const merchantSchema = new mongoose.Schema({
     type: String,
     default: null,
   },
+  // Set when a block also disabled the account: the merchant keeps sign-in,
+  // history and withdrawals, but its payment links, checkout pages and API
+  // keys are off too. See services/merchantDisableService.js.
+  accountDisabledAt: {
+    type: Date,
+    default: null,
+  },
+  accountDisabledBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin',
+    default: null,
+  },
   // ── Onboarding-Officer KYC pipeline (unset for self-serve merchants) ──
   // kybStatus has NO default — it must stay genuinely absent on every
   // merchant created by self-serve signup or the admin direct-onboard flow,

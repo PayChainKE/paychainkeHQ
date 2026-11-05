@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import mongoose from 'mongoose';
 import Merchant from '../models/Merchant.js';
 import { normalizeInboundBlockReason, DEFAULT_INBOUND_BLOCK_REASON, MAX_INBOUND_BLOCK_REASON } from '../utils/merchantPaymentAcceptance.js';
+import { disableMerchantCollections, restoreMerchantCollections } from '../services/merchantDisableService.js';
 import DeletedRecord from '../models/DeletedRecord.js';
 import Admin from '../models/Admin.js';
 import Transaction from '../models/Transaction.js';
@@ -721,6 +722,14 @@ export const confirmMerchantAction = async (req, res) => {
         message: `Incoming payments blocked by admin (OTP-verified) — reason: ${reason}`,
         merchant, actor: adminActor(admin), req,
       });
+      // A block also disables the account. Demo and app-review accounts stay
+      // usable, since the reviewer needs their links and keys. The block above
+      // already stops payments, so a failure here is logged, not fatal, and
+      // the bulk disable picks the merchant up.
+      if (!merchant.isDemoMerchant && !merchant.isAppReviewAccount) {
+        await disableMerchantCollections([merchant._id], admin._id)
+          .catch((err) => console.error('Disable after block failed:', err?.message || err));
+      }
       notifyMerchantInboundInApp(merchant, true, reason);
       notifyMerchantInboundExternal(merchant, true, reason);
     } else if (action === 'unlock_inbound') {
@@ -729,6 +738,7 @@ export const confirmMerchantAction = async (req, res) => {
       merchant.inboundLockedBy = null;
       merchant.inboundLockReason = null;
       await merchant.save();
+      await restoreMerchantCollections([merchant._id]);
       logAudit({
         action: 'admin.merchant.inbound_unlocked', category: 'admin', severity: 'success',
         message: 'Incoming payments allowed again by admin (OTP-verified)',
@@ -2036,6 +2046,7 @@ export const getMerchantDetail = async (req, res) => {
         lockedBy: merchant.lockedBy ? { email: merchant.lockedBy.email } : null,
         inboundLocked: !!merchant.inboundLocked,
         inboundLockedAt: merchant.inboundLockedAt || null,
+        accountDisabledAt: merchant.accountDisabledAt || null,
         inboundLockReason: merchant.inboundLockReason || null,
         inboundLockedBy: merchant.inboundLockedBy ? { email: merchant.inboundLockedBy.email } : null,
         // Flag / risk

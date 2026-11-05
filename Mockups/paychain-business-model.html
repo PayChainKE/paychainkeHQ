@@ -1,0 +1,543 @@
+<title>PayChain Revenue Model</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    color-scheme: light;
+    --paper:        #faf8f2;
+    --surface:      #ffffff;
+    --ink:          #14231d;
+    --ink-soft:     #4b5c55;
+    --ink-faint:    #8a988f;
+    --line:         #dce3db;
+    --line-strong:  #c3d0c6;
+    --brand-deep:   #0e3d2e;
+    --brand-deep-2: #163a2c;
+    --brand-mid:    #1f6b4c;
+    --brand-mint:   #2e8f63;
+    --brand-mint-bright: #5efeb3;
+    --tint:         #eef4ee;
+    --shadow: 0 1px 2px rgba(14,61,46,0.06), 0 8px 24px -12px rgba(14,61,46,0.18);
+
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --series-3: #1baf7a;
+    --series-4: #eda100;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --paper:        #0d1815;
+      --surface:      #12211c;
+      --ink:          #edf4f0;
+      --ink-soft:     #a8bdb3;
+      --ink-faint:    #6f8579;
+      --line:         #24382f;
+      --line-strong:  #2f473c;
+      --brand-deep:   #163a2c;
+      --brand-deep-2: #1b4433;
+      --brand-mid:    #3fa374;
+      --brand-mint:   #4fd696;
+      --brand-mint-bright: #5efeb3;
+      --tint:         #16261f;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
+
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --series-3: #199e70;
+      --series-4: #c98500;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --paper:        #0d1815;
+    --surface:      #12211c;
+    --ink:          #edf4f0;
+    --ink-soft:     #a8bdb3;
+    --ink-faint:    #6f8579;
+    --line:         #24382f;
+    --line-strong:  #2f473c;
+    --brand-deep:   #163a2c;
+    --brand-deep-2: #1b4433;
+    --brand-mid:    #3fa374;
+    --brand-mint:   #4fd696;
+    --brand-mint-bright: #5efeb3;
+    --tint:         #16261f;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
+
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+  }
+  .eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--brand-mint-bright);
+    font-weight: 500;
+  }
+  :root:not([data-theme="dark"]) .cover .eyebrow,
+  :root[data-theme="light"] .cover .eyebrow { color: #9fe8c4; }
+
+  h1, h2, h3 { font-family: 'Source Serif 4', Georgia, serif; text-wrap: balance; color: var(--ink); }
+  p { text-wrap: pretty; }
+  .col { max-width: 700px; }
+  a { color: var(--brand-mint); }
+
+  .report { max-width: 980px; margin: 0 auto; padding: 0 20px 96px; }
+
+  /* ---------- cover ---------- */
+  .cover {
+    background: linear-gradient(160deg, var(--brand-deep) 0%, var(--brand-deep-2) 100%);
+    color: #f2f7f4;
+    margin: 28px 0 8px;
+    padding: 56px 44px 44px;
+    border-radius: 4px;
+    box-shadow: var(--shadow);
+  }
+  .cover .mark {
+    display: inline-flex; align-items: center; gap: 9px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.1em;
+    color: var(--brand-mint-bright); text-transform: uppercase; font-weight: 600;
+    margin-bottom: 30px;
+  }
+  .cover .mark::before {
+    content: ""; width: 9px; height: 9px; border-radius: 50%;
+    background: var(--brand-mint-bright); box-shadow: 0 0 0 4px rgba(94,254,179,0.18);
+  }
+  .cover h1 {
+    font-size: clamp(30px, 4.4vw, 46px);
+    line-height: 1.12;
+    font-weight: 600;
+    margin: 0 0 14px;
+    max-width: 16ch;
+    color: #f6faf8;
+  }
+  .cover .sub {
+    font-size: 17px; color: #cfe4d8; max-width: 52ch; margin: 0 0 34px; font-weight: 400;
+  }
+  .cover .meta {
+    display: flex; flex-wrap: wrap; gap: 28px;
+    padding-top: 22px; border-top: 1px solid rgba(255,255,255,0.14);
+  }
+  .cover .meta div { font-size: 13px; }
+  .cover .meta .k { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: #93b3a3; margin-bottom: 4px; }
+  .cover .meta .v { color: #eef6f1; font-weight: 500; }
+
+  /* ---------- toc ---------- */
+  .toc {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(190px,1fr));
+    gap: 1px; background: var(--line); border: 1px solid var(--line);
+    border-radius: 4px; overflow: hidden; margin: 0 0 64px;
+  }
+  .toc a {
+    background: var(--surface); padding: 14px 16px; text-decoration: none;
+    display: flex; align-items: baseline; gap: 10px; color: var(--ink);
+    font-size: 13.5px; font-weight: 500; transition: background .15s;
+  }
+  .toc a:hover { background: var(--tint); }
+  .toc a .n { font-family: 'IBM Plex Mono', monospace; color: var(--brand-mint); font-size: 12px; font-weight: 600; }
+
+  /* ---------- sections ---------- */
+  section { margin: 0 0 76px; scroll-margin-top: 24px; }
+  .sec-head {
+    display: flex; align-items: baseline; gap: 18px; margin-bottom: 22px;
+    padding-bottom: 16px; border-bottom: 1.5px solid var(--line-strong);
+  }
+  .sec-head .num {
+    font-family: 'Source Serif 4', serif; font-size: 34px; font-weight: 600;
+    color: var(--brand-mint); line-height: 1; flex-shrink: 0;
+  }
+  .sec-head h2 { font-size: 25px; font-weight: 600; margin: 0; line-height: 1.25; }
+  .sec-head .tag {
+    margin-left: auto; font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+    letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); white-space: nowrap;
+  }
+
+  section > p, section > .col > p { color: var(--ink-soft); font-size: 15.5px; margin: 0 0 16px; }
+  section strong { color: var(--ink); font-weight: 600; }
+
+  .lede { font-size: 18px !important; color: var(--ink) !important; line-height: 1.55; }
+
+  /* ---------- callout ---------- */
+  .callout {
+    background: var(--tint); border: 1px solid var(--line-strong); border-left: 3px solid var(--brand-mint);
+    border-radius: 3px; padding: 18px 22px; margin: 24px 0; display: flex; gap: 16px;
+  }
+  .callout .ico { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--brand-mint); font-weight: 700; flex-shrink: 0; padding-top: 2px; white-space: nowrap; }
+  .callout p { margin: 0; font-size: 14.5px; color: var(--ink-soft); }
+  .callout p + p { margin-top: 8px; }
+
+  /* ---------- pillars ---------- */
+  .pillar {
+    display: grid; grid-template-columns: 64px 1fr; gap: 20px;
+    padding: 26px 0; border-top: 1px solid var(--line);
+  }
+  .pillar:first-of-type { border-top: none; padding-top: 4px; }
+  .pillar .pnum {
+    font-family: 'Source Serif 4', serif; font-size: 30px; font-weight: 600; color: var(--line-strong);
+  }
+  .pillar h3 { font-size: 19px; margin: 0 0 6px; font-weight: 600; }
+  .pillar .role { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--brand-mint); margin-bottom: 10px; display: block; font-weight: 600; }
+  .pillar p { color: var(--ink-soft); font-size: 14.75px; margin: 0 0 12px; max-width: 640px; }
+  .pillar-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+  @media (max-width: 640px) { .pillar-grid { grid-template-columns: 1fr; } .pillar { grid-template-columns: 1fr; } .pillar .pnum { display: none; } }
+  .pillar-box { background: var(--surface); border: 1px solid var(--line); border-radius: 3px; padding: 13px 15px; }
+  .pillar-box .lbl { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 5px; }
+  .pillar-box .txt { font-size: 13.75px; color: var(--ink); line-height: 1.5; }
+
+  /* ---------- tables ---------- */
+  .tbl-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: 13.75px; min-width: 560px; }
+  thead th {
+    text-align: left; font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--ink-faint); font-weight: 600;
+    padding: 12px 16px; border-bottom: 1.5px solid var(--line-strong); background: var(--tint);
+  }
+  tbody td { padding: 13px 16px; border-bottom: 1px solid var(--line); color: var(--ink-soft); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody td:first-child { color: var(--ink); font-weight: 600; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .hl-col { background: rgba(46,143,99,0.06); }
+  .pill {
+    display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 20px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; font-weight: 600; letter-spacing: .03em;
+    background: rgba(46,143,99,0.14); color: var(--brand-mid);
+  }
+  :root:not([data-theme="light"]) .pill { color: var(--brand-mint-bright); }
+
+  /* ---------- pricing tiers ---------- */
+  .tiers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 24px; }
+  @media (max-width: 760px) { .tiers { grid-template-columns: 1fr; } }
+  .tier { background: var(--surface); border: 1px solid var(--line); border-radius: 5px; padding: 22px 20px; display: flex; flex-direction: column; }
+  .tier.feat { border-color: var(--brand-mint); box-shadow: 0 0 0 1px var(--brand-mint); }
+  .tier .tname { font-family: 'Source Serif 4', serif; font-size: 19px; font-weight: 600; margin-bottom: 3px; }
+  .tier .tfor { font-size: 12.5px; color: var(--ink-faint); margin-bottom: 16px; }
+  .tier .tprice { font-family: 'IBM Plex Mono', monospace; font-size: 22px; font-weight: 600; color: var(--brand-mint); margin-bottom: 2px; }
+  .tier .tprice small { font-size: 12px; color: var(--ink-faint); font-weight: 500; }
+  .tier ul { list-style: none; margin: 16px 0 0; padding: 0; border-top: 1px solid var(--line); padding-top: 14px; flex: 1; }
+  .tier li { font-size: 13.25px; color: var(--ink-soft); padding: 5px 0 5px 18px; position: relative; }
+  .tier li::before { content: "—"; position: absolute; left: 0; color: var(--ink-faint); }
+
+  /* ---------- chart ---------- */
+  .chart-card { background: var(--surface); border: 1px solid var(--line); border-radius: 5px; padding: 26px 26px 20px; }
+  .bar-row { display: grid; grid-template-columns: 118px 1fr; align-items: center; gap: 14px; margin-bottom: 18px; }
+  .bar-row .rlabel { font-size: 13px; font-weight: 600; color: var(--ink); }
+  .bar-row .ryear { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--ink-faint); display: block; margin-top: 2px; text-transform: uppercase; letter-spacing: .05em; }
+  .stack { display: flex; height: 30px; border-radius: 3px; overflow: hidden; background: var(--tint); }
+  .seg { height: 100%; display: flex; align-items: center; justify-content: center; font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600; color: #fff; min-width: 0; }
+  .seg span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 6px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 18px 22px; margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }
+  .legend .item { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--ink-soft); }
+  .legend .sw { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+  .chart-note { font-size: 12px; color: var(--ink-faint); margin-top: 14px; }
+
+  /* ---------- roadmap ---------- */
+  .phases { display: grid; grid-template-columns: 1fr; gap: 0; border-left: 2px solid var(--line-strong); margin-left: 6px; }
+  .phase { position: relative; padding: 4px 0 30px 28px; }
+  .phase:last-child { padding-bottom: 4px; }
+  .phase::before {
+    content: ""; position: absolute; left: -7px; top: 6px; width: 12px; height: 12px;
+    border-radius: 50%; background: var(--surface); border: 2.5px solid var(--brand-mint);
+  }
+  .phase .pwhen { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--brand-mint); font-weight: 600; margin-bottom: 4px; }
+  .phase h4 { font-size: 16px; margin: 0 0 6px; font-weight: 600; font-family: 'Source Serif 4', serif; }
+  .phase p { font-size: 14px; color: var(--ink-soft); margin: 0; max-width: 620px; }
+
+  /* ---------- risk list ---------- */
+  .risk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 680px) { .risk-grid { grid-template-columns: 1fr; } }
+  .risk { background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 16px 18px; }
+  .risk .rtitle { font-size: 13.75px; font-weight: 600; color: var(--ink); margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+  .risk .rtitle .dot { width: 7px; height: 7px; border-radius: 50%; background: #d03b3b; flex-shrink: 0; }
+  :root:not([data-theme="light"]) .risk .rtitle .dot { background: #e66767; }
+  .risk p { font-size: 13px; color: var(--ink-soft); margin: 0; }
+
+  /* ---------- closing ---------- */
+  .closing {
+    background: var(--brand-deep); color: #eef6f1; border-radius: 5px; padding: 38px 40px; margin-top: 8px;
+  }
+  .closing p { color: #cfe4d8; font-size: 15.5px; max-width: 640px; margin: 0; }
+  .closing p strong { color: #fff; }
+
+  footer.rfooter {
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--line);
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--ink-faint);
+  }
+
+  @media (prefers-reduced-motion: no-preference) { a, .toc a { transition: color .15s, background .15s; } }
+  ::selection { background: rgba(46,143,99,0.28); }
+</style>
+
+<div class="report">
+
+  <header class="cover">
+    <div class="mark">PayChain · Strategy &amp; Finance</div>
+    <h1>A revenue model built on merchants doing well — not on merchants paying more.</h1>
+    <p class="sub">A proposal for diversifying PayChain's revenue beyond transfer markups, without touching the two things merchants already trust: free money-in, and no surprise fees.</p>
+    <div class="meta">
+      <div><div class="k">Prepared for</div><div class="v">PayChain Leadership</div></div>
+      <div><div class="k">Scope</div><div class="v">Revenue model &amp; merchant pricing</div></div>
+      <div><div class="k">Status</div><div class="v">For internal discussion</div></div>
+      <div><div class="k">Version</div><div class="v">1.0</div></div>
+    </div>
+  </header>
+
+  <nav class="toc">
+    <a href="#summary"><span class="n">01</span>Executive Summary</a>
+    <a href="#today"><span class="n">02</span>Where PayChain Stands Today</a>
+    <a href="#model"><span class="n">03</span>The Proposed Model</a>
+    <a href="#merchant"><span class="n">04</span>Merchant Value</a>
+    <a href="#pricing"><span class="n">05</span>Pricing Structure</a>
+    <a href="#mix"><span class="n">06</span>Illustrative Revenue Mix</a>
+    <a href="#roadmap"><span class="n">07</span>Roadmap</a>
+    <a href="#risk"><span class="n">08</span>Risk &amp; Compliance</a>
+    <a href="#close"><span class="n">09</span>Recommendation</a>
+  </nav>
+
+  <!-- 01 — SUMMARY -->
+  <section id="summary">
+    <div class="sec-head"><span class="num">01</span><h2>Executive Summary</h2><span class="tag">Overview</span></div>
+    <div class="col">
+      <p class="lede">Today, PayChain earns almost entirely from one thing: a markup layered onto the real NCBA/Safaricom cost of money leaving a merchant's account. Money coming in stays free. That's a genuinely merchant-friendly design worth keeping — but it's also thin, and it caps PayChain's revenue at a small slice of the value it actually creates: real-time visibility into every merchant's cash flow, the same data a bank would spend months underwriting for.</p>
+      <p>This report proposes four revenue pillars, layered on top of the current model rather than replacing it: <strong>priced-right transfers</strong> (fixed and already live), <strong>embedded working capital</strong>, <strong>shared float yield</strong>, and a <strong>Growth tier</strong> for scaling merchants. Each is designed so PayChain earns more only when the merchant is better off, better served, or growing — never by extracting more from a transaction that hasn't changed.</p>
+    </div>
+  </section>
+
+  <!-- 02 — TODAY -->
+  <section id="today">
+    <div class="sec-head"><span class="num">02</span><h2>Where PayChain Stands Today</h2><span class="tag">Diagnosis</span></div>
+    <div class="col">
+      <p>PayChain's ledger is built on a simple, honest rule: <strong>money in is free</strong> — Safaricom takes its own cut from the paying customer, and PayChain earns nothing directly on a collection. <strong>Money out carries a fee</strong> — on every payout (mobile withdrawal, PesaLink, RTGS, KPLC/NCWSC bills, Lipa na M-Pesa B2B), the merchant pays NCBA or Safaricom's real pass-through cost, plus PayChain's own kept margin, shown side by side rather than blended into one opaque number.</p>
+      <p>It's a fair structure, and it's a real point of difference from a bank account that charges for both directions. But it is a <strong>single-lever</strong> model — the only way revenue grows is more transfer volume at the same thin per-transaction margin.</p>
+    </div>
+    <div class="callout">
+      <div class="ico">Case in point</div>
+      <div>
+        <p>A recent audit found that <strong>Excise Duty</strong> — KRA's tax on bank transfer fees, roughly a fifth of NCBA's own charge — had never been priced into PayChain's margin. On the highest-volume rails, that tax alone was quietly erasing most of the kept markup on every transfer. It's now corrected, but it's the clearest illustration of the ceiling on a single-lever model: a cost nobody modeled can silently outrun the only revenue line that exists to absorb it.</p>
+        <p>The fix going forward isn't just "price it right once" — it's not depending on one thin, cost-sensitive line to carry the whole business.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 03 — MODEL -->
+  <section id="model">
+    <div class="sec-head"><span class="num">03</span><h2>The Proposed Model — Four Pillars</h2><span class="tag">Framework</span></div>
+
+    <div class="pillar">
+      <div class="pnum">1</div>
+      <div>
+        <span class="role">Foundation · Live today</span>
+        <h3>Priced-Right Transfers</h3>
+        <p>The current cost-plus model, kept exactly as is in principle — money in free, money out priced transparently — but now with every real cost, including tax, actually built into the margin rather than discovered later. This stays the floor the other three pillars are built on top of, not something they replace.</p>
+        <div class="pillar-grid">
+          <div class="pillar-box"><div class="lbl">Revenue mechanism</div><div class="txt">Per-transaction service fee, cost-plus, disclosed alongside the real third-party charge.</div></div>
+          <div class="pillar-box"><div class="lbl">Merchant sees</div><div class="txt">Exactly what NCBA/Safaricom charged and exactly what PayChain kept — no blended number.</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pillar">
+      <div class="pnum">2</div>
+      <div>
+        <span class="role">New · Highest revenue potential</span>
+        <h3>Embedded Working Capital</h3>
+        <p>PayChain sees a merchant's real daily cash flow before any bank does — every collection, every payout, months of it. That's exactly the signal used to underwrite fast, fairly-priced short-term capital, without a credit bureau check or collateral. Advance a multiple of a merchant's average weekly collections; recover it automatically as a small, fixed percentage of daily inflows, not a fixed monthly instalment — so a slow week never strains the merchant the way a bank loan repayment would.</p>
+        <div class="pillar-grid">
+          <div class="pillar-box"><div class="lbl">Revenue mechanism</div><div class="txt">A one-time origination fee plus a fixed factor rate on the advance — priced in, not compounding.</div></div>
+          <div class="pillar-box"><div class="lbl">Merchant benefit</div><div class="txt">Same-day capital at a fraction of the effective cost of a typical Kenyan mobile-lending app.</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pillar">
+      <div class="pnum">3</div>
+      <div>
+        <span class="role">New · Requires legal review before launch</span>
+        <h3>Shared Float Yield</h3>
+        <p>Merchant balances sit in a pooled NCBA account between the moment they're received and the moment a merchant withdraws them — money that is, today, simply idle. Placing a portion of consistently-idle float in a short-duration, low-risk instrument and sharing part of the yield back to merchants would be a genuinely rare thing for a Kenyan SME account to offer: a balance that earns something, rather than one that sits flat the way every bank current account does.</p>
+        <div class="pillar-grid">
+          <div class="pillar-box"><div class="lbl">Revenue mechanism</div><div class="txt">A spread between the yield earned and the portion PayChain passes back to merchants.</div></div>
+          <div class="pillar-box"><div class="lbl">Before this ships</div><div class="txt">Needs a legal/compliance read on trust-account rules and PayChain's NCBA agreement — see §08.</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pillar">
+      <div class="pnum">4</div>
+      <div>
+        <span class="role">New · Predictable, recurring</span>
+        <h3>Growth Tier</h3>
+        <p>A monthly subscription for merchants who've outgrown pay-as-you-go: a lower blended transfer fee at volume, more Bulk Pay batch headroom, more team seats, and priority support. It rewards exactly the merchants already doing the most volume — the ones currently paying full price on every single transaction regardless of how much of it they send PayChain's way.</p>
+        <div class="pillar-grid">
+          <div class="pillar-box"><div class="lbl">Revenue mechanism</div><div class="txt">Flat monthly fee, recurring, layered on top of (not instead of) usage revenue.</div></div>
+          <div class="pillar-box"><div class="lbl">Merchant benefit</div><div class="txt">Lower effective cost per transaction as they scale, plus better tooling for a growing team.</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 — MERCHANT VALUE -->
+  <section id="merchant">
+    <div class="sec-head"><span class="num">02</span><h2>What This Means for Merchants</h2><span class="tag">Value comparison</span></div>
+    <p class="col">Every pillar above was chosen because it survives one test: does PayChain only earn more when the merchant is genuinely better off? The table below is the honest before/after.</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th style="width:22%">Aspect</th><th>Today</th><th class="hl-col">Proposed</th></tr></thead>
+        <tbody>
+          <tr><td>Money in</td><td>Free — unchanged</td><td class="hl-col">Stays free. This is not up for negotiation.</td></tr>
+          <tr><td>Money out</td><td>Cost-plus markup</td><td class="hl-col">Same, now with every real cost correctly priced in</td></tr>
+          <tr><td>Access to capital</td><td>None through PayChain</td><td class="hl-col">Same-day advance against their own transaction history</td></tr>
+          <tr><td>Idle balance</td><td>Earns nothing</td><td class="hl-col">Shares in yield on pooled float, pending compliance review</td></tr>
+          <tr><td>Cost at scale</td><td>Flat fee regardless of volume</td><td class="hl-col">Lower blended fee available via Growth tier</td></tr>
+          <tr><td>Fee visibility</td><td>Full detail is admin-only</td><td class="hl-col">A simplified "why this fee" breakdown surfaced to the merchant directly</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 05 — PRICING -->
+  <section id="pricing">
+    <div class="sec-head"><span class="num">05</span><h2>Pricing Structure</h2><span class="tag">Illustrative</span></div>
+    <p class="col">A starting shape for three tiers — figures below are directional, not final; Growth and Enterprise pricing should be validated against real support-cost and margin data before locking a number.</p>
+    <div class="tiers">
+      <div class="tier">
+        <div class="tname">Starter</div>
+        <div class="tfor">Pay-as-you-go · every merchant today</div>
+        <div class="tprice">KES 0<small> /mo</small></div>
+        <ul>
+          <li>Free money-in, always</li>
+          <li>Standard cost-plus rates on every rail</li>
+          <li>Full fee breakdown on request</li>
+          <li>No commitment, no minimum volume</li>
+        </ul>
+      </div>
+      <div class="tier feat">
+        <div class="tname">Growth</div>
+        <div class="tfor">Merchants doing regular volume</div>
+        <div class="tprice">KES 2,500<small> /mo, illustrative</small></div>
+        <ul>
+          <li>Reduced service fee across all rails</li>
+          <li>Higher Bulk Pay batch limits</li>
+          <li>Additional team seats included</li>
+          <li>Priority support queue</li>
+          <li>Eligible for working-capital advances first</li>
+        </ul>
+      </div>
+      <div class="tier">
+        <div class="tname">Enterprise</div>
+        <div class="tfor">High-volume &amp; multi-branch merchants</div>
+        <div class="tprice">Custom</div>
+        <ul>
+          <li>Negotiated rail-by-rail pricing</li>
+          <li>Dedicated relationship manager</li>
+          <li>Service-level commitment</li>
+          <li>Volume-based float-yield share</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 06 — MIX CHART -->
+  <section id="mix">
+    <div class="sec-head"><span class="num">06</span><h2>Illustrative Revenue Mix</h2><span class="tag">Directional, not a forecast</span></div>
+    <p class="col">A single-lever model against a four-lever one, shown as share of total revenue. These proportions are illustrative — meant to show the shape of the shift, not a committed target.</p>
+    <div class="chart-card">
+      <div class="bar-row">
+        <div><span class="rlabel">Today</span><span class="ryear">Current state</span></div>
+        <div class="stack">
+          <div class="seg" style="width:95%; background:var(--series-1);"><span>Transfer markups · 95%</span></div>
+          <div class="seg" style="width:5%; background:var(--ink-faint);"><span></span></div>
+        </div>
+      </div>
+      <div class="bar-row">
+        <div><span class="rlabel">Target</span><span class="ryear">~18 months</span></div>
+        <div class="stack">
+          <div class="seg" style="width:55%; background:var(--series-1);"><span>Transfers · 55%</span></div>
+          <div class="seg" style="width:25%; background:var(--series-2);"><span>Capital · 25%</span></div>
+          <div class="seg" style="width:10%; background:var(--series-3);"><span>Growth tier · 10%</span></div>
+          <div class="seg" style="width:10%; background:var(--series-4);"><span>Float · 10%</span></div>
+        </div>
+      </div>
+      <div class="legend">
+        <div class="item"><span class="sw" style="background:var(--series-1);"></span>Transfer markups</div>
+        <div class="item"><span class="sw" style="background:var(--series-2);"></span>Embedded working capital</div>
+        <div class="item"><span class="sw" style="background:var(--series-3);"></span>Growth tier subscriptions</div>
+        <div class="item"><span class="sw" style="background:var(--series-4);"></span>Shared float yield</div>
+        <div class="item"><span class="sw" style="background:var(--ink-faint);"></span>Other (invoicing, FX)</div>
+      </div>
+      <p class="chart-note">Illustrative mix only — not an audited forecast. Actual proportions depend on advance uptake, Growth-tier adoption, and the outcome of the float-yield compliance review in §08.</p>
+    </div>
+  </section>
+
+  <!-- 07 — ROADMAP -->
+  <section id="roadmap">
+    <div class="sec-head"><span class="num">07</span><h2>Implementation Roadmap</h2><span class="tag">Phased</span></div>
+    <div class="phases">
+      <div class="phase">
+        <div class="pwhen">Phase 1 · Now</div>
+        <h4>Foundation</h4>
+        <p>Cost-correct transfer pricing and merchant-facing fee transparency (already underway). Launch the Growth tier using the Bulk Pay and Team infrastructure that already exists — the fastest pillar to ship, since it needs no new underwriting or compliance work.</p>
+      </div>
+      <div class="phase">
+        <div class="pwhen">Phase 2 · Next</div>
+        <h4>Working Capital Pilot</h4>
+        <p>Pilot embedded advances with a small cohort of merchants who already have months of transaction history on the platform. Underwrite conservatively — a fixed multiple of proven average weekly collections, never a guess — and repay automatically as a share of daily inflows.</p>
+      </div>
+      <div class="phase">
+        <div class="pwhen">Phase 3 · Later</div>
+        <h4>Float Yield, If Cleared</h4>
+        <p>Legal and compliance review of float-yield sharing runs in parallel with Phase 2. If it clears, pilot with a small merchant set before any wider rollout. Expand working-capital eligibility as underwriting data accumulates.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 08 — RISK -->
+  <section id="risk">
+    <div class="sec-head"><span class="num">08</span><h2>Risk &amp; Compliance</h2><span class="tag">Read before building</span></div>
+    <div class="risk-grid">
+      <div class="risk">
+        <div class="rtitle"><span class="dot"></span>Responsible underwriting</div>
+        <p>Advance limits must be tied to a merchant's proven cash flow, not an aspirational one — over-extending a thin-margin merchant is the one outcome that breaks the trust this whole model depends on.</p>
+      </div>
+      <div class="risk">
+        <div class="rtitle"><span class="dot"></span>Float-yield legality</div>
+        <p>Requires a proper legal read on trust-account rules, PayChain's NCBA agreement, and whatever licensing posture applies before a single shilling of merchant float is placed anywhere.</p>
+      </div>
+      <div class="risk">
+        <div class="rtitle"><span class="dot"></span>Subscription unit economics</div>
+        <p>Growth-tier pricing above is a starting point, not a locked number — validate against real support cost and the actual margin given up per discounted transaction before publishing a rate card.</p>
+      </div>
+      <div class="risk">
+        <div class="rtitle"><span class="dot"></span>Free money-in is not negotiable</div>
+        <p>It's core to the value proposition and a real point of difference from a bank account. No pillar in this report should ever be allowed to erode it.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 09 — CLOSE -->
+  <section id="close">
+    <div class="sec-head"><span class="num">09</span><h2>Recommendation</h2><span class="tag">Closing</span></div>
+    <div class="closing">
+      <p>Ship Phase 1 first — it requires no new risk, no new compliance work, and rewards PayChain's best merchants immediately. <strong>Every pillar after that should earn its place the same way: revenue that grows because merchants are growing, never revenue that grows by charging the same merchant more for the same transaction.</strong> That's the version of this business that keeps compounding — merchants stay because the fees are fair, and the fees can afford to stay fair because the business no longer depends on only one of them.</p>
+    </div>
+  </section>
+
+  <footer class="rfooter">
+    <span>PayChain — Revenue Model Proposal</span>
+    <span>v1.0 · For internal discussion</span>
+  </footer>
+
+</div>
